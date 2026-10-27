@@ -156,7 +156,7 @@ repository-root/
 │   ├── contracts/                 # Shared browser-safe application schemas/types
 │   ├── api-client/                # Framework-free API/native transport client
 │   └── player/                    # Framework-free playback from supplied sources
-├── supabase/                      # Application-owned schemas and migrations
+├── supabase/                      # Local service config; application-owned schemas/migrations
 ├── test/                          # Cross-app journeys and release smoke checks
 ├── scripts/                       # Development, setup and verification commands
 ├── docs/                          # Architecture, specs and operating guidance
@@ -356,7 +356,7 @@ Validate required provider configuration before calls and report missing credent
 
 ### Local Dev
 
-Everyday development is local web/backend against dedicated development Supabase and private R2, not production resources and not a selected all-local service replacement. Tests use isolated real Postgres, controlled external responses and synthetic/licensed media; never customer data or ignored private demo assets.
+Everyday development uses local web/backend and a **Workprint-only local Supabase CLI/Docker stack**, as approved on 2026-10-27. This supplies real Supabase Auth/Postgres, not mocked identity or a custom auth service. Use unused ports, separate setup/serving database roles and ignored private configuration; two synthetic local test accounts may be provisioned through supported local setup outside the product. Do not alter other projects' stacks or hosted/production resources. Automated persistence/recovery tests use isolated real Postgres separate from the everyday-development stack, with actual local Supabase token verification where authentication is under test. Private R2 remains a separately qualified prerequisite for later media work, not Sprint 001. Tests use controlled external responses and synthetic/licensed media; never customer data or ignored private demo assets.
 
 P1-S1 supplies pinned Node/pnpm, a deterministic lockfile, credential-free examples and pre-admission environment validation. FFmpeg/ffprobe is required for media work; Docker supports isolated database tests; Supabase tooling supports owned schema development. Target commands from the repository root are:
 
