@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { spawn } from 'node:child_process';
 
-const compile = spawnSync('tsc', ['-p', 'apps/api/tsconfig.json'], { stdio: 'inherit' });
+const compile = spawnSync(process.execPath, ['scripts/test.mjs', 'compile'], { stdio: 'inherit' });
 if (compile.status !== 0) process.exit(compile.status ?? 1);
 const child = spawn(process.execPath, ['apps/api/.test-build/test/local-database.js'], { stdio: 'inherit' });
 process.on('SIGINT', () => child.kill('SIGINT'));

@@ -97,7 +97,7 @@ export async function isolatedPostgres() {
     const setupUrl = `postgresql://wp_setup:${setupPassword}@127.0.0.1:${port}/workprint`;
     const servingUrl = `postgresql://wp_serving:${servingPassword}@127.0.0.1:${port}/workprint`;
     return {
-      setupUrl, servingUrl, close,
+      setupUrl, servingUrl, adminUrl: adminDatabase, close,
       async terminateServingConnection(pid: number) {
         if (!Number.isInteger(pid) || pid < 1) throw new Error('Invalid fixture backend PID');
         const result = await query(adminDatabase, `SELECT pg_terminate_backend(pid) AS terminated FROM pg_stat_activity WHERE pid = ${pid} AND datname = current_database() AND usename = 'wp_serving' AND state = 'idle'`);
