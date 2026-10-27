@@ -85,9 +85,14 @@ test('built admission verifies Supabase accounts, rejects forged/expired tokens 
   // The separately authorized CLI stack's signing secret creates a genuinely signed expired token.
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
   const tokenParts = identities[0]!.access_token.split('.');
-  assert.ok(createHmac('sha256', signingKey).update(tokenParts.slice(0, 2).join('.')).digest('base64url') === tokenParts[2],
-    'Signing fixture must match the fresh real token, so expiry rejection cannot pass with a wrong key');
   const tokenPayload = JSON.parse(Buffer.from(tokenParts[1]!, 'base64url').toString()) as Record<string, unknown>;
+  const signingControlPayload = `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode(tokenPayload)}`;
+  const signingControl = `${signingControlPayload}.${createHmac('sha256', signingKey).update(signingControlPayload).digest('base64url')}`;
+  const controlResponse = await fetch(`${origin}/__auth_probe`, {
+    headers: { Authorization: `Bearer ${signingControl}` }, signal: AbortSignal.timeout(4000),
+  });
+  assert.equal(controlResponse.status, 200, 'Actual Supabase must accept the signing control before expiry rejection counts');
+  assert.deepEqual(await controlResponse.json(), { accountId: identities[0]!.user.id });
   const payload = `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ ...tokenPayload, exp: Math.floor(Date.now() / 1000) - 60, iat: Math.floor(Date.now() / 1000) - 120 })}`;
   const expired = `${payload}.${createHmac('sha256', signingKey).update(payload).digest('base64url')}`;
   const forged = `${identities[0]!.access_token.split('.').slice(0, 1).join('.')}.${encode({ sub: identities[1]!.user.id, exp: 9999999999 })}.${identities[0]!.access_token.split('.')[2]}`;
@@ -139,7 +144,7 @@ test('built admission verifies Supabase accounts, rejects forged/expired tokens 
   await production.stop();
   for (const name of ['probe.log', 'production.log', 'probe-build.log', 'production-build.log', 'failure.log', 'malformed.log', 'stall.log', 'body-stall.log']) {
     const log = await readFile(join(fixture.logs, name), 'utf8');
-    for (const secret of [sentinel, signingKey, config.anonKey, config.servingUrl, new URL(config.servingUrl).password, ...config.accounts.map((account) => account.password), ...identities.map((identity) => identity.access_token)]) assert.ok(!log.includes(secret));
+    for (const secret of [sentinel, signingKey, signingControl, expired, config.anonKey, config.servingUrl, new URL(config.servingUrl).password, ...config.accounts.map((account) => account.password), ...identities.map((identity) => identity.access_token)]) assert.ok(!log.includes(secret));
   }
   await fixture.noNetwork();
 });
