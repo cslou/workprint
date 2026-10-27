@@ -30,4 +30,6 @@ Work from the repository root and start with [README.md](README.md). This is a f
 - This repository is public. Stage explicit task-owned paths; preserve unrelated changes. Never commit secrets, ignored planning, generated/private material or assets without redistribution rights. Keep generated work under ignored `outputs/` and retain honest placeholder/provenance labels in design references.
 - Use feature branches and PR delivery; never push directly to the target branch or rewrite published review history. Ignoring sprint/spec records does not silently waive any delivery procedure requiring them: resolve that planning/delivery mismatch before implementation rather than force-publishing private documents.
 
-Public document navigation will be completed with the remaining migration chunks. Do not start the application sprint as part of this documentation migration.
+## Public references
+
+Use [production terminology](CONTEXT.md), [architecture background](docs/architecture.md) and [product vision](docs/litepaper.md) for their stated purposes. Public design navigation will be added with the final migration chunk. Do not start the application sprint as part of this documentation migration.

@@ -16,7 +16,15 @@ TypeScript, React/Vite/React Aria, one Mastra backend, Supabase Auth/Postgres an
 
 Work from the repository root. Setup, dependency versions and verification commands will be documented when their owning implementation is delivered; do not assume an application scaffold exists.
 
-Public product/architecture references will be added in the next migration chunk, followed by the design/brand-book bundle last. Local specs, sprints and selected research are intentionally gitignored and are not included in public clones. Maintainers must supply those files separately before dependent implementation; Git is not their backup.
+Local specs, sprints and selected research are intentionally gitignored and are not included in public clones. Maintainers must supply those files separately before dependent implementation; Git is not their backup.
+
+## Documentation
+
+- [Architecture background](docs/architecture.md) and [short overview](docs/architecture-lite.md) — intended technical direction, with current-MVP precedence over earlier broad examples.
+- [Product strategy litepaper](docs/litepaper.md) — longer-term vision and unvalidated hypotheses, not a release checklist.
+- [Production terminology](CONTEXT.md) — canonical distinctions for planning and review.
+
+The public design/brand-book bundle is the final migration chunk; it is reference material, not application code.
 
 ## Configuration and safety
 
