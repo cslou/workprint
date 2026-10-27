@@ -48,6 +48,7 @@ function run(command, args, cwd = '.', childEnv = env) {
   });
 }
 try {
+  if (task === 'build') await run('tsc', ['-p', 'packages/api-client/tsconfig.json']);
   if (task === 'build' || task === 'db:prepare') {
     rmSync('apps/api/dist', { recursive: true, force: true });
     await run('tsc', ['-p', 'apps/api/tsconfig.build.json']);

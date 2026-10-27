@@ -1,6 +1,60 @@
-# Native runtime qualification — foundation
+# Native runtime qualification
 
-## Scope and evidence identity
+## Story 2 — current authenticated native transport
+
+This section supersedes the historical Story 1 capability/prerequisite limits below. It is bounded implementer evidence, not independent acceptance. The PR identifies the documentation-inclusive revision and final checks. No live Muse/provider call, workflow/process-recovery qualification, media feature, hosted service or UI approval is claimed.
+
+### Composition and dependencies
+
+`apps/api/src/mastra/backend.ts` composes one Mastra instance, one restricted caller-owned Postgres pool/store, one assistant and actual Supabase Auth. Ordinary `index.ts` supplies no model; send/queue fail before native input persistence. Only `apps/api/test/native-runtime/` injects the deterministic model into the same factory. It is separately built in a temporary test workspace, never imported by production. No provider flags, qualification endpoint, new conversation store, scheduler, stream protocol or execution loop are added.
+
+New exact dependencies (existing cohort unchanged):
+
+| Dependency | Version | Purpose |
+| --- | --- | --- |
+| `@mastra/memory` | 1.39.0 | Supported agent memory with native Postgres thread/message persistence |
+| `@mastra/client-js` | 1.56.0 | Supported conversation HTTP methods, native stream parser/subscription and public types in the browser-safe `@workprint/api-client` package |
+| `@supabase/supabase-js` | 2.118.0 | Actual server-side `auth.getUser(token)` and isolated local-test account/sign-in setup; no mock identity |
+| Supabase CLI (external prerequisite) | 2.84.2 | Dedicated local Auth/Postgres stack; not an application runtime or global tool upgrade |
+
+The same local Node/TypeScript/Mastra core/CLI/pg pins below are retained. Dependency audits are rerun without advisory suppression; current delivered-revision findings belong in the PR rather than the historical Story 1 zero-finding count.
+
+### Local target, Auth and ownership
+
+`pnpm local:prepare` uses only recorded project `workprint-sprint001` and API/DB/shadow ports 55431/55432/55435, refusing initial port conflicts/unrecorded resources. It preserves the everyday development stack and generated credentials. It creates two synthetic local identities outside production and initializes native stores with separate setup/serving roles. CLI output containing credentials is captured, not printed. See README for private files, repeat setup, exact-project stop and fixture lifecycle. Tests use **new isolated Postgres fixtures**, not development conversation records; only actual local Auth is shared. No application-owned schema is introduced.
+
+`SUPABASE_URL` requires `SUPABASE_SECRET_KEY`; missing/invalid URL-associated configuration is a sanitized startup failure. Without a URL, conversation routes stay closed even if an unused key is present: key presence cannot enable a capability. Every admitted conversation request verifies the actual token with Supabase before ownership/storage work. Native auth is also configured; config middleware authenticates itself because this CLI executes it before route auth. Only the verified user ID grants native ownership. SDK `resourceId` is a required protocol claim, checked against that ID, never authority. Foreign thread/history/send/queue/subscribe/abort return non-disclosing 404; mismatched owner claims return 403. Missing, malformed and genuinely expired tokens return 401. Reserved context and arbitrary execution/model options are rejected (400).
+
+### Observed supported surface and shapes
+
+`createConversationClient({ baseUrl, resourceId, getToken })` is a thin typed SDK adapter with retries disabled and bounded ordinary calls. It exposes create/list/load/history/send/queue/subscribe/stop, not a replacement protocol. It requests the current token per call. Native subscription uses the SDK parser; cancellation is observer disconnect, not Stop.
+
+| Native HTTP interface | Observed contract |
+| --- | --- |
+| GET `/health` | Public native `200 { success: true }` |
+| POST `/api/memory/threads` | `resourceId`, optional bounded title and `agentId: assistant`; native `createdAt,id,resourceId,title,updatedAt` |
+| GET `/api/memory/threads` | Owned pagination only; `hasMore,page,perPage,threads,total` |
+| GET `/api/memory/threads/:id` | Owned native thread; load also exposes native `metadata` |
+| GET `/api/memory/threads/:id/messages` | Native `hasMore,messages,page,perPage,total,uiMessages`; no invented response mapping |
+| POST `/api/agents/assistant/send-message` and `/queue-message` | Bounded text, UUID thread/resource IDs; distinct signal/run identities and ordered queue execution in controlled composition; ordinary composition returns explicit 503 |
+| POST `/api/agents/assistant/threads/subscribe` | SDK-supported history/replay then native live chunks; detach/reconnect does not resend input or invoke another model |
+| POST `/api/agents/assistant/threads/abort` | Owned UUID thread plus mandatory exact `expectedRunId`; stale run returns false, current run true |
+
+Only these intended methods/shapes are admitted. Framework agent listing/generate/stream/signals/recovery/model changes, workflows, tools, logs, Swagger/OpenAPI and test-control routes were requested with real valid Auth and returned 404. No assistant messages were saved by rejected/unavailable sends. SDK rejections settled within request bounds. Backend logs were checked for actual local keys, account credentials and issued tokens, not only sentinel strings.
+
+### Native outcomes, limitations and verification design
+
+The controlled HTTP case uses real local Auth, a built native server, actual isolated Postgres and the public client. Deterministic file readiness/release barriers control generation; barriers/providers exist only in test composition. It observes streamed text; queues input while the first run is held; detaches and reconnects with history without another send/call; releases ordered successful runs; checks actual saved history; rejects stale Stop and aborts the exact third run. Exactly three controlled streaming calls are expected; optional nonstreaming generate is an explicit failure. Saved native input roles are `signal`, not an application-invented user protocol.
+
+Successful runs emit native finish; interrupted work emits native abort/`finishReason: aborted`, not a completed finish. Native storage can retain partial assistant text on abort. **Saved assistant content alone does not prove completion**: history is native saved content, not a durable product-level completion/approval classification. Stop is not observer disconnect and neither cancels independent workflows. This proof does not establish process-restart recovery, durable workflow status, transaction-pooler/TLS behavior, live-model compatibility or product rendering semantics.
+
+Verification was designed as two actual HTTP cases: owned saved history plus Auth/security/explicit failures; and controlled native stream/queue/reconnect/Stop. All seven foundation cases remain. The aggregate runs nine cases once; native selects two, security selects its original five plus the shared Auth/native case. Genuine expiry uses the unchanged previously accepted token and waits past the service-issued expiry; the real Auth service must reject it specifically for expiration, then native HTTP must return 401. It is not a wrong-signature shortcut. Default local token lifetime is 60s; auto-refresh is disabled only in test sign-ins.
+
+Working-tree red/green evidence under `/tmp/workprint-s2-logs/`: initial native declarations/build failures (`08`–`10`), corrected actual Auth proof (`13-native-checkpoint.log`), controlled-model strict optional typing red (`15-stream-checkpoint.log`), two native cases passing (`16-stream-checkpoint.log`), and expanded natural-expiry/foreign-action/production-route matrix passing (`19-auth-exposure.log`). The latter runtime passed while its separate compile exposed TS7022 on two inferred Response variables; those now have explicit public `Response` annotations. These are checkpoint observations, not substitutes for final committed-head checks. The final PR records full retained results, failures/corrections if any, exact revision and audit. Documentation received editorial consistency review; no prose-presence tests were added.
+
+## Historical Story 1 foundation evidence
+
+### Scope and evidence identity
 
 This is **Story 1 / P1-S1 foundation evidence**, not acceptance of Auth, conversations, history, streaming, Stop, independent workflows, process recovery or a live Muse integration. One exported `Mastra` instance owns the backend; no Agent, provider, workflow, telemetry exporter or alternative server/store/runner is registered. The browser is a minimal React shell, not an approved product design.
 
