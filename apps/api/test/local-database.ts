@@ -15,6 +15,7 @@ const stopped = new Promise<void>((resolve) => {
 const db = await isolatedPostgres();
 const contents = `DATABASE_URL=${db.servingUrl}\nMIGRATION_DATABASE_URL=${db.setupUrl}\nDEFAULT_ASSISTANT_MODEL=unqualified/disabled\n`;
 let written = false;
+let keepAlive: ReturnType<typeof setInterval> | undefined;
 try {
   await writeFile(file, contents, { flag: 'wx', mode: 0o600 });
   written = true;
@@ -27,10 +28,11 @@ try {
   console.info('Isolated database ready. In another terminal:');
   console.info('WORKPRINT_ENV_FILE=outputs/local-database.env pnpm dev');
   console.info('Ctrl-C here stops only this fixture and removes its unchanged environment file. Data is ephemeral.');
-  process.stdin.resume();
+  // A closed/ignored stdin must not let Node exit before fixture-owned teardown.
+  keepAlive = setInterval(() => {}, 60000);
   await stopped;
 } finally {
-  process.stdin.pause();
+  clearInterval(keepAlive);
   await db.close();
   if (written) {
     if (await readFile(file, 'utf8') === contents) await unlink(file);

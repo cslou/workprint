@@ -33,7 +33,7 @@ export async function isolatedPostgres() {
   const close = async () => {
     const label = await docker('inspect', '--format', '{{index .Config.Labels "workprint.fixture"}}', id);
     if (label !== owner) throw new Error('Refusing cleanup: fixture ownership mismatch');
-    await docker('stop', '--time', '5', id);
+    await docker('stop', '--timeout', '5', id);
   };
   try {
     const mapping = await docker('port', id, '5432/tcp');

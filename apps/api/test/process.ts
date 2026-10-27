@@ -74,4 +74,3 @@ export async function unusedPort() {
   await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   return address.port;
 }
-
