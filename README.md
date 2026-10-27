@@ -20,7 +20,7 @@ Local specs, sprints and selected research are intentionally gitignored and are 
 
 ## Documentation
 
-- [Architecture background](docs/architecture.md) and [short overview](docs/architecture-lite.md) — intended technical direction, with current-MVP precedence over earlier broad examples.
+- [Architecture background](docs/architecture.md) — intended technical direction, with current-MVP precedence over earlier broad examples.
 - [Product strategy litepaper](docs/litepaper.md) — longer-term vision and unvalidated hypotheses, not a release checklist.
 - [Production terminology](CONTEXT.md) — canonical distinctions for planning and review.
 

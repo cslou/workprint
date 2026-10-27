@@ -6,8 +6,6 @@
 
 The detailed lifecycle, API inventory and module notes below retain the earlier broader architecture for rationale, not additional current requirements. References to deferred behavior, the earlier folder layout or still-pending B-020 are historical. Current modules also include `application`, `contracts`, `exports`, `usage` and configuration-only `model-catalog`; assistant bindings live under `agent/mastra`, separate from backend `mastra` composition, in one instance. Both modules and native behavior are qualified through the owning implementation stories. Obtain the approved local plan before implementing; do not infer contracts from these background examples.
 
-[Architecture — lite](architecture-lite.md) summarizes this direction, its application operations, component boundaries and open decisions.
-
 ## Contents
 
 1. [Film production lifecycle](#film-production-lifecycle)
