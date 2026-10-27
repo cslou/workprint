@@ -15,7 +15,8 @@
     "test": "node scripts/test.mjs",
     "test:smoke": "node scripts/test.mjs smoke",
     "test:security": "node scripts/test.mjs security",
-    "test:contracts": "node scripts/test.mjs contracts"
+    "test:contracts": "node scripts/test.mjs contracts",
+    "qualify:ingress": "node scripts/test.mjs ingress-qualification"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

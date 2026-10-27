@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { test } from 'node:test';
 import { createApiClient } from '@workprint/api-client';
+import { operations } from '@workprint/contracts';
 import { applicationRequests } from './application-requests.js';
 
 test('client bounds transport, headers/body stalls, cancellation and invalid responses; native unavailable never fetches', { timeout: 10000 }, async (t) => {
@@ -23,6 +24,15 @@ test('client bounds transport, headers/body stalls, cancellation and invalid res
   assert.ok(address && typeof address !== 'string');
   const baseUrl = `http://127.0.0.1:${address.port}`;
   const client = (token: string) => createApiClient({ baseUrl, getAccessToken: async () => token, timeoutMs: 100 });
+  const beforeInvalidPaths = requests;
+  for (const id of ['.', '..']) {
+    const input = { ...applicationRequests.workspace, params: { id } };
+    const result = await client('unused').workspace(input);
+    assert.deepEqual(result, { ok: false, error: { code: 'invalid_input', message: 'Invalid application request' } });
+    assert.equal(operations.workspace.request.safeParse(input).success, false);
+    assert.equal(operations.saveVersion.request.safeParse({ ...applicationRequests.saveVersion, body: { ...applicationRequests.saveVersion.body, artifactId: id, dependencies: [id] } }).success, true, 'Non-path opaque IDs remain unrestricted');
+  }
+  assert.equal(requests, beforeInvalidPaths, 'Dot-segment path IDs reject before HTTP');
   for (const token of ['stall', 'body-stall']) {
     const before = Date.now();
     const result = await client(token).library(applicationRequests.library);
