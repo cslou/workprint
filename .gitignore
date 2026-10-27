@@ -15,6 +15,7 @@ build/
 .mastra/
 .vite/
 coverage/
+.test-build/
 *.tsbuildinfo
 
 # Generated work, local evidence and logs.
