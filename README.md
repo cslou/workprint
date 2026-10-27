@@ -28,9 +28,9 @@ The public design/brand-book bundle is the final migration chunk; it is referenc
 
 ## Configuration and safety
 
-The tracked `.env.example` contains only safe configuration notes. Actual credentials belong in ignored `.env`, remain server-side and must never enter browser bundles, prompts, screenshots or logs. No credential has been transferred from the earlier prototype.
+Actual credentials belong in ignored `.env`, remain server-side and must never enter browser bundles, prompts, screenshots or logs. No credential has been transferred from the earlier prototype.
 
-`AI_MODE=off` is the intended default. Controlled test providers are nonproduction-only; live inference and paid media calls require explicit enablement, qualified integrations and applicable human authorization. Adding a key alone enables nothing. This repository does not yet implement those runtime safeguards.
+Automated tests use controlled providers. Real integrations require valid configuration and qualification; credentials do not replace applicable human authorization. These runtime safeguards are not implemented yet.
 
 ## Verification approach
 
