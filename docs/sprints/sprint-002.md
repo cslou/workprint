@@ -88,6 +88,8 @@ Record reference → actual component/page → screenshot pair → result or exp
   3. Record approved reference mappings, deviations and dependency evidence in existing records.
 - **Technical notes:** keep presentation in web; React-free contracts/client stay React-free. Story 1 establishes the browser runner; Story 2 extends it to real backend wiring, avoiding a dependency cycle. No new global state framework is implied.
 
+**Story 1 delivery:** [PR #11](https://github.com/cslou/workprint/pull/11), accepted code head `156b3635b8822e17e5c922e7cda4f23f21c521f8`, merged into sprint-002 at `3dd9cfd816aa8a96c84733d23d8555f21f6fa18e`. Seven independent checks completed with no findings, meta-review 5/5. Current-head aggregate 13/13, browser 5/5, foundation-region visual comparisons 24/24, check/build/frozen install/audit passed; two B-001 ingress leaves still failed separately. Zero pixel drift in compared primitive regions and temporary spacing negative control proved sensitivity. Orchestrator inspected paired desktop opening and narrow viewer screenshots; this is AI inspection, not new human approval. These fixtures are reference-context primitive mounts, not implemented product pages. Main-page human review remains at Phase 2 handoff; absent session/proposal/error/export layouts remain scoped approval gates for their owning slices. Post-merge check passed; complete evidence and gap inventory are in PR #11. No new layout/deviation was approved, no planning file was changed by the worker, and no main merge occurred.
+
 #### Story 2: Browser-to-backend connectivity and scoped request handling (P2-S2a)
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
   - [x] Follows sprint template
