@@ -1,4 +1,5 @@
 import { databaseUrl } from '../db/index.js';
+import { loadSupabaseConfig } from './auth.js';
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -16,5 +17,5 @@ export function loadServerConfig(env: Environment) {
   if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) invalid('PORT');
   if (env.MIGRATION_DATABASE_URL) invalid('MIGRATION_DATABASE_URL must not enter the serving process');
   if (Object.keys(env).some((key) => key.startsWith('VITE_'))) invalid('VITE_* is not server configuration');
-  return { connectionString, model, port: Number(port) };
+  return { connectionString, model, port: Number(port), supabase: loadSupabaseConfig(env) };
 }

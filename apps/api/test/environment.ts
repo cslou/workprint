@@ -26,6 +26,9 @@ export async function environment() {
     MASTRA_SKIP_DOTENV: '1',
     DEFAULT_ASSISTANT_MODEL: 'unqualified/disabled',
     SUPABASE_SECRET_KEY: sentinel,
+    // Health-only fixtures never call Auth. Protected admission has its own real target.
+    SUPABASE_URL: 'http://127.0.0.1:1',
+    SUPABASE_PUBLISHABLE_KEY: 'unused-health-only-key',
   };
   await command(process.execPath, ['--input-type=module', '-e', 'try { await fetch("https://example.invalid"); process.exitCode = 1; } catch {}'], { cwd: root, env, log: join(logs, 'guard-control.log') });
   assert.match(await readFile(networkLog, 'utf8'), /blocked non-loopback/);

@@ -5,6 +5,8 @@ import { loadServerConfig } from './config.js';
 const valid = {
   DATABASE_URL: 'postgresql://serving:local-only@127.0.0.1:5432/workprint',
   DEFAULT_ASSISTANT_MODEL: 'unqualified/disabled',
+  SUPABASE_URL: 'http://127.0.0.1:54321',
+  SUPABASE_PUBLISHABLE_KEY: 'fixture-key',
 };
 
 test('missing or malformed configuration fails without echoing values', () => {
@@ -15,6 +17,13 @@ test('missing or malformed configuration fails without echoing values', () => {
     { ...valid, DEFAULT_ASSISTANT_MODEL: `https://${sentinel}` },
     { ...valid, DEFAULT_ASSISTANT_MODEL: 'test/fake' },
     { ...valid, DATABASE_URL: sentinel },
+    { ...valid, SUPABASE_URL: '' },
+    { ...valid, SUPABASE_URL: 'http://remote.invalid' },
+    { ...valid, SUPABASE_URL: 'https://example.invalid/path' },
+    { ...valid, SUPABASE_URL: `https://key:${sentinel}@example.invalid` },
+    { ...valid, SUPABASE_URL: `https://example.invalid/?key=${sentinel}` },
+    { ...valid, SUPABASE_PUBLISHABLE_KEY: '' },
+    { ...valid, SUPABASE_PUBLISHABLE_KEY: 'invalid\nkey' },
     { ...valid, PORT: '-1' },
     { ...valid, PORT: '4111junk' },
     { ...valid, MIGRATION_DATABASE_URL: valid.DATABASE_URL },
@@ -27,4 +36,5 @@ test('missing or malformed configuration fails without echoing values', () => {
     });
   }
   assert.equal(loadServerConfig(valid).port, 4111);
+  assert.equal(loadServerConfig({ ...valid, SUPABASE_URL: 'https://auth.example.invalid' }).supabase.url, 'https://auth.example.invalid');
 });

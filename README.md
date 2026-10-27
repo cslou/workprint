@@ -4,7 +4,7 @@ A chat-first filmmaking workspace: the assistant prepares the work; the creator 
 
 ## Status
 
-The application foundation supplies a minimal React shell and **one native Mastra backend** backed by Postgres. Only the native `GET /health` endpoint is exposed; assistant, Auth, conversations and filmmaking features are not available yet. Reference screens are not implemented behavior. Muse is the intended model family, not a qualified integration.
+The application foundation supplies a minimal React shell and **one native Mastra backend** backed by Postgres. Only the native `GET /health` endpoint is exposed in production. Backend admission verifies configured Supabase tokens for explicitly registered protected routes; no product routes, sign-in UI, assistant, conversations or filmmaking features are available yet. Reference screens are not implemented behavior. Muse is the intended model family, not a qualified integration.
 
 ## Development
 
@@ -22,8 +22,10 @@ Keep that terminal open. The development-only helper creates a uniquely labelled
 In a second terminal:
 
 ```sh
-WORKPRINT_ENV_FILE=outputs/local-database.env pnpm dev
+SUPABASE_URL=http://127.0.0.1:1 SUPABASE_PUBLISHABLE_KEY=health-only WORKPRINT_ENV_FILE=outputs/local-database.env pnpm dev
 ```
+
+These health-only examples explicitly configure an unreachable loopback Auth target: health never calls Auth and no product route is mounted. This is not a token-verification bypass or a working sign-in configuration. For actual admission, supply your separately authorized Supabase URL and publishable/anon key instead.
 
 Open `http://127.0.0.1:5173`; the backend health endpoint is `http://127.0.0.1:4111/health`. `PORT` and `WEB_PORT` override those loopback ports. Stop the apps first, then Ctrl-C the database helper: it stops only its owned container and removes its unchanged environment file. **Fixture data is temporary and is lost on stop.** If the file was edited, the helper preserves it and reports that fact. After an uncatchable host/process kill, inspect the exact `workprint-fixture-<UUID>` container and its matching `workprint.fixture` label before stopping that container; never reset another stack or prune Docker resources broadly.
 
@@ -31,7 +33,7 @@ To build and serve the built apps while that database helper remains open:
 
 ```sh
 pnpm build
-WORKPRINT_ENV_FILE=outputs/local-database.env pnpm start
+SUPABASE_URL=http://127.0.0.1:1 SUPABASE_PUBLISHABLE_KEY=health-only WORKPRINT_ENV_FILE=outputs/local-database.env pnpm start
 ```
 
 `pnpm start` uses the actual Mastra build output plus Vite preview (a local verification server, not deployment configuration). `pnpm build` needs no database or private environment file. The native production artifact is `apps/api/.mastra/output/`; browser output is `apps/web/dist/`. Setup code is compiled separately into `apps/api/dist/`; test helpers compile only into ignored `.test-build/` and are not part of the native production bundle.
@@ -42,30 +44,31 @@ The isolated fixture is sufficient for this foundation. For separately authorize
 
 `db:prepare` calls **`PostgresStore.init()`**, never application-authored native DDL. There are no application-owned tables or migrations yet. When an owning feature introduces them, use the Supabase CLI migration workflow under `supabase/`, excluding native schemas; do not add a custom SQL migration runner. Shared/production targets still require separate authorization.
 
-Story 2 requires privately supplied dedicated Supabase Auth configuration, two existing authorized test identities, and setup/serving connections identifying the approved target. Do not provision accounts, substitute a trusted-identity bypass, or use an arbitrary shared project. R2, media tooling and real model keys are not prerequisites here.
+Auth qualification requires privately supplied dedicated Supabase Auth configuration, two existing authorized synthetic identities, and restricted serving credentials identifying the approved target. Provisioning/accounts remain outside the product and serving process. Do not substitute a trusted-identity bypass or use an arbitrary shared project. R2, media tooling and real model keys are not prerequisites here.
 
 ## Configuration and safety
 
+- `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` are required backend configuration. Supply a publishable or legacy anon key; no service-role/admin credential is needed. HTTPS is required except on loopback, and URLs cannot contain credentials, paths, query strings or fragments. The single integration calls `GET /auth/v1/user` with the bearer token and API key, uses only the verified user `id`, and has a 2-second deadline including response body. Missing/malformed/invalid/expired tokens receive HTTP 401 `unauthenticated`; verifier failures receive HTTP 503 `integration_failure`. Caller owner claims never supply identity.
 - `DATABASE_URL` is serving-only. `MIGRATION_DATABASE_URL` is setup-only; root development/start commands remove it from the native child environment.
 - `DEFAULT_ASSISTANT_MODEL` is required and checked for `provider/model` identifier syntax before startup. URLs, missing values and test-provider prefixes are rejected. No model is resolved or enabled. The **development fixture only** supplies `unqualified/disabled`, an inert identifier, not a real model, provider or assistant response.
 - Exact Muse IDs, credential names and real-provider compatibility are not yet qualified. No provider SDK/Agent is configured and no missing provider key is silently substituted. Provider-specific credential validation belongs with the actual integration before enabling calls; identifier syntax is not that qualification.
 - Actual credentials belong only in ignored private files/environment, never browser configuration, prompts or logs. Vite receives no backend environment, does not load dotenv files, and restricts development filesystem serving to the web app and installed dependencies—not private research or outputs. There is no public environment contract yet; backend `VITE_*` settings are rejected.
-- Root commands force Mastra telemetry disabled, offline tooling and explicit dotenv handling. Interrupted or failed compilation stops the pipeline; no later build/setup stage may launch. No inference, paid work, telemetry exporter, test provider or qualification endpoint is registered. Credential presence is not call authorization.
+- Root commands force Mastra telemetry disabled, offline tooling and explicit dotenv handling. Interrupted or failed compilation stops the pipeline; no later build/setup stage may launch. No inference, paid work, telemetry exporter, test provider or qualification endpoint is registered in production. A separately built test composition adds a protected identity probe using the same backend admission code; no environment flag enables that probe in the production artifact. Credential presence is not call authorization.
 - Expected idle Postgres disconnects are logged with a sanitized SQLSTATE, not credentials or raw error payloads. The native pool discards failed idle clients and can replace them on demand. Docker fixture cleanup is registered before acquisition, verifies the preselected name/owner and exact ID, explicitly removes never-started owned containers, and retains both acquisition and cleanup errors if ownership cannot be established.
 
 ## Verification
 
 ```sh
 pnpm check
-pnpm test
+WORKPRINT_AUTH_FIXTURE=/absolute/private/auth-fixture.json WORKPRINT_AUTH_SIGNING_FIXTURE=/absolute/private/cli-status.json pnpm test
 pnpm test:smoke
-pnpm test:security
+WORKPRINT_AUTH_FIXTURE=/absolute/private/auth-fixture.json WORKPRINT_AUTH_SIGNING_FIXTURE=/absolute/private/cli-status.json pnpm test:security
 pnpm audit
 ```
 
-`check` runs strict TypeScript, ESLint and dependency-cruiser, including temporary forbidden-import controls removed in `finally` cleanup. `test` compiles TypeScript and runs all implemented `node:test` cases; focused commands select the same cases, not duplicate suites. Smoke exports **committed HEAD** with Git (commit source changes before testing that candidate), installs frozen, builds, initializes fresh isolated storage, serves built/development apps within deadlines, verifies real responses and shuts down owned resources. Security checks configuration rejection, privileges, excluded routes, secret sentinels and absence of observed non-loopback Node network attempts. Missing Docker or other prerequisites fail, not skip. Logs stay in temporary directories named in test output; redirect verbose command output to local log files.
+`check` runs strict TypeScript, ESLint and dependency-cruiser, including temporary forbidden-import controls removed in `finally` cleanup. `test` compiles TypeScript and runs all implemented `node:test` cases; focused commands select the same cases, not duplicate suites. Smoke exports **committed HEAD** with Git (commit source changes before testing that candidate), installs frozen, builds, initializes fresh isolated storage, serves built/development apps within deadlines, verifies real responses and shuts down owned resources. Security checks configuration rejection, privileges, actual Supabase admission, built-HTTP verifier failures/deadlines, excluded routes, secret sentinels and absence of observed non-loopback Node network attempts. The Auth fixture JSON contains `url`, `anonKey` (publishable/legacy anon key), `servingUrl` and two `accounts` with `email`/`password`. The signing fixture is the authorized development CLI status JSON containing `JWT_SECRET`, used only by the harness to construct a signed expired token. Neither private file is copied into builds or inherited by serving. Keep both ignored and mode 0600; never use a hosted/shared project. The harness gets fresh tokens after building, builds probe/production artifacts in owned temporary directories using frozen workspace dependencies, and fails clearly if prerequisites are missing. Smoke uses only explicit health-only loopback configuration and needs no Auth fixture or Supabase service. Missing Docker or other prerequisites fail, not skip. Logs stay in temporary directories named in test output; redirect verbose command output to local log files.
 
-No inherited application tests or behavior existed; application baseline regression is N/A. These checks become regression coverage for later stories. No live AI calls, Auth/account isolation, conversation/recovery qualification, deployed-capacity or product-visual acceptance is claimed.
+No inherited application tests or behavior existed; application baseline regression is N/A. These checks become regression coverage for later stories. The Auth case proves distinct verified identities, not conversation/resource ownership. No live AI calls, conversation/recovery qualification, deployed-capacity or product-visual acceptance is claimed.
 
 ## Documentation
 
