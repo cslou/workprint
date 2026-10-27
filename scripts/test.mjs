@@ -1,6 +1,8 @@
-import { globSync } from 'node:fs';
+import { globSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
+// Never discover stale emitted cases from a different branch or removed source files.
+rmSync('apps/api/.test-build', { recursive: true, force: true });
 const compile = spawnSync('tsc', ['-p', 'apps/api/tsconfig.json'], { stdio: 'inherit' });
 if (compile.status !== 0) process.exit(compile.status ?? 1);
 const group = process.argv[2];
