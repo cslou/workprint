@@ -7,6 +7,10 @@
 # Private research stays local; specs, sprints and design are tracked.
 /docs/research/
 
+# Backlog records stay local for now.
+/docs/backlog.md
+/docs/backlog-archive.md
+
 # Dependencies, build output and caches.
 node_modules/
 .pnpm-store/
@@ -15,6 +19,7 @@ build/
 .mastra/
 .vite/
 coverage/
+.test-build/
 *.tsbuildinfo
 
 # Generated work, local evidence and logs.

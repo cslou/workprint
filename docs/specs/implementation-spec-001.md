@@ -117,7 +117,7 @@ Backend modules are folders within the API deployable, not separate services/pac
 | `contracts` | Shared application request/response schemas, DTOs/errors and pure structural content shapes | No app/server imports, DB rows, provider payloads, secrets or authoritative approval rules. Backend and client consume it; native protocol types are reused, not cloned | Cross-boundary 8.1–8.9; P1-S4/S5, feature contracts thereafter |
 | `api-client` | Framework-free authenticated application/native transport, correlation, source access and reconciliation | `contracts` and supported native/Auth client interfaces; consumed by web. It grants no business/approval authority | 8.1–8.7; Phases 1–3 and producer refresh in Phase 4 |
 | `player` | Framework-free single-clip playback and events from supplied sources | Mediabunny/WebCodecs and narrow structural source/event contracts; no domain, selection, access or export authority | 8.2/8.5/8.6; P2-S6, P3-S10, P4-S18 |
-| Backend `mastra` | Native entry/bootstrap, server/auth/HTTP adapters, independent workflow registration/adapters, readiness/drain | Composes `agent/mastra`, `application`, platform/native adapters and trusted collaborators into one runtime | All backend entry/operating paths; P1-S2/S3, functional workflows and P4-S19 |
+| Backend `mastra` | Native entry/bootstrap, server/auth/HTTP adapters, independent workflow registration/adapters, readiness/drain | Composes `agent/mastra`, `application`, platform/native adapters and trusted collaborators into one runtime | All backend entry/operating paths; P1-S2 admission, P3-S18/S19 workflows and P4-S19 |
 | `application` | Named shared use cases, cross-domain transaction coordination and recoverable hand-offs | Domain public functions plus narrow supplied native/conversation/workflow collaborators. No domain SQL or imports of `agent`, either Mastra subtree or assembled bootstrap | Cross-domain 8.1–8.9; foundation interfaces, Phase 3 shared behavior, Phase 4 producer integrations |
 | `agent` / `agent/mastra` | Assistant guidance/context/capabilities; native Agent/tool bindings, trusted conversation access, queue/report integration | Shared application/domain interfaces and supported native APIs. Backend composition supplies the native instance; no second loop/store | 8.1/8.3–8.5/8.7/8.9; basic conversation in Phase 3, creative tools/producers in Phase 4 |
 | `artifacts` | Immutable production work, conversation uses/approval/selection, the conversation selection revision, questions/answers, uploads and dependencies/changes; owned read/write/validation functions | `db`, structural contracts and narrow storage mechanics; composition coordinates peer-owned guards/work. No provider execution | 8.2–8.6; P3-S2–S5/S7, reused by P4-S2–S7/S10 |
@@ -156,7 +156,7 @@ repository-root/
 │   ├── contracts/                 # Shared browser-safe application schemas/types
 │   ├── api-client/                # Framework-free API/native transport client
 │   └── player/                    # Framework-free playback from supplied sources
-├── supabase/                      # Application-owned schemas and migrations
+├── supabase/                      # Supabase CLI config and application-owned schemas/migrations
 ├── test/                          # Cross-app journeys and release smoke checks
 ├── scripts/                       # Development, setup and verification commands
 ├── docs/                          # Architecture, specs and operating guidance
@@ -167,7 +167,7 @@ Only these higher-level boundaries are fixed. Smaller components/files/subfolder
 
 `agent/mastra` binds the normal assistant to native Agent/tools/Memory/queue/report APIs. Sibling `apps/api/src/mastra` retains the conventional `index.ts` entry and HTTP/independent workflow adapters, composing the agent into **one Mastra instance and one execution owner**. Backend export/cleanup must not depend on an assistant turn. Mastra's [project layout](https://mastra.ai/reference/project-structure) is largely unopinionated and its [source directory is configurable](https://mastra.ai/reference/cli/mastra#common-flags); this separation is this project's choice, not a framework mandate.
 
-Application schemas/migrations live under `supabase/`, owned by their modules. `model-catalog` creates no table. A `deletion` owner for closure barriers and cleanup checkpoints is reserved for the deferred lifecycle features and is not created in this release. Native schemas remain excluded from application migrations. The existing `.pi/` working product, its tests and ignored outputs remain in the source repository; they are not part of the fresh application baseline. Introduce only folders with real work in the current sprint, following these module boundaries rather than scaffolding the full tree at once.
+Application-owned schema changes use the Supabase CLI migration workflow under `supabase/`, owned by their modules. `model-catalog` creates no table. A `deletion` owner for closure barriers and cleanup checkpoints is reserved for the deferred lifecycle features and is not created in this release. Native schemas remain excluded from application migrations. The existing `.pi/` working product, its tests and ignored outputs remain in the source repository; they are not part of the fresh application baseline. Introduce only folders with real work in the current sprint, following these module boundaries rather than scaffolding the full tree at once.
 
 ### Key Concepts & Data Flow
 
@@ -175,7 +175,7 @@ Application schemas/migrations live under `supabase/`, owned by their modules. `
 
 **Authority.** Supabase/native context supplies trusted identity and conversation scope. Domain functions check owned resources and actor capability. Human use/approval/selection binds exact versions and purpose; assistant saves remain unapproved drafts and do not replace pinned human choices. Draft/Ready are derived from conversation use, not global version approval. Manual human edits save against the expected base, move the human's use approved, and start no assistant turn. Viewing, generation, decoding and technical export completion grant no creative approval.
 
-**Surfaces.** P1-S4 resolves the closed, versioned surface catalog before consumers: owner, caller, flow, inputs/outputs, authentication/authorization, validation, errors, idempotency and implementation status. Reuse qualified native interfaces; do not invent custom copies or treat every operation as an HTTP route/tool. The following logical contracts constrain that catalog, rather than leaving product behavior to discovery:
+**Surfaces.** P1-S4 resolves the closed, versioned surface catalog before consumers: owner, caller, flow, inputs/outputs, authentication/authorization, validation, errors, idempotency and implementation status. Reuse supported native contracts, marking qualification pending until the owning Phase 3/4 story; do not invent custom copies or treat every operation as an HTTP route/tool. The following logical contracts constrain that catalog, rather than leaving product behavior to discovery:
 
 | Caller / operation | Owner and inputs | Results, errors and retry boundary |
 | --- | --- | --- |
@@ -249,7 +249,7 @@ For every enabled integration, record the selected versions/model mapping, curre
 
 - **Purpose/docs:** native HTTP/request context, conversations/Memory, normal tool-using agent, streaming/queue/Stop and independent persistent execution; [request context](https://mastra.ai/docs/server/request-context), [model providers](https://mastra.ai/models/providers), [project structure](https://mastra.ai/reference/project-structure).
 - **Auth/configuration:** verified Supabase identity enters trusted native context. Backend `DEFAULT_ASSISTANT_MODEL`, selected provider's server-only credential variables and native Postgres configuration. A candidate mentioned in research is not a selected model.
-- **Interfaces used:** supported native conversation create/list/history/send/queue/subscribe/Stop, Agent/tool/results/errors, supported turn-ending and saved-message correlation, workflow start/state/wait/recovery/cancel and native store preparation. P1 qualifies the coherent package set before freezing dependent contracts; P4-S1 separately qualifies actual tool/guidance/report seams. Do not substitute an arbitrary chat route for native queue/wake behavior.
+- **Interfaces used:** supported native conversation create/list/history/send/queue/subscribe/Stop, Agent/tool/results/errors, supported turn-ending and saved-message correlation, workflow start/state/wait/recovery/cancel and native store preparation. P1 pins the package set and catalogs supported interfaces without claiming conversation/workflow compatibility. P3-S1a–S1c qualifies conversations; P3-S18/S19 qualifies shared execution before dependent features. P4-S1 separately qualifies actual tool/guidance/report seams. Do not substitute an arbitrary chat route for native queue/wake behavior.
 - **Failure/retry/bounds:** missing or invalid provider configuration fails explicitly before provider work; unavailable/error/interrupted states settle the client without exposing credentials. Bound retries, calls, output, context, tools and concurrency. Tool effects reconcile stable operations; an assistant retry cannot repeat completed business effects. No silent provider/model substitution. Normal reasoning need not resume after process death.
 - **Usage/qualification:** observe every enabled actual native/framework/background model attempt, including memory/report/other automatic calls where used; disable optional billable paths whose activity cannot be covered. P3-S1 qualifies configured text chat; P4 adds tool/multimodal/report paths with actual authorized evidence. Source/docs and controlled native tests are distinct from selected-provider qualification.
 
@@ -269,7 +269,7 @@ For every enabled integration, record the selected versions/model mapping, curre
 - **MVP entry:** use Supabase's standard email/password sign-in and password reset for an existing authorized Supabase account. Account provisioning is outside the app; signup/invitation policy and administration remain deferred. Use supported SDK flows; add no custom credential store, role-management system, separate authentication service or extra auth stories.
 - **Interfaces used:** supported sign-in/password-reset/session/token verification/refresh/sign-out; SQL transactions/owned queries; supported native storage initialization. Supabase owns identity; native schema mutation is not application migration work.
 - **Failure/retry/bounds:** bound pool/connect/query/transaction timeouts; qualify the chosen connection/pooling mode. Token refresh/reconnect cannot replay commands. Uncertain writes reconcile stable operation identity before repetition.
-- **Qualification:** P1-S2/S3 exercises actual server/Postgres/auth integration, P3-S1 verifies standard sign-in/reset/session behavior and isolation. Prove restricted serving privileges and separate schema setup; no production credentials/data in tests.
+- **Qualification:** P1-S2 exercises actual backend token verification and restricted route exposure; P3-S1a–S1c verifies conversation persistence, standard sign-in/reset/session behavior and resource isolation. P3-S18/S19 qualifies workflow persistence/recovery. Prove restricted serving privileges and separate schema setup; no production credentials/data in tests.
 
 ### Cloudflare R2
 
@@ -356,7 +356,7 @@ Validate required provider configuration before calls and report missing credent
 
 ### Local Dev
 
-Everyday development is local web/backend against dedicated development Supabase and private R2, not production resources and not a selected all-local service replacement. Tests use isolated real Postgres, controlled external responses and synthetic/licensed media; never customer data or ignored private demo assets.
+Supabase is one Auth/Postgres integration; endpoints and credentials select the environment. Use environment-neutral Supabase module/helper names, not separate local/production integrations or folders. The conventional `supabase/` directory holds CLI configuration and application migrations, not an alternate runtime. Development provisioning may use the Workprint-only CLI/Docker stack authorized on 2026-10-27, with loopback-only unused ports, separate setup/serving roles and ignored private configuration. Two synthetic development accounts may be provisioned through supported setup outside the product. This does not authorize hosted/production changes or changes to other projects' stacks. Tests exercise the same integration with actual Supabase verification and isolated real Postgres where those boundaries are implemented; no identity bypass or fake conversation store. Private R2 and live AI remain separately authorized later prerequisites. Use synthetic/licensed media, never customer data or ignored private demo assets.
 
 P1-S1 supplies pinned Node/pnpm, a deterministic lockfile, credential-free examples and pre-admission environment validation. FFmpeg/ffprobe is required for media work; Docker supports isolated database tests; Supabase tooling supports owned schema development. Target commands from the repository root are:
 
@@ -369,7 +369,7 @@ pnpm test
 pnpm build
 ```
 
-These are **planned hosted-app commands**, not commands already supplied by Workprint. `db:prepare` uses separately authorized setup privileges and supported application/native mechanisms; it must not normalize manual native-schema changes or make serving credentials privileged. Validate the selected cohort's actual initialization behavior.
+These root commands are supplied by the accepted Sprint 001 Story 1 foundation; they do not establish Auth, conversation or workflow qualification. `db:prepare` uses separately authorized setup privileges and supported application/native mechanisms; it must not normalize manual native-schema changes or make serving credentials privileged. Preserve the accepted initialization/privilege checks as later capabilities are added.
 
 The fresh application repository starts with no inherited tests. Each sprint adds automated proof of its actual behavior and credible failure risks; useful checks become regression coverage for subsequent work. Final verification runs the full available application suite, including earlier stories' checks. Record the actual baseline at execution; do not count the source repository's local-skill suites as imported, removed, passing or pending application tests.
 
@@ -379,7 +379,7 @@ Prefer focused boundary tests for native runtime, authentication, persistence an
 
 Production targets are Cloudflare static frontend, **one Railway backend**, Supabase Auth/Postgres and private R2, with Sentry as configured. P4-S19 deploys the exact reviewed/verified build and records identity/targets, using reviewed application and supported native store preparation, restricted serving grants and separate setup credentials. No additional CI/CD platform is required.
 
-Before action, separately authorize resources, exposure/access, schema preparation, secrets and any paid smoke calls. Verify API origins/Auth redirects/password-reset email delivery/R2 CORS/private access, selected model mappings, exclusion of test-only providers/controls and the qualified pool/provider/media/process/readiness/shutdown limits. Signup policy and announcements are not implied.
+Before action, resolve and verify B-001's incoming-request admission/body-limit gate; its private-development risk acceptance does not permit public exposure. Separately authorize resources, exposure/access, schema preparation, secrets and any paid smoke calls. Verify API origins/Auth redirects/password-reset email delivery/R2 CORS/private access, selected model mappings, exclusion of test-only providers/controls and the qualified pool/provider/media/process/readiness/shutdown limits. Signup policy and announcements are not implied.
 
 Use bounded actual deployed browser/API smoke checks with authorized accounts and synthetic/licensed material, including private upload/playback/download and saved-work-to-export. Enabled AI wiring needs separately authorized exact proposals/calls and usage evidence; no production fake provider or seed endpoint. Reuse the release build's feature/regression evidence rather than recreating QA. Missing authorization or a required failed/unrun check is non-pass.
 
@@ -475,7 +475,7 @@ Every criterion is observable and maps to the goals; functional and relevant reg
 
 Common release gates: selected native package-set qualification with actual built server/Postgres; authorized sanitized real-provider response evidence; Supabase/R2 qualification; ownership/route/cleanup safeguards; documented tested input/concurrency/timeout/shutdown bounds; desktop/narrow keyboard/focus/loading/empty/failure/interruption checks; relevant automated and application-repository regression suites. No fixed account-capacity, full accessibility certification, zero-downtime or exactly-once-provider claim is inferred.
 
-Phase 1's native-qualification evidence and Phase 2's wiring evidence are not proof of these complete product behaviors. Phase 2 verifies honest not-implemented feedback and no pretend mutation; it does not require fake successful lifecycles. Under the revised allocation, Phase 3 owns real stale-version/human-answer, transfer, ownership, frontend status/cancellation, workspace-update and export currentness/recovery/independence tests. Phase 4 owns initial agent question/proposal creation, real provider generation/cancellation/partial-success/late-publication behavior and complete tool-driven flows. Consumer tests may supply valid isolated persisted prerequisites without implementing the absent agent producer. P4-S18 closes remaining combined-product coverage and P4-S19 delivers actual deployment/operating handoff; neither supplies the first functional proof of export or another unfinished feature. These obligations are deferred to their functional owners, not removed or left wholesale to a final release test.
+Phase 1's API-foundation evidence and Phase 2's wiring evidence are not proof of these complete product behaviors. Phase 2 verifies honest not-implemented feedback and no pretend mutation; it does not require fake successful lifecycles. Under the revised allocation, Phase 3 owns real stale-version/human-answer, transfer, ownership, frontend status/cancellation, workspace-update and export currentness/recovery/independence tests. Phase 4 owns initial agent question/proposal creation, real provider generation/cancellation/partial-success/late-publication behavior and complete tool-driven flows. Consumer tests may supply valid isolated persisted prerequisites without implementing the absent agent producer. P4-S18 closes remaining combined-product coverage and P4-S19 delivers actual deployment/operating handoff; neither supplies the first functional proof of export or another unfinished feature. These obligations are deferred to their functional owners, not removed or left wholesale to a final release test.
 
 ### Goal-to-delivery traceability
 
@@ -485,16 +485,16 @@ Phase 1's native-qualification evidence and Phase 2's wiring evidence are not pr
 | G2 Visible human creative control and targeted revisions | 8.3, 8.5 | `web`, `artifacts`, `application`, `agent` | P3-S2, S5, S7, S9; P4-S3–S7, S12–S14 | Criterion 2: exact versions, human-only decisions, stale-save rejection, preserved manual input/history and no automatic replacement; actual backend/native-to-UI effects. |
 | G3 Reusable immutable work | 8.2, 8.5 | `artifacts`, `storage`, `application` | P3-S2–S4, S17; P4-S6–S7, S15 | Criteria 2–3: cross-conversation exact-version reuse with independent approvals; original preservation; foreign references rejected; no silent replacement. |
 | G4 Full chosen clips assembled in order | 8.6 | `exports`, `artifacts`, `storage`, `application`, native workflows, `player` | P3-S10–S13, S17; P4-S18–S19 | Criterion 4: actual captured sources → bounded processing → decoded/downloaded output with correct order, geometry, duration and existing audio; restart safety and completed-output independence. |
-| G5 Understandable independent work and distinct Stop/cancel | 8.4, 8.7 | `generation`, `agent`, `application`, native workflows, `api-client`, `web` | P1-S2–S3; P3-S8–S9; P4-S9–S10, S13–S16 | Criteria 5 and 7: actual progress/partial/failed/unknown states, Stop isolation, scoped cancellation, guarded publication and correlated saved reports, including process interruption. |
+| G5 Understandable independent work and distinct Stop/cancel | 8.4, 8.7 | `generation`, `agent`, `application`, native workflows, `api-client`, `web` | P3-S1b, S8–S9, S18–S19; P4-S9–S10, S13–S16 | Criteria 5 and 7: actual progress/partial/failed/unknown states, Stop isolation, scoped cancellation, guarded publication and correlated saved reports, including process interruption. |
 | G6 Exact informed media authorization | 8.3–8.5 | `artifacts`, `generation`, `model-catalog`, `application`, `web` | P3-S7; P4-S4, S8–S9, S11–S13, S15 | Criterion 6: exact disclosed inputs/provider/model/settings/count/estimate binding; stale or changed proposals cannot authorize new paid submissions; repeated authority resolves to the same batch; no budget gate. |
-| G7 Reliable return to saved work | 8.1, 8.7 | native conversations/workflows, `agent`, `application`, domain owners, `api-client` | P1-S2–S3; P3-S1, S9, S13; P4-S2, S4, S9–S10, S14–S16 | Criterion 7 and common gates: real built-server/Postgres kill/restart/reconnect around intent/start, submission, finalization and report acknowledgment; no duplicate effects or replay. |
+| G7 Reliable return to saved work | 8.1, 8.7 | native conversations/workflows, `agent`, `application`, domain owners, `api-client` | P3-S1a–S1c, S9, S13, S18–S19; P4-S2, S4, S9–S10, S14–S16 | Criterion 7 and common gates: real built-server/Postgres kill/restart/reconnect around intent/start, submission, finalization and report acknowledgment; no duplicate effects or replay. |
 | G8 Honest correlated usage and costs | 8.9 and every enabled AI path | `usage`, `application`, native/provider adapters | P3-S1; P4-S11, S13–S14, S18–S19 | Criterion 8: trusted per-attempt assistant/framework/background/media observations; unknown ≠ zero; genuine additional calls stay separate; no sensitive logging. |
 
 P4-S18 closes missing supported combinations/races, not every feature's first test. P4-S19 proves the deployed configuration and operating handoff; it does not accept unfinished functionality. Phases are milestones, not sprint boundaries, and approval of this plan is not implementation or live-service authorization.
 
 ## 10. Phases
 
-The delivery sequence is **contracts/API foundation → connected frontend and surface audit → frontend/shared functionality → actual agent/media capabilities, complete acceptance and deployment**. Four phases contain 45 active stories (5 + 9 + 13 + 18); deferred identifiers P3-S6, P3-S14–S16 and P4-S17 are retained for traceability and are not active work. Phases are milestones, not sprint boundaries; foundations are explicitly internal increments, not usable filmmaking releases. Each story targets ≤5 logical commits including verification and may be split during concrete sprint packaging without dropping its checks.
+The delivery sequence is **contracts/API foundation → connected frontend and surface audit → frontend/shared functionality → actual agent/media capabilities, complete acceptance and deployment**. Phase story identifiers preserve traceability rather than fixing sprint size. P1-S3 is relocated to P3-S18/S19 and P4-S9; P3-S1 is split into P3-S1a–S1c. Deferred identifiers P3-S6, P3-S14–S16 and P4-S17 remain outside this release. Phases are milestones, not sprint boundaries; foundations are explicitly internal increments, not usable filmmaking releases. Each story targets ≤5 logical commits including verification and may be split during concrete sprint packaging without dropping its checks.
 
 | Actual production callers | Phase 3 | Phase 4 |
 | --- | --- | --- |
@@ -510,17 +510,19 @@ There is no separate general QA phase. Functional/regression proof stays with it
 
 ### Phase 1 — Contracts and API Foundation
 
-**Outcome:** a runnable backend and typed client interface that the frontend can connect to. Unfinished product operations return not-implemented responses. Authentication and native integration are genuinely exercised; controlled model/provider responses are confined to explicit tests and native-runtime qualification.
+**Outcome:** a runnable authenticated backend, closed API catalog and typed client that the frontend can connect to. Unfinished operations return validated, side-effect-free not-implemented responses. Authentication and route restrictions are real; functional conversations and background execution are deferred to Phase 3, with tool-driven execution in Phase 4.
 
 This is an **internal development milestone**, not a usable filmmaking product.
+
+**Approved private-development limitation (B-001):** The pinned generated server reads POST/PUT JSON before application authentication and request deadlines. An unfinished-upload reproduction fails its independent five-second watchdog; end-to-end ingress boundedness is not qualified. The user approved deferring this safety gate for private/local Phase 1–2 development only, retaining completed-request authentication/validation and bounded client behavior. Preserve the failing qualification and report it separately, not as passing sprint coverage. Resolve the serving approach and verify early admission/body limits before Phase 3 native-runtime qualification and before public deployment. No adapter migration, public exposure or weakening of unrelated tests is authorized. This tracked gate stands independently of the private backlog.
 
 #### Scope
 
 **Included**
 
 - Repository/application setup and validated environment configuration.
-- Basic authentication and native conversation integration.
-- Early proof of native background execution.
+- Backend Supabase token verification, trusted identity and restricted route exposure.
+- Declared native interfaces with explicit unqualified/unavailable status, not functional conversations or workflows.
 - Browser-route, agent-tool and internal-operation contracts.
 - Callable unavailable-feature responses, `api-client`, and test-only qualification fixtures.
 
@@ -533,11 +535,11 @@ This is an **internal development milestone**, not a usable filmmaking product.
 
 #### Modules
 
-The `api` deployable scaffolds backend `mastra`, `application`, `agent` (including `agent/mastra`), `db` and domain-owned interfaces under the approved directory structure. `contracts` holds shared browser-safe schemas; `api-client` owns transport. `web` receives only its initial application scaffold. This establishes boundaries, not unfinished domain behavior.
+The `api` deployable retains backend `mastra` composition and `db` mechanics, adding admission and application unavailable boundaries as needed. `contracts` holds shared browser-safe schemas; `api-client` owns application transport and the explicit unavailable-native capability boundary. `web` retains its minimal scaffold. Catalog future domain/agent owners without creating empty modules; functional native bindings arrive in Phase 3.
 
 #### Flows Delivered
 
-Framework-level conversation creation/loading, observation and stopping are exercised with controlled model responses in the native-integration test harness. Implemented platform operations stay real; unfinished product operations have callable contracts returning not-implemented responses, **not completed functionality**. Until assistant functionality is implemented and qualified, ordinary development must not manufacture assistant replies or silently make paid calls.
+Developer client calls authenticate, validate closed application inputs and receive truthful unavailable results. Only implemented resources receive ownership checks; no conversation/domain store is manufactured for unavailable routes. Native conversation capabilities are cataloged but remain disabled until Phase 3 qualification. No inference, fabricated assistant replies or workflow execution is delivered here.
 
 #### Dependencies
 
@@ -554,28 +556,19 @@ This spec’s §§4–7 and separately authorized development Supabase access. C
   - [ ] Type, lint and module-boundary checks run alongside existing required verification.
 - **Commits:** ≤5.
 
-##### P1-S2 — Native conversation integration proof
+##### P1-S2 — Backend authentication and route security
 
-- **What:** connect Supabase authentication and Postgres-backed Mastra conversation behavior, using controlled model responses in explicit qualification tests rather than a simulated application workflow.
+- **What:** verify Supabase identity at backend admission and restrict the existing server to intended routes, independently of conversations.
 - **Acceptance criteria:**
-  - [ ] Exercise saved history, streaming, queued input and Stop through supported native interfaces.
-  - [ ] Verify ownership isolation and distinguish interrupted output from saved completion.
-  - [ ] Missing provider configuration or unavailable assistant functionality produces an explicit error before provider work. `api-client` settles loading without exposing credentials or hanging. Qualification uses harness-supplied controlled providers through supported native interfaces, not a parallel stream protocol.
-  - [ ] Expose only the intended native/product routes—not unrestricted framework administration or tool execution.
+  - [ ] Actual configured Supabase token verification accepts two synthetic authorized identities and rejects missing, malformed, expired or invalid tokens; browser owner claims never supply trusted identity.
+  - [ ] A bounded test-only protected handler observes distinct verified account IDs through the same built admission path. It creates no conversation/product records and is absent from production composition.
+  - [ ] Production exposes only intended operational and implemented application routes; native conversations, administration, direct tools and test controls remain inaccessible. Health access is an explicit operational exception, not product authentication bypass.
+  - [ ] One environment-configured Supabase integration uses neutral module/helper names. Setup privileges and secrets remain outside serving/browser paths. No inference or workflow is enabled.
 - **Commits:** ≤5.
 
-##### P1-S3 — Native background-execution proof
+##### P1-S3 — Relocated: native background execution
 
-- **What:** exercise a small persistent workflow through the actual built server and real Postgres, using test-only fake external work—not the finished generation system.
-- **Acceptance criteria:**
-  - [ ] Start background work from a tool in a controlled assistant turn, return without waiting for the job, then Stop that still-active turn. The independently started workflow continues; closing browser observation also does not cancel it.
-  - [ ] Kill the process after saving a test work intent and its stable run identity but before native start. After restart, narrow reconciliation starts or recovers that same work; the intent is not stranded and repeated reconciliation does not create additional runs.
-  - [ ] Exercise waiting, process restart, step re-entry, explicit workflow cancellation and terminal failure. Record native statuses and the application safeguards required for repeated steps; do not infer exactly-once external execution.
-  - [ ] Demonstrate bounded test-work concurrency and timeouts, with observable cancellation/failure outcomes rather than indefinite waits or silent loss.
-  - [ ] Retain native workflows only if these cases pass without a parallel runner or custom scheduler. A demonstrated essential gap blocks the dependent contracts until the documented pg-boss alternative or a simpler supported solution is assessed; do not hide it behind mocks.
-- **Commits:** ≤5.
-
-This proves framework behavior; complete generation/export safety tests still belong to their feature implementations.
+Not active Phase 1 work. Shared execution/recovery obligations move to P3-S18/S19 before cancellation/export depends on them. Tool-started independent work moves to P4-S9; full generation safety remains P4-S15/S16. No required proof is removed, and no workflow capability is claimed by Phase 1.
 
 ##### P1-S4 — Surface catalog and contracts
 
@@ -592,7 +585,7 @@ This proves framework behavior; complete generation/export safety tests still be
 
 - **What:** implement route scaffolding and `api-client`, leaving unfinished operations explicitly unavailable instead of building stateful domain simulations.
 - **Acceptance criteria:**
-  - [ ] Scripted client calls exercise the intended browser surfaces through the actual backend, with authentication and boundary-input validation rather than frontend-only alerts.
+  - [ ] Scripted client calls exercise the intended application browser routes through the actual backend, with authentication and boundary-input validation rather than frontend-only alerts. Native conversation operations remain cataloged but unexposed; their client capability boundary settles as unavailable without a custom native route/protocol, pending P3-S1a–S1c.
   - [ ] Tests cover success for implemented platform operations and distinct authentication/validation/ownership failures before not-implemented responses. Include malformed unfinished-route requests so an unconditional placeholder response cannot pass. Use genuine isolated platform records where implemented ownership checks require them; never bypass those checks to force an unavailable response. Unimplemented domain semantics are not claimed as verified.
   - [ ] Unfinished commands cause no product-state mutation, approval or paid/provider work. Do not add fake lifecycle stores or application scenario-seeding endpoints.
   - [ ] Controlled provider responses remain test/qualification-only. Static contract examples or read-only component data may support tests, but cannot stand in for persisted application work.
@@ -600,7 +593,7 @@ This proves framework behavior; complete generation/export safety tests still be
 
 #### Open Questions
 
-No unresolved product-scope decision is carried for this phase. The exact compatible package cohort and native-runtime behavior remain implementation-time qualification work within the stories above, not established capabilities. A material qualification failure requires revisiting the execution choice before treating the phase as complete.
+The accepted foundation pins the package cohort; conversation/workflow compatibility is not yet established. Phase 1 catalogs supported native interfaces and their qualification owners without inventing a parallel protocol or promising unobserved runtime behavior. Phase 3 must qualify those seams before dependent functionality; a material gap returns for an approved execution/contract decision.
 
 #### References
 
@@ -611,16 +604,16 @@ No unresolved product-scope decision is carried for this phase. The exact compat
 
 #### Done When
 
-- [ ] All phase stories are complete.
+- [ ] All active phase stories are complete; relocated P1-S3 is not a Phase 1 completion requirement.
 - [ ] The frontend has a coherent, callable interface to build against, with honest not-implemented responses for unfinished operations.
-- [ ] Native integration evidence, including Stop isolation and the saved-before-start crash case, supports those contracts.
+- [ ] Actual Supabase admission and route-exposure evidence supports the protected API skeleton; native conversation/workflow capabilities are explicitly unavailable and assigned to Phase 3/4.
 - [ ] Every surface has an intended consumer; actual frontend wiring is audited in Phase 2.
 - [ ] Contract/runtime tests and required regression checks pass, with evidence recorded.
-- [ ] No unresolved framework incompatibility is hidden behind a mock.
+- [ ] No unqualified native behavior is represented as implemented or hidden behind a mock.
 
 #### Background-execution clarification
 
-This execution model does not expand P1-S3 into implementation of the finished generation system.
+This is the intended later execution model, not a Phase 1 deliverable. P3-S18/S19 qualifies shared execution before its consumers; P4-S9 qualifies actual tool-started generation.
 
 - The persistent Railway backend—not an ongoing assistant turn—executes background work through Mastra workflows.
 - After human batch approval, an application tool saves Generation Requests and their stable workflow identities, starts the workflows asynchronously, and returns. Application writes and native workflow starts are separate operations requiring recoverable hand-offs.
@@ -629,12 +622,12 @@ This execution model does not expand P1-S3 into implementation of the finished g
 - Postgres stores state; it does not execute work. During backend downtime, application polling and downloads pause, while an external provider may continue.
 - On restart, native workflow recovery and narrow application reconciliation must recover persisted execution and saved-but-not-started work. This behavior requires executable qualification against the selected package set.
 - Recovery may re-enter a step. Persistence is not exactly-once provider execution: ambiguous paid submissions must not be blindly repeated, and cancellation does not guarantee remote work or charges stop. Full application-side submission/publication safeguards are implemented and verified with their features.
-- P1-S3 uses a small real workflow, real Postgres and fake external jobs to observe asynchronous execution, disconnection, waiting, process restart, step re-entry and cancellation. Its evidence becomes regression coverage, not a parallel scheduler.
+- P3-S18/S19 uses small real workflows, real Postgres and controlled external jobs for shared execution/recovery proof. P4-S9 adds tool-started execution. Their evidence becomes regression coverage, not a parallel scheduler.
 - pg-boss remains an alternative only for a demonstrated gap that cannot be handled simply; it is not an additional runner alongside native workflows.
 
 ### Phase 2 — Connected Frontend and Surface Audit
 
-**Outcome:** a React frontend whose intended controls connect through `api-client` to Phase 1's actual backend. Implemented platform operations work; unfinished operations visibly report “Not implemented yet” without pretending to save, approve, generate or export work.
+**Outcome:** a React frontend whose intended application controls connect through `api-client` to Phase 1's actual backend. Native conversation controls use the client's explicit unavailable capability boundary until Phase 3; this exception is not native transport evidence. Implemented platform operations work; unfinished operations visibly report “Not implemented yet” without pretending to save, approve, generate or export work.
 
 This proves **frontend/API wiring and interface coverage**, not a complete simulated or functional filmmaking journey. Static sample content may support layout/component checks, but no stateful fake application or simulated end-to-end lifecycle is required.
 
@@ -648,13 +641,13 @@ Primarily `web`, `api-client` and the playback interface in `player`, plus Phase
 
 Connect the browser-facing interactions for §8.1–8.7: starting/resuming, bringing material, developing work, approving batches, reviewing/choosing versions, exporting and stopping/cancelling. These are wiring targets, not claims that the underlying flows are complete.
 
-Existing implemented Phase 1 functionality remains real. Native inference/streaming qualification may use the explicit test harness; the ordinary application does not invent assistant replies. Unfinished interactions return not-implemented responses and leave saved state unchanged. Usage inspection remains internal—no analytics dashboard is added.
+Existing implemented Phase 1 admission remains real. Native conversation/streaming capabilities remain disabled and explicitly unavailable until Phase 3; Phase 2 does not add a native qualification harness or invent assistant replies. Unfinished interactions return not-implemented responses and leave saved state unchanged. Usage inspection remains internal—no analytics dashboard is added.
 
 For controls whose prerequisites are not implemented, use read-only sample props in isolated component/wiring tests to exercise the actual frontend consumer through `api-client` against the backend skeleton. Record the missing prerequisite and later owning phase. Do not seed a fake application lifecycle just to make a complete journey appear to work; a generic API test without a real frontend consumer is not wiring evidence.
 
 #### Dependencies
 
-- Phase 1's callable contracts and qualified native conversation integration.
+- Phase 1's authenticated callable application contracts and declared, not yet qualified, native conversation interfaces.
 - Existing design tokens, components and approved flows.
 - Reproducible synthetic or appropriately licensed sample content for layout/component tests—not private, ignored demo assets. Real R2 transfer/playback qualification accompanies the first functional media slice; it is not a prerequisite for an unavailable-feature response.
 
@@ -681,10 +674,10 @@ Each story is bounded to **≤5 logical commits**, with verification included. T
 
 ##### P2-S3 — Conversation and question interactions
 
-- **What:** connect messages, supported native streaming/queued-input/Stop interfaces, and pending-question controls. Own the exact proposal-bound batch-approval presentation: scope, inputs, provider/model disclosure and informational estimate.
+- **What:** connect message/queue/Stop presentation to the unavailable-native capability boundary and pending-question controls to application contracts. Functional native transport arrives in P3-S1b/S1c. Own the exact proposal-bound batch-approval presentation: scope, inputs, provider/model disclosure and informational estimate.
 - **Acceptance criteria:**
-  - [ ] Exercise option-answer wiring and ordinary typed-message wiring while a question is pending through backend contracts. Batch-approval actions carry the saved question/proposal identity; not-implemented responses leave the decision pending rather than showing approval.
-  - [ ] Use P1-S2's native-integration test harness with controlled providers for stream/queue/Stop browser checks. Unbuilt assistant functionality reports unavailable and clears loading instead of producing fake replies in the ordinary application.
+  - [ ] Exercise option-answer/batch-approval wiring through actual backend application contracts, carrying the saved question/proposal identity; not-implemented responses leave the decision pending rather than showing approval. Typed-message controls while a question is pending exercise the explicit unavailable-native client boundary without a network request; real message delivery belongs to P3-S1b/S1c.
+  - [ ] Exercise unavailable chat/queue/Stop presentation through the actual frontend consumer without inventing a stream protocol or pretending native runtime behavior is qualified. Disabled native capabilities return an explicit client unavailable outcome without attempting an unexposed route; real streaming, queue and Stop checks belong to P3-S1b/S1c. Application routes still use the actual backend skeleton.
   - [ ] Reconnection must not replay commands; closing observation must not send Stop or generation cancellation. Human-answer/superseded-binding and saved-approval tests belong to Phase 3; actual agent question/proposal creation and authorized generation execution are qualified in Phase 4.
 - **Commits:** ≤5.
 
@@ -762,7 +755,7 @@ Bounded skeleton visual decisions belong to P2-S1; feature-specific states follo
 
 #### Done When
 
-- [ ] All stories are complete: intended frontend controls are connected to the actual backend and unfinished actions clearly report not implemented, without static "next demo page" shortcuts or fake successful work.
+- [ ] All stories are complete: intended application controls connect to the actual backend and unfinished actions clearly report not implemented. Native conversation controls use the explicitly cataloged unavailable-client exception pending P3-S1a–S1c; no static "next demo page" shortcuts, invented protocol or fake successful work.
 - [ ] Frontend requests use `api-client`; native protocols are not reimplemented.
 - [ ] Every exposed browser product route has a genuine frontend consumer with browser or isolated-consumer wiring evidence; tools/internal/operational surfaces have justified non-browser consumers. Blocked complete-flow checks name their later owning phase.
 - [ ] Desktop/narrow layouts, keyboard interaction, focus handling and basic loading/empty/error/not-built states are verified.
@@ -842,7 +835,7 @@ Classify operations by their intended callers, not by their folder name. A front
 - `storage` / `db`: private objects, bounded media processing and connection/transaction mechanics. Domains own their tables/SQL; application composition coordinates their interfaces.
 - `contracts`, `web`, `api-client`, `player`: shared structural schemas, actual frontend operations, authoritative refresh, access-controlled sources and playback only. Backend domains retain authoritative rules.
 
-Use Phase 1's single qualified background-execution mechanism for export. Do not add a parallel runner, custom scheduler, new HTTP server or another agent loop. Never modify Mastra-owned schemas.
+Qualify the single background-execution mechanism in P3-S18/S19 before cancellation/export uses it. Do not add a parallel runner, custom scheduler, new HTTP server or another agent loop. Never modify Mastra-owned schemas.
 
 #### Flows Delivered
 
@@ -856,7 +849,7 @@ Use Phase 1's single qualified background-execution mechanism for export. Do not
 
 #### Dependencies
 
-- Phase 1's actual built-server/Auth/Postgres/native-workflow qualification and Phase 2's connected frontend/contracts. Preserve their required checks; mocks cannot replace failed native qualification.
+- Phase 1's built-server foundation, backend Auth and contracts plus Phase 2's connected frontend. Resolve B-001's pre-authentication/pre-timeout JSON-read limitation and qualify the chosen serving path before Phase 3 native-runtime qualification. P3-S1a–S1c qualifies conversations; P3-S18/S19 qualifies shared workflows before P3-S8/S11–S13. Preserve established checks; mocks cannot replace native qualification.
 - The configured assistant integration for frontend chat, a declared media upload/playback allowlist and export compatibility rules/limits. Choose concrete versions, formats and technical bounds during sprint packaging; verify real response shapes before integration-specific handling and qualify behavior before feature acceptance.
 - Dedicated development Supabase/R2 and separately authorized real-model/service verification. Tests use isolated data and synthetic/licensed media, never customer records or private demo assets.
 - Existing design references. New conflict, progress, expired-source and export states need visual approval before implementation; Phase approval does not approve unseen screens.
@@ -867,13 +860,53 @@ Use Phase 1's single qualified background-execution mechanism for export. Do not
 
 Each story targets **≤5 logical commits including verification**. Split oversized stories during sprint packaging without dropping their checks or moving an agent-only capability into this phase. This milestone may span multiple sprints. A partial export implementation is not exposed as a working export; its capture, processing and safety stories must be complete before enabling the command.
 
-##### P3-S1 — Frontend conversation operations and native chat
+##### P3-S1 — Conversation operations (split into P3-S1a–S1c)
 
-- **What:** finish actual frontend Auth/conversation operations and qualify the configured native text-chat integration, without product tools or creative skills.
+This umbrella retains references to the original capability; the following independently verifiable stories replace it. They implement the conversation work relocated from P1-S2. No production creative tools or skills are registered.
+
+##### P3-S1a — Auth UI and owned conversation persistence
+
+- **What:** implement standard Supabase sign-in/out, password reset/session refresh and native conversation creation/listing/loading over Phase 1 admission.
 - **Acceptance criteria:**
-  - [ ] Sign-in/out, session refresh, New video, Recents, history, send/queue/subscribe and exact-turn Stop work through qualified native interfaces. Reconnect never replays a command; disconnect and Stop do not cancel independent export work. Late responses cannot populate another account/conversation.
-  - [ ] Qualify selected-model responses/errors/streaming and interrupted versus saved output. Automated checks use harness-supplied controlled providers; real-model qualification remains separately authorized. Chat text is not a saved production Artifact; no tool-driven save, question creation or generation is advertised.
-  - [ ] Record available native assistant/framework-model usage per attempt with actual model, account/conversation/turn correlation and reported/calculated/estimated/unknown provenance. Deduplicate observations, not real additional calls. Bound calls/retries/output/concurrency; disable optional unobservable billable features. No spending gate or sensitive logging.
+  - [ ] Actual browser/backend/native Postgres tests create, paginate, reopen and read owned conversations/history with two accounts. Foreign references fail without exposure or mutation; client pagination is accessible, not only server-supported.
+  - [ ] New video, Recents, sign-in/out, reset failures and session expiry settle loading; late responses cannot populate another account/conversation. No second conversation store or custom authentication service.
+  - [ ] Preserve Phase 1 security/exposure checks; only qualified native resource routes become available. Sending remains unavailable until P3-S1b.
+- **Commits:** ≤5.
+
+##### P3-S1b — Native turn transport and interruption
+
+- **What:** qualify send/stream/queue/reconnect/exact-turn Stop through the actual built server, native client and isolated Postgres, using test-harness controlled providers.
+- **Acceptance criteria:**
+  - [ ] After P3-S1a, verify persisted message text, identities and order after reload; distinguish interrupted output from saved completion through native evidence. Queue while a turn is active without loss or duplication.
+  - [ ] Reconnect observes without replay; disconnect sends no Stop/cancellation. Stop names the exact turn, and delayed old-turn Stop cannot affect a newer turn. Subscription establishment, transport errors and cancellation have bounded deadlines and settle client loading.
+  - [ ] Missing configuration/unavailable functionality fails before provider work. Controlled providers/controls remain test-only; normal application inference stays disabled until P3-S1c. Reuse native interfaces, never a parallel stream protocol.
+- **Commits:** ≤5.
+
+##### P3-S1c — Functional browser chat and configured-model qualification
+
+- **What:** connect the real browser chat consumer to P3-S1a/S1b and qualify enabled model behavior and usage.
+- **Acceptance criteria:**
+  - [ ] Browser checks cover send/queue/subscribe/Stop, history reload and account/conversation switching with controlled providers; separately authorized selected-model evidence covers actual responses/errors/streaming before enabling live chat.
+  - [ ] Record available native assistant/framework-model usage per attempt with actual model, account/conversation/turn correlation and reported/calculated/estimated/unknown provenance. Deduplicate observations, not real additional calls. Bound calls/retries/output/concurrency; disable optional unobservable billable features.
+  - [ ] Chat text is not a saved production Artifact. No creative tools, initial questions/proposals, spending gate or sensitive logging. Preserve conversation/security regressions; independent-work isolation is qualified by P3-S18 before workflows are enabled.
+- **Commits:** ≤5.
+
+##### P3-S18 — Independent native execution and cancellation
+
+- **What:** qualify shared workflow start/wait/cancel/failure and resource bounds before P3-S8 or export uses it. Depends on P3-S1b for real turn/observer separation tests, not on live model authorization.
+- **Acceptance criteria:**
+  - [ ] Through the actual built server and real Postgres, start a test-harness workflow independently of an active controlled turn. Stop the exact turn and close observation separately; work retains its identity and continues. Explicit workflow cancellation remains distinct. No production tool is introduced; tool-started proof belongs to P4-S9.
+  - [ ] Verify native waiting, cancellation and terminal failure with honest observable outcomes. Record concrete concurrency, wait deadlines and shutdown/cleanup bounds; excess work is queued/rejected explicitly, stalls terminate and capacity is released.
+  - [ ] No application transaction/connection spans an external wait. Keep one native execution owner; an essential gap blocks consumers pending an approved simpler solution or conditional pg-boss replacement, never a parallel scheduler.
+- **Commits:** ≤5.
+
+##### P3-S19 — Durable start and process recovery
+
+- **What:** qualify the saved-intent/native-start hand-off and re-entry over P3-S18 before P3-S8 or P3-S11–S13 depends on recovery.
+- **Acceptance criteria:**
+  - [ ] Kill the actual built process after a test intent/stable run identity commits but before native start. Restart and repeat narrow reconciliation; recover the same logical work without stranded intents or extra runs. Use real native state, not a mocked restart.
+  - [ ] Restart during native waiting and exercise step re-entry, guarded repeated effects and lost start acknowledgment. Record native statuses and required application safeguards without an exactly-once external execution claim.
+  - [ ] Retain P3-S18 and conversation/security regression evidence. Fixtures/barriers remain test-only; no generation/export business schema or alternate scheduler. Feature owners still prove publication, cancellation races and provider-specific uncertainty.
 - **Commits:** ≤5.
 
 ##### P3-S2 — Shared saved-work and manual-version operations
@@ -923,7 +956,7 @@ Each story targets **≤5 logical commits including verification**. Split oversi
 
 ##### P3-S8 — Generation status and cancellation operations
 
-- **What:** implement the frontend's real generation-record queries and cancellation backend without building the generation producer.
+- **What:** implement the frontend's real generation-record queries and cancellation backend without building the generation producer. Depends on P3-S18/S19 for native cancellation/recovery.
 - **Acceptance criteria:**
   - [ ] Render authoritative queued/running/terminal states, failures, partial results and unknown information from persisted records. Missing progress/cost is not invented. Normal empty state stays empty until requests exist; tests supply isolated real records rather than a simulated product.
   - [ ] Cancellation identifies and owns one request, guards terminal transitions and batch effects once, and requests cancellation of its qualified native run when applicable. It never calls assistant Stop or retries a submission. Test repeats/races with terminal state and a controlled native workflow.
@@ -950,7 +983,7 @@ Each story targets **≤5 logical commits including verification**. Split oversi
 
 ##### P3-S11 — Export request, snapshot and frontend lifecycle
 
-- **What:** implement direct Export from Videos, exact request capture and the status/history/download interfaces, using shared saved work and access rules.
+- **What:** implement direct Export from Videos, exact request capture and the status/history/download interfaces, using shared saved work and access rules. P3-S18/S19 must pass before relying on native start/recovery.
 - **Acceptance criteria:**
   - [ ] Validate ownership, complete choices and the supplied selection revision against the conversation's current selection revision inside the capture transaction; capture exact Shot/version IDs server-side. Missing/stale inputs start no work. Repeated command ID/payload returns the same export; conflicting reuse fails.
   - [ ] Persist the request/stable workflow identity before separate background start. Return the saved identity promptly and show actual status/history; do not enable submission as working until the processing/publication path is complete. No placeholder queued jobs or fake downloads.
@@ -1092,7 +1125,7 @@ Shared content/media/export rules stay with the Phase 3 backend; Phase 4 adds ag
 ##### Submission and recovery contract
 
 1. Resolve an exact, currently valid human-approved proposal. Its immutable snapshot binds purpose, provider/model, prompt, settings, count, ordered input versions, disclosures and estimate basis/unknowns. Resolve account/conversation authority from trusted native context, never model arguments.
-2. Persist the batch, one Generation Request per candidate and stable native run identities before asynchronous start. The same authorized execution resolves to the same batch even if the tool is repeated with another call ID; generating extra candidates requires fresh authority. Reconcile a saved-but-not-started hand-off using the Phase 1-qualified execution mechanism.
+2. Persist the batch, one Generation Request per candidate and stable native run identities before asynchronous start. The same authorized execution resolves to the same batch even if the tool is repeated with another call ID; generating extra candidates requires fresh authority. Reconcile a saved-but-not-started hand-off using the execution mechanism qualified by P3-S18/S19.
 3. Recheck eligibility and atomically save `submitting` before the paid network call. SDK, workflow and tool retries cannot bypass this guard. An ambiguous response or recovered unreceipted submission becomes `failed` with `outcome_unknown`, not permission to submit again.
 4. **Asynchronous adapters:** persist the real provider task identity before `running`; poll only that task using bounded native waits. **Synchronous adapters:** retain the bounded response/result receipt and finalize through the same owned-result path; do not invent a remote task, polling API or cancel guarantee. Lost synchronous responses have the same paid-submission uncertainty rule. HTTP correlation IDs are not resumable task IDs.
 5. Acquire and verify returned bytes under stable private request-owned storage. A provider-success response or temporary URL is not yet an Artifact Version. Reconcile available receipts/staged bytes on re-entry; do not overwrite published media or regenerate to fix download/validation failures.
@@ -1220,7 +1253,7 @@ Each story targets **≤5 logical commits including verification**. Split oversi
 - **Acceptance criteria:**
   - [ ] Commit the approved batch, one request per candidate and stable run identities before starting work. Repeated execution against the same authority returns the existing batch, not extra calls; conflicting reuse fails. Return the durable identity and end the assistant's work without waiting or repeatedly reasoning during provider polling.
   - [ ] Recover a saved-before-start gap by checking actual native state before starting missing work. Atomically claim eligibility/save `submitting` before network submission; SDK/native retries and repeated tool calls cannot bypass it. Recovery revalidates the persisted human authority before submission; credentials alone do not authorize work. Admission and publication honor existing cancellation barriers.
-  - [ ] Actual built-server/Postgres tests with controlled adapters prove creation, independent start, Stop/disconnect isolation, queued work, re-entry, lost start acknowledgment and bounded admission. No artificial public generation-submit API, second scheduler or blanket authorization for future dependent requests is added.
+  - [ ] Actual built-server/Postgres tests with controlled adapters prove creation, independent start, Stop/disconnect isolation, queued work, re-entry, lost start acknowledgment and bounded admission. Specifically start work from a real native tool in a controlled still-active turn, return without waiting, then Stop that turn; independently started work continues. This owns the tool-started proof relocated from P1-S3 and reuses P3-S18/S19 rather than rebuilding execution. No artificial public generation-submit API, second scheduler or blanket authorization for future dependent requests is added.
 - **Commits:** ≤5.
 
 ##### P4-S10 — Owned result acquisition, verification and publication
