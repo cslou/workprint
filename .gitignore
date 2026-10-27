@@ -1,0 +1,33 @@
+# Local credentials: keep the safe example, never actual values.
+.env
+.env.*
+!.env.example
+/secrets/
+
+# Planning/research stays local; public design sources are intentionally tracked.
+/docs/sprints/
+/docs/specs/
+/docs/research/
+
+# Dependencies, build output and caches.
+node_modules/
+.pnpm-store/
+dist/
+build/
+.mastra/
+.vite/
+coverage/
+*.tsbuildinfo
+
+# Generated work, local evidence and logs.
+/outputs/
+/logs/
+*.log
+
+# Personal editor and operating-system files.
+.DS_Store
+Thumbs.db
+/.idea/
+/.obsidian/
+*.swp
+*.swo
