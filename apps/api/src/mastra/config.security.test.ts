@@ -19,6 +19,10 @@ test('missing or malformed configuration fails without echoing values', () => {
     { ...valid, PORT: '4111junk' },
     { ...valid, MIGRATION_DATABASE_URL: valid.DATABASE_URL },
     { ...valid, VITE_PRIVATE_KEY: sentinel },
+    { ...valid, SUPABASE_URL: 'http://127.0.0.1:55431' },
+    { ...valid, SUPABASE_URL: `https://${sentinel}@example.invalid`, SUPABASE_SECRET_KEY: sentinel },
+    { ...valid, SUPABASE_URL: `https://example.invalid/${sentinel}`, SUPABASE_SECRET_KEY: sentinel },
+    { ...valid, SUPABASE_URL: 'http://example.invalid', SUPABASE_SECRET_KEY: sentinel },
   ]) {
     assert.throws(() => loadServerConfig(env), (error: unknown) => {
       assert.ok(error instanceof Error);
@@ -27,4 +31,6 @@ test('missing or malformed configuration fails without echoing values', () => {
     });
   }
   assert.equal(loadServerConfig(valid).port, 4111);
+  assert.equal(loadServerConfig({ ...valid, SUPABASE_SECRET_KEY: sentinel }).auth, undefined, 'Key presence alone cannot enable Auth or conversations');
+  assert.equal(loadServerConfig({ ...valid, SUPABASE_URL: 'http://127.0.0.1:55431', SUPABASE_SECRET_KEY: sentinel }).auth?.secret, sentinel);
 });

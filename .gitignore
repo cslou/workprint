@@ -17,6 +17,8 @@ build/
 coverage/
 .test-build/
 *.tsbuildinfo
+/supabase/.branches/
+/supabase/.temp/
 
 # Generated work, local evidence and logs.
 /outputs/

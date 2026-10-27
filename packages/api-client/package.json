@@ -1,0 +1,8 @@
+{
+  "name": "@workprint/api-client",
+  "private": true,
+  "type": "module",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "scripts": { "build": "tsc -p tsconfig.json" },
+  "dependencies": { "@mastra/client-js": "1.56.0", "zod": "4.6.7" }
+}
