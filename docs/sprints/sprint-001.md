@@ -2,7 +2,7 @@
 
 **Date:** Initially approved 2026-10-27; revised scope approved during replanning. Completion remains subject to evidence and delivery gates.
 **Goal:** Build on the accepted application foundation to expose authenticated, closed application contracts through a typed client, with validated, side-effect-free not-implemented responses. No functional conversations or background execution.
-**Status:** 🔵 In Progress — Stories 1–2 accepted; Stories 4–5 and Final Verification explicitly authorized. Integration into `main` still requires a separate merge command.
+**Status:** 🔵 In Progress — all active implementation and private-scope verification complete; final-story review and sprint integration pending. Integration into `main` still requires a separate merge command.
 
 ---
 
@@ -11,7 +11,7 @@
 ### Project Context
 - **Repo:** Workprint; paths are relative to the repository root. Sprint integration into `main` still requires an explicit user merge command.
 - **Tech stack:** TypeScript, pinned Node/pnpm, React/Vite shell, one Mastra server, Supabase Auth/Postgres, plain `pg`, strict types/lint/dependency-cruiser. Keep the accepted package cohort unless a demonstrated need requires a separately reviewed change.
-- **Current state:** Story 1 merged through [PR #3](https://github.com/cslou/workprint/pull/3). Its acceptance and seven regression cases are retained below. Auth, native conversations/workflows and live AI remain unqualified. The planning branch contains Story 1 application code, not the deferred Story 2 implementation.
+- **Current state:** Active Stories 1, 2, 4 and 5 are merged into `sprint-001` through PRs #3, #5, #6 and #7. Real Supabase admission, 19 closed application routes and typed client are verified for the approved private/local scope. Thirteen aggregate cases pass; two explicit ingress qualification cases remain failed under B-001. Native conversations/workflows, live AI and filmmaking business behavior remain unavailable. PR #4 remains deferred.
 - **Implementation spec:** [Implementation Spec 001](../specs/implementation-spec-001.md), §§4–7 and revised Phase 1. P1-S3 is relocated, not an active sprint dependency.
 
 ### Sprint-Wide Context
@@ -140,19 +140,19 @@ Not active Sprint 001 work. P3-S18 owns independent workflow isolation/cancellat
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
   - [x] Ready for Lou
-- **Planning review:** Revised-plan sprint-doc-reviewer: 5/5, no findings on dependencies or unavailable-native boundary. Implementation checks remain unrun.
+- **Planning review:** Revised-plan sprint-doc-reviewer: 5/5, no findings on dependencies or unavailable-native boundary. Execution evidence is recorded in Final Review.
 - **As a** developer, **I want** closed shared contracts and explicit owners/consumers, **so that** later features do not invent competing APIs or mistake declarations for functionality.
 - **Dependencies:** Stories 1–2; maps to P1-S4. No native conversation/workflow qualification dependency.
 - **Acceptance criteria:**
-  - [ ] S4-AC1: `docs/api-surface.md` catalogs §4 application routes plus intended native/tool/internal operations: owner, caller, flow, inputs/outputs, authorization, errors, idempotency, implementation/qualification status and later owner. Native API references are declared supported interfaces, not claimed runtime proof. Tools/internal operations acquire no unnecessary HTTP routes.
-  - [ ] S4-AC2: Browser-safe closed schemas preserve operation IDs, exact version/question/proposal/Shot/Panel bindings, option-only answers, targets and selection revision. Reuse supported native types; no copied stream protocol or private rows/provider state. Shared request/response shapes do not implement domain rules.
-  - [ ] S4-AC3: Define structured error/unavailable handling and named application boundaries: authenticate → closed-input validation → ownership for implemented resources → not implemented. Native capabilities remain unexposed; the client reports explicit unavailable without a custom route or network attempt. Do not add fake ownership stores, mutation ledgers or domain implementations.
-  - [ ] S4-AC4: Separate human actions from agent capabilities. No public generation-submit, amendment, deletion, model-preference or totals endpoint. Future ownership checks are assigned to functional stories, not falsely claimed tested here.
+  - [x] S4-AC1: `docs/api-surface.md` catalogs §4 application routes plus intended native/tool/internal operations: owner, caller, flow, inputs/outputs, authorization, errors, idempotency, implementation/qualification status and later owner. Native API references are declared supported interfaces, not claimed runtime proof. Tools/internal operations acquire no unnecessary HTTP routes.
+  - [x] S4-AC2: Browser-safe closed schemas preserve operation IDs, exact version/question/proposal/Shot/Panel bindings, option-only answers, targets and selection revision. Reuse supported native types; no copied stream protocol or private rows/provider state. Shared request/response shapes do not implement domain rules.
+  - [x] S4-AC3: Define structured error/unavailable handling and named application boundaries: authenticate → closed-input validation → ownership for implemented resources → not implemented. Native capabilities remain unexposed; the client reports explicit unavailable without a custom route or network attempt. Do not add fake ownership stores, mutation ledgers or domain implementations.
+  - [x] S4-AC4: Separate human actions from agent capabilities. No public generation-submit, amendment, deletion, model-preference or totals endpoint. Future ownership checks are assigned to functional stories, not falsely claimed tested here.
 - **Functional verification:**
-  - [ ] V9 — add `pnpm test:contracts` for shared schemas/error decoding. Representative valid requests parse; malformed/extra fields, forged authority, missing operation IDs and invalid conditional targets reject for the intended reason. Keep only distinct branches; Story 5 owns HTTP proof.
-  - [ ] V10 — `pnpm check` confirms browser-safe shared types and import direction, without duplicating native protocol definitions.
+  - [x] V9 — add `pnpm test:contracts` for shared schemas/error decoding. Representative valid requests parse; malformed/extra fields, forged authority, missing operation IDs and invalid conditional targets reject for the intended reason. Keep only distinct branches; Story 5 owns HTTP proof.
+  - [x] V10 — `pnpm check` confirms browser-safe shared types and import direction, without duplicating native protocol definitions.
 - **Regression verification:**
-  - [ ] `pnpm test`, `pnpm check`, `pnpm build`: retain foundation/Auth/exposure checks. No native/workflow suite is a prerequisite before those features exist.
+  - [x] `pnpm test`, `pnpm check`, `pnpm build`: retain foundation/Auth/exposure checks. No native/workflow suite is a prerequisite before those features exist.
 - **Editorial/design verification:** Compare catalog with the closed spec inventory; record genuine consumers, declared versus verified native behavior and later owners. No prose-presence test or new product visual approval.
 - **Manual-only behavior verification:** N/A — executable schemas automated; prose reviewed editorially.
 - **Planned commits:**
@@ -171,19 +171,19 @@ Not active Sprint 001 work. P3-S18 owns independent workflow isolation/cancellat
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
   - [x] Ready for Lou
-- **Planning review:** Revised-plan sprint-doc-reviewer: 5/5, no findings on the application-only boundary. Implementation checks remain unrun.
+- **Planning review:** Revised-plan sprint-doc-reviewer: 5/5, no findings on the application-only boundary. Execution evidence and the subsequent approved B-001 exception are recorded in Final Review.
 - **As a** frontend developer, **I want** callable authenticated application routes and a typed client, **so that** Phase 2 can wire controls without pretending unfinished work succeeds.
 - **Dependencies:** Stories 1–2 and 4; maps to P1-S5. No dependency on relocated Story 3 or PR #4.
 - **Acceptance criteria:**
-  - [ ] S5-AC1: Mount the cataloged application routes on the existing Mastra server and expose typed `api-client` methods derived from shared schemas. Every application browser route has a scripted client → real backend call. Native conversations remain unavailable/unexposed, not a parallel chat protocol.
-  - [ ] S5-AC2: Requests enforce real authentication, closed input validation and ownership only for implemented resources before unavailable results. Invalid identity/input, actual resource ownership failure, unavailable features and transport failures remain distinguishable; client calls settle within bounded deadlines/cancellation. No unconditional placeholder hides earlier guards.
-  - [ ] S5-AC3: Unavailable operations create no product records, approval, model/provider work or success-shaped results. No conversation/domain seed store or mutation/idempotency ledger is needed. Catalog resource ownership and business semantics as unimplemented until their owners deliver them.
-  - [ ] S5-AC4: Record mounted route/client evidence and production exposure; test controls remain inaccessible. A test caller proves transport, not a genuine frontend consumer; Phase 2 owns frontend wiring.
+  - [x] S5-AC1: Mount the cataloged application routes on the existing Mastra server and expose typed `api-client` methods derived from shared schemas. Every application browser route has a scripted client → real backend call. Native conversations remain unavailable/unexposed, not a parallel chat protocol.
+  - [x] S5-AC2: Requests enforce real authentication, closed input validation and ownership only for implemented resources before unavailable results. Invalid identity/input, actual resource ownership failure, unavailable features and transport failures remain distinguishable; client calls settle within bounded deadlines/cancellation. No unconditional placeholder hides earlier guards.
+  - [x] S5-AC3: Unavailable operations create no product records, approval, model/provider work or success-shaped results. No conversation/domain seed store or mutation/idempotency ledger is needed. Catalog resource ownership and business semantics as unimplemented until their owners deliver them.
+  - [x] S5-AC4: Record mounted route/client evidence and production exposure; test controls remain inaccessible. A test caller proves transport, not a genuine frontend consumer; Phase 2 owns frontend wiring.
 - **Functional verification:**
-  - [ ] V9 — extend `pnpm test:contracts` with a parameterized typed-client → built-server matrix for every application route. Valid authenticated payloads return structured unavailable; missing/invalid/expired identity and representative malformed/extra fields fail at their earlier boundary. Client-observed transport errors, stalled requests and cancellation settle without hanging. Native unavailable calls make no network request or custom stream. Server-side unfinished-upload rejection remains the explicitly deferred, known-failing B-001 qualification; client settlement must not be reported as proof of server cleanup.
-  - [ ] V9/V3 — observe applicable real state and provider-work boundaries before/after unavailable requests; no writes/calls or success-shaped output. Exercise guard order with malformed inputs as well as valid requests. No claim of unimplemented conversation/domain isolation; test actual owned-resource rejection when such resources exist.
+  - [x] V9 — extend `pnpm test:contracts` with a parameterized typed-client → built-server matrix for every application route. Valid authenticated payloads return structured unavailable; missing/invalid/expired identity and representative malformed/extra fields fail at their earlier boundary. Client-observed transport errors, stalled requests and cancellation settle without hanging. Native unavailable calls make no network request or custom stream. Server-side unfinished-upload rejection remains the explicitly deferred, known-failing B-001 qualification; client settlement must not be reported as proof of server cleanup.
+  - [x] V9/V3 — observe applicable real state and provider-work boundaries before/after unavailable requests; no writes/calls or success-shaped output. Exercise guard order with malformed inputs as well as valid requests. No claim of unimplemented conversation/domain isolation; test actual owned-resource rejection when such resources exist.
 - **Regression verification:**
-  - [ ] `pnpm test`, `pnpm check`, `pnpm build`: retain Story 1 smoke/security and Story 2 Auth/exposure plus Story 4 schema cases. Focused runs reuse the aggregate cases.
+  - [x] `pnpm test`, `pnpm check`, `pnpm build`: retain Story 1 smoke/security and Story 2 Auth/exposure plus Story 4 schema cases. Focused runs reuse the aggregate cases.
 - **Editorial/design verification:** Reconcile actual routes/client/examples/catalog with spec; identify later functional owners and honest unavailable status. No frontend visual acceptance.
 - **Manual-only behavior verification:** N/A — scripted actual client/server checks.
 - **Planned commits:**
@@ -198,19 +198,19 @@ Not active Sprint 001 work. P3-S18 owns independent workflow isolation/cancellat
   - [x] Defines evidence location
   - [x] Includes full regression verification
   - [x] Ready for Lou
-- **Planning review:** Revised-plan sprint-doc-reviewer: 5/5, no findings on the completion boundary. Final execution verification has not occurred.
+- **Planning review:** Revised-plan sprint-doc-reviewer: 5/5, no findings on the completion boundary. Final evidence gathering completed at `124aa977500902cbf66dc330de33c3fe804f89e0`; resulting documentation-head review remains pending.
 - **As a** maintainer, **I want** current functional and regression evidence, **so that** integration accepts only the revised API foundation.
 - **Dependencies:** Active Stories 1, 2, 4 and 5; not relocated Story 3 or deferred PR #4.
 - **Acceptance criteria:**
-  - [ ] Evaluate every active story AC and functional/regression item against implementation evidence; record failed, ambiguous, manual-only and unrun items as non-pass.
-  - [ ] Run all sprint functional checks and the full available regression suite, including checks established during execution. Preserve accepted Story 1 coverage.
-  - [ ] Identify reusable new checks and report verification delta by canonical type; relocated planned V4–V8 are neither removed tests nor completed checks.
-  - [ ] Reconcile spec, catalog, qualification record and README; no claimed native conversation/workflow or filmmaking capability.
+  - [x] Evaluate every active story AC and functional/regression item against implementation evidence; record failed, ambiguous, manual-only and unrun items as non-pass.
+  - [x] Run all sprint functional checks and the full available regression suite, including checks established during execution. Preserve accepted Story 1 coverage.
+  - [x] Identify reusable new checks and report verification delta by canonical type; relocated planned V4–V8 are neither removed tests nor completed checks.
+  - [x] Reconcile spec, catalog, qualification record and README; no claimed native conversation/workflow or filmmaking capability.
   - [ ] Update status to `🟢 Complete` only after completion gates; append `## Final Review` with the quoted final completion message, evidence and New Dependencies (or `None`).
 - **Functional verification:**
-  - [ ] Run current V1/V2/V3/V9/V10 at the final candidate revision. Keep final verification short by reusing existing aggregate suites and concise evidence, not adding an acceptance harness or duplicating focused runs already included. Required coverage is unchanged. Native Stop/crash checks belong to the relocated stories, not this candidate.
+  - [x] Run current V1/V2/V3/V9/V10 at the final candidate revision. Keep final verification short by reusing existing aggregate suites and concise evidence, not adding an acceptance harness or duplicating focused runs already included. Required coverage is unchanged. Native Stop/crash checks belong to the relocated stories, not this candidate.
 - **Regression verification:**
-  - [ ] Run `pnpm test`, `pnpm check`, `pnpm build` and clean-checkout smoke plus any additional established required checks. Record how aggregate/focused commands overlap so cases are counted once.
+  - [x] Run `pnpm test`, `pnpm check`, `pnpm build` and clean-checkout smoke plus any additional established required checks. Record how aggregate/focused commands overlap so cases are counted once.
 - **Editorial/design verification:** Review documentation against observed admission, contract and exposure behavior. Record B-001's user-approved private-development exception and known-failing ingress qualification separately from passing sprint tests; no public exposure or Phase 3 native-runtime qualification until resolved. Other feature qualification is explicitly pending; no product design/live-service/deployment acceptance.
 - **Manual-only behavior verification:** N/A planned. If automation is genuinely impractical, record rationale, reproducible steps and pass/fail conditions before acceptance; missing required evidence remains non-pass.
 - **Planned commits:**
@@ -231,3 +231,80 @@ Final evidence identifies revision, commands/environment, package cohort, safe f
 - Final Review records the quoted completion message, candidate/commands/results, delta table and new dependencies.
 - Spec/catalog/qualification records reflect actual capability and later owners; no relocated feature is claimed completed.
 - Integration PR passes independent review/check/conversation gates and merges only after explicit user authorization.
+
+## Final Review
+
+> Sprint 001's active implementation and private/local verification are complete: reproducible foundation, actual Supabase admission, closed contracts and 19 callable unavailable application operations with a bounded typed client. Thirteen current-scope cases pass, with static checks, build and audit passing. Two separately executed ingress qualification cases remain failed under the explicit B-001 private-development exception, not fixed or counted as passes. Resolve that gate before Phase 3 native-runtime qualification and before public deployment. Final-story/cumulative review and explicit integration approval remain delivery gates; nothing here authorizes merging into main or public exposure.
+
+**Mergeability:** Pending — resulting final-story head review required. Historical Story 4 and Story 5 reviews were 5/5 at the revisions below; they do not review this record commit. The status remains In Progress until the remaining delivery gates pass.
+
+### Sprint objective + accomplishments
+
+**Objective:** authenticated, closed application contracts and a typed client over the accepted foundation, with truthful side-effect-free unavailable responses; no functional conversations or background execution.
+
+- **Story 1 — foundation:** pinned workspace, minimal web/native backend, safe configuration, supported Postgres initialization and restricted serving roles. Accepted PR #3 introduced seven retained cases; historical evidence remains unchanged above.
+- **Story 2 — authentication:** actual configured Supabase verification and route restrictions, with two synthetic identities and sanitized bounded outbound verification. Accepted PR #5 head `964157e886489ab32dc5b798a8ef697838a8a196`; post-merge eight cases/check/build passed. This does not prove early admission before native body parsing.
+- **Story 4 — contracts:** closed shared schemas and catalog with genuine intended consumers, named unavailable boundaries and explicit human/agent distinctions. Accepted [PR #6](https://github.com/cslou/workprint/pull/6) head `7749c0a39c3ffa0cccf46527ce1269d078e8a2f1`, merge `6dcfb0f9df0f9472bd5bab3f7ee85bba48dc0d94`. Independent verification found missing Version response coverage; added focused content/media/private-field proof, re-review 5/5. Orchestrator post-merge test 12/12/check/build passed.
+- **Story 5 — API/client:** all 19 application routes and schema-derived client methods; actual built-server matrix for both identities, no product effects, local-only unavailable native methods and bounded client failures/cancellation. Accepted [PR #7](https://github.com/cslou/workprint/pull/7) head `bc1a1e4e34e7e914702eda696d6f6e22e50fcd20`, merge `124aa977500902cbf66dc330de33c3fe804f89e0`. Dot-path IDs corrected and completed oversized-body rejection proved. Actual unfinished-upload failure exposed B-001; user explicitly accepted private-only deferral, not a runtime fix. Fix verification and renewed full review both 5/5 under that scope. A hygiene claim that commit scope was mandatory was dismissed: canonical policy explicitly permits scope omission.
+
+### Verification evidence
+
+At **`124aa977500902cbf66dc330de33c3fe804f89e0`**, the final evidence-only worker ran:
+
+| Command | Result |
+| --- | --- |
+| `pnpm test` with private authorized Auth fixtures | **13/13 PASS**, zero failed/skipped/cancelled/todo; includes current committed-HEAD frozen-export install/build/setup/start/dev smoke |
+| `pnpm check` | **PASS** strict types, lint, dependency boundaries and 12 rejected temporary forbidden-import controls |
+| `pnpm build` | **PASS** native and browser artifacts; generated-entry shape advisory remains, but real built/dev serving passes |
+| `pnpm audit` | **PASS**, no known vulnerabilities reported |
+| `pnpm qualify:ingress` with the same private fixtures | **NON-PASS**, exit 1: authenticated and unauthenticated unfinished uploads hit five-second watchdogs; explicitly deferred B-001 |
+
+Logs and detailed AC evaluations: `/tmp/workprint-s001-final-124aa977/{test,check,build,audit,ingress}.log` and `report.md`. Durable results are summarized here and in PR metadata; temporary logs are not repository dependencies. Node 24.22.1 / pnpm 11.28.8; Workprint-only loopback Supabase, two synthetic accounts, fixture-owned Postgres and separate setup/serving roles. Credentials remain private. No new runtime/service/proxy migration, paid calls or deployment. Focused commands select aggregate cases; no redundant full acceptance harness was added.
+
+### Verification delta
+
+Counting basis: actual behavioral test cases, each assigned its most specific canonical type once. The qualification contributes **two leaf cases**, not its grouping parent. After sprint counts implemented verification surfaces, not passes; failed-but-run is not not-yet-run. Before sprint was the empty application baseline `eac9135b707497e225fe0e78a75cf54f6de53427`. No Unknown counts. Parameter rows/assertions/focused repetitions are not extra cases.
+
+| Verification type | Before sprint | Added this sprint | Removed | Pending / not yet run | After sprint | Notes |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Unit | 0 | 0 | 0 | 0 | 0 | Schema cases classified as contracts |
+| Integration / contract | 0 | 6 | 0 | 0 | 6 | Four schema/boundary, client transport, compiler cancellation: passed |
+| E2E / smoke | 0 | 1 | 0 | 0 | 1 | Frozen committed-export journey: passed |
+| Simulator / device | 0 | 0 | 0 | 0 | 0 | Not implemented scope |
+| AI / model evals | 0 | 0 | 0 | 0 | 0 | No enabled model |
+| Static / local checks | 0 | 0 | 0 | 0 | 0 | Command groups reported separately below |
+| Performance / load | 0 | 0 | 0 | 0 | 0 | Deadlines are not a capacity benchmark |
+| Security / dependency | 0 | 8 | 0 | 0 | 8 | Six passed; two known-failed B-001 leaf cases |
+| Accessibility / visual | 0 | 0 | 0 | 0 | 0 | No product visual acceptance |
+| Manual-only | 0 | 0 | 0 | 0 | 0 | No required manual behavior checks |
+| Other verification | 0 | 0 | 0 | 0 | 0 | Editorial evidence is not a persistent suite |
+| **Total** | **0** | **15** | **0** | **0** | **15** | **13 passing + 2 failed, explicitly deferred** |
+
+Separately, three command groups were added (before 0, removed 0, unrun 0): Static/local `pnpm check` and `pnpm build`; Security/dependency `pnpm audit`. All pass; do not sum these groups with behavioral cases. Frozen install is already covered by smoke. Security cases include configuration, built admission, privileges/secrets, pool recovery/sanitization, Docker ownership cleanup and Vite private-file denial. All seven original foundation cases remain. V4–V8 were relocated plans, not removed tests.
+
+Regression summary: **0 required current-scope cases unrun; 13/13 passed**. The two failed ingress cases remain separate and open. All reusable behavior checks are future regression coverage; one-off catalog/setup editorial review is not a new test.
+
+### Delivered / why ready for integration review
+
+| Story | Acceptance criteria | Functional proof | Regression / editorial evidence |
+| --- | --- | --- | --- |
+| 1 | S1-AC1–4 accepted | Clean export/start, safe config, restricted setup, static controls | Seven foundation cases retained; README/cohort rationale checked |
+| 2 | S2-AC1–4 accepted, with later B-001 ingress distinction explicit | Actual Supabase identity/errors, restricted routes, probe isolation | Current aggregate and static/build; no native conversation claim |
+| 4 | S4-AC1–4 accepted | Four closed-schema/error/unavailable cases, private-field rejection | Current aggregate/static/build; spec/catalog editorial comparison |
+| 5 | S5-AC1–4 accepted under private-only exception | Built-server 19-route matrix, no effects, client bounds/no-network native, completed oversized JSON | All 13 current cases retained; B-001 separately failed, not passed |
+| Final | Evidence gathering complete; delivery review pending | V1/V2/V3/V9/V10 evaluated at final code revision | Entire current suite/check/build/audit; no unapproved public or live-service qualification |
+
+No product visual changes or required manual-only checks. Descriptive documentation functional/regression testing is N/A; editorial review reconciled spec/catalog/routes/client/setup and limitations. Product ownership, domain authority/idempotency, rich creative validation, conversations/workflows, R2, live Muse, frontend wiring and filmmaking remain later obligations, not simulated passes.
+
+### Open for your decision
+
+- Sprint integration into `main` remains subject to explicit user approval after cumulative review. No further risk acceptance is inferred.
+- B-001 risk acceptance is already granted only for private/local Phase 1–2 development; solution selection and successful qualification remain open before Phase 3 native work/public deployment.
+
+### Drift from spec
+
+Approved narrowing relocated conversations/workflows out of Phase 1; Story 1 retained. The tracked private-development ingress exception permits this milestone despite two known-failed qualification cases. The spec and sprint preserve the later gate independently of the gitignored backlog. No other scope expansion or newly approved product flow.
+
+### New Dependencies
+
+The fresh application added Node/pnpm tooling; TypeScript; React/react-dom and Vite for the minimal shell; Mastra core/CLI/Postgres integration for one native runtime; `pg` for explicit database mechanics; Zod for runtime contracts with inferred types; ESLint/typescript-eslint/dependency-cruiser and type packages for strict checks. Exact pins and individual rationale are in `docs/native-runtime-qualification.md` and the lockfile. Story 2 added no third-party dependency; Story 4 reused pinned Zod, Story 5 added workspace links only. Final verification adds **None**. Current audit and clean frozen install passed.
