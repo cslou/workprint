@@ -29,7 +29,12 @@ test('clean tracked export installs frozen, prepares, builds and serves built/de
   });
   await command('pnpm', ['build'], { cwd: checkout, env: fixture.env, log: join(fixture.logs, 'build.log') });
   const databaseLog = join(fixture.logs, 'local-database.log');
-  const database = await start(process.execPath, ['scripts/local-database.mjs'], { cwd: checkout, env: fixture.env, log: databaseLog });
+  const database = await start(process.execPath, ['scripts/local-database.mjs'], {
+    cwd: checkout,
+    // An ambient setup URL must never redirect fixture preparation to another target.
+    env: { ...fixture.env, MIGRATION_DATABASE_URL: 'postgresql://not-owned:unused@127.0.0.1:1/not_the_fixture' },
+    log: databaseLog,
+  });
   t.after(database.stop);
   const deadline = Date.now() + 30000;
   for (;;) {

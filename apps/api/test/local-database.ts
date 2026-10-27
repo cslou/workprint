@@ -21,7 +21,14 @@ try {
   written = true;
   await command('pnpm', ['db:prepare'], {
     cwd: process.cwd(),
-    env: { ...process.env, WORKPRINT_ENV_FILE: file, MASTRA_TELEMETRY_DISABLED: '1', MASTRA_OFFLINE: '1' },
+    env: {
+      ...process.env,
+      WORKPRINT_ENV_FILE: file,
+      // Node dotenv loading preserves ambient values; the fixture target must win.
+      MIGRATION_DATABASE_URL: db.setupUrl,
+      MASTRA_TELEMETRY_DISABLED: '1',
+      MASTRA_OFFLINE: '1',
+    },
     log: join(process.cwd(), 'outputs/local-database.log'),
   });
   await db.grantServing();
