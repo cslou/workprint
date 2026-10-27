@@ -53,6 +53,10 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+    devDependencies:
+      '@workprint/api-client':
+        specifier: workspace:*
+        version: link:../../packages/api-client
 
   apps/web:
     dependencies:
@@ -72,6 +76,12 @@ importers:
       vite:
         specifier: 8.3.5
         version: 8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(yaml@2.9.1)
+
+  packages/api-client:
+    dependencies:
+      '@workprint/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/contracts:
     dependencies:

@@ -379,7 +379,7 @@ Prefer focused boundary tests for native runtime, authentication, persistence an
 
 Production targets are Cloudflare static frontend, **one Railway backend**, Supabase Auth/Postgres and private R2, with Sentry as configured. P4-S19 deploys the exact reviewed/verified build and records identity/targets, using reviewed application and supported native store preparation, restricted serving grants and separate setup credentials. No additional CI/CD platform is required.
 
-Before action, separately authorize resources, exposure/access, schema preparation, secrets and any paid smoke calls. Verify API origins/Auth redirects/password-reset email delivery/R2 CORS/private access, selected model mappings, exclusion of test-only providers/controls and the qualified pool/provider/media/process/readiness/shutdown limits. Signup policy and announcements are not implied.
+Before action, resolve and verify B-001's incoming-request admission/body-limit gate; its private-development risk acceptance does not permit public exposure. Separately authorize resources, exposure/access, schema preparation, secrets and any paid smoke calls. Verify API origins/Auth redirects/password-reset email delivery/R2 CORS/private access, selected model mappings, exclusion of test-only providers/controls and the qualified pool/provider/media/process/readiness/shutdown limits. Signup policy and announcements are not implied.
 
 Use bounded actual deployed browser/API smoke checks with authorized accounts and synthetic/licensed material, including private upload/playback/download and saved-work-to-export. Enabled AI wiring needs separately authorized exact proposals/calls and usage evidence; no production fake provider or seed endpoint. Reuse the release build's feature/regression evidence rather than recreating QA. Missing authorization or a required failed/unrun check is non-pass.
 
@@ -513,6 +513,8 @@ There is no separate general QA phase. Functional/regression proof stays with it
 **Outcome:** a runnable authenticated backend, closed API catalog and typed client that the frontend can connect to. Unfinished operations return validated, side-effect-free not-implemented responses. Authentication and route restrictions are real; functional conversations and background execution are deferred to Phase 3, with tool-driven execution in Phase 4.
 
 This is an **internal development milestone**, not a usable filmmaking product.
+
+**Approved private-development limitation (B-001):** The pinned generated server reads POST/PUT JSON before application authentication and request deadlines. An unfinished-upload reproduction fails its independent five-second watchdog; end-to-end ingress boundedness is not qualified. The user approved deferring this safety gate for private/local Phase 1–2 development only, retaining completed-request authentication/validation and bounded client behavior. Preserve the failing qualification and report it separately, not as passing sprint coverage. Resolve the serving approach and verify early admission/body limits before Phase 3 native-runtime qualification and before public deployment. No adapter migration, public exposure or weakening of unrelated tests is authorized. This tracked gate stands independently of the private backlog.
 
 #### Scope
 
@@ -847,7 +849,7 @@ Qualify the single background-execution mechanism in P3-S18/S19 before cancellat
 
 #### Dependencies
 
-- Phase 1's built-server foundation, backend Auth and contracts plus Phase 2's connected frontend. P3-S1a–S1c qualifies conversations; P3-S18/S19 qualifies shared workflows before P3-S8/S11–S13. Preserve established checks; mocks cannot replace native qualification.
+- Phase 1's built-server foundation, backend Auth and contracts plus Phase 2's connected frontend. Resolve B-001's pre-authentication/pre-timeout JSON-read limitation and qualify the chosen serving path before Phase 3 native-runtime qualification. P3-S1a–S1c qualifies conversations; P3-S18/S19 qualifies shared workflows before P3-S8/S11–S13. Preserve established checks; mocks cannot replace native qualification.
 - The configured assistant integration for frontend chat, a declared media upload/playback allowlist and export compatibility rules/limits. Choose concrete versions, formats and technical bounds during sprint packaging; verify real response shapes before integration-specific handling and qualify behavior before feature acceptance.
 - Dedicated development Supabase/R2 and separately authorized real-model/service verification. Tests use isolated data and synthetic/licensed media, never customer records or private demo assets.
 - Existing design references. New conflict, progress, expired-source and export states need visual approval before implementation; Phase approval does not approve unseen screens.

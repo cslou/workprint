@@ -11,11 +11,12 @@
     "start": "node scripts/tasks.mjs start",
     "db:prepare": "node scripts/tasks.mjs db:prepare",
     "db:local": "node scripts/local-database.mjs",
-    "check": "tsc -p packages/contracts/tsconfig.json && tsc --noEmit && eslint . && node scripts/boundaries.mjs && node scripts/boundary-controls.mjs",
+    "check": "tsc -p packages/contracts/tsconfig.json && tsc -p packages/api-client/tsconfig.json && tsc --noEmit && eslint . && node scripts/boundaries.mjs && node scripts/boundary-controls.mjs",
     "test": "node scripts/test.mjs",
     "test:smoke": "node scripts/test.mjs smoke",
     "test:security": "node scripts/test.mjs security",
-    "test:contracts": "node scripts/test.mjs contracts"
+    "test:contracts": "node scripts/test.mjs contracts",
+    "qualify:ingress": "node scripts/test.mjs ingress-qualification"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

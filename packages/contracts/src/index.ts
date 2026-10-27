@@ -10,7 +10,7 @@ export const errorStatus: Readonly<Record<ErrorCode, number>> = { unauthenticate
 export function applicationError(code: ErrorCode, message: string): ErrorEnvelope { return { error: { code, message } }; }
 
 const empty = z.strictObject({});
-const scope = z.strictObject({ id: idSchema });
+const scope = z.strictObject({ id: idSchema.refine((id) => id !== '.' && id !== '..', 'Path ID cannot be a dot segment') });
 export const paginationSchema = z.strictObject({ cursor: z.string().min(1).max(1000).optional(), limit: z.number().int().min(1).max(100).optional() });
 const mutation = { operationId: idSchema };
 const request = <P extends z.ZodType, Q extends z.ZodType, B extends z.ZodType>(params: P, query: Q, body: B) => z.strictObject({ params, query, body });

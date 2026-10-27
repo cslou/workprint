@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { operations, errorEnvelopeSchema, proposalSchema, questionSchema } from '@workprint/contracts';
 import { unavailableApplication } from '../src/application/index.js';
+import { applicationRequests } from './application-requests.js';
 
 const operationId = 'operation-1';
 const save = { params: { id: 'conversation-1' }, query: {}, body: { operationId, kind: 'script', content: {}, dependencies: [] } };
@@ -95,16 +96,8 @@ test('named unavailable boundaries authenticate before validation and have no ow
   assert.equal(unavailable.error.code, 'not_implemented');
   assert.equal((await unavailableApplication.saveVersion({}, async () => ({ kind: 'unavailable' }))).error.code, 'integration_failure');
   assert.deepEqual(calls, ['authenticate']);
-  const bodies: Partial<Record<keyof typeof operations, unknown>> = {
-    saveVersion: save.body,
-    useVersion: { operationId, versionId: 'v', purpose: 'panel_image', shotId: 's', panelId: 'p' },
-    editStoryboard: { operationId, baseVersionId: 'base-v', shots: [{ shotId: 's', order: 0, panels: [{ panelId: 'p', order: 0, references: ['reference-v'] }] }] },
-    answerQuestion: { operationId, questionRevision: 2, optionId: 'approve' },
-    requestUpload: { operationId, kind: 'image', filename: 'image.png', contentType: 'image/png', byteSize: 1024 },
-    confirmUpload: { operationId }, cancelGeneration: { operationId }, createExport: { operationId, selectionRevision: 7 },
-  };
   for (const name of Object.keys(operations) as (keyof typeof operations)[]) {
-    const input = { params: name === 'library' ? {} : { id: 'exact-resource' }, query: {}, body: bodies[name] ?? {} };
+    const input = applicationRequests[name];
     assert.equal(operations[name].request.safeParse(input).success, true, name);
     assert.equal((await unavailableApplication[name](input, async () => ({ kind: 'verified', accountId: 'account' }))).error.code, 'not_implemented', name);
   }
