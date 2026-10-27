@@ -54,6 +54,37 @@ test('response contracts retain exact proposal/question targets and decode only 
   assert.equal(operations.export.response.safeParse({ ...exported, sources: [{ shotId: 's', order: 0 }] }).success, false);
 });
 
+test('Version responses decode content and media branches while rejecting malformed and private fields', () => {
+  const base = { id: 'version-2', artifactId: 'artifact-1', revision: 2, createdBy: 'human', createdAt: '2026-10-27T12:00:00Z', dependencies: ['reference-version-1'] };
+  const contentVersion = { ...base, kind: 'script', content: { schemaVersion: 1, text: 'A door opens.' } };
+  const mediaVersion = { ...base, id: 'video-version-1', kind: 'video', createdBy: 'assistant', media: { contentType: 'video/mp4', byteSize: 1024, width: 1920, height: 1080, durationMs: 1000, hasAudio: true } };
+  assert.deepEqual(operations.version.response.parse(contentVersion), contentVersion);
+  assert.deepEqual(operations.confirmUpload.response.parse({ version: mediaVersion }), { version: mediaVersion });
+  const page = { items: [contentVersion, mediaVersion], nextCursor: null };
+  assert.deepEqual(operations.artifactVersions.response.parse(page), page);
+
+  for (const content of [undefined, 'not-an-object']) {
+    const result = operations.version.response.safeParse({ ...contentVersion, content });
+    assert.equal(result.success, false);
+    if (!result.success) assert.ok(result.error.issues.some((issue) => issue.code === 'invalid_type' && issue.path.join('.') === 'content'));
+  }
+  const malformedMedia = operations.confirmUpload.response.safeParse({ version: { ...mediaVersion, media: { ...mediaVersion.media, width: 'wide' } } });
+  assert.equal(malformedMedia.success, false);
+  if (!malformedMedia.success) assert.ok(malformedMedia.error.issues.some((issue) => issue.code === 'invalid_type' && issue.path.join('.') === 'version.media.width'));
+  assert.equal(operations.version.response.safeParse({ ...mediaVersion, media: undefined }).success, false);
+  assert.equal(operations.version.response.safeParse({ ...contentVersion, createdBy: 'system' }).success, false);
+
+  for (const privateOrWrongBranch of [{ accountId: 'private-owner' }, { media: mediaVersion.media }]) {
+    const result = operations.version.response.safeParse({ ...contentVersion, ...privateOrWrongBranch });
+    assert.equal(result.success, false);
+    if (!result.success) assert.ok(result.error.issues.some((issue) => issue.code === 'unrecognized_keys'));
+  }
+  assert.equal(operations.confirmUpload.response.safeParse({ version: { ...mediaVersion, content: contentVersion.content } }).success, false);
+  const privateMedia = operations.confirmUpload.response.safeParse({ version: { ...mediaVersion, media: { ...mediaVersion.media, objectKey: 'private-storage-key' } } });
+  assert.equal(privateMedia.success, false);
+  if (!privateMedia.success) assert.ok(privateMedia.error.issues.some((issue) => issue.code === 'unrecognized_keys' && issue.path.join('.') === 'version.media'));
+});
+
 test('named unavailable boundaries authenticate before validation and have no ownership or mutation fiction', async () => {
   const calls: string[] = [];
   const denied = await unavailableApplication.saveVersion({}, async () => { calls.push('authenticate'); return { kind: 'unauthorized' }; });
