@@ -84,7 +84,10 @@ test('built admission verifies Supabase accounts, rejects forged/expired tokens 
   }
   // The separately authorized CLI stack's signing secret creates a genuinely signed expired token.
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
-  const tokenPayload = JSON.parse(Buffer.from(identities[0]!.access_token.split('.')[1]!, 'base64url').toString()) as Record<string, unknown>;
+  const tokenParts = identities[0]!.access_token.split('.');
+  assert.ok(createHmac('sha256', signingKey).update(tokenParts.slice(0, 2).join('.')).digest('base64url') === tokenParts[2],
+    'Signing fixture must match the fresh real token, so expiry rejection cannot pass with a wrong key');
+  const tokenPayload = JSON.parse(Buffer.from(tokenParts[1]!, 'base64url').toString()) as Record<string, unknown>;
   const payload = `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ ...tokenPayload, exp: Math.floor(Date.now() / 1000) - 60, iat: Math.floor(Date.now() / 1000) - 120 })}`;
   const expired = `${payload}.${createHmac('sha256', signingKey).update(payload).digest('base64url')}`;
   const forged = `${identities[0]!.access_token.split('.').slice(0, 1).join('.')}.${encode({ sub: identities[1]!.user.id, exp: 9999999999 })}.${identities[0]!.access_token.split('.')[2]}`;
