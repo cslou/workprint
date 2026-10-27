@@ -2,9 +2,9 @@
 
 **Status:** Architectural background migrated to Workprint on 2026-10-27 from the 2026-10-19 direction. The application is not implemented or runtime-qualified. The [README](../README.md) describes the actual repository state; the [litepaper](litepaper.md) records product vision.
 
-**Current MVP scope takes precedence over historical detail below.** The approved implementation spec and sprint are local maintainer planning records, intentionally absent from public clones. Current scope is one video/Narrative Scene, four workspace tabs, exact human review/choices, server-configured Muse models, independent generation, single-clip playback and stream-copy export of compatible full clips. Deletion/retention workflows, model selectors/preferences, spending caps, usage totals/completeness, audio-reference or separate-audio generation, Editor/timeline work, clip conversion, Play all/comparison playback and Project/multi-scene composition are deferred. Typed chat is not an approval/answer; proposal cards approve only the exact shown snapshot. No paid call or deployment is authorized by this document.
+**Current MVP scope takes precedence over historical detail below.** The [implementation spec](specs/implementation-spec-001.md) and [Sprint 001](sprints/sprint-001.md) define current planned scope and verification. Current scope is one video/Narrative Scene, four workspace tabs, exact human review/choices, server-configured Muse models, independent generation, single-clip playback and stream-copy export of compatible full clips. Deletion/retention workflows, model selectors/preferences, spending caps, usage totals/completeness, audio-reference or separate-audio generation, Editor/timeline work, clip conversion, Play all/comparison playback and Project/multi-scene composition are deferred. Typed chat is not an approval/answer; proposal cards approve only the exact shown snapshot. No paid call or deployment is authorized by this document.
 
-The detailed lifecycle, API inventory and module notes below retain the earlier broader architecture for rationale, not additional current requirements. References to deferred behavior, the earlier folder layout or still-pending B-020 are historical. Current modules also include `application`, `contracts`, `exports`, `usage` and configuration-only `model-catalog`; assistant bindings live under `agent/mastra`, separate from backend `mastra` composition, in one instance. Both modules and native behavior are qualified through the owning implementation stories. Obtain the approved local plan before implementing; do not infer contracts from these background examples.
+The detailed lifecycle, API inventory and module notes below retain the earlier broader architecture for rationale, not additional current requirements. References to deferred behavior, the earlier folder layout or still-pending B-020 are historical. Current modules also include `application`, `contracts`, `exports`, `usage` and configuration-only `model-catalog`; assistant bindings live under `agent/mastra`, separate from backend `mastra` composition, in one instance. Both modules and native behavior are qualified through the owning implementation stories. Read the implementation spec and assigned sprint plan before implementing; do not infer contracts from these background examples.
 
 ## Contents
 
@@ -465,7 +465,7 @@ Generation submission is an agent-tool operation, not an agreed public generatio
 
 ### Folder layout
 
-One repository with pnpm workspaces: two apps and two small framework-free packages. Backend modules are folders, not packages, since only the backend uses them. This historical layout followed Mastra's project and monorepo conventions; current paths follow the scope notice above and the approved local spec.
+One repository with pnpm workspaces: two apps and two small framework-free packages. Backend modules are folders, not packages, since only the backend uses them. This historical layout followed Mastra's project and monorepo conventions; current paths follow the scope notice above and the approved implementation spec.
 
 ```
 apps/

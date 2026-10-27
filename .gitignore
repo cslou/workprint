@@ -4,9 +4,7 @@
 !.env.example
 /secrets/
 
-# Planning/research stays local; public design sources are intentionally tracked.
-/docs/sprints/
-/docs/specs/
+# Private research stays local; specs, sprints and design are tracked.
 /docs/research/
 
 # Dependencies, build output and caches.

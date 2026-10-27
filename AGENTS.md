@@ -5,8 +5,8 @@ Work from the repository root and start with [README.md](README.md). This is a f
 ## Context and authority
 
 - Read the current approved task before changing anything. Planning approval alone does not authorize implementation, deployment, new infrastructure or live/paid calls.
-- When present locally, read `docs/specs/implementation-spec-001.md` for current scope/contracts and the assigned file under `docs/sprints/` for its stories and verification. These folders and `docs/research/` are intentionally gitignored, but explicit file reads still work. Normal Git-aware search may omit them. Do not force-add or publish them.
-- A public clone or another worktree will not contain ignored planning material. If required context is absent, ask the maintainer to supply it; do not infer requirements from historical architecture or mockups. Back up local planning separately and transfer it explicitly to authorized workspaces.
+- Read `docs/specs/implementation-spec-001.md` for current scope/contracts and the assigned file under `docs/sprints/` for its stories and verification. Specs and sprint plans are tracked with the repository.
+- `docs/research/` remains private and gitignored, so public clones do not contain it. If required source material is absent, ask the maintainer to supply it; do not infer requirements from historical architecture or mockups. Do not force-add private research.
 - Public architecture documents explain technical background; the litepaper expresses product vision, not implemented capability or a release checklist. Current approved scope supersedes older prototype examples. Design reference screens are not product behavior or automatic approval of unseen states.
 - Keep production vocabulary distinct: Narrative Scene, Shot, Storyboard Panel, Frame, candidate, exact-version approval and selection are not interchangeable.
 
@@ -27,8 +27,8 @@ Work from the repository root and start with [README.md](README.md). This is a f
 
 - Muse is the intended model family, not an already qualified integration. Credentials stay in the documented server-only environment mechanism; never print values or put them in command arguments. Key presence is not live-call authorization.
 - Treat approval as applying to exact versions and intended uses. Assistant saves/generation/technical success do not grant human approval. Stop, observer disconnect and cancellation of independent work remain distinct.
-- This repository is public. Stage explicit task-owned paths; preserve unrelated changes. Never commit secrets, ignored planning, generated/private material or assets without redistribution rights. Keep generated work under ignored `outputs/` and retain honest placeholder/provenance labels in design references.
-- Use feature branches and PR delivery; never push directly to the target branch or rewrite published review history. Ignoring sprint/spec records does not silently waive any delivery procedure requiring them: resolve that planning/delivery mismatch before implementation rather than force-publishing private documents.
+- This repository is public. Stage explicit task-owned paths; preserve unrelated changes. Never commit secrets, private research, generated/private material or assets without redistribution rights. Keep generated work under ignored `outputs/` and retain honest placeholder/provenance labels in design references.
+- Use feature branches and PR delivery; never push directly to the target branch or rewrite published review history.
 
 ## Public references
 
