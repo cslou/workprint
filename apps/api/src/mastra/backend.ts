@@ -20,11 +20,19 @@ export async function createBackend(routes: ApiRoute[] = []) {
     console.error('Native storage idle connection lost', { code });
   });
   try {
-    const result = await pool.query<{ privileged: boolean }>(`SELECT
+    const result = await pool.query<{ privileged: boolean }>(`WITH native_schema AS (
+      SELECT oid, nspowner FROM pg_namespace WHERE nspname = 'mastra'
+    ), native_owners AS (
+      SELECT nspowner AS owner FROM native_schema
+      UNION SELECT relowner FROM pg_class WHERE relnamespace IN (SELECT oid FROM native_schema)
+      UNION SELECT proowner FROM pg_proc WHERE pronamespace IN (SELECT oid FROM native_schema)
+      UNION SELECT typowner FROM pg_type WHERE typnamespace IN (SELECT oid FROM native_schema)
+    ) SELECT
       has_database_privilege(current_database(), 'CREATE') OR
       has_schema_privilege('mastra', 'CREATE') OR
       has_schema_privilege('public', 'CREATE') OR
-      (SELECT rolsuper OR rolcreaterole OR rolcreatedb FROM pg_roles WHERE rolname = current_user)
+      (SELECT rolsuper OR rolcreaterole OR rolcreatedb FROM pg_roles WHERE rolname = current_user) OR
+      EXISTS (SELECT 1 FROM native_owners WHERE pg_has_role(current_user, owner, 'USAGE') OR pg_has_role(current_user, owner, 'SET'))
       AS privileged`);
     if (result.rows[0]?.privileged !== false) throw new Error('Privileged serving connection');
   } catch {

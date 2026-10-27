@@ -10,6 +10,8 @@ if (client.status !== 0) process.exit(client.status ?? 1);
 const compile = spawnSync('tsc', ['-p', 'apps/api/tsconfig.json'], { stdio: 'inherit' });
 if (compile.status !== 0) process.exit(compile.status ?? 1);
 const group = process.argv[2];
+// Development fixtures need the same dependency-ordered compilation, not tests.
+if (group === 'compile') process.exit(0);
 if (group && !['smoke', 'security', 'contracts', 'ingress-qualification'].includes(group)) throw new Error('Unknown test group');
 // B-001 is explicitly deferred by the private-development scope exception.
 // Its real failing qualification is opt-in, never counted as aggregate success.

@@ -25,7 +25,8 @@ test('built backend rejects unsafe config, separates setup privileges and exclud
   assert.equal(await prepare(db.setupUrl, 'setup-repeat'), 0, 'Supported initialization is repeatable');
   await db.grantServing();
   assert.notEqual(await prepare(db.servingUrl, 'serving-after'), 0);
-  const privileges = await query(db.servingUrl, `SELECT has_database_privilege(current_database(), 'CREATE') AS database_create, has_schema_privilege('mastra', 'CREATE') AS schema_create, has_schema_privilege('public', 'CREATE') AS public_create, (SELECT rolsuper OR rolcreaterole OR rolcreatedb FROM pg_roles WHERE rolname = current_user) AS privileged`);
+  const privilegeSql = `SELECT has_database_privilege(current_database(), 'CREATE') AS database_create, has_schema_privilege('mastra', 'CREATE') AS schema_create, has_schema_privilege('public', 'CREATE') AS public_create, (SELECT rolsuper OR rolcreaterole OR rolcreatedb FROM pg_roles WHERE rolname = current_user) AS privileged`;
+  const privileges = await query(db.servingUrl, privilegeSql);
   assert.deepEqual(privileges.rows[0], { database_create: false, schema_create: false, public_create: false, privileged: false });
   const owners = await query(db.setupUrl, "SELECT DISTINCT tableowner FROM pg_tables WHERE schemaname = 'mastra'");
   assert.deepEqual(owners.rows, [{ tableowner: 'wp_setup' }]);
@@ -56,6 +57,32 @@ test('built backend rejects unsafe config, separates setup privileges and exclud
     assert.notEqual(await privileged.exited, 0);
     assert.match(await readFile(join(fixture.logs, 'privileged-serving.log'), 'utf8'), /Serving storage unavailable or privileged/);
   } finally { await privileged.stop(); }
+
+  // Owners retain DDL authority even after ordinary CREATE grants are revoked.
+  // Change only fixture-role grants, never native table/schema definitions.
+  await query(db.adminUrl, 'REVOKE CREATE ON DATABASE workprint FROM wp_setup; REVOKE CREATE ON SCHEMA mastra, public FROM wp_setup; REVOKE CREATE ON SCHEMA public FROM pg_database_owner');
+  try {
+    for (const [name, url] of [['native-owner', db.setupUrl], ['inherited-owner', db.servingUrl], ['settable-owner', db.servingUrl]] as const) {
+      if (name === 'inherited-owner') await query(db.adminUrl, 'GRANT wp_setup TO wp_serving');
+      if (name === 'settable-owner') await query(db.adminUrl, 'GRANT wp_setup TO wp_serving WITH INHERIT FALSE');
+      assert.deepEqual((await query(url, privilegeSql)).rows[0], { database_create: false, schema_create: false, public_create: false, privileged: false });
+      const ownership = await query(url, "SELECT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'mastra' AND (pg_has_role(current_user, c.relowner, 'USAGE') OR pg_has_role(current_user, c.relowner, 'SET'))) AS owned");
+      assert.equal(ownership.rows[0]?.owned, true, 'Fixture connection can exercise native-object ownership');
+      if (name === 'settable-owner') assert.deepEqual((await query(url, "SELECT pg_has_role(current_user, 'wp_setup', 'USAGE') AS inherited, pg_has_role(current_user, 'wp_setup', 'SET') AS settable")).rows[0], { inherited: false, settable: true });
+      const ownerPort = await unusedPort();
+      const ownerLog = join(fixture.logs, `${name}.log`);
+      const owner = await start(process.execPath, ['apps/api/.mastra/output/index.mjs'], {
+        cwd: root, env: { ...fixture.env, DATABASE_URL: url, PORT: String(ownerPort) }, log: ownerLog,
+      });
+      try {
+        const code = await Promise.race([owner.exited, owner.response(`http://127.0.0.1:${ownerPort}/health`).then(async (response) => { await response.body?.cancel(); return 0; })]);
+        assert.notEqual(code, 0, `${name} must be rejected despite lacking CREATE/elevated attributes`);
+        assert.match(await readFile(ownerLog, 'utf8'), /Serving storage unavailable or privileged/);
+      } finally { await owner.stop(); }
+    }
+  } finally {
+    await query(db.adminUrl, 'REVOKE wp_setup FROM wp_serving; GRANT CREATE ON DATABASE workprint TO wp_setup; GRANT CREATE ON SCHEMA mastra TO wp_setup; GRANT CREATE ON SCHEMA public TO pg_database_owner');
+  }
 
   const port = await unusedPort();
   const server = await start(process.execPath, ['apps/api/.mastra/output/index.mjs'], {

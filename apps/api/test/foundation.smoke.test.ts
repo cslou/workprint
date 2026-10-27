@@ -27,9 +27,11 @@ test('clean tracked export installs frozen, prepares, builds and serves built/de
   await command('pnpm', ['install', '--frozen-lockfile'], {
     cwd: checkout, env: { PATH: process.env.PATH, HOME: process.env.HOME }, log: join(fixture.logs, 'install.log'),
   });
-  await command('pnpm', ['build'], { cwd: checkout, env: fixture.env, log: join(fixture.logs, 'build.log') });
+  for (const shared of ['contracts', 'api-client']) {
+    await assert.rejects(stat(join(checkout, 'packages', shared, 'dist')), { code: 'ENOENT' }, 'Shared exports must be absent before documented startup');
+  }
   const databaseLog = join(fixture.logs, 'local-database.log');
-  const database = await start(process.execPath, ['scripts/local-database.mjs'], {
+  const database = await start('pnpm', ['db:local'], {
     cwd: checkout,
     // An ambient setup URL must never redirect fixture preparation to another target.
     env: { ...fixture.env, MIGRATION_DATABASE_URL: 'postgresql://not-owned:unused@127.0.0.1:1/not_the_fixture' },
@@ -44,10 +46,11 @@ test('clean tracked export installs frozen, prepares, builds and serves built/de
   }
   const env = { ...fixture.env, WORKPRINT_ENV_FILE: 'outputs/local-database.env' };
   await command('pnpm', ['db:prepare'], { cwd: checkout, env, log: join(fixture.logs, 'prepare-repeat.log') });
-  for (const mode of ['start', 'dev']) {
+  for (const mode of ['dev', 'start']) {
+    if (mode === 'start') await command('pnpm', ['build'], { cwd: checkout, env: fixture.env, log: join(fixture.logs, 'build.log') });
     const port = await unusedPort();
     const webPort = await unusedPort();
-    const server = await start(process.execPath, ['scripts/tasks.mjs', mode], {
+    const server = await start('pnpm', [mode], {
       cwd: checkout, env: { ...env, PORT: String(port), WEB_PORT: String(webPort) }, log: join(fixture.logs, `${mode}.log`),
     });
     try {

@@ -19,7 +19,7 @@ pnpm install --frozen-lockfile
 pnpm db:local
 ```
 
-Keep that terminal open. The development-only helper creates a uniquely labelled, ephemeral Docker Postgres on a loopback-only ephemeral port, creates separate setup/serving roles, runs the supported native initialization through `pnpm db:prepare`, and grants serving DML access. It writes credentials only to ignored, mode-0600 `outputs/local-database.env`; it refuses to overwrite an existing file. It does not use your Supabase stacks or private `.env`.
+Keep that terminal open. No prior `pnpm build` is needed: `db:local` reuses the test fixture's dependency-ordered compilation of contracts, api-client and API helpers before starting storage. The development-only helper creates a uniquely labelled, ephemeral Docker Postgres on a loopback-only ephemeral port, creates separate setup/serving roles, runs the supported native initialization through `pnpm db:prepare`, and grants serving DML access. It writes credentials only to ignored, mode-0600 `outputs/local-database.env`; it refuses to overwrite an existing file. It does not use your Supabase stacks or private `.env`.
 
 In a second terminal:
 
@@ -42,7 +42,7 @@ SUPABASE_URL=http://127.0.0.1:1 SUPABASE_PUBLISHABLE_KEY=health-only WORKPRINT_E
 
 ### Privately configured development storage
 
-The isolated fixture is sufficient for this foundation. For separately authorized, dedicated development storage, copy `.env.example` to ignored `.env` and privately supply the exact target and **different restricted serving / setup credentials**. Then run `pnpm db:prepare` before `pnpm dev`. The setup role must own native objects and have database CREATE privilege; serving must not have database/schema CREATE, object ownership, superuser, role-creation or database-creation privileges. The process rejects privileged serving connections. Reapply narrowly scoped serving grants after supported native upgrades; the local fixture does this automatically.
+The isolated fixture is sufficient for this foundation. For separately authorized, dedicated development storage, copy `.env.example` to ignored `.env` and privately supply the exact target and **different restricted serving / setup credentials**. Then run `pnpm db:prepare` before `pnpm dev`. The setup role must own native objects and have database CREATE privilege; serving must not have database/schema CREATE, native schema/object ownership (direct, inherited or reachable through SET ROLE), superuser, role-creation or database-creation privileges. The process rejects privileged serving connections. Reapply narrowly scoped serving grants after supported native upgrades; the local fixture does this automatically.
 
 `db:prepare` calls **`PostgresStore.init()`**, never application-authored native DDL. There are no application-owned tables or migrations yet. When an owning feature introduces them, use the Supabase CLI migration workflow under `supabase/`, excluding native schemas; do not add a custom SQL migration runner. Shared/production targets still require separate authorization.
 
