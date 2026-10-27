@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workprint brand book — Patterns and accessibility</title>
+<link rel="stylesheet" href="../app-r11.css">
+<link rel="stylesheet" href="book.css">
+</head>
+<body>
+<header class="bb-top">
+ <a class="bb-brand" href="../brand-book.html"><b>Workprint</b><small>Brand book · 1.3</small></a>
+ <nav class="bb-pages" aria-label="Brand book pages"><a href="../brand-book.html">Home</a><a href="brand.html">Brand</a><a href="foundations.html">Foundations</a><a href="components.html">Components</a><a href="patterns.html" aria-current="page">Patterns and accessibility</a><a href="screens.html">Screens and flows</a><a href="records.html">Records</a></nav>
+</header>
+<div class="bb">
+ <nav class="bb-nav" aria-label="On this page"><a class="sec" href="#patterns"><span class="bb-num">12</span>Patterns</a><a class="sec" href="#accessibility"><span class="bb-num">13</span>Accessibility</a><a class="sub" href="#outline-compare">Chat-box outline</a></nav>
+ <main class="bb-main">
+  <section id="patterns" aria-labelledby="patterns-h">
+   <p class="bb-kicker">12</p>
+   <h2 class="bb-h2" id="patterns-h">Patterns</h2>
+   <p class="bb-p"><span class="bb-tag">Partial</span>Existing patterns retained, with Editor navigation added. Detailed edit-command and persistence rules remain open. Details: <a href="../design.md#patterns">design.md</a>.</p>
+   <div class="bb-scroll"><table class="bb-table">
+    <tr><th>Pattern</th><th>Where to see it</th></tr>
+    <tr><td><b>One question at a time</b> — docks on the chat box; × folds it to “1 question waiting · Show”</td><td><a href="components.html#question-card">Question card</a> · <a href="components.html#chat-box">Chat box</a></td></tr>
+    <tr><td><b>Approve what is shown</b> — options only cover what is on screen; plans are approved before paid work</td><td><a href="components.html#question-card">Plan approval</a></td></tr>
+    <tr><td><b>Report before replying</b> — activity lines first, linked to the tab they changed</td><td><a href="components.html#activity-lines">Activity lines</a></td></tr>
+    <tr><td><b>Tab life cycle</b> — empty → loading (first write only) → filled at once</td><td><a href="components.html#panel-sections">Panel sections</a></td></tr>
+    <tr><td><b>Changed out of view</b> — tabs never switch on their own; a dot marks change; new content rings briefly</td><td><a href="components.html#panel-tabs">Panel tabs</a></td></tr>
+    <tr><td><b>Stored state</b> — Empty, Draft, Ready (+ Chosen); “Making…” is progress, not a state</td><td><a href="components.html#status-pills">Status pills</a> · <a href="components.html#placeholders">Placeholders</a></td></tr>
+    <tr><td><b>Edits hand back to the agent</b> — board edits save at once and arrive as an edit record</td><td><a href="components.html#storyboard-board">Storyboard board</a> · <a href="components.html#messages">Messages</a></td></tr>
+    <tr><td><b>Same-conversation Editor</b> — Videos opens the complete current edit; ← Videos returns without export/re-import or a new thread</td><td><a href="screens.html#edit-a-scene">Edit a scene</a>; pending/concurrent edits and resume remain open</td></tr>
+    <tr><td><b>Chosen is not finished</b> — selecting videos prepares material for whole-scene review; Export does not require a dummy edit</td><td><a href="screens.html#editor-videos">Current-edit entry</a></td></tr>
+   </table></div>
+  </section>
+
+  <section id="accessibility" aria-labelledby="accessibility-h">
+   <p class="bb-kicker">13</p>
+   <h2 class="bb-h2" id="accessibility-h">Accessibility</h2>
+   <p class="bb-p">Proposed target WCAG 2.2 AA. All text colours pass. The chat-box outline does not, and you chose to keep it as a recorded gap. Full table and required behaviour in <a href="../design.md#accessibility">design.md</a>.</p>
+   <p class="bb-p">The new Editor reference uses the existing subtle-text colour for a stronger composer outline; it does not carry the legacy faint-outline exception into this surface. Native layout controls are checked separately from editing gestures, modal behaviour and full assistive-technology coverage, which remain incomplete.</p>
+   <p class="bb-p">The new <a href="components.html#single-select">material controls</a> use no focus rings. Keyboard focus is indicated by a 2px label underline with 2px offset in the existing text color; normal mouse appearance stays clean. This scoped change does not remove focus indication from other controls or certify complete accessibility.</p>
+   <div class="bb-spec raised"><div class="bb-row" style="align-items:center">
+    <div class="bb-col"><div class="composer" style="width:260px;margin:0"><div class="field" style="min-height:24px">Describe your video…</div></div><span class="bb-lab">Chat-box outline 1.26:1 (needs 3:1) · <b>accepted gap</b></span></div>
+    <div class="bb-col"><span class="chip">Eye level<button class="x" type="button" disabled aria-label="Remove Eye level">×</button></span><span class="bb-lab">Chip outline 1.38:1 (text identifies it) · × gets a 24px hit area</span></div>
+   </div></div>
+     <h3 class="bb-h3" id="outline-compare">Chat-box outline: side by side <span class="bb-tag off">Decided: keep today’s line</span></h3>
+   <p class="bb-p">Your decision on 2026-10-02: keep the faint outline and record the gap. The darker and focus-only versions below are kept as rejected alternatives, not guidance. The chat box does not meet the 3:1 outline guideline.</p>
+   <div class="bb-cmp">
+    <div class="bb-spec"><div class="composer"><div class="field">Describe your video…</div><div class="bar"><span class="attach"><span class="plus">+</span>Attach</span><button class="send" type="button" disabled>Send</button></div></div><p class="bb-cap"><b>Today</b> · <code>#0000001a</code> · 1.26:1 · fails</p></div>
+    <div class="bb-spec"><div class="composer" style="border-color:#0000006b"><div class="field">Describe your video…</div><div class="bar"><span class="attach"><span class="plus">+</span>Attach</span><button class="send" type="button" disabled>Send</button></div></div><p class="bb-cap"><b>Darker outline</b> · <code>#0000006b</code> · 3.03:1 · passes</p></div>
+    <div class="bb-spec"><div class="composer" style="outline:2px solid var(--primary);outline-offset:2px"><div class="field typed">A short scene in a gallery|</div><div class="bar"><span class="attach"><span class="plus">+</span>Attach</span><button class="send" type="button">Send</button></div></div><p class="bb-cap"><b>Focus only</b> · today's line at rest, blue ring while typing · fails at rest</p></div>
+   </div>
+   <div class="bb-cmp" style="margin-top:12px">
+    <div class="bb-spec"><div class="dockwrap"><div class="qcard dock"><div class="qhead"><div><h2>Does the script look right?</h2><div class="count">Question 2 of 2</div></div><span class="qclose" aria-hidden="true">×</span></div><div class="qopts"><button class="qopt" type="button" disabled><span class="key">A</span><span>The script looks right</span></button></div><div class="dock-input"><div class="field">Pick an option, type your own answer, or ask something else…</div><div class="bar"><span class="attach"><span class="plus">+</span>Attach</span><button class="send" type="button" disabled>Send</button></div></div></div></div><p class="bb-cap"><b>Today</b>, with a question docked</p></div>
+    <div class="bb-spec"><div class="dockwrap"><div class="qcard dock" style="border-color:#0000006b"><div class="qhead"><div><h2>Does the script look right?</h2><div class="count">Question 2 of 2</div></div><span class="qclose" aria-hidden="true">×</span></div><div class="qopts"><button class="qopt" type="button" disabled><span class="key">A</span><span>The script looks right</span></button></div><div class="dock-input"><div class="field">Pick an option, type your own answer, or ask something else…</div><div class="bar"><span class="attach"><span class="plus">+</span>Attach</span><button class="send" type="button" disabled>Send</button></div></div></div></div><p class="bb-cap"><b>Darker outline</b>, with a question docked</p></div>
+    <div class="bb-spec"><div class="dockwrap"><div class="qcard dock"><div class="qhead"><div><h2>Does the script look right?</h2><div class="count">Question 2 of 2</div></div><span class="qclose" aria-hidden="true">×</span></div><div class="qopts"><button class="qopt" type="button" disabled><span class="key">A</span><span>The script looks right</span></button></div><div class="dock-input"><div class="field">Pick an option, type your own answer, or ask something else…</div><div class="bar"><span class="attach"><span class="plus">+</span>Attach</span><button class="send" type="button" disabled>Send</button></div></div></div></div><p class="bb-cap"><b>Focus only</b>, at rest (same as today)</p></div>
+   </div>
+  </section>
+
+ </main>
+</div>
+<nav class="bb-pager" aria-label="Previous and next page"><a href="components.html">← Components</a><a href="screens.html">Screens and flows →</a></nav>
+</body>
+</html>

@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workprint brand book — Components</title>
+<link rel="stylesheet" href="../app-r11.css">
+<link rel="stylesheet" href="book.css">
+<link rel="stylesheet" href="../components/material-controls.css">
+<style>
+@media (min-width: 821px) {
+  #scene-edit-card, #editor-layout-and-timeline, #single-select, #scene-disclosure {  scroll-margin-top: calc(var(--space-32) * 5); }
+}
+</style>
+</head>
+<body>
+<header class="bb-top">
+ <a class="bb-brand" href="../brand-book.html"><b>Workprint</b><small>Brand book · 1.3</small></a>
+ <nav class="bb-pages" aria-label="Brand book pages"><a href="../brand-book.html">Home</a><a href="brand.html">Brand</a><a href="foundations.html">Foundations</a><a href="components.html" aria-current="page">Components</a><a href="patterns.html">Patterns and accessibility</a><a href="screens.html">Screens and flows</a><a href="records.html">Records</a></nav>
+</header>
+<div class="bb">
+ <nav class="bb-nav" aria-label="On this page"><a class="sec" href="#components"><span class="bb-num">11</span>Components</a><a class="sub" href="#app-shell">App shell</a><a class="sub" href="#sidebar">Sidebar</a><a class="sub" href="#messages">Messages</a><a class="sub" href="#activity-lines">Activity lines</a><a class="sub" href="#chat-box">Chat box</a><a class="sub" href="#question-card">Question card</a><a class="sub" href="#buttons">Buttons</a><a class="sub" href="#single-select">Single select</a><a class="sub" href="#scene-disclosure">Scene disclosure</a><a class="sub" href="#panel-tabs">Panel tabs</a><a class="sub" href="#panel-sections">Panel sections</a><a class="sub" href="#status-pills">Status pills</a><a class="sub" href="#chips-and-pills">Chips and pills</a><a class="sub" href="#item-rows">Item rows</a><a class="sub" href="#script">Script</a><a class="sub" href="#storyboard-shots">Storyboard shots</a><a class="sub" href="#storyboard-board">Storyboard board</a><a class="sub" href="#video-rows">Video rows</a><a class="sub" href="#scene-edit-card">Scene edit card</a><a class="sub" href="#editor-layout-and-timeline">Editor layout and timeline</a><a class="sub" href="#media-tiles">Media tiles</a><a class="sub" href="#viewer">Viewer</a><a class="sub" href="#scene-player">Scene player</a><a class="sub" href="#library-picker">Library picker</a><a class="sub" href="#reference-sheet">Reference sheet</a><a class="sub" href="#placeholders">Placeholders</a><a class="sub" href="#demo-only">Demo-only</a></nav>
+ <main class="bb-main">
+  <section id="components" aria-labelledby="components-h">
+   <p class="bb-kicker">11</p>
+   <h2 class="bb-h2" id="components-h">Components</h2>
+   <p class="bb-p"><span class="bb-tag">Partial</span>Existing components, the scene-edit card and Editor layout/timeline, plus reusable material controls. Each has the same anchor in <a href="../design.md#components">design.md</a>. Existing specimens retain the frozen stylesheet; Editor references have scoped design-only styles.</p>
+   <article id="app-shell" aria-labelledby="shell-h">
+   <h3 class="bb-h2c" id="shell-h">App shell</h3>
+   <p class="bb-p">Sidebar, chat and the always-present panel. The panel has its four tabs from the very first screen. <a href="../design.md#app-shell">Rules</a></p>
+   <div class="bb-screens"><figure><a href="../flow2-step1-r73.html"><img src="../assets/media-placeholder.svg" alt="Opening screen: sidebar, the question in the middle, the chat box, and the panel with empty Script, Assets, Storyboard and Videos tabs"></a><figcaption><b>Opening screen</b> · panel empty from the start</figcaption></figure><figure class="narrow"><a href="../flow2-step10-r82.html"><img src="../assets/media-placeholder.svg" alt="The same app at phone width, stacked in one column"></a><figcaption><b>≤ 820px</b> · one column, panel under the chat</figcaption></figure></div>
+   </article>
+   <article id="sidebar" aria-labelledby="sidebar-h">
+   <h3 class="bb-h2c" id="sidebar-h">Sidebar</h3>
+   <p class="bb-p">New video, Library, then Recents (one row per video). <a href="../design.md#sidebar">Rules</a></p>
+   <div class="bb-spec">
+    <nav class="sidebar bb-sidebar" aria-label="Example sidebar">
+     <span class="brand"><span class="mark">a</span><span class="name">Workprint</span></span>
+     <div class="navlist">
+      <span class="navitem"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>New video</span>
+      <span class="navitem"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="4" height="16" rx="1"/><rect x="9" y="4" width="4" height="16" rx="1"/><path d="m15.5 5.2 3.8-1 3 15.6-3.8.9Z"/></svg>Library</span>
+     </div>
+     <div class="section"><div class="navlabel">Recents</div><span class="navitem recent current">Vale and Mercer meet</span><span class="navitem recent">A rainy rooftop</span></div>
+     <div class="account"><span class="avatar">A</span>Account</div>
+    </nav>
+    <p class="bb-cap"><span class="bb-placeholder">Name and mark are placeholders</span></p>
+   </div>
+   </article>
+   <article id="messages" aria-labelledby="msg-h">
+   <h3 class="bb-h2c" id="msg-h">Messages</h3>
+   <p class="bb-p">The person's messages sit right in a bubble; the agent writes plain text with no bubble. Answered questions stay in the chat, question above answer. <a href="../design.md#messages">Rules</a></p>
+   <div class="bb-spec"><div class="msgs" style="width:100%;max-width:680px">
+    <div class="me">A short scene in a gallery. Vale realises the young man beside him is Mercer and quietly says “You must be Mercer.”</div>
+    <div class="agent"><p>Here's how I understood it. The story and a breakdown of the shots are in the <a class="inline-link" href="#script">Script</a>; edit anything there, or tell me here.</p><ul><li>I'll need to know what <strong>Vale</strong>, <strong>Mercer</strong> and <strong>the gallery</strong> look like.</li><li>You didn't mention a look, so I used natural colour and soft daylight.</li></ul></div>
+    <div class="me answered"><div class="asked"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v5"/></svg><span>How does Mercer react?</span><span class="qc">1 of 2</span></div><div class="ans"><span class="key">B</span><span>He stays still, then gives a small nod</span></div></div>
+    <div class="me answered"><div class="asked"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v5"/></svg><span>Make the storyboard?</span></div><div class="ans"><span class="key">A</span><span>Make the storyboard</span></div><details class="asked-ctx"><summary>Plan you approved</summary><div class="ctx"><p>3 shots, 4 panels. Each shot's panels are combined into one video.</p></div></details></div>
+   </div></div>
+   </article>
+   <article id="activity-lines" aria-labelledby="act-h">
+   <h3 class="bb-h2c" id="act-h">Activity lines</h3>
+   <p class="bb-p">What the agent did, before it writes. One result per line, past tense; a line links to the tab it changed. <a href="../design.md#activity-lines">Rules</a></p>
+   <div class="bb-spec"><div class="acts">
+    <div class="act"><a href="#panel-tabs"><span class="done"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>Wrote the script · 3 shots</span></a></div>
+    <div class="act"><span class="nolink"><span class="done"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>Made 3 looks for Vale</span></span></div>
+    <div class="act"><span class="nolink"><span class="run" >Making 4 panels…</span></span></div>
+   </div><p class="bb-cap">Done (linked) · done (no tab) · running</p></div>
+   </article>
+   <article id="chat-box" aria-labelledby="chat-h">
+   <h3 class="bb-h2c" id="chat-h">Chat box</h3>
+   <p class="bb-p">One chat box, identical in every state. It never changes colour and Send is never renamed. <a href="../design.md#chat-box">Rules</a></p>
+   <div class="bb-two">
+    <div class="bb-spec"><div class="composer"><div class="field">Describe your video…</div><div class="bar"><span class="attach"><span class="plus">+</span>Attach</span><button class="send" type="button" disabled>Send</button></div></div><p class="bb-cap">Idle, empty · Send disabled</p></div>
+    <div class="bb-spec"><div class="composer"><div class="att-chips show"><span class="att-chip"><img src="../assets/media-placeholder.svg" alt="">Café<small>Environment</small><button class="x" type="button" disabled aria-label="Remove Café">×</button></span></div><div class="field typed">Use this café for the meeting instead.</div><div class="bar"><span class="attach"><span class="plus">+</span>Attach</span><button class="send" type="button">Send</button></div></div><p class="bb-cap">Typed, with an attachment from the library</p></div>
+    <div class="bb-spec"><div class="composer working"><div class="field">Type to add something; I'll pick it up when I'm done…</div><div class="bar"><span class="working-label"><i></i>Working…</span><button class="stop" type="button" disabled aria-label="Stop"><span></span>Stop</button></div></div><p class="bb-cap">Agent working · Stop; typing queues</p></div>
+    <div class="bb-spec"><div class="dockwrap bb-folded"><div class="folded"><span>1 question waiting</span> · <a href="#question-card">Show</a></div><div class="qcard dock"><div class="qhead"><div><h2>Folded question</h2></div></div><div class="dock-input"><div class="field">Pick an option, type your own answer, or ask something else…</div><div class="bar"><span class="attach"><span class="plus">+</span>Attach</span><button class="send" type="button" disabled>Send</button></div></div></div></div><p class="bb-cap">Question folded with ×</p></div>
+   </div>
+   </article>
+   <article id="question-card" aria-labelledby="q-h">
+   <h3 class="bb-h2c" id="q-h">Question card</h3>
+   <p class="bb-p">The question grows on top of the chat box inside the same outline. Options are short suggested prompts; typing in the box answers too. <a href="../design.md#question-card">Rules</a></p>
+   <div class="bb-two">
+    <div class="bb-spec"><div class="dockwrap"><div class="qcard dock" role="group" aria-label="Example question"><div class="qhead"><div><h2>Does the script look right?</h2><div class="count">Question 2 of 2</div></div><span class="qclose" aria-hidden="true">×</span></div><div class="qopts"><button class="qopt" type="button" disabled><span class="key">A</span><span>The script looks right</span></button><button class="qopt" type="button" disabled><span class="key">B</span><span>Make shot 2 longer</span></button></div><div class="dock-input"><div class="field">Pick an option, type your own answer, or ask something else…</div><div class="bar"><span class="attach"><span class="plus">+</span>Attach</span><button class="send" type="button" disabled>Send</button></div></div></div></div><p class="bb-cap">Options</p></div>
+    <div class="bb-spec"><div class="dockwrap"><div class="qcard dock picker" role="group" aria-label="Example image question"><div class="qhead"><div><h2>Pick a look for Vale</h2><div class="count">Click an image to see it larger</div></div><span class="qclose" aria-hidden="true">×</span></div><div class="tiles"><span class="tile"><img src="../assets/media-placeholder.svg" alt="Look A"><span class="key">A</span></span><span class="tile"><img src="../assets/media-placeholder.svg" alt="Look B"><span class="key">B</span></span><span class="tile"><img src="../assets/media-placeholder.svg" alt="Look C"><span class="key">C</span></span></div><div class="dock-input"><div class="field">Pick A, B or C, or suggest changes…</div><div class="bar"><span class="attach"><span class="plus">+</span>Attach</span><button class="send" type="button" disabled>Send</button></div></div></div></div><p class="bb-cap">Image picker</p></div>
+   </div>
+   <div class="bb-spec"><div class="dockwrap" style="max-width:680px"><div class="qcard dock" role="group" aria-label="Example plan approval"><div class="qhead"><div><h2>Make the storyboard?</h2><div class="count">3 shots · 4 panels</div></div><span class="qclose" aria-hidden="true">×</span></div><div class="qplan multi"><div class="pshot"><div class="pshot-h"><span class="sn">1</span><b>Vale and Mercer on the bench</b></div><p class="pmeta">Wide shot · 1 panel</p><div class="refs"><span class="ref"><img src="../assets/media-placeholder.svg" alt="">Vale</span><span class="ref"><img src="../assets/media-placeholder.svg" alt="">Mercer</span></div></div><div class="pshot"><div class="pshot-h"><span class="sn">2</span><b>Vale recognises Mercer</b></div><p class="pmeta">Close-up · 2 panels</p></div></div><div class="qopts"><button class="qopt" type="button" disabled><span class="key">A</span><span>Make the storyboard</span></button></div><div class="dock-input"><div class="field">Pick an option, type your own answer, or ask something else…</div><div class="bar"><span class="attach"><span class="plus">+</span>Attach</span><button class="send" type="button" disabled>Send</button></div></div></div></div><p class="bb-cap">Plan approval: approves exactly what is shown</p></div>
+   </article>
+   <article id="buttons" aria-labelledby="btn-h">
+   <h3 class="bb-h2c" id="btn-h">Buttons</h3>
+   <p class="bb-p">One blue primary per area; everything else is a quiet pill or an icon. <a href="../design.md#buttons">Rules</a></p>
+   <div class="bb-spec raised"><div class="bb-row" style="align-items:center">
+    <div class="bb-col"><button class="send" type="button">Send</button><span class="bb-lab">Primary</span></div>
+    <div class="bb-col"><button class="send" type="button" disabled>Send</button><span class="bb-lab">Primary disabled</span></div>
+    <div class="bb-col"><button class="choose" type="button">Choose look A</button><span class="bb-lab">Primary 34</span></div>
+    <div class="bb-col"><span class="regen">Regenerate</span><span class="bb-lab">Primary small</span></div>
+    <div class="bb-col"><button class="stop" type="button"><span></span>Stop</button><span class="bb-lab">Stop</span></div>
+    <div class="bb-col"><span class="viewboard"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="7" height="6" rx="1"/><rect x="14" y="4" width="7" height="6" rx="1"/><rect x="3" y="14" width="7" height="6" rx="1"/><rect x="14" y="14" width="7" height="6" rx="1"/></svg>View storyboard</span><span class="bb-lab">Secondary pill</span></div>
+    <div class="bb-col"><span class="viewboard playall"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7Z"/></svg>Play all · 0:13</span><span class="bb-lab">Secondary pill</span></div>
+    <div class="bb-col"><span class="th-row" style="display:block;margin:0"><span class="use" style="display:inline-block">Use this version</span></span><span class="bb-lab">Secondary small</span></div>
+    <div class="bb-col"><div class="plabel" style="margin:0"><button class="edit" type="button" aria-label="Edit" style="margin:0"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button></div><span class="bb-lab">Icon 26</span></div>
+    <div class="bb-col"><div class="lb-nav"><a href="#buttons" aria-label="Previous"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></a><a href="#buttons" aria-label="Next"><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></a></div><span class="bb-lab">Round 32</span></div>
+    <div class="bb-col"><span class="attach"><span class="plus">+</span>Attach</span><span class="bb-lab">Attach 30</span></div>
+   </div></div>
+   <div class="bb-spec raised"><div class="bb-row">
+    <div class="bb-col"><span class="bb-lab">Quiet action</span><div class="product material-controls"><button class="gen-quiet-button" type="button">Collapse all</button></div></div>
+    <div class="bb-col"><span class="bb-lab">Hover / pressed</span><div class="product material-controls"><button class="gen-quiet-button" type="button" data-appearance="hover">Collapse all</button></div></div>
+    <div class="bb-col"><span class="bb-lab">Keyboard only · no ring</span><div class="product material-controls"><button class="gen-quiet-button" type="button" data-appearance="focus">Collapse all</button></div></div>
+    <div class="bb-col"><span class="bb-lab">Disabled</span><div class="product material-controls"><button class="gen-quiet-button" type="button" disabled>Collapse all</button></div></div>
+   </div><p class="bb-cap">Appearance specimens, not reset controls. Minimum 32px height, 13px text, 6px 10px padding, neutral hover fill. No focus ring; keyboard focus underlines the label. Collapse all closes outer Scene groups without changing the filter, tab or conversation.</p></div>
+   </article>
+   <article id="single-select" aria-labelledby="select-h">
+   <h3 class="bb-h2c" id="select-h">Single select</h3>
+   <p class="bb-p">One current value in a quiet pill, not a text-input box. The outlined chevron and neutral menu reuse the existing palette and shapes. A tick means the current filter, never creative approval. <a href="../design.md#single-select">Exact values, behavior and limits</a></p>
+   <div class="bb-spec raised"><div class="bb-row">
+    <div class="bb-col"><span class="bb-lab">Default</span><div class="product material-controls"><span class="gen-select"><span class="gen-select-label">All Scenes (3)</span><svg class="gen-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></div></div>
+    <div class="bb-col"><span class="bb-lab">Hover / open</span><div class="product material-controls"><span class="gen-select" data-appearance="hover"><span class="gen-select-label">All Scenes (3)</span><svg class="gen-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></div></div>
+    <div class="bb-col"><span class="bb-lab">Keyboard only · no ring</span><div class="product material-controls"><span class="gen-select" data-appearance="focus"><span class="gen-select-label">All Scenes (3)</span><svg class="gen-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></div></div>
+    <div class="bb-col"><span class="bb-lab">Disabled / empty</span><div class="product material-controls"><span class="gen-select" data-appearance="disabled"><span class="gen-select-label">No Scenes yet</span><svg class="gen-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></div></div>
+   </div><p class="bb-cap">Static appearance specimens. Minimum 34px height, 13px text, 6px 12px padding, pill radius, 15px icon. Keyboard focus is a 2px label underline with 2px offset, not a ring.</p></div>
+   <div class="bb-two">
+    <div class="bb-spec raised"><div class="product material-controls"><div class="gen-select-menu"><span class="gen-option" data-selected="true"><svg class="gen-icon" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:2.2"><path d="m5 12 5 5 9-10"/></svg><span class="option-label">All Scenes (3)</span></span><span class="gen-option"><span style="width:var(--size-icon-md);flex:none" aria-hidden="true"></span><span class="option-label">01 · The station</span></span><span class="gen-option"><span style="width:var(--size-icon-md);flex:none" aria-hidden="true"></span><span class="option-label">02 · Through the market</span></span><span class="gen-option"><span style="width:var(--size-icon-md);flex:none" aria-hidden="true"></span><span class="option-label">03 · Before sunset</span></span></div></div><p class="bb-cap">Menu appearance; these are not selection controls. Surface fill, 12px radius, strong border, no shadow. A larger list scrolls within min(246px, 60vh); it does not widen the workspace.</p></div>
+    <div class="bb-spec raised"><div class="product material-controls"><span class="gen-select" style="width:100%"><span class="gen-select-label">20 · The last light fades across the observatory rooftop</span><svg class="gen-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span><div class="gen-select-menu"><span class="gen-option" data-selected="true"><svg class="gen-icon" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:2.2"><path d="m5 12 5 5 9-10"/></svg><span class="option-label">20 · The last light fades across the observatory rooftop</span></span></div></div><p class="bb-cap">Long-name appearance: the closed label truncates; the option wraps in full. Fictional stress data, not another approved Scene.</p></div>
+   </div>
+   <p class="bb-p">Use an accessible name, native single-select keyboard navigation and Escape to close. Filtering material does not switch conversations. No search, remote-loading/error flow or cross-browser certification is implied; the interactive temporary reference was exercised in Chromium.</p>
+   </article>
+   <article id="scene-disclosure" aria-labelledby="scene-disclosure-h">
+   <h3 class="bb-h2c" id="scene-disclosure-h">Scene disclosure</h3>
+   <p class="bb-p">A flat group header, not a new navigation destination. Open several Scenes independently. Reuse existing Script, Storyboard Shot and video-row components inside; shared Assets stay in one deduplicated library. <a href="../design.md#scene-disclosure">Rules and reference-mechanic distinction</a></p>
+   <div class="bb-two">
+    <div class="bb-spec raised"><div class="product material-controls"><details class="gen-scene-group"><summary><span class="gen-scene-thumb"><img src="../assets/media-placeholder.svg" alt=""></span><span><b class="gen-scene-title">01 · Vale and Mercer meet</b><span class="gen-scene-meta">3 Shots · 4 Panels</span></span><svg class="gen-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><div class="gen-scene-body"><p class="gen-empty">Header specimen. The Storyboard Shot component below owns the Panel layout.</p></div></details></div><p class="bb-cap">Image variant: 56px 16:9 thumbnail, 13px/600 title, 12px metadata, trailing 15px chevron. Native disclosure; no conversation change.</p></div>
+    <div class="bb-spec raised"><div class="product material-controls"><details class="gen-scene-group text-only" open><summary><span><b class="gen-scene-title">01 · Vale and Mercer meet</b><span class="gen-scene-meta">Scene script</span></span><svg class="gen-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><div class="gen-scene-body"><p>Mercer and Vale sit side by side on the gallery bench. Vale realises who the young man is and quietly speaks.</p></div></details><details class="gen-scene-group text-only"><summary><span><b class="gen-scene-title">02 · Next Scene</b><span class="gen-scene-meta">No storyboard yet</span></span><svg class="gen-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><div class="gen-scene-body"><p class="gen-empty">Storyboard Panels for this Scene will appear here.</p></div></details></div><p class="bb-cap">Text-only and empty-material specimens. The second Scene is a state example, not added production material. Keyboard focus underlines the name; no ring.</p></div>
+   </div>
+   <p class="bb-p">10px header gaps/padding, 12px bottom content padding, default divider. The chevron and exposed content indicate expansion; a Scene never becomes Ready merely because it has material. Project composition and membership semantics remain outside this component checkpoint.</p>
+   </article>
+   <article id="panel-tabs" aria-labelledby="tabs-h">
+   <h3 class="bb-h2c" id="tabs-h">Panel tabs</h3>
+   <p class="bb-p">Always Script · Assets · Storyboard · Videos. The panel never switches tabs by itself; a tab that changed out of view gets a dot. <a href="../design.md#panel-tabs">Rules</a></p>
+   <div class="bb-spec"><div class="panel bb-shell"><nav class="ptabs" aria-label="Example tabs"><a class="default" href="#panel-tabs">Script</a><a class="dot" style="--at:0s" href="#panel-tabs">Assets</a><a href="#panel-tabs">Storyboard</a><a href="#panel-tabs">Videos</a></nav></div><p class="bb-cap">Script open · Assets changed out of view</p></div>
+   </article>
+   <article id="panel-sections" aria-labelledby="sec-h">
+   <h3 class="bb-h2c" id="sec-h">Panel sections</h3>
+   <p class="bb-p">Each tab is empty, then loading the first time the agent writes it, then filled. Sections have a small label and an optional pencil. <a href="../design.md#panel-sections">Rules</a></p>
+   <div class="bb-row">
+    <div class="bb-spec" style="flex:1 1 280px"><div class="pempty">Your script will appear here once you describe your video.</div><p class="bb-cap">Empty</p></div>
+    <div class="bb-spec" style="flex:1 1 280px"><div class="skeleton" style="position:static;opacity:1;animation:none"><i style="width:40%"></i><i></i><i style="width:85%"></i><i style="width:30%"></i><i></i></div><p class="bb-cap">Loading (first write only)</p></div>
+    <div class="bb-spec raised" style="flex:1 1 280px"><div class="pv" style="display:block"><section><div class="plabel"><span>What happens</span><button class="edit" type="button" disabled aria-label="Edit what happens"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button></div><p>Mercer and Vale sit side by side on the gallery bench. Vale realises who the young man is and quietly speaks.</p></section></div><p class="bb-cap">Filled</p></div>
+   </div>
+   </article>
+   <article id="status-pills" aria-labelledby="st-h">
+   <h3 class="bb-h2c" id="st-h">Status pills</h3>
+   <p class="bb-p">Three stored states, plus Chosen for videos. Always a word, never colour alone. <a href="../design.md#status-pills">Rules</a></p>
+   <div class="bb-spec raised"><div class="bb-row" style="align-items:center"><span class="status">Empty</span><span class="status draft">Draft</span><span class="status ready">Ready</span><span class="status ready">Chosen</span></div></div>
+   </article>
+   <article id="chips-and-pills" aria-labelledby="chip-h">
+   <h3 class="bb-h2c" id="chip-h">Chips and pills</h3>
+   <p class="bb-p">Picked looks in the Script, references in plans, attachments in the chat box. Camera pills live only in the board. <a href="../design.md#chips-and-pills">Rules</a></p>
+   <div class="bb-spec raised"><div class="bb-row" style="align-items:center">
+    <span class="chip picked">Soft daylight<button class="x" type="button" disabled aria-label="Remove Soft daylight">×</button></span>
+    <span class="chip">Eye level<button class="x" type="button" disabled aria-label="Remove Eye level">×</button></span>
+    <span class="chip changed">Low angle<small>Eye level</small><button class="x" type="button" disabled aria-label="Remove Low angle">×</button></span>
+    <span class="chip add">+ mood</span>
+    <span class="ref"><img src="../assets/media-placeholder.svg" alt="">Mercer</span>
+    <span class="att-chip"><img src="../assets/media-placeholder.svg" alt="">Café<small>Environment</small><button class="x" type="button" disabled aria-label="Remove Café">×</button></span>
+   </div><p class="bb-cap">Picked · default · changed in the board · add · reference · attachment</p></div>
+   </article>
+   <article id="item-rows" aria-labelledby="item-h">
+   <h3 class="bb-h2c" id="item-h">Item rows</h3>
+   <p class="bb-p">One row per character, place or prop in the Assets tab. <a href="../design.md#item-rows">Rules</a></p>
+   <div class="bb-spec raised" style="max-width:420px">
+    <a class="need asset" href="#reference-sheet"><img class="key-img" src="../assets/media-placeholder.svg" alt=""><span class="body"><b>Vale</b><small>Character sheet · in your Library</small></span><span class="status ready">Ready</span></a>
+    <div class="need"><b>Mercer</b><span class="status draft">Draft</span><small>Character · 3 looks to choose from</small></div>
+    <div class="need"><b>The bench</b><span class="status">Empty</span><small>Prop · described</small></div>
+   </div>
+   </article>
+   <article id="script" aria-labelledby="script-h">
+   <h3 class="bb-h2c" id="script-h">Script</h3>
+   <p class="bb-p">What happens · Shots · Look. Shots are named by what happens. No camera here. <a href="../design.md#script">Rules</a></p>
+   <div class="bb-spec raised" style="max-width:420px"><div class="pv" style="display:block"><section><div class="plabel"><span>Shots</span></div><ol class="breakdown"><li><b>Vale recognises Mercer</b><p>Close on Vale. He studies the young man beside him, realises who he is, and speaks quietly.</p><p class="quote">Vale: “You must be Mercer.”</p></li><li><b>Mercer reacts</b><p>Close on Mercer. He stays still, then gives a small nod.</p></li></ol><p class="hint-line">About 9 seconds in all.</p></section></div></div>
+   </article>
+   <article id="storyboard-shots" aria-labelledby="sb-h">
+   <h3 class="bb-h2c" id="sb-h">Storyboard shots</h3>
+   <p class="bb-p">Panels grouped by shot, read-only in the tab. Camera is text; Edit opens the board. <a href="../design.md#storyboard-shots">Rules</a></p>
+   <div class="bb-spec raised" style="max-width:420px">
+    <details class="sb-shot" open><summary><span class="sn">2</span><span class="ftitle"><b>Vale recognises Mercer</b><small>Close-up · 5 s · 2 panels</small></span><span class="status draft">Draft</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+     <div class="sb-body"><div class="sb-camline"><span>Close-up · Eye level · Still</span><span class="sb-edit">Edit</span></div><div class="sb-flag">In 2.2, the wall behind Vale is plain; the paintings seen in 2.1 are missing.</div><span class="sb-panel"><img src="../assets/media-placeholder.svg" alt="Panel 2.1"><span class="pt"><b>2.1</b><span class="tm">0:00</span></span><span class="cap">Vale looks left, studying the young man beside him.</span></span><span class="sb-panel"><img src="../assets/media-placeholder.svg" alt="Panel 2.2"><span class="pt"><b>2.2</b><span class="tm">0:03</span></span><span class="cap">He realises who it is and speaks quietly.<q>Vale: “You must be Mercer.”</q></span></span></div>
+    </details>
+    <details class="sb-shot is-changed" open><summary><span class="sn">3</span><span class="ftitle"><b>Mercer reacts</b><small>Close-up · 4 s · 1 panel</small></span><span class="status draft">Draft</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+     <div class="sb-body"><div class="sb-changed">Changed in the board: low angle. Regenerate to update.</div><span class="sb-panel"><img src="../assets/media-placeholder.svg" alt="Panel 3.1"><span class="pt"><b>3.1</b><span class="tm">0:00</span></span><span class="cap">Mercer stays still, then gives a small nod.</span></span></div>
+    </details>
+   </div>
+   </article>
+   <article id="storyboard-board" aria-labelledby="board-h">
+   <h3 class="bb-h2c" id="board-h">Storyboard board</h3>
+   <p class="bb-p">The full board, where camera pills and caption pencils live. A change marks only that shot and offers Regenerate. <a href="../design.md#storyboard-board">Rules</a></p>
+   <div class="bb-spec raised"><div class="bshot is-changed"><header><span class="sn">3</span><b>Mercer reacts</b><small>Close-up · 4 s</small><span class="regen">Regenerate</span></header><div class="chips bchips"><span class="chip changed">Low angle<small>Eye level</small><button class="x" type="button" disabled aria-label="Remove Low angle">×</button></span><span class="chip">Still<button class="x" type="button" disabled aria-label="Remove Still">×</button></span><span class="chip add">+ lens</span></div><div class="bgrid"><figure class="bp"><div class="bimg"><img src="../assets/media-placeholder.svg" alt="Panel 3.1"><span class="bn">3.1</span><span class="ood">Out of date</span></div><figcaption>Mercer stays still, then gives a small nod.<button class="edit" type="button" disabled aria-label="Edit caption"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button></figcaption></figure></div></div></div>
+   </article>
+   <article id="video-rows" aria-labelledby="vid-h">
+   <h3 class="bb-h2c" id="vid-h">Video rows</h3>
+   <p class="bb-p">One row per shot with its chosen or newest version; earlier versions stay closed inside the row. This specimen is for version comparison. A current edit uses the <a href="#scene-edit-card">scene-edit card</a> above its Shots list instead of Play all. <a href="../design.md#video-rows">Rules</a></p>
+   <div class="bb-spec raised" style="max-width:420px">
+    <span class="viewboard playall"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7Z"/></svg>Play all · 0:13</span>
+    <div class="take-item"><span class="fthumb take"><img src="../assets/media-placeholder.svg" alt=""><span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7Z"/></svg></span></span><span class="ftitle"><b><span class="sn">1</span>Vale and Mercer on the bench</b><small>Version 1 · 4.2 s · from 1.1</small></span><span class="status ready">Chosen</span></div>
+    <div class="take-item has-history"><span class="fthumb take"><img src="../assets/media-placeholder.svg" alt=""><span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7Z"/></svg></span></span><span class="ftitle"><b><span class="sn">2</span>Vale recognises Mercer</b><small>Version 2 · <span class="new-tag">New</span> · 5.1 s</small></span><span class="status draft">Draft</span><details class="take-hist" open><summary>Version history · 1 earlier</summary><div class="th-row"><span class="fthumb take"><img src="../assets/media-placeholder.svg" alt=""><span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7Z"/></svg></span></span><span class="ftitle"><b>Version 1</b><small>5.2 s</small></span><button class="use" type="button" disabled>Use this version</button></div></details></div>
+   </div>
+   </article>
+   <article id="scene-edit-card" aria-labelledby="scene-edit-card-h">
+   <h3 class="bb-h2c" id="scene-edit-card-h">Scene edit card</h3>
+   <p class="bb-p">One snapshot, <b>3 shots · 13.4 s</b>, <b>Open editor →</b> and <b>Export</b>. No Watch, heading, revision/status pill, Whole scene overlay or repeated aggregate count. The list below is Shots; each row keeps version, duration and Chosen. Removing a badge does not change approval state. <a href="../design.md#scene-edit-card">Rules and open variants</a></p>
+   <div class="bb-screens"><figure><a href="../editor/index.html"><img src="../assets/media-placeholder.svg" alt="Current-edit card with scene snapshot, 3 shots and duration, Open editor and Export"></a><figcaption>Reviewed populated-state layout; empty/missing-choice/error variants remain open. Native links, no media processing.</figcaption></figure></div>
+   </article>
+   <article id="editor-layout-and-timeline" aria-labelledby="editor-layout-and-timeline-h">
+   <h3 class="bb-h2c" id="editor-layout-and-timeline-h">Editor layout and timeline</h3>
+   <p class="bb-p"><span class="bb-tag">Partial</span>Tools, player, full-height conversation and a timeline beneath the tools/player only. No Inspect/Agent heading or revision/comparison chrome. <a href="../design.md#editor-layout-and-timeline">Exact geometry and interaction limits</a> · <a href="screens.html#editor">All linked states</a>.</p>
+   <div class="bb-screens"><figure><a href="../editor/editor.html"><img src="../assets/media-placeholder.svg" alt="Editor layout with timeline separated from the full-height conversation"></a><figcaption>Expanded default. Compact mode is optional; Visual and Audio groups collapse independently.</figcaption></figure></div>
+   <div class="bb-scroll"><table class="bb-table"><tr><th>Layout</th><th>Reference dimensions</th></tr><tr><td>Header / desktop columns</td><td>64px / 48px tools, flexible player, 320px conversation</td></tr><tr><td>821–1100px columns</td><td>44px tools, flexible player, 300px conversation</td></tr><tr><td>Timeline</td><td>Expanded: clamp(260px, 100vh − 420px, 480px); compact: 300px</td></tr><tr><td>Grid / labels / gap</td><td>Minimum 740px / 152px (140px narrow) / 12px</td></tr><tr><td>Video / audio / overlay rows</td><td>64px / 34px / 32px</td></tr><tr><td>≤820px</td><td>Tools → player → timeline → conversation; timeline 480px or 300px</td></tr><tr><td>Desktop height ≤680px</td><td>Minimum workspace 636px; page scrolls</td></tr></table></div>
+   <p class="bb-p">Seven tracks illustrate possible roles, not mandatory inventory. Mixed sound stays <b>Original audio</b>; separate dialogue/ambience are assumptions. Captions/title/SFX/music are placeholders. Exact values remain in design.md; no new application token file or editor dependency is adopted.</p>
+   <p class="bb-cap">The checkbox, disclosures, scrolling and navigation are native. Detailed tools, properties, edit proposals, undo, persistence and render behaviour remain undesigned or illustrative. Keyboard alternatives for editing gestures are still required before implementation.</p>
+   </article>
+   <article id="media-tiles" aria-labelledby="tile-h">
+   <h3 class="bb-h2c" id="tile-h">Media tiles</h3>
+   <p class="bb-p">Square for looks, 16:9 for frames and videos, 4:3 for sheet pages. <a href="../design.md#media-tiles">Rules</a></p>
+   <div class="bb-spec raised"><div class="picker"><div class="tiles" style="grid-template-columns:repeat(3,minmax(0,200px))">
+    <span class="tile"><img src="../assets/media-placeholder.svg" alt="Look A"><span class="key">A</span><span class="zoom" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></span></span>
+    <span class="tile frame"><img src="../assets/media-placeholder.svg" alt="Panel 2.1"><span class="key">2.1</span></span>
+    <span class="tile frame take"><img src="../assets/media-placeholder.svg" alt="Version 2"><span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7Z"/></svg></span><span class="dur">0:05</span><span class="cap">Version 2 <small>5.1 s · New</small></span></span>
+   </div></div><p class="bb-cap">Look · frame · video with caption</p></div>
+   </article>
+   <article id="viewer" aria-labelledby="viewer-h">
+   <h3 class="bb-h2c" id="viewer-h">Viewer</h3>
+   <p class="bb-p">A larger look over the scrim, with previous / next and the one action. <a href="../design.md#viewer">Rules</a></p>
+   <div class="bb-spec" style="padding:0"><div class="lightbox" role="presentation"><div class="lb-panel framev"><div class="lb-head"><h2>Panel 2.1</h2><span class="qclose" aria-hidden="true">×</span></div><img src="../assets/media-placeholder.svg" alt="Panel 2.1, larger"><div class="lb-foot"><div class="lb-nav"><a href="#viewer" aria-label="Previous"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></a><a href="#viewer" aria-label="Next"><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></a><span class="fullsize view3d" style="display:inline-flex;align-items:center;height:32px;border:1px solid var(--border-strong);border-radius:9999px;padding:0 14px;font-size:13px;color:var(--fg-muted)"><svg class="i3d" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 7.2v8.6L12 20l7.5-4.2V7.2Z"/><path d="M4.5 7.2 12 11.4l7.5-4.2M12 11.4V20"/></svg>View in 3D</span></div><button class="choose" type="button" disabled>Approve the storyboard</button></div></div></div></div>
+   </article>
+   <article id="scene-player" aria-labelledby="player-h">
+   <h3 class="bb-h2c" id="player-h">Scene player</h3>
+   <p class="bb-p">Play all: the scene in shot order, a timeline, and cut checks between shots. <a href="../design.md#scene-player">Rules</a></p>
+   <div class="bb-spec raised"><div class="lb-panel scene" style="box-shadow:none;width:100%;padding:0">
+    <div class="lb-head"><h2>The scene · 0:13</h2><span class="takeswitch"><span>Shot 2</span><a class="on" href="#scene-player">Version 2</a><a href="#scene-player">Version 1</a></span></div>
+    <div class="player"><img src="../assets/media-placeholder.svg" alt="Scene player showing shot 1"><span class="play big" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7Z"/></svg></span><span class="bar" aria-hidden="true"><i></i></span><span class="time">0:00 / 0:13</span></div>
+    <div class="timeline"><span class="tl-block cur" style="flex:4.2"><img src="../assets/media-placeholder.svg" alt=""><span>1</span></span><span class="tl-block" style="flex:5.1"><img src="../assets/media-placeholder.svg" alt=""><span>2</span></span><span class="tl-block" style="flex:4.1"><img src="../assets/media-placeholder.svg" alt=""><span>3</span></span></div>
+    <p class="cuts-h">Cuts</p>
+    <div class="cuts"><div class="cutpair"><figure><img src="../assets/media-placeholder.svg" alt=""><figcaption>End of 1</figcaption></figure><span class="cutarrow">→</span><figure><img src="../assets/media-placeholder.svg" alt=""><figcaption>Start of 2</figcaption></figure></div><div class="cutpair"><figure><img src="../assets/media-placeholder.svg" alt=""><figcaption>End of 2</figcaption></figure><span class="cutarrow">→</span><figure><img src="../assets/media-placeholder.svg" alt=""><figcaption>Start of 3</figcaption></figure></div></div>
+   </div></div>
+   </article>
+   <article id="library-picker" aria-labelledby="lib-h">
+   <h3 class="bb-h2c" id="lib-h">Library picker</h3>
+   <p class="bb-p">Opened from + Attach. Your library or the app's examples, then a category, then tiles. <a href="../design.md#library-picker">Rules</a> · <a href="../library-picker-r92.html">full example</a></p>
+   <div class="bb-spec" style="padding:0"><div class="libpick" role="presentation"><div class="lp-panel">
+    <div class="lp-head"><h2>Attach from library</h2><div class="lp-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>Search</div><span class="qclose" aria-hidden="true">×</span></div>
+    <nav class="lp-source" aria-label="Source"><a>Your library</a><a class="default">Examples</a></nav>
+    <div class="lp-pills"><span class="lp-pill">Style</span><span class="lp-pill">Camera</span><span class="lp-pill">Movement</span><span class="lp-pill on">Environment</span><span class="lp-pill">Lighting</span><span class="lp-pill">Colour</span></div>
+    <div class="lp-body"><div class="lp-grid">
+     <span class="lp-tile on"><span class="lp-media"><img src="../assets/media-placeholder.svg" alt=""><span class="lp-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></span></span><span class="lp-label">Café</span><span class="lp-sub">Environment</span></span>
+     <span class="lp-tile"><span class="lp-media"><img src="../assets/media-placeholder.svg" alt=""><span class="lp-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></span></span><span class="lp-label">Forest</span><span class="lp-sub">Environment</span></span>
+     <span class="lp-tile"><span class="lp-media"><img src="../assets/media-placeholder.svg" alt=""><span class="lp-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></span></span><span class="lp-label">City at night</span><span class="lp-sub">Environment</span></span>
+     <span class="lp-tile"><span class="lp-media"><img src="../assets/media-placeholder.svg" alt=""><span class="lp-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></span></span><span class="lp-label">Beach</span><span class="lp-sub">Environment</span></span>
+    </div></div>
+    <div class="lp-tray"><span class="lp-tray-l">1 selected</span><span class="chip">Café<button class="x" type="button" disabled aria-label="Remove Café">×</button></span><span class="send">Attach (1)</span></div>
+   </div></div></div>
+   <div class="bb-spec raised"><div class="lp-empty"><div><b>Nothing saved yet</b><br><span>Characters, places and props you approve will appear here.</span></div></div><p class="bb-cap">Your library, empty</p></div>
+   </article>
+   <article id="reference-sheet" aria-labelledby="sheet-h">
+   <h3 class="bb-h2c" id="sheet-h">Reference sheet</h3>
+   <p class="bb-p">Drawn from the asset's record; every image is its own file. <a href="../design.md#reference-sheet">Rules</a></p>
+   <div class="bb-spec" style="padding:0"><div class="livesheet" style="background:var(--paper)">
+    <header><span class="kicker">Character sheet</span><h2>Mercer</h2><p class="ssum">Early twenties, dark curly hair, round glasses, dark suit.</p><span class="status ready">Ready</span></header>
+    <div class="sgrid"><div class="ssec"><h3><span class="num">01</span>Portrait</h3><div class="sfigs"><figure class="sfig"><img src="../assets/media-placeholder.svg" alt="Mercer portrait" style="aspect-ratio:1"><figcaption>Front, neutral</figcaption></figure></div></div><div class="ssec"><h3><span class="num">02</span>Face</h3><div class="sfigs"><figure class="sfig"><img src="../assets/media-placeholder.svg" alt="Mercer face" style="aspect-ratio:1"><figcaption>Close, three-quarter</figcaption></figure></div></div><div class="ssec"><h3><span class="num">03</span>Turnaround</h3><div class="slots"><span class="slot">Side view<small>Add</small></span></div></div></div>
+   </div></div>
+   </article>
+   <article id="placeholders" aria-labelledby="ph-h">
+   <h3 class="bb-h2c" id="ph-h">Placeholders</h3>
+   <p class="bb-p">A planned panel before any image exists, and “Making…” while it is being made. <a href="../design.md#placeholders">Rules</a></p>
+   <div class="bb-spec raised"><div class="bb-row">
+    <div class="bb-col" style="width:220px"><div class="ph big">Panel 2.2 · planned</div><span class="bb-lab">Planned</span></div>
+    <div class="bb-col" style="width:220px"><div class="fresh making" style="--at:9999s;width:220px"><img src="../assets/media-placeholder.svg" alt="" style="display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px"></div><span class="bb-lab">Making…</span></div>
+   </div></div>
+   </article>
+   <article id="demo-only" aria-labelledby="demo-h">
+   <h3 class="bb-h2c" id="demo-h">Demo-only</h3>
+   <p class="bb-p">The soft glow (on the + circle only, no outline), the demo bar and word-by-word streaming exist only in the <a href="../generate-flows.html#demo">clickable demo</a>. They are not product components. <a href="../design.md#demo-only">Rules</a></p>
+   <div class="bb-spec raised"><div class="bb-row" style="align-items:center"><span class="attach"><span class="plus demo-glow">+</span>Attach</span><span class="demo-bar" style="position:static;transform:none">Demo · 4 of 18 · Restart · Exit</span></div></div>
+   </article>
+
+  </section>
+
+ </main>
+</div>
+<nav class="bb-pager" aria-label="Previous and next page"><a href="foundations.html">← Foundations</a><a href="patterns.html">Patterns and accessibility →</a></nav>
+</body>
+</html>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="Example media omitted">
+  <title id="title">Example media omitted</title>
+  <desc id="desc">Neutral placeholder. Original prototype images and screenshots are not included in this public repository.</desc>
+  <rect width="640" height="360" fill="#f7f5ed"/>
+  <rect x="1" y="1" width="638" height="358" fill="none" stroke="#a49e8e"/>
+  <text x="320" y="170" text-anchor="middle" font-family="system-ui, sans-serif" font-size="24" fill="#4e4a3f">Example media omitted</text>
+  <text x="320" y="205" text-anchor="middle" font-family="system-ui, sans-serif" font-size="16" fill="#656155">Layout reference only</text>
+</svg>

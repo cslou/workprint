@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Editor preview · Vale and Mercer meet</title>
+<link rel="stylesheet" href="../app-r11.css">
+<link rel="stylesheet" href="controls.css">
+<link rel="stylesheet" href="preview.css">
+<link rel="stylesheet" href="reference-layout.css">
+<link rel="stylesheet" href="track-layout.css">
+</head>
+<body class="reference-layout track-comparison">
+<div class="editor-shell">
+  <header class="editor-header">
+    <a class="back-link" href="index.html">← Videos</a><span class="header-divider"></span>
+    <div class="editor-identity"><h1>Editor</h1><span class="scene-name">Vale and Mercer meet</span></div>
+    <div class="header-actions"><button class="secondary" type="button" disabled>Undo</button><button class="primary" type="button" disabled title="Export is unavailable in this static preview">Export</button></div>
+  </header>
+  <main class="reference-editor" aria-label="Scene editor with an expanded track stack">
+    <aside class="tool-rail" aria-label="Illustrative editing tools; not interactive in this preview">
+      <button class="rail-tool selected-tool" type="button" disabled aria-label="Select" title="Select · illustrative"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 3 14 8-7 2-3 7Z"/></svg></button>
+      <button class="rail-tool" type="button" disabled aria-label="Text" title="Text · illustrative"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5V3h16v2M12 3v18M8 21h8"/></svg></button>
+      <button class="rail-tool" type="button" disabled aria-label="Media" title="Media · illustrative"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="14" height="16" rx="2"/><path d="m9 8 5 3-5 3ZM20 9v12H9"/></svg></button>
+      <button class="rail-tool" type="button" disabled aria-label="Shapes" title="Shapes · illustrative"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg></button>
+      <button class="rail-tool" type="button" disabled aria-label="Effects" title="Effects · illustrative"><span aria-hidden="true">Fx</span></button>
+      <button class="rail-tool" type="button" disabled aria-label="Motion" title="Motion · illustrative"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18C4 5 16 20 16 7M3 3l5 8"/><circle cx="17" cy="5" r="3"/></svg></button>
+      <button class="rail-tool" type="button" disabled aria-label="Layout" title="Layout · illustrative"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h18M10 9v12"/></svg></button>
+      <button class="rail-tool" type="button" disabled aria-label="Transitions" title="Transitions · illustrative"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5v14l8-7ZM20 5v14l-8-7Z"/></svg></button>
+      <button class="rail-tool" type="button" disabled aria-label="Captions" title="Captions · illustrative"><span class="cc-icon" aria-hidden="true">CC</span></button>
+      <button class="rail-tool" type="button" disabled aria-label="Comments" title="Comments · illustrative"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v13H9l-5 4Z"/></svg></button>
+    </aside>
+    <div class="preview-region">
+      <section class="preview-stage">
+        <div class="stage-heading"><h2>Scene preview</h2><small>13.4 s · Widescreen</small></div>
+        <div class="preview-picture"><img src="../assets/media-placeholder.svg" alt="Original edit at 8.80 seconds: the picture is still on Vale"><span class="still-label">Illustrative still · before the edit</span><div class="preview-caption"><span>“You must be Mercer.”</span></div></div>
+      </section>
+    </div>
+    <aside class="editor-chat" aria-label="Editing conversation">
+      <div class="editor-messages">
+        <div class="me">Use version 2. Keep the other two.</div>
+        <div class="acts"><div><span class="tick">✓</span>Prepared the first scene edit</div></div>
+        <div class="agent"><p>Your three videos are in place. Nothing has been trimmed yet.</p><p>Ask for an edit here, or work on the timeline. Your original videos stay unchanged.</p></div>
+        <div class="agent"><p>Vale’s recognition is selected. The picture currently cuts to Mercer at <b>00:09.30</b>.</p></div>
+      </div>
+      <div class="editor-composer">
+        <div class="selection-context">Selected · Vale recognises Mercer</div>
+        <p class="typed-example">Cut to Mercer half a second earlier, but let Vale finish speaking over his reaction.</p>
+        <div class="composer-bar"><small>Layout example only</small><button class="primary" type="button" disabled title="Editing is unavailable in this static preview">Send <span>↑</span></button></div>
+      </div>
+    </aside>
+    <section class="timeline-area" aria-label="Scene timeline" aria-describedby="timeline-disclosure">
+      <header class="timeline-toolbar">
+        <div class="transport">
+          <button class="transport-button" type="button" disabled aria-label="Previous frame"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14m11-14L8 12l10 7Z"/></svg></button>
+          <button class="transport-button play-button" type="button" disabled aria-label="Playback unavailable in this static example"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7Z"/></svg></button>
+          <button class="transport-button" type="button" disabled aria-label="Next frame"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 5v14M6 5l10 7-10 7Z"/></svg></button>
+          <span class="timecode">00:08.80 <span> / 00:13.40</span></span>
+          <span class="transport-divider"></span>
+          <button class="transport-button split-tool" type="button" disabled aria-label="Split"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="m8 8 12 12M8 16 20 4"/></svg></button>
+        </div>
+        <div class="timeline-options">
+          <span class="track-count">7 example tracks</span>
+          <label class="compact-toggle" for="compact-timeline"><input id="compact-timeline" type="checkbox"><span>Compact timeline</span></label>
+          <button class="secondary add-track" type="button" disabled title="Tracks would be added as needed; this example cannot add media">+ Add track</button>
+        </div>
+      </header>
+      <div class="timeline-scroll" tabindex="0" aria-label="Tracks; scroll vertically in compact mode and horizontally on small screens">
+        <div class="timeline-grid">
+          <div class="ruler-row"><span class="ruler-label">Scene time</span><div class="ruler"><span>0s</span><span>2s</span><span>4s</span><span>6s</span><span>8s</span><span>10s</span><span>12s</span><span>14s</span><i class="ruler-playhead" aria-hidden="true"></i></div></div>
+          <details class="track-group visual-group" open>
+            <summary><span class="group-name">Visual <small>3</small></span><span class="group-hint">Layers above the main video</span></summary>
+            <div class="lane caption-lane"><div class="lane-name"><span class="track-kind">CC</span><span>Captions</span></div><div class="track slim-track"><div class="overlay-region caption-region sample-region" style="left:51.4286%;width:15%" title="Caption sample: You must be Mercer. · 00:07.20–00:09.30"><span>You must be Mercer.</span></div></div></div>
+            <div class="lane title-lane"><div class="lane-name"><span class="track-kind">T</span><span>Titles / overlays</span></div><div class="track slim-track"><div class="overlay-region title-region sample-region" style="left:0%;width:21.4286%" title="Illustrative opening title; not a selected creative addition"><span>Vale &amp; Mercer · sample title</span></div></div></div>
+            <div class="lane video-lane"><div class="lane-name"><span class="track-kind">V1</span><span>Video</span></div><div class="track video-track">
+              <div class="clip" style="left:0%;width:30%"><img src="../assets/media-placeholder.svg" alt=""><span class="clip-name">On the bench · 4.2 s</span></div>
+              <div class="clip selected-clip" style="left:30%;width:36.4286%"><img src="../assets/media-placeholder.svg" alt=""><span class="clip-name">Vale recognises Mercer · 5.1 s</span><span class="trim-handle"></span></div>
+              <div class="clip" style="left:66.4286%;width:29.2857%"><img src="../assets/media-placeholder.svg" alt=""><span class="clip-name">Mercer reacts · 4.1 s</span></div>
+            </div></div>
+          </details>
+          <details class="track-group audio-group" open>
+            <summary><span class="group-name">Audio <small>4</small></span><span class="group-hint">Separate sources assumed · mixed sound stays “Original audio”</span></summary>
+            <div class="lane dialogue-lane"><div class="lane-name"><span class="track-kind">A1</span><span>Dialogue</span></div><div class="track audio"><div class="audio-region" style="left:51.4286%;width:15%"><span>Vale</span><svg viewBox="0 0 120 24" aria-hidden="true"><path d="M2 8v8M8 5v14M14 9v6M20 2v20M26 7v10M32 4v16M38 10v4M44 3v18M50 6v12M56 8v8M62 2v20M68 5v14M74 8v8M80 4v16M86 7v10M92 10v4M98 6v12M104 9v6M110 7v10M116 10v4"/></svg></div></div></div>
+            <div class="lane ambience-lane"><div class="lane-name"><span class="track-kind">A2</span><span>Ambience</span></div><div class="track audio"><div class="audio-region ambient" style="left:0%;width:95.7143%"><span>Gallery room tone</span><svg viewBox="0 0 420 24" aria-hidden="true"><path d="M4 10v4M12 8v8M20 9v6M28 7v10M36 10v4M44 8v8M52 9v6M60 7v10M68 9v6M76 8v8M84 10v4M92 7v10M100 8v8M108 9v6M116 7v10M124 8v8M132 10v4M140 9v6M148 7v10M156 8v8M164 10v4M172 9v6M180 7v10M188 8v8M196 9v6M204 8v8M212 10v4M220 7v10M228 9v6M236 8v8M244 10v4M252 7v10M260 9v6M268 8v8M276 10v4M284 9v6M292 7v10M300 8v8M308 10v4M316 9v6M324 7v10M332 8v8M340 10v4M348 9v6M356 7v10M364 8v8M372 9v6M380 8v8M388 10v4M396 7v10M404 9v6M412 8v8"/></svg></div></div></div>
+            <div class="lane effects-lane"><div class="lane-name"><span class="track-kind">A3</span><span>Sound effects</span></div><div class="track audio"><div class="audio-region sample-region sample-audio" style="left:7.1429%;width:19.2857%" title="Sound-effects placeholder; no sound file is attached"><span>Fabric rustle · sample</span><svg viewBox="0 0 80 24" aria-hidden="true"><path d="M4 10v4M12 8v8M20 3v18M28 6v12M36 2v20M44 5v14M52 7v10M60 9v6M68 10v4M76 11v2"/></svg></div></div></div>
+            <div class="lane music-lane"><div class="lane-name"><span class="track-kind">A4</span><span>Music</span></div><div class="track audio"><div class="audio-region sample-region sample-audio" style="left:0%;width:95.7143%" title="Music placeholder; no score has been selected or attached"><span>Music · sample</span><svg viewBox="0 0 420 24" aria-hidden="true"><path d="M4 9v6M12 7v10M20 4v16M28 6v12M36 8v8M44 5v14M52 3v18M60 5v14M68 7v10M76 4v16M84 2v20M92 4v16M100 6v12M108 3v18M116 5v14M124 7v10M132 4v16M140 2v20M148 4v16M156 6v12M164 3v18M172 5v14M180 7v10M188 4v16M196 2v20M204 4v16M212 6v12M220 3v18M228 5v14M236 7v10M244 4v16M252 2v20M260 4v16M268 6v12M276 3v18M284 5v14M292 7v10M300 4v16M308 2v20M316 4v16M324 6v12M332 3v18M340 5v14M348 7v10M356 5v14M364 7v10M372 9v6M380 7v10M388 9v6M396 10v4M404 9v6M412 11v2"/></svg></div></div></div>
+          </details>
+        </div>
+      </div>
+      <footer class="timeline-foot" id="timeline-disclosure"><span>Layout only · added captions, title, SFX and music are placeholders</span><span>Separate dialogue / ambience assumed · no audio separation</span></footer>
+    </section>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,8 @@
+/* Current scene edit entry, shared by the standalone reference and demo continuation. */
+.scene-card { border: 1px solid var(--border-strong); border-radius: 12px; overflow: hidden; margin-bottom: 24px; background: var(--bg); }
+.scene-card .scene-poster { position: relative; }
+.scene-poster img { display: block; width: 100%; aspect-ratio: 16/9; object-fit: cover; }
+.scene-card-body { padding: 14px; }
+.scene-card-body p { font-size: 12px; color: var(--fg-subtle); margin: 0; }
+.scene-card-meta { margin-bottom: 12px; }
+.pv section.scene-card { padding: 0; border: 1px solid var(--border-strong); }
