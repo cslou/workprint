@@ -2,7 +2,7 @@
 
 **Date:** Initially approved 2026-10-27; revised scope approved during replanning. Completion remains subject to evidence and delivery gates.
 **Goal:** Build on the accepted application foundation to expose authenticated, closed application contracts through a typed client, with validated, side-effect-free not-implemented responses. No functional conversations or background execution.
-**Status:** 🔵 In Progress — Story 1 accepted; revised Story 2 authorized; Stories 4–5 remain pending separate continuation.
+**Status:** 🔵 In Progress — Stories 1–2 accepted; Stories 4–5 and Final Verification explicitly authorized. Integration into `main` still requires a separate merge command.
 
 ---
 
@@ -107,21 +107,25 @@ Record actual Supabase admission/exposure and configuration evidence in `docs/na
 - **As a** developer, **I want** actual Supabase admission on the existing backend, **so that** protected API scaffolding trusts verified identity without implementing conversations.
 - **Dependencies:** Accepted Story 1 and authorized development Supabase target/two synthetic identities; maps to revised P1-S2.
 - **Acceptance criteria:**
-  - [ ] S2-AC1: Verify actual configured Supabase tokens and derive trusted account context. Missing, malformed, expired and invalid tokens fail without leaking credentials; caller owner claims cannot replace verified identity. Bound verification failures/timeouts.
-  - [ ] S2-AC2: Use one environment-configured Supabase integration and neutral helper/module names. Provisioning remains separate from serving; the approved development stack binds only to loopback. No alternate environment-specific application implementation/folder, custom credential service or account administration.
-  - [ ] S2-AC3: Expose only intended operational/application routes. Health remains the explicit operational exception. Native conversations, administration, direct tools and test controls remain inaccessible in production configuration; no inference or workflows are enabled.
-  - [ ] S2-AC4: A test-only protected probe observes distinct verified identities through the same built admission path, without conversation/domain records. Production composition excludes the probe. Record actual verification APIs, route policy and configuration in the qualification record.
+  - [x] S2-AC1: Verify actual configured Supabase tokens and derive trusted account context. Missing, malformed, expired and invalid tokens fail without leaking credentials; caller owner claims cannot replace verified identity. Bound verification failures/timeouts.
+  - [x] S2-AC2: Use one environment-configured Supabase integration and neutral helper/module names. Provisioning remains separate from serving; the approved development stack binds only to loopback. No alternate environment-specific application implementation/folder, custom credential service or account administration.
+  - [x] S2-AC3: Expose only intended operational/application routes. Health remains the explicit operational exception. Native conversations, administration, direct tools and test controls remain inaccessible in production configuration; no inference or workflows are enabled.
+  - [x] S2-AC4: A test-only protected probe observes distinct verified identities through the same built admission path, without conversation/domain records. Production composition excludes the probe. Record actual verification APIs, route policy and configuration in the qualification record.
 - **Functional verification:**
-  - [ ] V3 — extend `pnpm test:security` against the actual built server and Supabase verifier with two synthetic identities. Pass when verified accounts remain distinct, invalid/expired/missing tokens reject, forged owner claims do not alter identity and verifier failure settles within a declared deadline. Obtain fresh tokens at test execution, not before a lengthy build.
-  - [ ] V2/V3 — inspect production-configured HTTP exposure and built browser/output/log secret sentinels. Pass when unintended routes/probe are inaccessible, secrets remain private and no provider work occurs. If provisioning configuration is added, verify loopback-only publication and cleanup of only fixture-owned resources.
+  - [x] V3 — extend `pnpm test:security` against the actual built server and Supabase verifier with two synthetic identities. Pass when verified accounts remain distinct, invalid/expired/missing tokens reject, forged owner claims do not alter identity and verifier failure settles within a declared deadline. Obtain fresh tokens at test execution, not before a lengthy build.
+  - [x] V2/V3 — inspect production-configured HTTP exposure and built browser/output/log secret sentinels. Pass when unintended routes/probe are inaccessible, secrets remain private and no provider work occurs. If provisioning configuration is added, verify loopback-only publication and cleanup of only fixture-owned resources.
 - **Regression verification:**
-  - [ ] `pnpm test`, `pnpm check`, `pnpm build`: retain the seven foundation cases, clean-export smoke, setup/serving separation and no-startup-inference behavior. Focused security runs select existing aggregate cases rather than duplicating them.
+  - [x] `pnpm test`, `pnpm check`, `pnpm build`: retain the seven foundation cases, clean-export smoke, setup/serving separation and no-startup-inference behavior. Focused security runs select existing aggregate cases rather than duplicating them.
 - **Editorial/design verification:** Compare README and qualification record against actual configuration/admission/exposure; explicitly distinguish identity proof from conversation ownership. No product visual change.
 - **Manual-only behavior verification:** N/A — automated; authorized setup is a prerequisite, not a substitute.
 - **Planned commits:**
   1. Environment-configured Supabase verification and restricted admission.
   2. Built-server identity/exposure tests and setup/documentation evidence.
 - **Technical notes:** Do not import PR #4 wholesale. No native conversation client or domain stores are required. Test registration exercises the real admission path but stays outside production composition.
+
+**Story 2 execution evidence:** Accepted [PR #5](https://github.com/cslou/workprint/pull/5) head `964157e886489ab32dc5b798a8ef697838a8a196`, merged into `sprint-001` at `b73d083aae00c7be745ecaef2216fb15c82e0585`. Actual configured Supabase verification, distinct synthetic identities, invalid/expired/forged token rejection, bounded failure and production exclusion passed. Initial independent review identified a pre-existing framework-public route bypass; the additive fix reproduced then closed it, and independent fix verification plus security/logic/modularity scans returned 5/5 with no remaining findings. Current-head and post-merge `pnpm test` (8/8, zero failed/skipped/cancelled), `pnpm check` and `pnpm build` passed; aggregate includes clean-export smoke and all seven foundation cases. Orchestrator independently ran current-head check and inspected post-merge evidence. README/configuration/qualification editorial review passed; no visual/live-model acceptance. Durable evidence: [acceptance comment](https://github.com/cslou/workprint/pull/5#issuecomment-6446237499). No new dependencies.
+
+**Remaining execution selection:** User authorized completion of Stories 4–5 and Final Verification. The Story 2-only `medium` override has expired; use the previously requested `openai-codex/gpt-6.1-sol`, `high` for remaining work, retaining 15-minute execution windows and progress inspection. Story 4 uses a fresh worker because both its contract-focused scope and thinking differ from the stopped Auth worker. Later worker reuse is decided at each story boundary. Preserve lean aggregate verification and all required coverage.
 
 #### Story 3: Relocated — independent native work and process recovery
 
@@ -215,7 +219,7 @@ Final evidence identifies revision, commands/environment, package cohort, safe f
 
 ### Rules
 - Follow canonical delivery workflow before Git/PR delivery; only the orchestrator accepts/merges and updates planning records.
-- Revised Story 2 is explicitly authorized. Do not automatically start Stories 4–5 or resume the deferred worker/PR #4.
+- Remaining Stories 4–5 and Final Verification are explicitly authorized, sequentially after each acceptance gate. Do not resume deferred PR #4 or merge the sprint into `main` without its separate approval.
 - Stories are sequential and independently verified/reviewed; Final Verification is last. New dependencies require rationale and applicable audit evidence.
 - Sprint integration requires the user's explicit merge command. No production/shared infrastructure changes or live AI calls are authorized by this plan.
 
