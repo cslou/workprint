@@ -28,7 +28,7 @@ export async function isolatedPostgres() {
   let id: string | undefined;
   const inspect = async (reference: string) => {
     try {
-      return JSON.parse(await docker('inspect', '--format', '{"id":{{json .Id}},"owner":{{json (index .Config.Labels "workprint.fixture")}}}', reference)) as { id: string; owner: string | null };
+      return JSON.parse(await docker('inspect', '--format', '{"id":{{json .Id}},"owner":{{json (index .Config.Labels "workprint.fixture")}},"state":{{json .State.Status}}}', reference)) as { id: string; owner: string | null; state: string };
     } catch (error) {
       if (error instanceof Error && 'code' in error && error.code === 1 &&
         'stderr' in error && typeof error.stderr === 'string' && /No such (object|container):/.test(error.stderr)) return undefined;
@@ -42,8 +42,25 @@ export async function isolatedPostgres() {
     if (found.owner !== owner || !/^[0-9a-f]{64}$/.test(found.id) || (id && id !== found.id)) {
       throw new Error(`Refusing cleanup: fixture ownership mismatch (${name})`);
     }
-    id = found.id;
-    await docker('stop', '--timeout', '5', id);
+    const containerId = found.id;
+    id = containerId;
+    const cleanupCommand = async (operation: 'stop' | 'rm') => {
+      try {
+        await docker(operation, ...(operation === 'rm' ? ['--volumes'] : ['--timeout', '5']), containerId);
+      } catch (error) {
+        let remaining: Awaited<ReturnType<typeof inspect>>;
+        try { remaining = await inspect(containerId); } catch (inspectionError) {
+          throw new AggregateError([error, inspectionError], 'Owned fixture cleanup command and inspection failed', { cause: inspectionError });
+        }
+        if (!remaining) return; // Concurrent auto-removal already completed the owned cleanup.
+        if (remaining.state === 'removing' && error instanceof Error && 'code' in error && error.code === 1 &&
+          'stderr' in error && typeof error.stderr === 'string' && /removal .*already in progress/i.test(error.stderr)) return;
+        throw error;
+      }
+    };
+    // --rm runs only after a started container exits; a never-started one needs rm.
+    if (found.state === 'created') await cleanupCommand('rm');
+    else if (found.state !== 'removing') await cleanupCommand('stop');
     const deadline = Date.now() + 10000;
     while (await inspect(id)) {
       if (Date.now() > deadline) throw new Error(`Owned fixture removal deadline exceeded (${name})`);
