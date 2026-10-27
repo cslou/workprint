@@ -60,14 +60,19 @@ test('built backend rejects unsafe config, separates setup privileges and exclud
 
   // Owners retain DDL authority even after ordinary CREATE grants are revoked.
   // Change only fixture-role grants, never native table/schema definitions.
-  await query(db.adminUrl, 'REVOKE CREATE ON DATABASE workprint FROM wp_setup; REVOKE CREATE ON SCHEMA mastra, public FROM wp_setup; REVOKE CREATE ON SCHEMA public FROM pg_database_owner');
+  await query(db.adminUrl, 'CREATE ROLE wp_owner_bridge NOLOGIN; REVOKE CREATE ON DATABASE workprint FROM wp_setup; REVOKE CREATE ON SCHEMA mastra, public FROM wp_setup; REVOKE CREATE ON SCHEMA public FROM pg_database_owner');
   try {
-    for (const [name, url] of [['native-owner', db.setupUrl], ['inherited-owner', db.servingUrl], ['settable-owner', db.servingUrl]] as const) {
+    for (const [name, url] of [['native-owner', db.setupUrl], ['inherited-owner', db.servingUrl], ['settable-owner', db.servingUrl], ['mixed-chain-owner', db.servingUrl]] as const) {
       if (name === 'inherited-owner') await query(db.adminUrl, 'GRANT wp_setup TO wp_serving');
       if (name === 'settable-owner') await query(db.adminUrl, 'GRANT wp_setup TO wp_serving WITH INHERIT FALSE');
+      if (name === 'mixed-chain-owner') {
+        await query(db.adminUrl, 'REVOKE wp_setup FROM wp_serving; GRANT wp_setup TO wp_owner_bridge WITH SET FALSE; GRANT wp_owner_bridge TO wp_serving WITH INHERIT FALSE');
+        const chain = await query(url, "SELECT pg_has_role(current_user, 'wp_setup', 'USAGE') AS owner_inherited, pg_has_role(current_user, 'wp_setup', 'SET') AS owner_settable, pg_has_role(current_user, 'wp_owner_bridge', 'USAGE') AS bridge_inherited, pg_has_role(current_user, 'wp_owner_bridge', 'SET') AS bridge_settable, pg_has_role('wp_owner_bridge', 'wp_setup', 'USAGE') AS bridge_inherits_owner, pg_has_role('wp_owner_bridge', 'wp_setup', 'SET') AS bridge_sets_owner");
+        assert.deepEqual(chain.rows[0], { owner_inherited: false, owner_settable: false, bridge_inherited: false, bridge_settable: true, bridge_inherits_owner: true, bridge_sets_owner: false });
+      }
       assert.deepEqual((await query(url, privilegeSql)).rows[0], { database_create: false, schema_create: false, public_create: false, privileged: false });
       const ownership = await query(url, "SELECT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'mastra' AND (pg_has_role(current_user, c.relowner, 'USAGE') OR pg_has_role(current_user, c.relowner, 'SET'))) AS owned");
-      assert.equal(ownership.rows[0]?.owned, true, 'Fixture connection can exercise native-object ownership');
+      assert.equal(ownership.rows[0]?.owned, name !== 'mixed-chain-owner', 'Direct ownership flags deliberately miss the mixed chain');
       if (name === 'settable-owner') assert.deepEqual((await query(url, "SELECT pg_has_role(current_user, 'wp_setup', 'USAGE') AS inherited, pg_has_role(current_user, 'wp_setup', 'SET') AS settable")).rows[0], { inherited: false, settable: true });
       const ownerPort = await unusedPort();
       const ownerLog = join(fixture.logs, `${name}.log`);
@@ -81,7 +86,7 @@ test('built backend rejects unsafe config, separates setup privileges and exclud
       } finally { await owner.stop(); }
     }
   } finally {
-    await query(db.adminUrl, 'REVOKE wp_setup FROM wp_serving; GRANT CREATE ON DATABASE workprint TO wp_setup; GRANT CREATE ON SCHEMA mastra TO wp_setup; GRANT CREATE ON SCHEMA public TO pg_database_owner');
+    await query(db.adminUrl, 'REVOKE wp_setup FROM wp_serving; REVOKE wp_owner_bridge FROM wp_serving; REVOKE wp_setup FROM wp_owner_bridge; DROP ROLE wp_owner_bridge; GRANT CREATE ON DATABASE workprint TO wp_setup; GRANT CREATE ON SCHEMA mastra TO wp_setup; GRANT CREATE ON SCHEMA public TO pg_database_owner');
   }
 
   const port = await unusedPort();

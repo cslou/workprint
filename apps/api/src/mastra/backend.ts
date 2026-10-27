@@ -32,7 +32,11 @@ export async function createBackend(routes: ApiRoute[] = []) {
       has_schema_privilege('mastra', 'CREATE') OR
       has_schema_privilege('public', 'CREATE') OR
       (SELECT rolsuper OR rolcreaterole OR rolcreatedb FROM pg_roles WHERE rolname = current_user) OR
-      EXISTS (SELECT 1 FROM native_owners WHERE pg_has_role(current_user, owner, 'USAGE') OR pg_has_role(current_user, owner, 'SET'))
+      EXISTS (
+        SELECT 1 FROM pg_roles reachable CROSS JOIN native_owners
+        WHERE pg_has_role(current_user, reachable.oid, 'SET')
+          AND pg_has_role(reachable.oid, native_owners.owner, 'USAGE')
+      )
       AS privileged`);
     if (result.rows[0]?.privileged !== false) throw new Error('Privileged serving connection');
   } catch {
