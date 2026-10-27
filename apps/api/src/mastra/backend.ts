@@ -1,5 +1,5 @@
 import { Mastra } from '@mastra/core';
-import type { ApiRoute } from '@mastra/core/server';
+import { registerApiRoute, type ApiRoute } from '@mastra/core/server';
 import { PostgresStore } from '@mastra/pg';
 import { Pool } from 'pg';
 import { loadServerConfig } from './config.js';
@@ -35,7 +35,15 @@ export async function createBackend(routes: ApiRoute[] = []) {
     server: {
       host: '127.0.0.1', port: config.port,
       build: { swaggerUI: false, openAPIDocs: false },
-      apiRoutes: routes,
+      apiRoutes: [
+        ...routes,
+        // Mastra skips server middleware for framework-public routes. Custom routes
+        // precede native registration, so this terminal fallback closes those too.
+        registerApiRoute('/*', {
+          method: 'ALL',
+          handler: (context) => context.json({ error: { code: 'not_found', message: 'Not found' } }, 404),
+        }),
+      ],
       middleware: [async (context, next) => {
         if (context.req.path === '/health' && context.req.method === 'GET') return next();
         // Default-deny before native handlers, regardless of caller identity.

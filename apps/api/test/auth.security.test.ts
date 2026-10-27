@@ -137,10 +137,17 @@ test('built admission verifies Supabase accounts, rejects forged/expired tokens 
   });
   t.after(production.stop);
   await production.response(`${origin}/health`);
-  for (const path of ['/__auth_probe', '/api/agents', '/api/memory/threads', '/api/workflows', '/api/tools', '/api/telemetry', '/swagger-ui', '/openapi.json', '/health/']) {
-    const response = await fetch(`${origin}${path}`, { headers: { Authorization: `Bearer ${identities[0]!.access_token}` }, signal: AbortSignal.timeout(3000) });
-    assert.equal(response.status, 404, path);
+  const exposure: { path: string; bearer: boolean; status: number }[] = [];
+  for (const path of ['/api/auth/capabilities', '/api/auth/me', '/__auth_probe', '/api/agents', '/api/memory/threads', '/api/workflows', '/api/tools', '/api/telemetry', '/swagger-ui', '/openapi.json', '/health/']) {
+    for (const bearer of [false, true]) {
+      const response = await fetch(`${origin}${path}`, {
+        headers: bearer ? { Authorization: `Bearer ${identities[0]!.access_token}` } : {}, signal: AbortSignal.timeout(3000),
+      });
+      exposure.push({ path, bearer, status: response.status });
+      await response.body?.cancel();
+    }
   }
+  assert.deepEqual(exposure, exposure.map((entry) => ({ ...entry, status: 404 })), 'Every unregistered route must remain closed, including framework-public Auth handlers');
   await production.stop();
   for (const name of ['probe.log', 'production.log', 'probe-build.log', 'production-build.log', 'failure.log', 'malformed.log', 'stall.log', 'body-stall.log']) {
     const log = await readFile(join(fixture.logs, name), 'utf8');
