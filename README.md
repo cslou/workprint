@@ -62,17 +62,21 @@ Auth qualification requires privately supplied dedicated Supabase Auth configura
 pnpm check
 WORKPRINT_AUTH_FIXTURE=/absolute/private/auth-fixture.json WORKPRINT_AUTH_SIGNING_FIXTURE=/absolute/private/cli-status.json pnpm test
 pnpm test:smoke
+pnpm test:contracts
 WORKPRINT_AUTH_FIXTURE=/absolute/private/auth-fixture.json WORKPRINT_AUTH_SIGNING_FIXTURE=/absolute/private/cli-status.json pnpm test:security
 pnpm audit
 ```
 
 `check` runs strict TypeScript, ESLint and dependency-cruiser, including temporary forbidden-import controls removed in `finally` cleanup. `test` compiles TypeScript and runs all implemented `node:test` cases; focused commands select the same cases, not duplicate suites. Smoke exports **committed HEAD** with Git (commit source changes before testing that candidate), installs frozen, builds, initializes fresh isolated storage, serves built/development apps within deadlines, verifies real responses and shuts down owned resources. Security checks configuration rejection, privileges, actual Supabase admission, built-HTTP verifier failures/deadlines, excluded routes, secret sentinels and absence of observed non-loopback Node network attempts. The Auth fixture JSON contains `url`, `anonKey` (publishable/legacy anon key), `servingUrl` and two `accounts` with `email`/`password`. The signing fixture is the authorized development CLI status JSON containing `JWT_SECRET`, used only by the harness to construct a signed expired token. Neither private file is copied into builds or inherited by serving. Keep both ignored and mode 0600; never use a hosted/shared project. The harness gets fresh tokens after building, builds probe/production artifacts in owned temporary directories using frozen workspace dependencies, and fails clearly if prerequisites are missing. Smoke uses only explicit health-only loopback configuration and needs no Auth fixture or Supabase service. Missing Docker or other prerequisites fail, not skip. Logs stay in temporary directories named in test output; redirect verbose command output to local log files.
 
+`test:contracts` selects the same shared-schema/error and named unavailable-boundary cases as the aggregate suite, without HTTP or native-client transport (Story 5 owns those). Browser-safe `@workprint/contracts` contains the closed application inventory; no declared application route is mounted yet. Creative `content` and provider `settings` are domain-owned JSON data, not implemented creative validation or authority. See the [surface catalog](docs/api-surface.md) for exact DTO choices and later owners. The contracts package reuses the already pinned Zod version; no new third-party version is introduced.
+
 No inherited application tests or behavior existed; application baseline regression is N/A. These checks become regression coverage for later stories. The Auth case proves distinct verified identities, not conversation/resource ownership. No live AI calls, conversation/recovery qualification, deployed-capacity or product-visual acceptance is claimed.
 
 ## Documentation
 
 - [Implementation spec](docs/specs/implementation-spec-001.md) and [Sprint 001](docs/sprints/sprint-001.md) — approved scope and story sequencing; planning is not completion evidence.
+- [API surface catalog](docs/api-surface.md) — closed shared schemas, unavailable boundaries, genuine intended callers and later functional/qualification owners; declarations are not mounted features.
 - [Native runtime qualification](docs/native-runtime-qualification.md) — exact dependency purposes, interfaces, privileges and observed foundation verification.
 - [Architecture background](docs/architecture.md) — intended direction; current approved scope takes precedence.
 - [Product strategy litepaper](docs/litepaper.md) — longer-term vision and unvalidated hypotheses.

@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@workprint/contracts": "workspace:*",
     "@mastra/core": "1.79.0",
     "@mastra/pg": "1.32.0",
     "pg": "8.23.1",
