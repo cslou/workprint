@@ -75,9 +75,7 @@
 .reference-editor .lane-name { font-size: 11px; }
 .reference-editor .track { height: 66px; border-radius: 2px; }
 .reference-editor .clip { height: 66px; border-radius: 3px; background-repeat: repeat-x; background-size: 82px auto; background-position: left bottom; }
-.reference-editor .clip:has(img[src$="p1-1.jpg"]) { background-image: url(../../../outputs/studio-mockup/r44/assets/panels/p1-1.jpg); }
-.reference-editor .clip:has(img[src$="t2-2.jpg"]) { background-image: url(../../../outputs/studio-mockup/r44/assets/panels/t2-2.jpg); }
-.reference-editor .clip:has(img[src$="p3-1.jpg"]) { background-image: url(../../../outputs/studio-mockup/r44/assets/panels/p3-1.jpg); }
+.reference-editor .clip:has(img[src$="media-placeholder.svg"]) { background-image: url(../assets/media-placeholder.svg); }
 .reference-editor .clip img { visibility: hidden; }
 .reference-editor .clip .clip-name { top: 0; left: 0; right: 0; bottom: auto; padding: 3px 8px; border-radius: 0; background: var(--primary); color: var(--primary-fg); }
 .reference-editor .clip.selected-clip { outline-offset: 1px; }
