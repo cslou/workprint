@@ -1,15 +1,15 @@
 # Sprint 001 — Backend foundation and native-runtime qualification
 
-**Date:** Planning approved 2026-10-27; execution is not scheduled and ends only when the completion gates pass.
+**Date:** Planning and execution approved 2026-10-27; execution ends only when the completion gates pass.
 **Goal:** From a clean application checkout, build and start one authenticated native backend and a typed client, pass real-Postgres conversation and process-recovery checks, and demonstrate that unfinished product operations return validated, side-effect-free not-implemented responses.
-**Status:** 🟡 Planning
+**Status:** 🔵 In Progress
 
 ---
 
 ## Handoff
 
 ### Project Context
-- **Repo:** Workprint; every command/path below is relative to its root. The user authorized publication of the spec and sprint plan. Application implementation has not been authorized or started.
+- **Repo:** Workprint; every command/path below is relative to its root. The user authorized Sprint 001 implementation through a verified, independently reviewed integration PR ready to merge. Integration merge still requires an explicit user command.
 - **Tech stack:** TypeScript, pinned Node/pnpm workspaces, React/Vite shell, one Mastra server/runtime with its supported Postgres integration, Supabase Auth, plain `pg`, strict type/lint/dependency-cruiser checks. Docker supports isolated Postgres tests. Select a coherent exact package cohort in Story 1 and qualify it in Stories 2–3 before dependent contracts are finalized.
 - **Current state:** No hosted application code or inherited tests. The source repository's local Pi tools and 313 Node + 7 Python tests remain there; none is imported, counted as an application baseline, or treated as hosted proof. No live assistant/media integration is qualified by this sprint.
 - **Implementation spec:** [Implementation Spec 001](../specs/implementation-spec-001.md), especially §§4–7 and Phase 1, P1-S1–S5. The fresh-repository baseline applies; older source-checkout assumptions do not require importing local code/tests.
@@ -17,13 +17,15 @@
 ### Sprint-Wide Context
 - **Sprint type:** Mixed — application foundation / tooling / native-integration qualification.
 - **Shared context:** Five implementation stories map one-to-one to P1-S1–S5, followed by final verification. Scope and proposed verification groups V1–V10 were individually approved in planning; no implementation AC or runtime check is completed by that approval. Work sequentially, with each story independently reviewed and no more than five logical commits including verification.
+- **Execution selection:** User override for this sprint only: `claude-bridge/claude-opus-5-5`, `max` effort; if Opus fails, replace the stopped worker with `openai-codex/gpt-6.1-sol`, `max`, carrying partial work and a full handoff. Reviewer routing and global settings remain unchanged.
+- **Execution baseline:** Refreshed `main` at `eac9135b707497e225fe0e78a75cf54f6de53427`: no application manifests, lockfile, runnable application checks or inherited tests. Existing application regression: N/A. Node, pnpm, Supabase CLI and a responding Docker engine are present; exact application versions remain Story 1 qualification work.
 - **Non-goals:** Full workspace UI; creative agent skills/tools; Artifact business persistence/editing/approval; uploads/private-media integration; image/video generation; export; exact launch-model qualification/live inference; deployment or CI/CD changes; billing/spending controls; deletion; model selectors; importing old tests. No parallel HTTP server, scheduler, agent loop, conversation store or fake product lifecycle.
 
 **Application model direction:** the user selected Meta's Muse model family. Verify exact assistant/image/video model IDs, capabilities and API contracts with their owning integration stories; this is not a claim that any Muse path is already qualified. The user will supply the API key through the new repository's ignored `.env` after the move, using the provider's verified server-only configuration name. Do not put keys in source, browser configuration, prompts or logs. Sprint 001 uses harness-supplied controlled providers and makes no live AI calls; credentials do not replace paid-call authorization.
 
 **Planning handoff:** the spec and sprint plan are versioned alongside public product/architecture/design references; research and original local-skill sources are not included. Obtain required source material from the maintainer before dependent adaptation. The original 5/5 verdict predates migration and the user-directed configuration simplification; it is historical, not a verdict on this revision. At execution, record the actual baseline/checks; zero inherited tests is not permission to discard checks added since planning.
 
-Before Story 2, separately authorize dedicated development Supabase access, two existing authorized test identities, supported native/schema preparation and private configuration. Account provisioning remains outside the app. Automated persistence tests use isolated real Postgres, not shared development/customer records. Setup privileges never become the serving connection. Missing access or failed native qualification blocks dependent acceptance; it is not a reason to mock identity/persistence away. R2 access and paid AI calls are not prerequisites for this sprint.
+The user separately authorized dedicated development Supabase access, two existing test identities and supported native/schema preparation on 2026-10-27. Private project/auth configuration, separate setup/serving connections and the two existing test identities must be supplied through ignored local files before Story 2; none was present at the execution baseline. Account provisioning remains outside the app. Automated persistence tests use isolated real Postgres, not shared development/customer records. Setup privileges never become the serving connection. Missing access or failed native qualification blocks dependent acceptance; it is not a reason to mock identity/persistence away. R2 access and paid AI calls are not prerequisites for this sprint.
 
 **Incremental initial structure:** use the spec's names and dependency direction, but introduce each path only when the owning story puts real content there.
 
@@ -47,7 +49,7 @@ repository-root/
 └── scripts/                      # Only actual setup/check helpers needed by commands
 ```
 
-Root manifests, lockfile, safe environment examples and compiler/lint/boundary configuration accompany their owners. Colocate narrow tests with their implementation; `apps/api/test/` owns process/native/cross-boundary qualification, not all future tests. Add `supabase/` only for actual application-owned schema/setup content; native tables are initialized through supported native mechanisms, not edited by application migrations. Test-work intent tables belong to isolated qualification fixtures, not a production generation schema. Do not precreate empty `artifacts`, `generation`, `exports`, `usage`, `model-catalog`, `storage`, `player` or root cross-app `test/` folders. Catalog future owners now; create their source modules when an actual implementation needs them. Documentation such as the surface catalog and native qualification record is added by its owning story, not as an empty transfer inventory.
+Root manifests, lockfile, safe environment examples and compiler/lint/boundary configuration accompany their owners. Colocate narrow tests with their implementation; `apps/api/test/` owns process/native/cross-boundary qualification, not all future tests. Add `supabase/` only for actual application-owned schema content managed by the Supabase CLI migration workflow; native tables are initialized through supported native mechanisms, not edited by application migrations. Test-work intent tables belong to isolated qualification fixtures, not a production generation schema. Do not precreate empty `artifacts`, `generation`, `exports`, `usage`, `model-catalog`, `storage`, `player` or root cross-app `test/` folders. Catalog future owners now; create their source modules when an actual implementation needs them. Documentation such as the surface catalog and native qualification record is added by its owning story, not as an empty transfer inventory.
 
 ### Affected Flows
 - **Existing flows affected:** Spec §8.1 conversation start/resume and §8.7 Stop/disconnect/recovery gain internal platform qualification, not a finished creator-facing flow. The API boundaries for §8.2–8.6 and request cancellation are callable but unavailable; §8.9 remains a later real-integration obligation. The source repository's local skill workflows are unchanged.
@@ -122,7 +124,7 @@ Record exact versions, setup/serving roles, native interfaces, connection mode, 
   1. Pinned workspace and minimal web/native backend build/start configuration.
   2. Safe environment handling, supported database setup and isolated verification fixtures.
   3. Smoke/security/static checks and reproducible development instructions.
-- **Technical notes:** Root commands may use narrow real helpers under `scripts/`; no generic setup framework is required. Keep schema initialization separate from serving. Select exact versions here rather than treating past registry research as a tested cohort. Tests and examples contain no real credentials.
+- **Technical notes:** Root commands may use narrow real helpers under `scripts/`. Application schema changes use the Supabase CLI migration workflow rather than a custom migration runner. Keep schema initialization separate from serving. Select exact versions here rather than treating past registry research as a tested cohort. Tests and examples contain no real credentials.
 
 #### Story 2: Authenticated native conversation proof
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
