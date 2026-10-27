@@ -21,6 +21,7 @@ function stop(signal = 'SIGTERM') {
   if (stopping) return;
   stopping = true;
   const signalGroup = (child, value) => {
+    if (!child.pid) return;
     try { process.kill(-child.pid, value); } catch (error) {
       if (error.code !== 'ESRCH') throw error;
     }
@@ -30,16 +31,18 @@ function stop(signal = 'SIGTERM') {
   const timer = setTimeout(() => { for (const child of owned) signalGroup(child, 'SIGKILL'); }, 5000);
   timer.unref();
 }
-process.on('SIGINT', () => stop('SIGINT'));
-process.on('SIGTERM', () => stop());
+process.on('SIGINT', () => { process.exitCode = 130; stop('SIGINT'); });
+process.on('SIGTERM', () => { process.exitCode = 143; stop(); });
 function run(command, args, cwd = '.', childEnv = env) {
+  if (stopping) return Promise.reject(new Error('Task stopped; no further stages may launch'));
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { cwd, env: childEnv, stdio: 'inherit', detached: true });
     children.add(child);
-    child.once('error', reject);
+    child.once('error', (error) => { children.delete(child); reject(error); });
     child.once('exit', (code, signal) => {
       children.delete(child);
-      if (code === 0 || stopping) resolve();
+      if (stopping) reject(new Error(`Task stopped while running ${command}`));
+      else if (code === 0) resolve();
       else reject(new Error(`${command} failed (${code ?? signal})`));
     });
   });
@@ -65,5 +68,5 @@ try {
 } catch (error) {
   stop();
   console.error(error.message);
-  process.exitCode = 1;
+  process.exitCode ||= 1;
 }

@@ -11,6 +11,12 @@ const pool = new Pool({
   idleTimeoutMillis: 5000,
   statement_timeout: 10000,
 });
+// Caller-owned pools must handle idle disconnects; pg discards the failed client.
+pool.on('error', (error) => {
+  const code = 'code' in error && typeof error.code === 'string' && /^[0-9A-Z]{5}$/.test(error.code)
+    ? error.code : 'connection_error';
+  console.error('Native storage idle connection lost', { code });
+});
 try {
   const result = await pool.query<{ privileged: boolean }>(`SELECT
     has_database_privilege(current_database(), 'CREATE') OR
