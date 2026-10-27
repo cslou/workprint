@@ -59,7 +59,7 @@ test('built backend rejects unsafe config, separates setup privileges and exclud
   } finally { await privileged.stop(); }
 
   // Owners retain DDL authority even after ordinary CREATE grants are revoked.
-  // Change only fixture-role grants, never native table/schema definitions.
+  // Change only fixture roles/grants, never native table/schema definitions.
   await query(db.adminUrl, 'CREATE ROLE wp_owner_bridge NOLOGIN; REVOKE CREATE ON DATABASE workprint FROM wp_setup; REVOKE CREATE ON SCHEMA mastra, public FROM wp_setup; REVOKE CREATE ON SCHEMA public FROM pg_database_owner');
   try {
     for (const [name, url] of [['native-owner', db.setupUrl], ['inherited-owner', db.servingUrl], ['settable-owner', db.servingUrl], ['mixed-chain-owner', db.servingUrl]] as const) {
