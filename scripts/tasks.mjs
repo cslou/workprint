@@ -50,6 +50,7 @@ function run(command, args, cwd = '.', childEnv = env) {
 try {
   if (task === 'build' || task === 'db:prepare') {
     await run('tsc', ['-p', 'packages/contracts/tsconfig.json']);
+    await run('tsc', ['-p', 'packages/api-client/tsconfig.json']);
     rmSync('apps/api/dist', { recursive: true, force: true });
     await run('tsc', ['-p', 'apps/api/tsconfig.build.json']);
   }
@@ -59,7 +60,10 @@ try {
   } else if (task === 'db:prepare') {
     await run(process.execPath, ['dist/src/mastra/prepare.js'], 'apps/api');
   } else {
-    if (task === 'dev') await run('tsc', ['-p', 'packages/contracts/tsconfig.json']);
+    if (task === 'dev') {
+      await run('tsc', ['-p', 'packages/contracts/tsconfig.json']);
+      await run('tsc', ['-p', 'packages/api-client/tsconfig.json']);
+    }
     await Promise.all([
       task === 'dev'
         ? run('mastra', ['dev'], 'apps/api', serving)

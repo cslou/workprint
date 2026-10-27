@@ -6,6 +6,10 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { environment, root, sentinel } from './environment.js';
 import { command, start, unusedPort } from './process.js';
+import { createApiClient } from '@workprint/api-client';
+import { operations, type OperationName, type OperationRequest } from '@workprint/contracts';
+import { applicationRequests } from './application-requests.js';
+import { query } from './postgres.js';
 
 // Private fixture input, never inherited by the serving process. Accounts already exist.
 test('built admission verifies Supabase accounts, rejects forged/expired tokens and closes production routes', { timeout: 180000 }, async (t) => {
@@ -137,6 +141,59 @@ test('built admission verifies Supabase accounts, rejects forged/expired tokens 
   });
   t.after(production.stop);
   await production.response(`${origin}/health`);
+  // The same built production artifact/admission fixture proves all application routes.
+  const snapshot = async () => {
+    const tables = await query(config.servingUrl, "SELECT tablename FROM pg_tables WHERE schemaname = 'mastra' ORDER BY tablename");
+    const fingerprints: unknown[] = [];
+    for (const row of tables.rows as { tablename: string }[]) {
+      const table = row.tablename.replaceAll('"', '""');
+      const result = await query(config.servingUrl, `SELECT md5(COALESCE(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text)::text, '[]')) AS digest FROM mastra."${table}" t`);
+      fingerprints.push([row.tablename, result.rows[0]]);
+    }
+    return fingerprints;
+  };
+  const beforeRequests = await snapshot();
+  for (const identity of identities) {
+    const client = createApiClient({ baseUrl: origin, getAccessToken: async () => identity.access_token });
+    // Preserve the key/input correlation when dynamically iterating the mapped client.
+    const invoke = <N extends OperationName>(name: N) => (client[name] as (input: OperationRequest<N>) => Promise<unknown>)(applicationRequests[name]);
+    for (const name of Object.keys(operations) as OperationName[]) {
+      const result = await invoke(name);
+      assert.deepEqual(result, { ok: false, error: { code: 'not_implemented', message: 'This operation is not implemented' } }, name);
+    }
+  }
+  const raw = async (path: string, method: string, body: string | undefined, token = identities[0]!.access_token) => {
+    const response = await fetch(`${origin}${path}`, { method, headers: { Authorization: token ? `Bearer ${token}` : '', 'Content-Type': 'application/json' }, ...(body !== undefined ? { body } : {}), signal: AbortSignal.timeout(4000) });
+    return { status: response.status, payload: await response.json() as { error: { code: string } } };
+  };
+  for (const token of ['', 'malformed', expired]) {
+    const client = createApiClient({ baseUrl: origin, getAccessToken: async () => token || null });
+    const result = await client.library(applicationRequests.library);
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.error.code, 'unauthenticated');
+    const response = await raw('/v1/conversations/c/versions', 'POST', '{', token);
+    assert.equal(response.status, 401, 'Identity rejects before malformed JSON');
+    assert.equal(response.payload.error.code, 'unauthenticated');
+  }
+  for (const [path, method, body] of [
+    ['/v1/conversations/c/versions', 'POST', '{'],
+    ['/v1/conversations/c/versions', 'POST', JSON.stringify({ ...applicationRequests.saveVersion.body, accountId: identities[1]!.user.id })],
+    ['/v1/conversations/c/uses', 'POST', JSON.stringify({ operationId: 'op', purpose: 'panel_image', versionId: 'v', shotId: 's' })],
+    ['/v1/questions/q/answers', 'POST', JSON.stringify({ questionRevision: 1, optionId: 'approve' })],
+    ['/v1/library?ownerId=forged', 'GET', undefined],
+    ['/v1/library?__proto__=forged', 'GET', undefined],
+    ['/v1/library?limit=not-a-number', 'GET', undefined],
+    ['/v1/library?limit=1&limit=2', 'GET', undefined],
+  ] as const) {
+    const response = await raw(path, method, body);
+    assert.equal(response.status, 400, `${method} ${path}`);
+    assert.equal(response.payload.error.code, 'invalid_input');
+  }
+  for (const [path, method] of [['/v1/conversations/c/workspace/extra', 'GET'], ['/v1/conversations//workspace', 'GET'], ['/v1/conversations/c/workspace', 'POST'], ['/v1/library/', 'GET']] as const) {
+    assert.equal((await raw(path, method, undefined)).status, 404, 'Only exact catalog paths/methods are admitted');
+  }
+  // No product resources exist; these arbitrary IDs prove no ownership semantics.
+  assert.deepEqual(await snapshot(), beforeRequests, 'Unavailable matrix creates/changes no native records');
   const exposure: { path: string; bearer: boolean; status: number }[] = [];
   for (const path of ['/api/auth/capabilities', '/api/auth/me', '/__auth_probe', '/api/agents', '/api/memory/threads', '/api/workflows', '/api/tools', '/api/telemetry', '/swagger-ui', '/openapi.json', '/health/']) {
     for (const bearer of [false, true]) {

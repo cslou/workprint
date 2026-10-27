@@ -4,9 +4,11 @@ import { PostgresStore } from '@mastra/pg';
 import { Pool } from 'pg';
 import { loadServerConfig } from './config.js';
 import { verifyAccount } from './auth.js';
+import { applicationRoutes } from './application-routes.js';
 
-/** Explicit composition only: production supplies no routes; tests build their own probe entry. */
+/** One backend: cataloged application routes plus explicit test-composition additions. */
 export async function createBackend(routes: ApiRoute[] = []) {
+  const protectedRoutes = [...applicationRoutes, ...routes];
   const config = loadServerConfig(process.env);
   const pool = new Pool({
     connectionString: config.connectionString, max: 4, connectionTimeoutMillis: 5000,
@@ -36,7 +38,7 @@ export async function createBackend(routes: ApiRoute[] = []) {
       host: '127.0.0.1', port: config.port,
       build: { swaggerUI: false, openAPIDocs: false },
       apiRoutes: [
-        ...routes,
+        ...protectedRoutes,
         // Mastra skips server middleware for framework-public routes. Custom routes
         // precede native registration, so this terminal fallback closes those too.
         registerApiRoute('/*', {
@@ -47,7 +49,12 @@ export async function createBackend(routes: ApiRoute[] = []) {
       middleware: [async (context, next) => {
         if (context.req.path === '/health' && context.req.method === 'GET') return next();
         // Default-deny before native handlers, regardless of caller identity.
-        if (!routes.some((route) => route.path === context.req.path && route.method === context.req.method)) {
+        if (!protectedRoutes.some((route) => {
+          const template = route.path.split('/');
+          const segments = context.req.path.split('/');
+          return route.method === context.req.method && template.length === segments.length &&
+            template.every((part, index) => /^:[A-Za-z][A-Za-z0-9_]*$/.test(part) ? Boolean(segments[index]) : part === segments[index]);
+        })) {
           return context.json({ error: { code: 'not_found', message: 'Not found' } }, 404);
         }
         const identity = await verifyAccount(context.req.header('Authorization'), config.supabase);
