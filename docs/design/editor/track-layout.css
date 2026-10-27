@@ -1,0 +1,236 @@
+/* Reviewed Editor layout reference; detailed editing behaviour remains open.
+   Only the compact toggle, track-group disclosures, scrolling and navigation work.
+   All media, waveforms, added layers and editing controls remain illustrative. */
+.track-comparison {
+  --preview-height: 0px;
+  --comparison-timeline-height: clamp(260px, calc(100vh - 420px), 480px);
+  --track-label-width: 152px;
+  --track-column-gap: 12px;
+}
+.track-comparison .reference-editor {
+  grid-template-rows: minmax(0, 1fr) var(--comparison-timeline-height);
+}
+.track-comparison .reference-editor:has(#compact-timeline:checked) {
+  grid-template-rows: minmax(0, 1fr) 300px;
+}
+.track-comparison .editor-chat { grid-row: 1 / -1; }
+.track-comparison .timeline-area {
+  grid-column: 1 / 3;
+  min-height: 0;
+  padding: 10px 16px;
+}
+.track-comparison .timeline-toolbar {
+  min-height: 34px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+.timeline-options {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.track-count { font-size: 11px; color: var(--fg-subtle); }
+.compact-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.compact-toggle input {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+.compact-toggle input:focus-visible,
+.track-comparison .timeline-scroll:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+.timeline-options .secondary { font-size: 12px; min-height: 32px; padding: 4px 12px; }
+.track-comparison .timeline-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 0 0 4px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.track-comparison .timeline-grid { min-width: 740px; }
+.track-comparison .ruler-row,
+.track-comparison .lane {
+  grid-template-columns: var(--track-label-width) minmax(0, 1fr);
+  gap: var(--track-column-gap);
+}
+.track-comparison .ruler-row {
+  height: 28px;
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  background: var(--raised);
+}
+.ruler-label {
+  display: flex;
+  align-items: flex-start;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--raised);
+}
+.track-comparison .ruler > span { position: absolute; top: 0; border-left: 0; padding-left: 0; transform: translateX(-50%); }
+.track-comparison .ruler > span:nth-child(1) { left: 0; transform: none; }
+.track-comparison .ruler > span:nth-child(2) { left: 14.2857%; }
+.track-comparison .ruler > span:nth-child(3) { left: 28.5714%; }
+.track-comparison .ruler > span:nth-child(4) { left: 42.8571%; }
+.track-comparison .ruler > span:nth-child(5) { left: 57.1429%; }
+.track-comparison .ruler > span:nth-child(6) { left: 71.4286%; }
+.track-comparison .ruler > span:nth-child(7) { left: 85.7143%; }
+.track-comparison .ruler > span:nth-child(8) { left: 100%; transform: translateX(-100%); }
+.ruler-playhead {
+  position: absolute;
+  left: 62.8571%;
+  top: 16px;
+  bottom: 0;
+  width: 1px;
+  background: var(--fg);
+}
+.ruler-playhead::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px 2px 4px 4px;
+  background: var(--fg);
+}
+.track-group { margin: 0; }
+.track-group > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--track-column-gap);
+  min-height: 28px;
+  padding: 0;
+  list-style: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--fg-subtle);
+  background: var(--raised);
+  border-bottom: 1px solid var(--border);
+}
+.track-group > summary::-webkit-details-marker { display: none; }
+.group-name {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: var(--track-label-width);
+  min-height: 28px;
+  flex-shrink: 0;
+  background: var(--raised);
+  color: var(--fg-muted);
+  font-weight: 600;
+}
+.group-name::before { content: "▾"; display: inline-block; width: 12px; }
+.track-group:not([open]) .group-name::before { content: "▸"; }
+.group-name small { font-size: 11px; font-weight: 400; color: var(--fg-subtle); }
+.group-hint { white-space: nowrap; }
+.track-comparison .lane { margin-top: 4px; }
+.track-comparison .lane-name {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  gap: 8px;
+  padding-right: 4px;
+  background: var(--raised);
+  font-size: 12px;
+  box-shadow: 8px 0 0 var(--raised);
+}
+.track-kind {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+  width: 24px;
+  min-height: 24px;
+  font-size: 11px;
+  color: var(--fg-subtle);
+}
+.track-comparison .track { border-radius: 3px; }
+.track-comparison .track::after {
+  content: "";
+  position: absolute;
+  left: 62.8571%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  z-index: 3;
+  background: var(--fg);
+  pointer-events: none;
+}
+.track-comparison .track.slim-track { height: 32px; }
+.track-comparison .track.video-track,
+.track-comparison .clip { height: 64px; }
+.track-comparison .track.audio,
+.track-comparison .audio-region { height: 34px; }
+.overlay-region {
+  position: absolute;
+  top: 0;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 0 9px;
+  border: 1px solid var(--control-line);
+  border-radius: 3px;
+  font-size: 11px;
+  color: var(--fg-muted);
+  background: var(--bg-dark);
+}
+.overlay-region > span,
+.track-comparison .sample-audio > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.caption-region { background: var(--selected); color: var(--link); border-color: var(--primary); }
+.sample-region { border-style: dashed; }
+.track-comparison .sample-audio {
+  color: var(--fg-subtle);
+  background: var(--bg-dark);
+  border-color: var(--control-line);
+}
+.track-comparison .sample-audio svg { opacity: .65; }
+.track-comparison .timeline-foot {
+  margin-top: 8px;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  line-height: 1.4;
+}
+@media (max-width: 1100px) and (min-width: 821px) {
+  .track-count { display: none; }
+  .timeline-options { gap: 10px; }
+}
+@media (min-width: 821px) and (max-height: 680px) {
+  .track-comparison { overflow-y: auto; }
+  .track-comparison .editor-shell { min-height: 636px; }
+}
+@media (max-width: 820px) {
+  .track-comparison { --track-label-width: 140px; }
+  .track-comparison .preview-nav { justify-content: flex-start; gap: 8px; }
+  .track-comparison .timeline-area { height: 480px; padding: 10px 12px; }
+  .track-comparison .reference-editor:has(#compact-timeline:checked) .timeline-area { height: 300px; }
+  .track-comparison .timeline-toolbar { gap: 8px; }
+  .track-comparison .timeline-toolbar .transport-divider,
+  .track-comparison .split-tool { display: none; }
+  .timeline-options { margin-left: 0; width: 100%; justify-content: space-between; gap: 8px; }
+  .track-count { display: none; }
+  .track-comparison .timeline-foot { font-size: 11px; }
+}

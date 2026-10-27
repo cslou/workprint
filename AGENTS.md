@@ -32,4 +32,4 @@ Work from the repository root and start with [README.md](README.md). This is a f
 
 ## Public references
 
-Use [production terminology](CONTEXT.md), [architecture background](docs/architecture.md) and [product vision](docs/litepaper.md) for their stated purposes. Public design navigation will be added with the final migration chunk. Do not start the application sprint as part of this documentation migration.
+Use [production terminology](CONTEXT.md), [architecture background](docs/architecture.md) and [product vision](docs/litepaper.md) for their stated purposes. Use the [brand book](docs/design/brand-book.html) for visual reference and [design guide](docs/design/design.md) for approved values and rules. Respect migration notes and placeholder limitations; older discovery/Editor/Project examples do not widen MVP scope. Do not start the application sprint as part of this documentation migration.

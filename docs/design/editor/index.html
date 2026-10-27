@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Videos · Editor design reference</title>
+<link rel="stylesheet" href="../app-r11.css">
+<link rel="stylesheet" href="controls.css">
+<link rel="stylesheet" href="scene-card.css">
+<link rel="stylesheet" href="preview.css">
+<style>
+body:has(#export:target) > .preview-bar, body:has(#export:target) > .app { visibility: hidden; }
+#export { inset: 0; }
+#export .export-dialog { max-height: calc(100vh - 32px); overflow: auto; }
+</style>
+</head>
+<body class="entry">
+<header class="preview-bar">
+  <div class="preview-title"><b class="preview-label">Design reference</b><span>Videos → Editor</span><span class="preview-note">Static example · no media processing</span></div>
+  <nav class="preview-nav" aria-label="Design reference"><a class="current" href="index.html" aria-current="page">Videos</a><a href="editor.html">Editor</a><a href="../brand-book/screens.html#editor">Brand book</a></nav>
+</header>
+<div class="app with-panel">
+  <nav class="sidebar" aria-label="Workprint">
+    <a class="brand" href="../generate-flows.html"><span class="mark">a</span><span class="name">Workprint</span></a>
+    <div class="navlist"><span class="navitem"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>New video</span><span class="navitem"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="4" height="16" rx="1"/><rect x="9" y="4" width="4" height="16" rx="1"/><path d="m15.5 5.2 3.8-1 3 15.6-3.8.9Z"/></svg>Library</span></div>
+    <div class="section"><div class="navlabel">Recents</div><a class="navitem recent current" href="index.html">Vale and Mercer meet</a></div>
+    <div class="spacer"></div><div class="account"><span class="avatar">A</span>Account</div>
+  </nav>
+  <main class="main">
+    <header class="entry-heading"><h1>Vale and Mercer meet</h1><p>The same conversation, from the first idea to the finished scene.</p></header>
+    <div class="thread chat">
+      <div class="msgs">
+        <div class="me answered"><div class="asked">Use version 2 for Vale’s recognition?</div><div class="ans">Use version 2. Keep the other two.</div></div>
+        <div class="acts"><div class="act"><span class="nolink"><span class="done"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>Chose version 2 for Vale’s recognition</span></span></div><div class="act"><span class="nolink"><span class="done"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>Prepared the first scene edit · 13.4 seconds</span></span></div></div>
+        <div class="agent">
+          <h2>Now, make it flow.</h2>
+          <p>You’ve chosen a version for each shot. I’ve put them together in a first edit; the original videos stay unchanged.</p>
+          <div class="mini-cut"><figure><img src="../assets/media-placeholder.svg" alt="Vale and Mercer sitting on the gallery bench"><figcaption>On the bench</figcaption></figure><figure><img src="../assets/media-placeholder.svg" alt="Vale recognises Mercer"><figcaption>Vale recognises Mercer</figcaption></figure><figure><img src="../assets/media-placeholder.svg" alt="Mercer reacts"><figcaption>Mercer reacts</figcaption></figure></div>
+          <p>Tell me what to change here, or <a class="inline-link" href="editor.html">open the Editor</a> to work on timing and sound alongside me.</p>
+          <p>We’ll review the complete scene before calling it finished.</p>
+        </div>
+        <div class="context-line">Picture choices are kept. Timing and sound are still a draft.</div>
+      </div>
+    </div>
+    <div class="composer"><div class="field">Ask for a change…</div><div class="bar"><span class="attach"><span class="plus">+</span>Attach</span><button class="send" type="button" disabled>Send</button></div></div>
+  </main>
+  <aside class="panel" aria-label="This scene">
+    <nav class="preview-tabs" aria-label="This scene"><span>Script</span><span>Assets</span><span>Storyboard</span><b>Videos</b></nav>
+    <div class="entry-panel">
+      <section class="scene-card" aria-label="Current scene edit">
+        <div class="scene-poster"><img src="../assets/media-placeholder.svg" alt="Preview of the assembled gallery scene"></div>
+        <div class="scene-card-body">
+          <div class="scene-card-meta"><p>3 shots · 13.4 s</p></div>
+          <div class="action-row"><a class="primary" href="editor.html">Open editor <span aria-hidden="true">→</span></a><a class="secondary" href="#export">Export</a></div>
+        </div>
+      </section>
+      <div class="source-heading"><h2>Shots</h2></div>
+      <div class="source-row"><img src="../assets/media-placeholder.svg" alt="On the bench"><div><b>On the bench</b><small>Version 1 · 4.2 s · <span class="chosen">Chosen</span></small></div></div>
+      <div class="source-row"><img src="../assets/media-placeholder.svg" alt="Vale recognises Mercer"><div><b>Vale recognises Mercer</b><small>Version 2 · 5.1 s · <span class="chosen">Chosen</span></small></div></div>
+      <details class="source-history"><summary>Version history · 1 earlier</summary><p>Version 1 · 5.2 s. Preserved separately from the scene edit.</p></details>
+      <div class="source-row"><img src="../assets/media-placeholder.svg" alt="Mercer reacts"><div><b>Mercer reacts</b><small>Version 1 · 4.1 s · <span class="chosen">Chosen</span></small></div></div>
+      <details class="example-details"><summary>About this example</summary><p>Reviewed entry and layout; editing, persistence and export behaviour remain incomplete. <a href="../brand-book/screens.html#editor">Scope and open states</a> · <a href="../demo-18.html#p-takes">Return to the demo</a>.</p><p>Uses local example stills, not licensed for redistribution. Separate dialogue and ambience are fixture assumptions, not demonstrated audio separation.</p><p>No video plays, no changes persist, and no media is generated or exported.</p></details>
+    </div>
+  </aside>
+</div>
+<section class="export-overlay" id="export" role="dialog" aria-modal="true" aria-label="Draft export settings example">
+  <div class="export-dialog">
+    <header><h2>Export this edit</h2><a class="icon-button" href="index.html" aria-label="Close export settings">×</a></header>
+    <p>Vale and Mercer meet<br>13.4 seconds · original videos unchanged</p>
+    <div class="property"><span>File</span><b class="property-value">MP4</b></div>
+    <div class="property"><span>Picture</span><b class="property-value">Source resolution</b></div>
+    <div class="property"><span>Frame rate</span><b class="property-value">24 fps</b></div>
+    <div class="property"><span>Sound</span><b class="property-value">Current mix</b></div>
+    <div class="property"><span>Captions</span><b class="property-value">Off</b></div>
+    <div class="action-row"><button class="primary" type="button" disabled>Export MP4</button><a class="secondary" href="index.html">Back to videos</a></div>
+    <p class="micro" style="margin-top:16px">Draft settings example, not an approved delivery profile. This reference does not render or download a file.</p>
+  </div>
+</section>
+</body>
+</html>

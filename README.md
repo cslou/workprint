@@ -24,7 +24,7 @@ Local specs, sprints and selected research are intentionally gitignored and are 
 - [Product strategy litepaper](docs/litepaper.md) — longer-term vision and unvalidated hypotheses, not a release checklist.
 - [Production terminology](CONTEXT.md) — canonical distinctions for planning and review.
 
-The public design/brand-book bundle is the final migration chunk; it is reference material, not application code.
+- [Brand book](docs/design/brand-book.html) and [design guide](docs/design/design.md) — visual references with labelled media placeholders, not application code. Older Editor/Project examples are historical, not MVP scope.
 
 ## Configuration and safety
 

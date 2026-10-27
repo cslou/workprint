@@ -1,0 +1,121 @@
+/* Design references only. Exact values are owned by ../design.md.
+   The frozen application mockup and book stylesheets remain unchanged. */
+.product.material-controls {
+  color: var(--color-text-primary);
+  font: var(--font-weight-regular) var(--font-size-14)/var(--font-line-height-1-5) var(--font-family-sans);
+  font-style: normal; letter-spacing: normal; text-align: left; text-transform: none;
+}
+.product.material-controls, .product.material-controls * { box-sizing: border-box; }
+.product.material-controls p { margin: 0; }
+.product.material-controls .gen-icon {
+  display: block; width: var(--size-icon-md); height: var(--size-icon-md); flex: none;
+  fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+}
+.product.material-controls :is(button, select, summary):focus-visible { outline: none; }
+.product.material-controls .gen-select:focus-visible selectedcontent .option-label,
+.product.material-controls .gen-select[data-appearance="focus"] .gen-select-label,
+.product.material-controls .gen-select[data-appearance="focus"] selectedcontent .option-label,
+.product.material-controls .gen-quiet-button:focus-visible,
+.product.material-controls .gen-quiet-button[data-appearance="focus"],
+.product.material-controls .gen-scene-group > summary:focus-visible .gen-scene-title {
+  text-decoration: underline;
+  text-decoration-thickness: var(--border-width-focus);
+  text-underline-offset: var(--border-width-focus-offset);
+}
+.product.material-controls .gen-select {
+  appearance: base-select; display: inline-flex; align-items: center; gap: var(--space-8);
+  min-height: var(--size-control-lg); max-width: 100%;
+  border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-pill);
+  background: var(--color-bg-surface); color: var(--color-text-secondary);
+  padding: var(--space-6) var(--space-12);
+  font: var(--font-weight-regular) var(--font-size-13)/var(--font-line-height-1-45) var(--font-family-sans);
+}
+.product.material-controls select.gen-select { cursor: pointer; }
+.product.material-controls .gen-select > button {
+  display: flex; align-items: center; gap: var(--space-8); width: 100%; min-width: 0;
+  border: 0; background: transparent; padding: 0; text-align: left; font: inherit; color: inherit;
+}
+.product.material-controls .gen-select selectedcontent,
+.product.material-controls .gen-select-label {
+  display: block; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.product.material-controls .gen-select selectedcontent .option-check { display: none; }
+.product.material-controls .gen-select selectedcontent .option-label { display: inline; }
+.product.material-controls .gen-select > button > .gen-icon { margin-left: auto; }
+.product.material-controls .gen-select::picker-icon { display: none; }
+.product.material-controls select.gen-select:not(:disabled):hover,
+.product.material-controls .gen-select[data-appearance="hover"],
+.product.material-controls .gen-select:open {
+  background: var(--color-bg-hover); border-color: var(--color-border-strong);
+}
+.product.material-controls .gen-select:disabled,
+.product.material-controls .gen-select[data-appearance="disabled"] { opacity: .45; cursor: default; }
+.product.material-controls .gen-select::picker(select),
+.product.material-controls .gen-select-menu {
+  appearance: base-select; box-sizing: border-box;
+  border: var(--border-width-default) solid var(--color-border-strong); border-radius: var(--radius-xl);
+  background: var(--color-bg-surface); color: var(--color-text-primary); box-shadow: none;
+  margin-top: var(--space-4); padding: var(--space-4);
+  max-height: min(calc(var(--size-control-lg) * 7 + var(--space-8)), 60vh); overflow-y: auto;
+  max-width: min(calc(var(--size-layout-panel) - var(--space-20) * 2), calc(100vw - var(--space-32)));
+}
+.product.material-controls .gen-select::picker(select) {
+  inset: auto; top: anchor(bottom); left: anchor(left); position-try-fallbacks: flip-block, flip-inline;
+}
+.product.material-controls .gen-select option,
+.product.material-controls .gen-option {
+  display: flex; align-items: center; gap: var(--space-8);
+  min-height: var(--size-control-lg); padding: var(--space-8) var(--space-10); border-radius: var(--radius-md);
+  font-size: var(--font-size-13); line-height: var(--font-line-height-1-45); white-space: normal;
+}
+.product.material-controls .gen-select option::checkmark { display: none; }
+.product.material-controls .gen-select .option-check { visibility: hidden; stroke-width: 2.2; }
+.product.material-controls .gen-select option:checked .option-check { visibility: visible; }
+.product.material-controls .gen-select option:checked,
+.product.material-controls .gen-select option:hover,
+.product.material-controls .gen-option[data-selected] { background: var(--color-bg-hover); }
+.product.material-controls .gen-select option:focus-visible { outline: none; }
+.product.material-controls .gen-select option:focus-visible .option-label {
+  text-decoration: underline; text-decoration-thickness: var(--border-width-focus); text-underline-offset: var(--border-width-focus-offset);
+}
+.product.material-controls .option-label { min-width: 0; overflow-wrap: anywhere; }
+.product.material-controls .gen-quiet-button {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: var(--size-control-md); padding: var(--space-6) var(--space-10);
+  border: 0; border-radius: var(--radius-pill); background: transparent; color: var(--color-text-secondary);
+  font: var(--font-weight-regular) var(--font-size-13)/var(--font-line-height-1-45) var(--font-family-sans);
+  white-space: nowrap; cursor: pointer;
+}
+.product.material-controls .gen-quiet-button:not(:disabled):hover,
+.product.material-controls .gen-quiet-button:not(:disabled):active,
+.product.material-controls .gen-quiet-button[data-appearance="hover"] {
+  background: var(--color-bg-hover); color: var(--color-text-primary);
+}
+.product.material-controls .gen-quiet-button:disabled { opacity: .45; cursor: default; }
+.product.material-controls .gen-scene-group { border-bottom: var(--border-width-default) solid var(--color-border-default); }
+.product.material-controls .gen-scene-group > summary {
+  display: grid; grid-template-columns: var(--size-media-asset-key) minmax(0, 1fr) var(--size-icon-md);
+  gap: var(--space-10); align-items: center; padding: var(--space-10) 0;
+  list-style: none; cursor: pointer; border-radius: var(--radius-sm);
+}
+.product.material-controls .gen-scene-group.text-only > summary { grid-template-columns: minmax(0, 1fr) var(--size-icon-md); }
+.product.material-controls .gen-scene-group > summary::-webkit-details-marker { display: none; }
+.product.material-controls .gen-scene-group > summary:hover { background: var(--color-bg-hover); }
+.product.material-controls .gen-scene-group[open] > summary > .gen-icon { transform: rotate(180deg); }
+.product.material-controls .gen-scene-thumb {
+  display: block; width: var(--size-media-asset-key); aspect-ratio: 16 / 9; overflow: hidden;
+  border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-sm);
+}
+.product.material-controls .gen-scene-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.product.material-controls .gen-scene-title { display: block; font-size: var(--font-size-13); font-weight: var(--font-weight-semibold); }
+.product.material-controls .gen-scene-meta {
+  display: block; margin-top: var(--space-2); font-size: var(--font-size-12);
+  line-height: var(--font-line-height-1-4); color: var(--color-text-subtle);
+}
+.product.material-controls .gen-scene-body { padding: 0 0 var(--space-12); }
+.product.material-controls .gen-empty { padding: var(--space-10) 0; font-size: var(--font-size-13); color: var(--color-text-subtle); }
+@media (min-width: 821px) and (max-width: 1100px) {
+  .product.material-controls .gen-select::picker(select), .product.material-controls .gen-select-menu {
+    max-width: min(calc(330px - var(--space-20) * 2), calc(100vw - var(--space-32)));
+  }
+}

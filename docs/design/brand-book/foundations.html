@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workprint brand book — Foundations</title>
+<link rel="stylesheet" href="../app-r11.css">
+<link rel="stylesheet" href="book.css">
+</head>
+<body>
+<header class="bb-top">
+ <a class="bb-brand" href="../brand-book.html"><b>Workprint</b><small>Brand book · 1.3</small></a>
+ <nav class="bb-pages" aria-label="Brand book pages"><a href="../brand-book.html">Home</a><a href="brand.html">Brand</a><a href="foundations.html" aria-current="page">Foundations</a><a href="components.html">Components</a><a href="patterns.html">Patterns and accessibility</a><a href="screens.html">Screens and flows</a><a href="records.html">Records</a></nav>
+</header>
+<div class="bb">
+ <nav class="bb-nav" aria-label="On this page"><a class="sec" href="#color"><span class="bb-num">05</span>Color</a><a class="sub" href="#semantic-colors">Semantic colors</a><a class="sub" href="#primitive-palette">Primitive palette</a><a class="sub" href="#color-usage">Color usage</a><a class="sec" href="#typography"><span class="bb-num">06</span>Typography</a><a class="sec" href="#spacing-and-layout"><span class="bb-num">07</span>Spacing and layout</a><a class="sub" href="#spacing-scale">Spacing scale</a><a class="sub" href="#layout-and-controls">Layout and controls</a><a class="sec" href="#shape-and-elevation"><span class="bb-num">08</span>Shape and elevation</a><a class="sub" href="#radius">Radius</a><a class="sub" href="#borders-elevation-and-focus">Borders, elevation and focus</a><a class="sec" href="#iconography-and-imagery"><span class="bb-num">09</span>Iconography and imagery</a><a class="sec" href="#motion"><span class="bb-num">10</span>Motion</a></nav>
+ <main class="bb-main">
+  <section id="color" aria-labelledby="color-h">
+   <p class="bb-kicker">05</p>
+   <h2 class="bb-h2" id="color-h">Color</h2>
+   <p class="bb-p">A warm cream light theme with one blue for actions and a tan for things that are done. Components use the semantic tokens below; the primitive palette only feeds them. Alpha colours are shown over <code>--color-bg-canvas</code>.</p>
+   <h3 class="bb-h3" id="semantic-colors">Semantic colors</h3>
+   <h4 class="bb-h4">Backgrounds</h4>
+   <div class="bb-swatches">
+    <div class="bb-sw"><i style="background:var(--color-bg-canvas)"></i><div><code>--color-bg-canvas</code>#faf8f3<span class="r">Page background and inner wells.</span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-bg-sunken)"></i><div><code>--color-bg-sunken</code>#f7f5ed<span class="r">Sidebar, user messages, image wells.</span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-bg-surface)"></i><div><code>--color-bg-surface</code>#fffefa<span class="r">Right panel, chat box, cards, viewers.</span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-bg-paper)"></i><div><code>--color-bg-paper</code>#fcfcf9<span class="r">Reference-sheet page.</span></div></div>
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-bg-hover),var(--color-bg-hover)),var(--color-bg-canvas)"></i><div><code>--color-bg-hover</code>#0000000a<span class="r">Hover fill; neutral (Empty) status fill.</span></div></div>
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-bg-selected),var(--color-bg-selected)),var(--color-bg-canvas)"></i><div><code>--color-bg-selected</code>#125da31a<span class="r">Selected or draft fill: Draft status, flags, changed chip.</span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-bg-inverse)"></i><div><code>--color-bg-inverse</code>#1b1913<span class="r">Inverted fill for the active tab and selected pills.</span></div></div>
+   </div>
+   <h4 class="bb-h4">Text</h4>
+   <div class="bb-swatches">
+    <div class="bb-sw"><i style="background:var(--color-text-primary)"></i><div><code>--color-text-primary</code>#1b1913<span class="r">Main text. 16.56:1 on bg.canvas.</span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-text-secondary)"></i><div><code>--color-text-secondary</code>#4e4a3f<span class="r">Secondary text, captions, secondary buttons. 8.33:1.</span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-text-subtle)"></i><div><code>--color-text-subtle</code>#656155<span class="r">Labels, metadata, placeholders. 5.67:1 or better on every bg.</span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-text-disabled)"></i><div><code>--color-text-disabled</code>#a49e8e<span class="r">Disabled text only; never readable content. 2.52:1 (exempt).</span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-text-link)"></i><div><code>--color-text-link</code>#125da3<span class="r">Links and draft text. 6.34:1 on bg.canvas, 5.45:1 on bg.selected.</span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-text-inverse)"></i><div><code>--color-text-inverse</code>#faf8f3<span class="r">Text on bg.inverse.</span></div></div>
+   </div>
+   <h4 class="bb-h4">Borders</h4>
+   <div class="bb-swatches">
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-border-default),var(--color-border-default)),var(--color-bg-canvas)"></i><div><code>--color-border-default</code>#00000014<span class="r">Default dividers and outlines: rows, cards, tiles.</span></div></div>
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-border-strong),var(--color-border-strong)),var(--color-bg-canvas)"></i><div><code>--color-border-strong</code>#00000024<span class="r">Control outlines and hover: chips, round icon buttons. 1.38:1; chips are identified by text.</span></div></div>
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-border-subtle),var(--color-border-subtle)),var(--color-bg-canvas)"></i><div><code>--color-border-subtle</code>#0000000a<span class="r">Dividers inside a group.</span></div></div>
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-border-input),var(--color-border-input)),var(--color-bg-canvas)"></i><div><code>--color-border-input</code>#0000001a<span class="r">Chat box and search outline. 1.26:1, below 3:1: accepted gap (2026-10-02).</span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-border-focus)"></i><div><code>--color-border-focus</code>#125ca1<span class="r">Focus ring and selected ring.</span></div></div>
+   </div>
+   <h4 class="bb-h4">Action</h4>
+   <div class="bb-swatches">
+    <div class="bb-sw"><i style="background:var(--color-action-primary-bg)"></i><div><code>--color-action-primary-bg</code>#125ca1<span class="r">Send, Choose, Regenerate, Attach (n). One per area.</span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-action-primary-bg-hover)"></i><div><code>--color-action-primary-bg-hover</code>#0e477c<span class="r">Primary hover.</span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-action-primary-text)"></i><div><code>--color-action-primary-text</code>#ffffff<span class="r">Text on action.primary.bg. 6.84:1.</span></div></div>
+   </div>
+   <h4 class="bb-h4">Status</h4>
+   <div class="bb-swatches">
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-status-empty-bg),var(--color-status-empty-bg)),var(--color-bg-canvas)"></i><div><code>--color-status-empty-bg</code>#0000000a<span class="r">Empty: nothing made yet.</span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-status-empty-text)"></i><div><code>--color-status-empty-text</code>#4e4a3f<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-status-draft-bg),var(--color-status-draft-bg)),var(--color-bg-canvas)"></i><div><code>--color-status-draft-bg</code>#125da31a<span class="r">Draft: made, waiting for the person.</span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-status-draft-text)"></i><div><code>--color-status-draft-text</code>#125da3<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-status-ready-bg),var(--color-status-ready-bg)),var(--color-bg-canvas)"></i><div><code>--color-status-ready-bg</code>#bea9891a<span class="r">Ready and Chosen fill; picked chips, avatar.</span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-status-ready-text)"></i><div><code>--color-status-ready-text</code>#63534b<span class="r">Ready, Chosen, Approved text; done ticks. 6.44:1.</span></div></div>
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-status-ready-border),var(--color-status-ready-border)),var(--color-bg-canvas)"></i><div><code>--color-status-ready-border</code>#bea9894d<span class="r">Picked outline.</span></div></div>
+   </div>
+   <h4 class="bb-h4">On media</h4>
+   <div class="bb-swatches">
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-media-scrim),var(--color-media-scrim)),var(--color-bg-canvas)"></i><div><code>--color-media-scrim</code>#1b1913b3<span class="r">Modal backdrop; dark control over media.</span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-media-on-scrim)"></i><div><code>--color-media-on-scrim</code>#fffefa<span class="r">Text and icons on media.scrim. 6.68:1.</span></div></div>
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-media-track),var(--color-media-track)),var(--color-bg-canvas)"></i><div><code>--color-media-track</code>#fffefa66<span class="r">Unfilled progress track on media.</span></div></div>
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-media-label),var(--color-media-label)),var(--color-bg-canvas)"></i><div><code>--color-media-label</code>#fffefae6<span class="r">Light label on an image: tile keys, panel numbers.</span></div></div>
+   </div>
+   <h3 class="bb-h3" id="primitive-palette">Primitive palette <a href="../design.md#primitive-palette">referenced only by the tokens above</a></h3>
+   <div class="bb-swatches">
+    <div class="bb-sw"><i style="background:var(--color-cream-50)"></i><div><code>--color-cream-50</code>#fffefa<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-cream-100)"></i><div><code>--color-cream-100</code>#fcfcf9<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-cream-200)"></i><div><code>--color-cream-200</code>#faf8f3<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-cream-300)"></i><div><code>--color-cream-300</code>#f7f5ed<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-ink-400)"></i><div><code>--color-ink-400</code>#a49e8e<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-ink-600)"></i><div><code>--color-ink-600</code>#656155<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-ink-700)"></i><div><code>--color-ink-700</code>#4e4a3f<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-ink-900)"></i><div><code>--color-ink-900</code>#1b1913<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-blue-550)"></i><div><code>--color-blue-550</code>#125da3<span class="r">One step from blue.600 in the source theme; kept separate by decision.</span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-blue-600)"></i><div><code>--color-blue-600</code>#125ca1<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-blue-700)"></i><div><code>--color-blue-700</code>#0e477c<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-tan-300)"></i><div><code>--color-tan-300</code>#bea989<span class="r">Reserved; not used on any approved screen.</span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-tan-700)"></i><div><code>--color-tan-700</code>#63534b<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:var(--color-white)"></i><div><code>--color-white</code>#ffffff<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-alpha-black-04),var(--color-alpha-black-04)),var(--color-bg-canvas)"></i><div><code>--color-alpha-black-04</code>#0000000a<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-alpha-black-08),var(--color-alpha-black-08)),var(--color-bg-canvas)"></i><div><code>--color-alpha-black-08</code>#00000014<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-alpha-black-10),var(--color-alpha-black-10)),var(--color-bg-canvas)"></i><div><code>--color-alpha-black-10</code>#0000001a<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-alpha-black-14),var(--color-alpha-black-14)),var(--color-bg-canvas)"></i><div><code>--color-alpha-black-14</code>#00000024<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-alpha-blue-10),var(--color-alpha-blue-10)),var(--color-bg-canvas)"></i><div><code>--color-alpha-blue-10</code>#125da31a<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-alpha-tan-10),var(--color-alpha-tan-10)),var(--color-bg-canvas)"></i><div><code>--color-alpha-tan-10</code>#bea9891a<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-alpha-tan-30),var(--color-alpha-tan-30)),var(--color-bg-canvas)"></i><div><code>--color-alpha-tan-30</code>#bea9894d<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-alpha-ink-70),var(--color-alpha-ink-70)),var(--color-bg-canvas)"></i><div><code>--color-alpha-ink-70</code>#1b1913b3<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-alpha-cream-40),var(--color-alpha-cream-40)),var(--color-bg-canvas)"></i><div><code>--color-alpha-cream-40</code>#fffefa66<span class="r"></span></div></div>
+    <div class="bb-sw"><i style="background:linear-gradient(var(--color-alpha-cream-90),var(--color-alpha-cream-90)),var(--color-bg-canvas)"></i><div><code>--color-alpha-cream-90</code>#fffefae6<span class="r"></span></div></div>
+   </div>
+   <h3 class="bb-h3" id="color-usage">Color usage</h3>
+   <div class="bb-row"><div class="bb-spec raised" style="flex:1 1 260px;border-top:4px solid var(--color-status-ready-text)"><b>Do</b> · <code>background: var(--color-action-primary-bg)</code></div><div class="bb-spec raised" style="flex:1 1 260px;border-top:4px dashed var(--color-border-strong)"><b>Don’t</b> · <code>background: #125ca1</code> or a primitive in a component</div></div>
+  </section>
+
+  <section id="typography" aria-labelledby="typography-h">
+   <p class="bb-kicker">06</p>
+   <h2 class="bb-h2" id="typography-h">Typography</h2>
+   <p class="bb-p">Two system families, no font files: <b>Georgia</b> for display and dialogue, the <b>system UI font</b> for everything else. Bold is always 600.</p>
+   <div class="bb-type"><div class="meta"><code>typography.display-xl</code>44 / 1.05 · display 400</div><div style="font:400 44px/1.05 var(--font-display)">Vale</div></div>
+   <div class="bb-type"><div class="meta"><code>typography.display-lg</code>38 / 1.15 · display 400</div><div style="font:400 38px/1.15 var(--font-display);letter-spacing:-.2px">Generate flows</div></div>
+   <div class="bb-type"><div class="meta"><code>typography.display-md</code>34 / 1.2 · display 400</div><div style="font:400 34px/1.2 var(--font-display);letter-spacing:-.2px">What would you like to make?</div></div>
+   <div class="bb-type"><div class="meta"><code>typography.display-sm</code>19 / 1.2 · display 400</div><div style="font:400 19px/1.2 var(--font-display)">Face and expression</div></div>
+   <div class="bb-type"><div class="meta"><code>typography.quote</code>17 / 1.4 · display 400</div><div style="font:400 17px/1.4 var(--font-display)">Vale: “You must be Mercer.”</div></div>
+   <div class="bb-type"><div class="meta"><code>typography.title-lg</code>17 / 1.5 · sans 600</div><div style="font:600 17px/1.5 var(--font-sans)">Flow 2 · Create a scene</div></div>
+   <div class="bb-type"><div class="meta"><code>typography.title</code>15 / 1.5 · sans 600</div><div style="font:600 15px/1.5 var(--font-sans)">Approve the storyboard?</div></div>
+   <div class="bb-type"><div class="meta"><code>typography.input</code>15 / 1.45 · sans 400</div><div style="font:400 15px/1.45 var(--font-sans)">A short scene in a gallery: Vale realises the young man beside him is Mercer.</div></div>
+   <div class="bb-type"><div class="meta"><code>typography.body</code>14 / 1.5 · sans 400</div><div style="font:400 14px/1.5 var(--font-sans)">Here's how I understood it. The story and a breakdown of the shots are in the Script; edit anything there, or tell me here.</div></div>
+   <div class="bb-type"><div class="meta"><code>typography.body-sm</code>13 / 1.45 · sans 400</div><div style="font:400 13px/1.45 var(--font-sans);color:var(--fg-muted)">Made 3 reference sheets · View storyboard · Play all · 0:13</div></div>
+   <div class="bb-type"><div class="meta"><code>typography.caption</code>12 / 1.4 · sans 400</div><div style="font:400 12px/1.4 var(--font-sans);color:var(--fg-subtle)">Close-up · 5 s · 2 panels · Question 2 of 2</div></div>
+   <div class="bb-type"><div class="meta"><code>typography.micro</code>11 / 1.4 · sans 400–600</div><div style="font:600 11px/1.4 var(--font-sans);color:var(--fg-muted)">Draft · Ready · 2.1 · 0:05</div></div>
+  </section>
+
+  <section id="spacing-and-layout" aria-labelledby="spacing-and-layout-h">
+   <p class="bb-kicker">07</p>
+   <h2 class="bb-h2" id="spacing-and-layout-h">Spacing and layout</h2>
+   <h3 class="bb-h3" id="spacing-scale">Spacing scale</h3>
+   <p class="bb-p">A 2px grid. Most layouts use 4, 6, 8, 10, 12 and 16.</p>
+   <div class="bb-space">
+    <code>--space-2</code><i style="width:2px"></i><code>--space-4</code><i style="width:4px"></i><code>--space-6</code><i style="width:6px"></i><code>--space-8</code><i style="width:8px"></i><code>--space-10</code><i style="width:10px"></i><code>--space-12</code><i style="width:12px"></i><code>--space-14</code><i style="width:14px"></i><code>--space-16</code><i style="width:16px"></i><code>--space-18</code><i style="width:18px"></i><code>--space-20</code><i style="width:20px"></i><code>--space-22</code><i style="width:22px"></i><code>--space-24</code><i style="width:24px"></i><code>--space-32</code><i style="width:32px"></i>
+   </div>
+   <h3 class="bb-h3" id="layout-and-controls">Layout and controls</h3>
+   <p class="bb-p">The existing foundation values are unchanged. The dedicated <a href="components.html#editor-layout-and-timeline">Editor layout</a> records its new reference geometry separately; this integration does not adopt a new application token file.</p>
+   <p class="bb-p">Three columns: sidebar <code>260px</code>, chat, panel <code>380px</code>. At ≤ 1100px they become 220 / 330. At ≤ 820px everything stacks and the panel sits under the chat. The chat column is <code>680px</code>.</p>
+   <div class="bb-spec raised" aria-hidden="true">
+    <div style="display:grid;grid-template-columns:26fr 84fr 38fr;height:120px;border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:12px;color:var(--fg-subtle)">
+     <div style="background:var(--bg-dark);border-right:1px solid var(--border);padding:8px">Sidebar 260</div>
+     <div style="background:var(--bg);display:grid;grid-template-rows:1fr auto;padding:8px"><span style="justify-self:center">Chat column 680</span><span style="justify-self:center;width:70%;height:22px;border:1px solid var(--input-border);border-radius:8px;background:var(--raised)"></span></div>
+     <div style="background:var(--raised);border-left:1px solid var(--border);padding:8px">Panel 380</div>
+    </div>
+   </div>
+   <div class="bb-scroll"><table class="bb-table">
+    <tr><th>Controls</th><th>Size</th><th>Examples</th></tr>
+    <tr><td><code>--size-control-sm</code></td><td>28px</td><td>Chips, close ×</td></tr>
+    <tr><td><code>--size-control-md</code></td><td>32px</td><td>Send, Stop, viewer arrows</td></tr>
+    <tr><td><code>--size-control-lg</code></td><td>34px</td><td>Choose, search</td></tr>
+    <tr><td><code>--size-control-icon</code> / <code>--size-control-attach</code></td><td>26px / 30px</td><td>Edit pencil, zoom / + Attach</td></tr>
+   </table></div>
+  </section>
+
+  <section id="shape-and-elevation" aria-labelledby="shape-and-elevation-h">
+   <p class="bb-kicker">08</p>
+   <h2 class="bb-h2" id="shape-and-elevation-h">Shape and elevation</h2>
+   <h3 class="bb-h3" id="radius">Radius</h3>
+   <div class="bb-spec raised"><div class="bb-row">
+    <div class="bb-col"><div class="bb-rad" style="border-radius:2px"></div><span class="bb-lab"><code>--radius-2xs</code> 2</span></div>
+    <div class="bb-col"><div class="bb-rad" style="border-radius:4px"></div><span class="bb-lab"><code>--radius-xs</code> 4</span></div>
+    <div class="bb-col"><div class="bb-rad" style="border-radius:6px"></div><span class="bb-lab"><code>--radius-sm</code> 6</span></div>
+    <div class="bb-col"><div class="bb-rad" style="border-radius:8px"></div><span class="bb-lab"><code>--radius-md</code> 8</span></div>
+    <div class="bb-col"><div class="bb-rad" style="border-radius:10px"></div><span class="bb-lab"><code>--radius-lg</code> 10</span></div>
+    <div class="bb-col"><div class="bb-rad" style="border-radius:12px"></div><span class="bb-lab"><code>--radius-xl</code> 12</span></div>
+    <div class="bb-col"><div class="bb-rad" style="border-radius:14px"></div><span class="bb-lab"><code>--radius-2xl</code> 14</span></div>
+    <div class="bb-col"><div class="bb-rad" style="border-radius:16px"></div><span class="bb-lab"><code>--radius-3xl</code> 16</span></div>
+    <div class="bb-col"><div class="bb-rad" style="border-radius:18px 18px 4px 18px"></div><span class="bb-lab"><code>--radius-bubble</code> + <code>-tail</code></span></div>
+    <div class="bb-col"><div class="bb-rad" style="border-radius:9999px;height:34px"></div><span class="bb-lab"><code>--radius-pill</code></span></div>
+    <div class="bb-col"><div class="bb-rad" style="border-radius:50%;width:64px"></div><span class="bb-lab">50% (rule)</span></div>
+   </div></div>
+   <h3 class="bb-h3" id="borders-elevation-and-focus">Borders, elevation and focus</h3>
+   <p class="bb-p">Flat by default: 1px borders do the work. Only three things lift: the chat box, modals and the selected segment.</p>
+   <div class="bb-spec"><div class="bb-row">
+    <div class="bb-col"><div class="bb-elev" style="border:1px solid var(--input-border);box-shadow:0 1px 2px #0000000a,0 6px 20px #0000000a">Chat box</div><span class="bb-lab"><code>--shadow-input</code></span></div>
+    <div class="bb-col"><div class="bb-elev" style="box-shadow:0 20px 60px #0000004d">Modal</div><span class="bb-lab"><code>--shadow-overlay</code></span></div>
+    <div class="bb-col"><div class="bb-elev" style="box-shadow:0 1px 2px #00000014;height:40px;width:120px;border-radius:7px">Segment</div><span class="bb-lab"><code>--shadow-segment</code></span></div>
+    <div class="bb-col"><span class="send bb-focus" style="display:inline-grid;place-items:center">Send</span><span class="bb-lab"><code>--border-width-focus</code> 2px, offset 2</span></div>
+    <div class="bb-col"><div class="bb-rad" style="border-radius:12px;outline:2px solid var(--primary);outline-offset:2px;width:64px"></div><span class="bb-lab">selected ring</span></div>
+    <div class="bb-col"><div class="bb-rad" style="border-radius:8px;box-shadow:0 0 0 2px var(--primary)"></div><span class="bb-lab"><code>--shadow-fresh</code> (fades)</span></div>
+   </div></div>
+  </section>
+
+  <section id="iconography-and-imagery" aria-labelledby="iconography-and-imagery-h">
+   <p class="bb-kicker">09</p>
+   <h2 class="bb-h2" id="iconography-and-imagery-h">Iconography and imagery</h2>
+   <p class="bb-p">Inline strokes on a 24px grid: 1.7–1.8 stroke, round caps and joins, current colour. Drawn at 13–18px. No icon library chosen yet.</p>
+   <div class="bb-icons" aria-hidden="true">
+    <div><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>New video, Edit</div>
+    <div><svg viewBox="0 0 24 24"><rect x="3" y="4" width="4" height="16" rx="1"/><rect x="9" y="4" width="4" height="16" rx="1"/><path d="m15.5 5.2 3.8-1 3 15.6-3.8.9Z"/></svg>Library</div>
+    <div><svg viewBox="0 0 24 24" style="stroke-width:2.2"><path d="m5 12 5 5 9-10"/></svg>Done, selected</div>
+    <div><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v5"/></svg>Answered</div>
+    <div><svg class="fill" viewBox="0 0 24 24"><path d="M8 5v14l11-7Z"/></svg>Play</div>
+    <div><svg viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>Enlarge</div>
+    <div><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>Open / close</div>
+    <div><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>Previous</div>
+    <div><svg viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="6" rx="1"/><rect x="14" y="4" width="7" height="6" rx="1"/><rect x="3" y="14" width="7" height="6" rx="1"/><rect x="14" y="14" width="7" height="6" rx="1"/></svg>Storyboard</div>
+    <div><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>Search</div>
+    <div><svg viewBox="0 0 24 24" style="stroke-width:1.5"><path d="M12 3 4.5 7.2v8.6L12 20l7.5-4.2V7.2Z"/><path d="M4.5 7.2 12 11.4l7.5-4.2M12 11.4V20"/></svg>View in 3D</div>
+   </div>
+  </section>
+
+  <section id="motion" aria-labelledby="motion-h">
+   <p class="bb-kicker">10</p>
+   <h2 class="bb-h2" id="motion-h">Motion</h2>
+   <p class="bb-p">Motion only says “working” or “new”. Everything has a still version when the device asks for reduced motion.</p>
+   <div class="bb-spec raised"><div class="bb-row" style="align-items:center">
+    <div class="bb-col"><span class="working-label"><i></i>Working…</span><span class="bb-lab"><code>--duration-pulse</code> 1s</span></div>
+    <div class="bb-col" style="width:220px"><div class="skeleton" style="position:static;opacity:1;animation:none;width:220px"><i style="width:60%"></i><i></i><i style="width:80%"></i></div><span class="bb-lab"><code>--duration-shimmer</code> 1.2s</span></div>
+    <div class="bb-col"><span class="bb-pulse"></span><span class="bb-lab">Tab dot appears · <code>--duration-fade</code></span></div>
+   </div></div>
+   <div class="bb-scroll"><table class="bb-table">
+    <tr><th>Moment</th><th>Token</th><th>Value</th></tr>
+    <tr><td>Agent text streams in (demo only)</td><td><code>--duration-word</code> / <code>--duration-word-fade</code></td><td>28ms stagger / 120ms fade</td></tr>
+    <tr><td>Activity line, tab dot</td><td><code>--duration-fade</code></td><td>200ms ease-out</td></tr>
+    <tr><td>Question rises in after the message</td><td><code>--duration-card-delay</code> + <code>--duration-card</code></td><td>250ms, then 350ms with a 6px lift</td></tr>
+    <tr><td>Panel content replaces the shimmer</td><td><code>--duration-appear</code></td><td>400ms</td></tr>
+    <tr><td>Panel first appears</td><td><code>--duration-panel</code></td><td>450ms fade</td></tr>
+    <tr><td>New content ring fades</td><td><code>--duration-highlight</code></td><td>1.6s</td></tr>
+   </table></div>
+  </section>
+
+ </main>
+</div>
+<nav class="bb-pager" aria-label="Previous and next page"><a href="brand.html">← Brand</a><a href="components.html">Components →</a></nav>
+</body>
+</html>

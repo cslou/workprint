@@ -1,0 +1,107 @@
+/* Editor tools, player, conversation and timeline presentation.
+   Adapted from the reviewed local layout; retains Generate's palette and type.
+   No speculative inspector contents or media-processing behaviour. */
+.reference-editor {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 320px;
+  grid-template-rows: minmax(0, 1fr) 286px;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-dark);
+}
+.tool-rail {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 6px;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  background: var(--raised);
+}
+.rail-tool {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg-subtle);
+  font: 400 17px/1 var(--font-sans);
+}
+.rail-tool svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.rail-tool.selected-tool { background: var(--fg); color: var(--raised); }
+.rail-tool .cc-icon { border: 1px solid currentColor; border-radius: 3px; font-size: 11px; padding: 2px; }
+.reference-editor .preview-region { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; min-width: 0; }
+.reference-editor .preview-stage { flex: 1; padding: 16px 20px 20px; }
+.reference-editor .stage-heading { margin-bottom: 12px; }
+.reference-editor .preview-picture { border-radius: 4px; }
+.reference-editor .editor-chat {
+  grid-column: 3;
+  grid-row: 1;
+  min-width: 0;
+  border: 0;
+  border-left: 1px solid var(--border);
+  background: var(--raised);
+}
+.reference-editor .editor-messages { padding: 16px; gap: 14px; }
+.reference-editor .editor-messages .agent { font-size: 13px; }
+.reference-editor .editor-messages .me { max-width: 100%; padding: 10px 12px; border-radius: 8px; }
+.reference-editor .editor-composer { margin: 10px; padding: 12px; border-radius: 8px; box-shadow: none; flex-shrink: 0; }
+.reference-editor .editor-composer .typed-example { font-size: 13px; }
+.reference-editor .editor-composer .composer-bar { margin-top: 12px; }
+.reference-editor .editor-composer .placeholder { font-size: 13px; min-height: 30px; }
+.reference-editor .timeline-area { grid-column: 1 / -1; grid-row: 2; padding: 10px 16px 12px; background: var(--raised); }
+.reference-editor .timeline-toolbar { min-height: 34px; margin-bottom: 10px; flex-shrink: 0; }
+.reference-editor .transport { gap: 4px; }
+.transport-button { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; background: transparent; border: 0; border-radius: 4px; color: var(--fg-subtle); }
+.transport-button svg { width: 15px; height: 15px; stroke: currentColor; stroke-width: 1.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.transport-button.play-button svg { fill: currentColor; }
+.transport-button.add-tool { font-size: 22px; font-weight: 400; }
+.transport-divider { height: 20px; border-left: 1px solid var(--border-strong); margin: 0 8px; }
+.reference-editor .timecode { margin-left: 10px; font-size: 12px; }
+.reference-editor .timecode > span { color: var(--fg-subtle); }
+.reference-editor .timeline-tools > span { font-size: 11px; color: var(--fg-subtle); margin-right: 10px; }
+.reference-editor .timeline-scroll { padding: 2px 0; }
+.reference-editor .timeline-grid { min-width: 740px; }
+.reference-editor .ruler-row, .reference-editor .lane { grid-template-columns: 76px minmax(0, 1fr); gap: 12px; }
+.reference-editor .ruler-row { height: 28px; }
+.reference-editor .ruler { background: repeating-linear-gradient(to right, var(--border) 0 1px, transparent 1px 3.57143%) left bottom / 100% 7px no-repeat; }
+.reference-editor .lane-name { font-size: 11px; }
+.reference-editor .track { height: 66px; border-radius: 2px; }
+.reference-editor .clip { height: 66px; border-radius: 3px; background-repeat: repeat-x; background-size: 82px auto; background-position: left bottom; }
+.reference-editor .clip:has(img[src$="p1-1.jpg"]) { background-image: url(../../../outputs/studio-mockup/r44/assets/panels/p1-1.jpg); }
+.reference-editor .clip:has(img[src$="t2-2.jpg"]) { background-image: url(../../../outputs/studio-mockup/r44/assets/panels/t2-2.jpg); }
+.reference-editor .clip:has(img[src$="p3-1.jpg"]) { background-image: url(../../../outputs/studio-mockup/r44/assets/panels/p3-1.jpg); }
+.reference-editor .clip img { visibility: hidden; }
+.reference-editor .clip .clip-name { top: 0; left: 0; right: 0; bottom: auto; padding: 3px 8px; border-radius: 0; background: var(--primary); color: var(--primary-fg); }
+.reference-editor .clip.selected-clip { outline-offset: 1px; }
+.reference-editor .track.audio, .reference-editor .audio-region { height: 34px; border-radius: 3px; }
+.reference-editor .audio-region svg { height: 24px; }
+.reference-editor .audio-region.ambient { background: var(--tan-surface); }
+.reference-editor .playhead { top: -30px; bottom: -84px; background: var(--fg); }
+.reference-editor .playhead::before { background: var(--fg); }
+.reference-editor .timeline-foot { flex-shrink: 0; margin-top: 12px; }
+@media (max-width: 1100px) and (min-width: 821px) {
+  .reference-editor { grid-template-columns: 44px minmax(0, 1fr) 300px; }
+  .reference-editor .preview-stage { padding: 12px; }
+}
+@media (max-width: 820px) {
+  .reference-editor { display: flex; flex-direction: column; }
+  .tool-rail { order: 0; flex-direction: row; justify-content: flex-start; padding: 8px; border-right: 0; border-bottom: 1px solid var(--border); overflow-x: auto; }
+  .reference-editor .preview-region { order: 1; }
+  .reference-editor .preview-stage { padding: 12px; }
+  .reference-editor .preview-picture { flex: auto; }
+  .reference-editor .timeline-area { order: 2; padding: 12px; }
+  .reference-editor .editor-chat { order: 3; border-left: 0; border-top: 1px solid var(--border); }
+  .reference-editor .editor-messages { max-height: none; }
+  .reference-editor .timeline-toolbar { flex-wrap: wrap; }
+  .reference-editor .timecode { margin-left: 6px; }
+  .reference-editor .transport-divider { margin: 0 4px; }
+  .reference-editor .timeline-foot { gap: 4px; }
+}

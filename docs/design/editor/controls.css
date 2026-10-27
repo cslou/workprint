@@ -1,0 +1,14 @@
+/* Shared static-reference actions, using the existing Generate palette. */
+.action-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.primary, .secondary, .plain-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 34px; padding: 6px 14px; border-radius: 9999px;
+  font-size: 13px; line-height: 1.4; white-space: nowrap;
+}
+.primary { background: var(--primary); color: var(--primary-fg); border: 1px solid var(--primary); font-weight: 600; }
+.primary:hover { background: var(--primary-hover); }
+.secondary { background: var(--raised); border: 1px solid var(--border-strong); color: var(--fg-muted); }
+.secondary:hover { background: var(--muted); }
+.plain-button { border: 0; background: transparent; color: var(--fg-subtle); }
+.primary:disabled, .secondary:disabled, .plain-button:disabled { opacity: .5; }
+.primary:focus-visible, .secondary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }

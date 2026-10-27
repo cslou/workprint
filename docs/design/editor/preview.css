@@ -1,0 +1,192 @@
+/* Static design-reference styles, not application code.
+   Shared colours/type remain owned by ../design.md; Editor behaviour is partial. */
+:root {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: Georgia, "Times New Roman", serif;
+  --control-line: #656155;
+  --preview-height: 44px;
+  --editor-header-height: 64px;
+}
+body { overflow: hidden; }
+button, a, summary { -webkit-tap-highlight-color: transparent; }
+button:disabled { cursor: default; }
+a:focus-visible, button:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--primary); outline-offset: 3px;
+}
+b, strong, h1, h2, h3 { font-weight: 600; }
+.preview-bar {
+  height: var(--preview-height); padding: 0 20px; display: flex; align-items: center;
+  justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--border);
+  background: var(--bg-dark); font-size: 12px; color: var(--fg-muted);
+}
+.preview-bar .preview-title { display: flex; align-items: center; gap: 10px; }
+.preview-label { color: var(--link); font-weight: 600; }
+.preview-nav { display: flex; align-items: center; gap: 4px; }
+.preview-nav a { padding: 5px 10px; border-radius: 9999px; min-height: 28px; }
+.preview-nav .current { background: var(--fg); color: var(--raised); }
+.preview-note { color: var(--fg-subtle); }
+.app.with-panel { height: calc(100vh - var(--preview-height)); min-height: 0; }
+.app .brand .mark { border-radius: 6px; }
+.entry-heading { padding: 20px 24px; border-bottom: 1px solid var(--border); }
+.entry-heading h1 { font-size: 15px; }
+.entry-heading p { font-size: 12px; color: var(--fg-subtle); margin-top: 3px; }
+.entry .thread.chat { justify-content: center; padding: 28px; }
+.entry .msgs { gap: 20px; }
+.entry .agent h2 { font: 400 28px/1.2 var(--font-display); margin-bottom: 12px; }
+.entry .agent .inline-link { display: inline-flex; align-items: center; min-height: 28px; }
+.entry .composer { border-color: var(--control-line); }
+.entry .composer .field { min-height: 36px; }
+.context-line { font-size: 12px; color: var(--fg-subtle); }
+.context-line a { color: var(--link); text-decoration: underline; }
+.mini-cut { display: flex; gap: 4px; margin: 16px 0 12px; }
+.mini-cut img { width: 100%; min-width: 0; height: 76px; object-fit: cover; border-radius: 6px; }
+.mini-cut figure { margin: 0; flex: 1; min-width: 0; }
+.mini-cut figcaption { font-size: 11px; color: var(--fg-subtle); margin-top: 5px; }
+.entry-panel { padding: 18px; overflow: auto; }
+.preview-tabs { display: flex; justify-content: space-between; padding: 12px 14px; gap: 2px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.preview-tabs span, .preview-tabs b { padding: 6px 10px; font-weight: 400; }
+.preview-tabs b { background: var(--fg); color: var(--raised); border-radius: 9999px; }
+.source-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.source-heading h2 { font-size: 13px; }
+.source-heading span { font-size: 12px; color: var(--fg-subtle); }
+.source-row { display: grid; grid-template-columns: 72px 1fr; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--border); }
+.source-row img { display: block; width: 72px; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px; }
+.source-row b { display: block; font-size: 13px; }
+.source-row small { font-size: 11px; color: var(--fg-subtle); }
+.source-row .chosen { color: var(--tan); }
+.source-history { font-size: 12px; color: var(--fg-subtle); margin: 8px 0 12px; }
+.source-history summary { min-height: 28px; cursor: pointer; }
+.source-history p { padding: 6px 0; }
+.example-details { font-size: 12px; color: var(--fg-subtle); margin-top: 20px; }
+.example-details summary { cursor: pointer; min-height: 28px; }
+.example-details p { margin-top: 6px; }
+/* Editor is an expanded workspace, not a fifth panel tab or a new product. */
+.editor-shell { height: calc(100vh - var(--preview-height)); display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: var(--editor-header-height) minmax(0, 1fr); }
+.editor-header { display: flex; align-items: center; gap: 18px; padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--raised); }
+.back-link { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; font-size: 13px; color: var(--fg-muted); }
+.back-link:hover { color: var(--link); }
+.header-divider { width: 1px; height: 26px; background: var(--border); }
+.editor-identity { display: flex; align-items: baseline; gap: 12px; }
+.editor-identity h1 { font-size: 15px; }
+.editor-identity .scene-name { color: var(--fg-subtle); font-size: 13px; }
+.header-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.editor-chat { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border); background: var(--bg); }
+.editor-messages { flex: 1; min-height: 0; overflow: auto; padding: 20px; display: flex; flex-direction: column; gap: 18px; }
+.editor-messages .me { align-self: flex-end; max-width: 94%; font-size: 13px; }
+.editor-messages .agent { font-size: 14px; }
+.editor-messages .agent p + p { margin-top: 10px; }
+.editor-messages .agent .small { font-size: 12px; color: var(--fg-subtle); }
+.editor-messages .acts { font-size: 12px; color: var(--fg-subtle); }
+.editor-messages .acts div { display: flex; gap: 6px; }
+.tick { color: var(--tan); }
+.thread-divider { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--fg-subtle); }
+.thread-divider::before, .thread-divider::after { content: ""; height: 1px; flex: 1; background: var(--border); }
+.editor-composer { margin: 16px; padding: 12px; background: var(--raised); border: 1px solid var(--control-line); border-radius: 14px; box-shadow: 0 1px 2px #0000000a; }
+.editor-composer .selection-context { font-size: 11px; color: var(--link); margin-bottom: 8px; }
+.editor-composer .typed-example { font-size: 14px; line-height: 1.5; }
+.editor-composer .composer-bar { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; gap: 8px; }
+.editor-composer .composer-bar small { font-size: 11px; color: var(--fg-subtle); }
+.editor-composer .placeholder { color: var(--fg-subtle); font-size: 14px; min-height: 44px; }
+.preview-region { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 226px; }
+.preview-stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 16px 24px 12px; }
+.stage-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
+.stage-heading h2 { font-size: 13px; }
+.stage-heading small { color: var(--fg-subtle); font-size: 11px; }
+.preview-picture { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; border-radius: 8px; overflow: hidden; background: var(--fg); }
+.preview-picture img { display: block; max-width: 100%; max-height: 100%; width: 100%; height: 100%; object-fit: contain; }
+.preview-picture .still-label { position: absolute; top: 10px; left: 10px; color: var(--raised); background: #1b1913b3; padding: 4px 8px; border-radius: 6px; font-size: 11px; }
+.preview-caption { position: absolute; bottom: 16px; left: 14px; right: 14px; text-align: center; font-size: 17px; font-family: var(--font-display); color: var(--raised); }
+.preview-caption span { background: #1b1913b3; padding: 5px 12px; border-radius: 4px; }
+.playback-controls { display: flex; align-items: center; justify-content: space-between; padding: 8px 0 0; gap: 8px; font-size: 12px; color: var(--fg-subtle); }
+.transport { display: flex; align-items: center; gap: 8px; }
+.icon-button { width: 32px; height: 32px; padding: 6px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border-strong); background: transparent; border-radius: 9999px; }
+.icon-button svg { width: 14px; height: 14px; fill: currentColor; }
+.icon-button:disabled { opacity: .5; }
+.timecode { font-variant-numeric: tabular-nums; color: var(--fg); }
+.property { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; margin: 10px 0; }
+.property > span { color: var(--fg-subtle); }
+.property-value { border: 1px solid var(--border-strong); border-radius: 6px; background: var(--raised); padding: 5px 8px; min-width: 68px; text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; }
+/* Timeline positions use the fixture's fixed 14-second ruler. */
+.timeline-area { border-top: 1px solid var(--border); display: flex; flex-direction: column; padding: 12px 20px; min-width: 0; }
+.timeline-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.timeline-toolbar h2 { font-size: 13px; }
+.timeline-toolbar > span { font-size: 11px; color: var(--fg-subtle); }
+.timeline-toolbar .timeline-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.timeline-tools .secondary { font-size: 11px; min-height: 28px; padding: 4px 10px; }
+.timeline-scroll { overflow-x: auto; min-height: 0; }
+.timeline-grid { min-width: 650px; }
+.ruler-row, .lane { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 10px; }
+.ruler-row { height: 24px; font-size: 11px; color: var(--fg-subtle); }
+.ruler { position: relative; display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--border); }
+.ruler span { border-left: 1px solid var(--border); padding-left: 4px; }
+.lane { margin-top: 6px; }
+.lane-name { display: flex; align-items: center; font-size: 12px; color: var(--fg-muted); }
+.lane-name small { font-size: 11px; color: var(--fg-subtle); display: block; }
+.track { position: relative; height: 46px; border-radius: 6px; background: var(--bg); }
+.track.audio { height: 30px; }
+.clip { position: absolute; top: 0; height: 46px; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; }
+.clip img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.clip .clip-name { position: absolute; left: 4px; bottom: 4px; right: 4px; font-size: 11px; padding: 2px 5px; background: #fffefae6; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clip.selected-clip { outline: 2px solid var(--primary); outline-offset: 1px; z-index: 1; }
+.clip .trim-handle { position: absolute; right: 0; top: 0; bottom: 0; width: 5px; background: var(--primary); }
+.audio-region { position: absolute; top: 0; height: 30px; border-radius: 6px; background: var(--selected); border: 1px solid var(--primary); color: var(--link); display: flex; align-items: center; padding: 0 8px; gap: 6px; overflow: hidden; }
+.audio-region span { font-size: 11px; white-space: nowrap; position: relative; z-index: 1; }
+.audio-region svg { flex: 1; min-width: 0; height: 20px; stroke: currentColor; stroke-width: 2; }
+.audio-region.ambient { background: var(--tan-surface); border-color: var(--tan); color: var(--tan); }
+.audio-region .audio-tail { position: absolute; right: 0; top: 0; bottom: 0; width: 23.8095%; background: var(--selected); border-left: 2px dashed var(--primary); }
+.playhead { position: absolute; left: 62.8571%; top: -6px; bottom: -6px; width: 2px; background: var(--primary); z-index: 2; pointer-events: none; }
+.playhead::before { content: ""; position: absolute; top: 0; left: -3px; width: 8px; height: 7px; border-radius: 0 0 4px 4px; background: var(--primary); }
+.timeline-foot { margin-top: 8px; display: flex; justify-content: space-between; gap: 12px; font-size: 11px; color: var(--fg-subtle); }
+.timeline-foot .cut-note { color: var(--link); }
+.export-overlay { display: none; position: fixed; inset: var(--preview-height) 0 0; background: #1b1913b3; z-index: 10; align-items: center; justify-content: center; padding: 24px; }
+.export-overlay:target { display: flex; }
+.export-dialog { max-width: 480px; width: 100%; padding: 24px; background: var(--raised); border-radius: 16px; box-shadow: 0 20px 60px #0000004d; }
+.export-dialog header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.export-dialog h2 { font-size: 17px; }
+.export-dialog p { font-size: 13px; color: var(--fg-muted); margin-bottom: 16px; }
+.export-dialog .property { margin: 12px 0; }
+.export-dialog .action-row { margin-top: 20px; }
+.export-dialog .micro { font-size: 12px; color: var(--fg-subtle); }
+@media (max-width: 1200px) {
+  .preview-region { grid-template-columns: minmax(0, 1fr) 196px; }
+  .preview-stage { padding: 14px; }
+  .editor-identity .scene-name { display: none; }
+  .preview-bar .preview-note { display: none; }
+}
+@media (max-width: 820px) {
+  :root { --preview-height: 80px; --editor-header-height: 64px; }
+  body { overflow: auto; }
+  .preview-bar { height: auto; min-height: var(--preview-height); padding: 8px 12px; flex-wrap: wrap; gap: 4px; }
+  .preview-bar .preview-title { width: 100%; font-size: 11px; }
+  .preview-nav { width: 100%; justify-content: space-between; }
+  .preview-nav a { font-size: 11px; padding: 4px 8px; }
+  .app.with-panel { height: auto; }
+  .entry .thread.chat { padding: 20px; }
+  .entry .main { min-height: auto; }
+  .entry .entry-heading { padding: 16px 20px; }
+  .entry .entry-heading h1 { font-size: 14px; }
+  .entry .agent h2 { font-size: 28px; }
+  .entry .sidebar { padding: 8px 12px; }
+  .entry-panel { overflow: visible; }
+  .editor-shell { height: auto; }
+  .editor-header { padding: 10px 12px; gap: 10px; flex-wrap: wrap; min-height: 64px; }
+  .header-divider { display: none; }
+  .editor-identity { gap: 0; }
+  .editor-header .header-actions { gap: 6px; }
+  .header-actions .secondary { display: none; }
+  .editor-chat { order: 1; border-right: 0; border-top: 1px solid var(--border); }
+  .editor-messages { max-height: none; }
+  .preview-region { display: flex; flex-direction: column; }
+  .preview-stage { padding: 12px; }
+  .preview-picture { aspect-ratio: 16/9; flex: auto; }
+  .preview-caption { font-size: 15px; }
+  .timeline-area { padding: 12px; }
+  .timeline-grid { min-width: 650px; }
+  .timeline-foot { flex-direction: column; gap: 3px; }
+  .timeline-toolbar .timeline-tools { display: none; }
+  .export-overlay { inset: 0; padding: 14px; }
+  .export-dialog { padding: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

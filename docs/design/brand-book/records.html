@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workprint brand book — Records</title>
+<link rel="stylesheet" href="../app-r11.css">
+<link rel="stylesheet" href="book.css">
+</head>
+<body>
+<header class="bb-top">
+ <a class="bb-brand" href="../brand-book.html"><b>Workprint</b><small>Brand book · 1.3</small></a>
+ <nav class="bb-pages" aria-label="Brand book pages"><a href="../brand-book.html">Home</a><a href="brand.html">Brand</a><a href="foundations.html">Foundations</a><a href="components.html">Components</a><a href="patterns.html">Patterns and accessibility</a><a href="screens.html">Screens and flows</a><a href="records.html" aria-current="page">Records</a></nav>
+</header>
+<div class="bb">
+ <nav class="bb-nav" aria-label="On this page"><a class="sec" href="#assets"><span class="bb-num">15</span>Assets</a><a class="sec" href="#decisions"><span class="bb-num">16</span>Decisions</a><a class="sub" href="#mockup-differences">Mockup differences</a><a class="sec" href="#verification"><span class="bb-num">17</span>Verification</a></nav>
+ <main class="bb-main">
+  <section id="assets" aria-labelledby="assets-h">
+   <p class="bb-kicker">15</p>
+   <h2 class="bb-h2" id="assets-h">Assets</h2>
+   <div class="bb-scroll"><table class="bb-table"><tr><th>Asset</th><th>Path</th><th>Status</th></tr>
+    <tr><td>Product name and mark</td><td>Workprint</td><td>Name selected; existing mark remains a placeholder</td></tr>
+    <tr><td>Public reference imagery</td><td><code>docs/design/assets/media-placeholder.svg</code></td><td>Authored neutral placeholder; no original prototype images/screenshots copied</td></tr>
+    <tr><td>Mercer &amp; Vale stills, panels, sheets</td><td><code>outputs/studio-mockup/r15</code>, <code>r44</code>, <code>r91-library</code> (git-ignored)</td><td>Local example media; not licensed for redistribution</td></tr>
+    <tr><td>Library stock examples</td><td><code>outputs/studio-mockup/r92-library/stock/</code></td><td>CC0 / public domain, example only</td></tr>
+    <tr><td>Icons</td><td>Inline SVG</td><td>No icon library chosen</td></tr>
+    <tr><td>Fonts</td><td>System fonts</td><td>None needed</td></tr>
+    <tr><td>Material controls</td><td><code>docs/design/components/material-controls.css</code></td><td>Scoped design-reference styles; values stay in design.md. No application implementation</td></tr>
+    <tr><td>Editor references</td><td><code>docs/design/editor/</code></td><td>Tracked inert HTML/CSS; no media processing</td></tr>
+    <tr><td>Editor screenshots</td><td><code>outputs/brand-book/editor/</code></td><td>Git-ignored local evidence; same unlicensed example media</td></tr>
+    <tr><td>Project workspace roadmap</td><td><code>docs/design/roadmap/project-workspace/</code></td><td>Separate inert HTML/CSS copies; existing Editor styles and local JPEGs reused, no new media</td></tr>
+    <tr><td>Roadmap screenshots</td><td><code>outputs/brand-book/roadmap/project-workspace/</code></td><td>Git-ignored local reference; not licensed for redistribution</td></tr></table></div>
+  </section>
+
+  <section id="decisions" aria-labelledby="decisions-h">
+   <p class="bb-kicker">16</p>
+   <h2 class="bb-h2" id="decisions-h">Decisions</h2>
+   <p class="bb-p"></p>
+   <p class="bb-p">Full table with responses and conditions: <a href="../design.md#decisions">design.md</a>. Earlier studies: <a href="../history.md">history</a>.</p>
+   <div class="bb-scroll"><table class="bb-table"><tr><th>Date</th><th>Decision</th><th>Status</th></tr>
+    <tr><td>2026-09-28</td><td>Visual direction: <code>app-r11.css</code> light theme</td><td><span class="bb-tag ok">Chosen</span></td></tr>
+    <tr><td>2026-10-02</td><td>Tokens r94 with four tidy-ups · components r94 · final handoff r94</td><td><span class="bb-tag ok">Approved</span></td></tr>
+    <tr><td>2026-10-02</td><td>Chat-box outline: keep, record the gap</td><td><span class="bb-tag ok">Decided</span></td></tr>
+    <tr><td>2026-10-02</td><td>Name and logo</td><td><span class="bb-tag off">Deferred</span></td></tr>
+    <tr><td>2026-10-02</td><td>Restructure to the new brand book format; design.md stays the source of values</td><td><span class="bb-tag ok">Adopted</span></td></tr>
+    <tr><td>2026-10-15</td><td>Videos snapshot entry and cleaned Editor layout; “ok looks good” on the entry, requested banner/status removal</td><td>Reviewed direction; detailed editing behaviour remains open</td></tr>
+    <tr><td>2026-10-15</td><td>User authorized integrating Editor as a connected single-scene section, not a fifth tab; preserve direct Export</td><td><span class="bb-tag">For inspection</span>integration authorized, final acceptance pending; multi-scene was deferred at this checkpoint</td></tr>
+    <tr><td>2026-10-16</td><td>Material component study: “Use these components (Recommended)”, followed by “We just don't need the focus rings”</td><td>Component direction approved; rings removed, keyboard underline and full Project preview for inspection. No architecture or editing approval</td></tr>
+    <tr><td>2026-10-16</td><td>“we can add this as a separate flow” for the future roadmap; no incorporation into existing approved flows or demo</td><td>Separate roadmap reference authorized, not application scope or a delivery commitment; displayed addition for inspection</td></tr>
+    <tr><td>2026-10-16</td><td>“ok looks good. help me to push this”</td><td>Displayed roadmap reference accepted; Git delivery authorized. Not full Editor, application, architecture or accessibility acceptance; media/screenshots remain local</td></tr></table></div>
+   <h3 class="bb-h3" id="mockup-differences">Mockup differences</h3>
+   <p class="bb-p">Where the frozen mockup stylesheet and the tokens disagree. Build the token, not the mockup value. Details in <a href="../design.md#mockup-differences">design.md</a>.</p>
+   <div class="bb-scroll"><table class="bb-table">
+    <tr><th>Mockup</th><th>Token</th><th>Status</th></tr>
+    <tr><td>Inter, Aeonik, Canela in the font stacks</td><td>System UI and Georgia</td><td><span class="bb-tag ok">Decided</span></td></tr>
+    <tr><td>Picker heading 16px</td><td>15px</td><td><span class="bb-tag ok">Approved</span></td></tr>
+    <tr><td>10px labels</td><td>11px</td><td><span class="bb-tag ok">Approved</span></td></tr>
+    <tr><td>Radius 7px and 5px</td><td>6px and 4px</td><td><span class="bb-tag ok">Approved</span></td></tr>
+    <tr><td>Chip × 20px target</td><td>24px hit area</td><td><span class="bb-tag ok">Approved</span></td></tr>
+   </table></div>
+  </section>
+
+  <section id="verification" aria-labelledby="verification-h">
+   <p class="bb-kicker">17</p>
+   <h2 class="bb-h2" id="verification-h">Verification</h2>
+   <p class="bb-p">The records below describe the source prototype. They are not verification of this migrated Workprint copy or its placeholder imagery.</p>
+   <p class="bb-p"><span class="bb-tag ok">Artifact checks passed</span>Separate roadmap checkpoint 1.3: 64 paired anchors; 12 scope/filter-tab states at six viewports; Editor entry/back, keyboard cues, local assets and all seven book pages checked. Existing flow/demo/Editor references, original previews, 150 token rows and frozen styles unchanged from the pre-addition working tree. Application tests are N/A; the displayed separate reference is accepted, not roadmap implementation. <a href="../design.md#verification">Evidence and limitations</a>.</p>
+   <p class="bb-p"><span class="bb-tag ok">Retained checks</span>Material-component checkpoint 1.2: 58 paired anchors; 150 token rows and frozen styles unchanged; five preview viewports, separate conversations, filtering/reset, keyboard cues without rings and 20-name selector checked. All seven book pages rendered at desktop/narrow widths. Application tests are N/A; final inspection remains pending. <a href="../design.md#verification">Evidence and limitations</a> distinguish the temporary native-syntax supplement, unverified cross-browser/accessibility cases and the still-draft Project design.</p>
+   <p class="bb-p"><span class="bb-tag ok">Retained checks</span>Editor integration 1.1, 15 October 2026; its final user acceptance is still pending. <a href="../design.md#verification">Evidence and limitations</a>: 56 paired anchors, 150 existing token rows unchanged, native controls/navigation and responsive layouts checked. Detailed editing/export remain partial; application tests are N/A.</p>
+  </section>
+
+ </main>
+</div>
+<nav class="bb-pager" aria-label="Previous and next page"><a href="screens.html">← Screens and flows</a><span></span></nav>
+</body>
+</html>
