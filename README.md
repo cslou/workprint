@@ -16,10 +16,11 @@ TypeScript, React/Vite/React Aria, one Mastra backend, Supabase Auth/Postgres an
 
 Work from the repository root. Setup, dependency versions and verification commands will be documented when their owning implementation is delivered; do not assume an application scaffold exists.
 
-Local specs, sprints and selected research are intentionally gitignored and are not included in public clones. Maintainers must supply those files separately before dependent implementation; Git is not their backup.
+Specs and sprint plans are versioned with the repository. Private research remains gitignored; obtain required source material from the maintainer before dependent work.
 
 ## Documentation
 
+- [Implementation spec](docs/specs/implementation-spec-001.md) and [Sprint 001](docs/sprints/sprint-001.md) — current planned scope and verification, not completed implementation.
 - [Architecture background](docs/architecture.md) — intended technical direction, with current-MVP precedence over earlier broad examples.
 - [Product strategy litepaper](docs/litepaper.md) — longer-term vision and unvalidated hypotheses, not a release checklist.
 - [Production terminology](CONTEXT.md) — canonical distinctions for planning and review.
