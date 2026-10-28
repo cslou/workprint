@@ -119,6 +119,38 @@ Current-head aggregate 13/13, browser 101/101, visual 165/165 (166 comparison re
   3. Add isolated supplied-source checks, actual-backend failure proof and visual comparisons.
 - **Technical notes:** no React dependency in player; web owns UI. Player does not fetch credentials or resolve resource IDs. Later source-access implementation plugs into the same seam rather than another transport stack.
 
+**Story 2 delivery:** [PR #20](https://github.com/cslou/workprint/pull/20), accepted head `37f20774366115a0f28b03606e2d49bfe3e1c034`, merged into sprint-003 at `71dc72f7cb17491c09bde5fae680235c573a3a35`.
+
+Implementer: `deepseek/deepseek-flash` at `max` thinking. This was the user's trial override for this story, run in a fresh worker; the gpt-6.1-sol worker was stopped.
+
+Design: the user was away and had delegated decisions, so the orchestrator provisionally approved four states from concrete previews (2026-10-29), pending Lou's ratification at the Phase 2 handoff:
+- the Videos metadata line as a quiet playback trigger, with no visible change;
+- the single-clip viewer in the shared viewer dialog, paused and playing, from `flow1-step9-r90.html#take-1`;
+- "Loading this video…" in a 16:9 dashed surface;
+- the approved workspace-read lines, unchanged, for 401, 501 and source failure, with no player chrome or retry.
+
+These are recorded in `docs/design/design.md` and `history.md` (`6ba9fcc`).
+
+Behavior: the framework-free `packages/player` plays supplied sources and owns no fetch, IDs or selection. Only `apps/web` may import it, enforced by dependency-cruiser. The web media read requests the exact version, reacquires once per expiry and fails terminally if the refreshed source is still expired. The viewer's "Use this version" goes through Story 1's per-Shot selection owner. Viewing, playing, seeking and closing send no commands. No new third-party dependency was added. The synthetic clip is a VP8 WebM, 320×180, 2 s, generated with ffmpeg `testsrc2`; there is also a deliberately invalid `corrupt.webm`. The fixture notes in `apps/web/test/fixtures/README.md` make no codec-universality claim. Decoded playing frames are functional evidence only; the zero-tolerance player pair uses the supplied poster.
+
+Review:
+- **Initial review** at `c998ffe` (seven checks) scored 2/5, with eight P1s:
+  - unbounded reacquire on an expired `expiresAt`;
+  - play rejections overwriting failed;
+  - loading and error feedback pushed outside the 16:9 surface;
+  - five verification gaps: missing loading pairs and two-sided geometry, DOM-only teardown, no pending-scope race, unproven reacquire replacement, and no native error path.
+- **Fix cycle 1** resolved six. P1-E (teardown) and P1-F (scope race) remained partial, and a new P1-I appeared: a pause during a pending play became sticky failed. P1-I came from the orchestrator's own over-narrow rejection rule, which was corrected in the next assignment.
+- **Fix cycle 2** resolved P1-E and P1-F. Its P1-I proof stubbed `play()`, so the AbortError branch was unreached.
+- **Fix cycle 3** added a native AbortError proof and a current-attempt branch test, shown red→green. `/review-fix` coverage was complete, scoring 4/5. The orchestrator ruled that `ready` (not `paused`) is the truthful status for a pause issued before load, since nothing has played.
+
+Two P2s are carried to Story 3:
+- an unreachable `attempt.then(...)` re-pause branch in `packages/player/src/index.ts`;
+- the 51- and 54-character subjects on `d307ae9` and `d627bf1`, recorded only, with no history rewrite.
+
+The Story 1 carried P2 (public contracts import) is fixed. The story has ten commits: five planned and five fix-cycle commits, all append-only after the PR opened.
+
+Current-head results: aggregate 13/13, browser 121/121, visual 177/177. That is twelve new media pairs (the player at 1440/390/820/821; loading, 501, 401 and error at 1440/390), with prior comparisons unchanged and two-sided geometry. Check, build and frozen install passed. `pnpm audit` was NON-PASS under B-002, and the two B-001 ingress leaves still failed; both are reported separately. Post-merge check passed. No planning file was changed by the worker, and no main merge occurred.
+
 #### Story 3: Paste, upload and Library attachment consumers (P2-S7)
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
   - [x] Follows sprint template
