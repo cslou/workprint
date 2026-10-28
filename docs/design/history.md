@@ -1,5 +1,11 @@
 # Workprint — Application Design History
 
+## Library feedback — 2026-10-28
+
+The user approved the scoped Library feedback proposal in the Story 2 implementation continuation: reuse `demo-05.html#lib-yours`'s existing two-line empty styling for unauthenticated (401), unavailable (501), loading, transport/error and missing-configuration states. The exact copy and bounds are recorded in [the guide](design.md#library-feedback). Local proposal captures remain under ignored `outputs/verification/sprint-002/story-2-feedback-proposal/`; they are not required runtime assets.
+
+This approval adds no banner, colors, recovery controls or functional sign-in. It does not approve unrelated session, proposal/estimate or export designs, nor does it establish implementation acceptance. Existing approved empty Library copy remains unchanged.
+
 ## Unmigrated prototype evidence
 
 This is historical context from the Generate prototype, not current application scope. Source Git revisions, ignored previews and old verification outputs below were not imported. Original example imagery is not published; image links now show neutral placeholders. Historical output/checkout descriptions refer to that source workspace, not this public repository. Current scope follows the [architecture notice](../architecture.md).

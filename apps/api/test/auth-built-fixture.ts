@@ -3,7 +3,6 @@ import { createHmac } from 'node:crypto';
 import { createServer } from 'node:http';
 import { readFile, mkdir, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { TestContext } from 'node:test';
 import { environment, root, sentinel } from './environment.js';
 import { command, start, unusedPort } from './process.js';
 import { createApiClient } from '@workprint/api-client';
@@ -13,7 +12,9 @@ import { query } from './postgres.js';
 
 // Shared by current-scope checks and the separately invoked B-001 qualification.
 // Private fixture input is never inherited by serving. Accounts already exist.
-export async function verifyBuiltAdmission(t: TestContext, qualifyIngress?: (server: { origin: string; accessToken: string }) => Promise<void>) {
+export type BuiltAdmissionTarget = { origin: string; accessToken: string; accessTokens: readonly string[]; logs: string };
+type FixtureContext = { diagnostic(message: string): void; after(cleanup: () => void | Promise<void>): void };
+export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (server: BuiltAdmissionTarget) => Promise<void>, options: { browserOrigin?: string } = {}) {
   const file = process.env.WORKPRINT_AUTH_FIXTURE;
   assert.ok(file, 'Supply WORKPRINT_AUTH_FIXTURE with authorized Supabase URL, anonKey, servingUrl and two accounts');
   const fixture = await environment();
@@ -72,7 +73,8 @@ export async function verifyBuiltAdmission(t: TestContext, qualifyIngress?: (ser
   assert.notEqual(identities[0]!.user.id, identities[1]!.user.id);
   const port = await unusedPort();
   const env = { ...fixture.env, DATABASE_URL: config.servingUrl, SUPABASE_URL: config.url,
-    SUPABASE_PUBLISHABLE_KEY: config.anonKey, PORT: String(port) };
+    SUPABASE_PUBLISHABLE_KEY: config.anonKey, PORT: String(port),
+    ...(options.browserOrigin ? { WORKPRINT_BROWSER_ORIGIN: options.browserOrigin } : {}) };
   const probe = await start(process.execPath, [probeEntry], {
     cwd: root, env, log: join(fixture.logs, 'probe.log'),
   });
@@ -198,7 +200,7 @@ export async function verifyBuiltAdmission(t: TestContext, qualifyIngress?: (ser
   assert.equal(oversized.status, 400, 'Application rejects completed JSON beyond 1 MiB');
   assert.equal(oversized.payload.error.code, 'invalid_input');
 
-  if (qualifyIngress) await qualifyIngress({ origin, accessToken: identities[0]!.access_token });
+  if (qualifyIngress) await qualifyIngress({ origin, accessToken: identities[0]!.access_token, accessTokens: identities.map((identity) => identity.access_token), logs: fixture.logs });
   for (const [path, method] of [['/v1/conversations/c/workspace/extra', 'GET'], ['/v1/conversations//workspace', 'GET'], ['/v1/conversations/c/workspace', 'POST'], ['/v1/library/', 'GET']] as const) {
     assert.equal((await raw(path, method, undefined)).status, 404, 'Only exact catalog paths/methods are admitted');
   }
