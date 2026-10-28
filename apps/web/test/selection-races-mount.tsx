@@ -2,7 +2,8 @@ import { createRoot } from 'react-dom/client';
 import type { ApiClient, ClientResult } from '@workprint/api-client';
 import { versionSchema, useBindingSchema, type OperationResponse } from '@workprint/contracts';
 import { createBrowserClient } from '../src/api/client.js';
-import { Videos } from '../src/videos/videos.js';
+import { Videos, type VideoPrerequisites } from '../src/videos/videos.js';
+import type { StoryboardPrerequisites } from '../src/storyboard/presentation.js';
 import { Storyboard } from '../src/storyboard/storyboard.js';
 import { workspace, video, image } from './storyboard-fixtures.js';
 import '../src/ui/tokens.css';
@@ -25,7 +26,11 @@ const node = document.getElementById('root'); if (!node) throw new Error('Missin
 const root = createRoot(node);
 const projection = { ...workspace, storyboard: { ...workspace.storyboard, shots: workspace.storyboard.shots.map(shot => ({ ...shot, chosenVideoVersionId: videos[0]!.id, panels: shot.panels.map(panel => ({ ...panel, approvedImageVersionId: images[0]!.id, candidateImageVersions: images })) })) }, videos: videos.map((version, index) => ({ id: `candidate-${index}`, batchId: 'batch', proposalId: 'proposal', purpose: 'shot_video' as const, target: { shotId: 'shot-a' }, status: 'succeeded' as const, resultVersionId: version.id, remote: {} })) };
 (window as unknown as { selectionRace: unknown }).selectionRace = {
-  configure(mode: 'video' | 'panel') { const common = { connection: { kind: 'configured' as const, client }, scope: { accountId: 'read-only-account', conversationId: 'read-only-conversation' }, workspace: projection }; root.render(<div className="wp-panel-body" style={{ width: 380 }}>{mode === 'video' ? <Videos {...common} prerequisites={{ versions: videos }} /> : <Storyboard {...common} />}</div>); },
+  configure(mode: 'video' | 'panel', options: { storyboardFacts?: StoryboardPrerequisites; videoFacts?: VideoPrerequisites; foreignShot?: boolean } = {}) {
+    const displayed = options.foreignShot ? { ...projection, videos: projection.videos.map(request => ({ ...request, target: { shotId: 'unrelated-shot' } })) } : projection;
+    const common = { connection: { kind: 'configured' as const, client }, scope: { accountId: 'read-only-account', conversationId: 'read-only-conversation' }, workspace: displayed };
+    root.render(<div className="wp-panel-body" style={{ width: 380 }}>{mode === 'video' ? <Videos {...common} prerequisites={options.videoFacts ?? { versions: videos }} /> : <Storyboard {...common} {...(options.storyboardFacts ? { prerequisites: options.storyboardFacts } : {})} />}</div>);
+  },
   pending() { return pending.length; },
   complete(versionId: string, selectionRevision: number) { const index = pending.findIndex(value => value.body.versionId === versionId); if (index < 0) throw new Error('Missing controlled command'); const command = pending.splice(index, 1)[0]!; const binding = useBindingSchema.parse(Object.fromEntries(Object.entries(command.body).filter(([key]) => key !== 'operationId' && key !== 'versionId'))); command.resolve({ ok: true, value: { use: { id: `ack-${selectionRevision}`, versionId, binding, state: 'approved' }, selectionRevision } }); },
 };
