@@ -48,7 +48,7 @@ function ScopedStoryboard({ connection, scope, workspace, prerequisites }: Story
   };
   const choices = { uses, onUsed: (panelId: string, value: OperationResponse<'useVersion'>) => setUses(previous => { const current = previous.get(panelId); if (current && current.selectionRevision >= value.selectionRevision) return previous; const next = new Map(previous); next.set(panelId, value); return next; }) };
   return <div className="wp-storyboard">
-    <ViewerDialog trigger={<Button variant="secondary">View storyboard</Button>} title={facts?.title ? `Storyboard · ${facts.title}` : 'Storyboard'} size="board">
+    <ViewerDialog trigger={<Button variant="secondary"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="7" height="6" rx="1" /><rect x="14" y="4" width="7" height="6" rx="1" /><rect x="3" y="14" width="7" height="6" rx="1" /><rect x="14" y="14" width="7" height="6" rx="1" /></svg>View storyboard</Button>} title={facts?.title ? `Storyboard · ${facts.title}` : 'Storyboard'} size="board">
       <div className="wp-storyboard-board">{rows.map(({ shot, number, panels }) => <section className="wp-board-shot" key={shot.shotId} data-shot-id={shot.shotId}>
         <header><span className="wp-shot-number">{number}</span><b>{shot.intent ?? `Shot ${number}`}</b></header>
         <PlanningEditor {...common} target={{ kind: 'shot', shotId: shot.shotId }} draft={draftFor({ kind: 'shot', shotId: shot.shotId })} onEdited={edited} />
@@ -57,7 +57,7 @@ function ScopedStoryboard({ connection, scope, workspace, prerequisites }: Story
     </ViewerDialog>
     {rows.map(({ shot, number, panels }) => {
       const fact = facts?.shots?.find(value => value.shotId === shot.shotId);
-      return <details className="wp-storyboard-shot" key={shot.shotId} data-shot-id={shot.shotId} open><summary><span className="wp-shot-number">{number}</span><span className="wp-shot-title"><b>{shot.intent ?? `Shot ${number}`}</b><small>{fact?.duration ? `${fact.duration} · ` : ''}{panels.length} panel{panels.length === 1 ? '' : 's'}</small></span>{fact?.status && <span className={`wp-status wp-status-${fact.status.toLowerCase()}`}>{fact.status}</span>}<span className="wp-storyboard-chevron" aria-hidden="true">⌃</span></summary>
+      return <details className="wp-storyboard-shot" key={shot.shotId} data-shot-id={shot.shotId} open><summary><span className="wp-shot-number">{number}</span><span className="wp-shot-title"><b>{shot.intent ?? `Shot ${number}`}</b><small>{fact?.duration ? `${fact.duration} · ` : ''}{panels.length} panel{panels.length === 1 ? '' : 's'}</small></span>{fact?.status && <span className={`wp-status wp-status-${fact.status.toLowerCase()}`}>{fact.status}</span>}<svg className="wp-storyboard-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></summary>
         <div className="wp-storyboard-body">{fact?.camera && <p className="wp-storyboard-camera">{fact.camera}</p>}{panels.map(({ panel, number: panelNumber }) => <div className="wp-storyboard-panel" key={panel.panelId} data-panel-id={panel.panelId}><span className="wp-panel-number">{number}.{panelNumber}</span><p>{panel.description}</p><PanelVersions {...common} {...choices} shotId={shot.shotId} panel={panel} shotNumber={number} panelNumber={panelNumber} {...(facts ? { facts } : {})} /></div>)}</div>
       </details>;
     })}
@@ -69,7 +69,7 @@ function PanelVersions({ connection, scope, workspace, shotId, panel, shotNumber
   const selected = used && used.selectionRevision > workspace.selectionRevision ? used : null;
   const versions = panel.candidateImageVersions;
   if (new Set(versions.map(version => version.id)).size !== versions.length) return null;
-  return <div className="wp-panel-versions">{versions.filter(version => version.kind === 'image').map(version => <ViewerDialog key={version.id} trigger={<Button variant="quiet" aria-label={`View Panel ${shotNumber}.${panelNumber} version ${version.revision}`}>Version {version.revision}</Button>} title={`Panel ${shotNumber}.${panelNumber} · Version ${version.revision}`}>
+  return <div className="wp-panel-versions">{versions.filter(version => version.kind === 'image').map(version => <ViewerDialog key={version.id} trigger={<Button variant="quiet" aria-label={`View Panel ${shotNumber}.${panelNumber} version ${version.revision}`}>Version {version.revision}</Button>} title={`Panel ${shotNumber}.${panelNumber} · Version ${version.revision}`} size="wide">
     <PanelVersion connection={connection} scope={scope} version={version} caption={`Shot ${shotNumber} · Panel ${shotNumber}.${panelNumber} · Version ${version.revision}`} {...(facts ? { facts } : {})} />
     <VersionUse connection={connection} scope={scope} version={version} binding={{ purpose: 'panel_image', shotId, panelId: panel.panelId }} currentUse={selected?.use ?? null} selectedVersionId={selected?.use.versionId ?? panel.approvedImageVersionId} selectionRevision={selected?.selectionRevision ?? workspace.selectionRevision} presentation="viewer" onUsed={value => onUsed(panel.panelId, value)} />
   </ViewerDialog>)}</div>;

@@ -30,10 +30,10 @@ function VideoCandidate({ connection, scope, workspace, prerequisites, row }: Pr
   const prerequisite = prerequisites?.versions.find(version => version.id === row.id && version.kind === 'video');
   const version = observed?.id === row.id && observed.kind === 'video' ? observed : prerequisite;
   if (!version || version.kind !== 'video') return <EmptyState><Feedback>{read.kind === 'settled' && !read.result.ok && read.result.error.code === 'unauthenticated' ? 'Sign-in required to load this video.' : read.kind === 'settled' && !read.result.ok && read.result.error.code === 'not_implemented' ? 'Loading this video is not available yet.' : 'This video could not be loaded. Nothing was changed.'}</Feedback></EmptyState>;
-  return <section className="wp-video-row" data-shot-id={row.shotId}>
+  return <div className="wp-video-row" data-shot-id={row.shotId}>
     <VersionReview connection={connection} scope={scope} version={version} currentUse={null} selectedVersionId={row.selected} selectionRevision={workspace.selectionRevision} binding={{ purpose: 'shot_video', shotId: row.shotId }} {...(prerequisites ? { historyPrerequisite: prerequisites.versions } : {})}>{(visible, _editable, selection) => {
       const image = prerequisites?.images?.find(image => image.versionId === visible.id && image.revision === visible.revision);
       return <><div className="wp-video-head"><span className="wp-video-number">{row.number}</span><b className="wp-video-title">{row.title}</b>{(selection.currentUse?.versionId ?? row.selected) === visible.id && <StatusPill state="chosen" />}</div>{image && <img className="wp-video-thumbnail" src={image.src} alt={image.alt} />}<p className="wp-video-metadata">Version {visible.revision}{visible.kind === 'video' && visible.media.durationMs !== undefined ? ` · ${(visible.media.durationMs / 1000).toFixed(1)} s` : ''}</p><VersionUse connection={connection} scope={scope} version={visible} binding={{ purpose: 'shot_video', shotId: row.shotId }} currentUse={selection.currentUse} selectedVersionId={row.selected} selectionRevision={selection.selectionRevision} onUsed={selection.onUsed} /></>;
     }}</VersionReview>
-  </section>;
+  </div>;
 }

@@ -52,5 +52,5 @@ function BoundPlanningEditor({ connection, scope, workspace, target, draft, onEd
     } catch { if (active.current) setFeedback(saveFeedback('transport_failure')); }
     finally { busy.current = false; if (active.current || draft) setPending(false); }
   };
-  return <VersionTextSection versionId={base.id} revision={base.revision} label={label} value={value} editing={editing} text={text} pending={pending} canSave={connection.kind === 'configured' && !!scope?.conversationId} feedback={feedback} onBegin={() => { setText(value); setFeedback(null); setEditing(true); }} onCancel={() => { setText(''); setFeedback(null); setEditing(false); }} onSave={() => void save()} onChange={setText} />;
+  return <VersionTextSection pencilPadding="native" versionId={base.id} revision={base.revision} label={label} value={value} editing={editing} text={text} pending={pending} canSave={connection.kind === 'configured' && !!scope?.conversationId} feedback={feedback} onBegin={() => { setText(value); setFeedback(null); setEditing(true); }} onCancel={() => { setText(''); setFeedback(null); setEditing(false); }} onSave={() => void save()} onChange={setText} />;
 }
