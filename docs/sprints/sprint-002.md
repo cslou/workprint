@@ -46,7 +46,7 @@ Record reference → actual component/page → screenshot pair → result or exp
 | Conversation and question/proposal review — demo 02–04, 09–11, 14, 16–17 | 002/S4 | Shared option/media review presentation; inspect is not choose; representative layout comparisons, not working generation |
 | Script/edit/history — demo 02–03 | 002/S5 | Main view and representative editing/version controls |
 | Assets/reference sheets/viewer — demo 04, 09–11 | 002/S5 | Main Assets and reference review layout; read-only prerequisites where needed |
-| Library picker — demo 05–08 / library-picker-r92 | 002/S2–S3 Library read consumer and feedback/empty states; 003/S3 populated picker and attachment (user reassignment 2026-10-28) | Sprint 002: wired Library dialog, approved feedback/empty states and header/search parity. Sprint 003 Story 3: populated picker layout, with categories/selection checked behaviorally; no pretend attachment |
+| Library picker — demo 05–08 / library-picker-r92 | 002/S2–S3 Library read consumer and feedback/empty states; 003/S3 populated picker and attachment (user reassignment 2026-10-28) | Sprint 002: wired Library dialog and approved feedback/empty states; the shared search control is only region-matched against `library-picker-r92.html` `.lp-head`. Sprint 003 Story 3: the picker layout in the actual Library dialog (header/search, category pills, tile grid, selection), with categories/selection checked behaviorally; no pretend attachment |
 | Storyboard/Shot/Panel planning — demo 12–13 | 003/S1 | Main board and representative planning edit layout |
 | Videos/candidates/version review — demo 15–18 | 003/S1–S2 | Individual versions only; Play all/comparison excluded |
 | Material input and single-clip access — demo 08–11, 15–17 | 003/S2–S3 | Main input/viewer surfaces; real transfer/private playback remain Phase 3 |
@@ -315,8 +315,8 @@ Record reference → actual component/page → screenshot pair → result or exp
 > | Conversation and question/proposal review | `flow2-step2-r74.html#q1`, `flow2-step6-r78.html#plan` | 12 pairs, zero drift, two-sided geometry recorded |
 > | Script/edit/history | `flow2-step2-r74.html#p-script`, r82 history, approved inline edit | 12 pairs, zero drift, two-sided geometry |
 > | Assets/reference sheets/viewer | `flow2-step10-r82.html#p-assets`/`#sheet-vale` | 8 pairs plus Save/Use lines at 1440/390, zero drift, two-sided geometry |
-> | Library (Sprint 002 part) | `demo-05.html#lib-yours`, `library-picker-r92.html` header | 24 feedback/empty pairs plus header/search region pairs, zero drift |
-> | Library populated picker | `library-picker-r92.html` | **Reassigned to Sprint 003 Story 3** by the user on 2026-10-28; not built in Sprint 002, and a successful read renders nothing yet |
+> | Library (Sprint 002 part) | `demo-05.html#lib-yours`; `library-picker-r92.html` `.lp-head` for the search primitive only | 24 Library dialog feedback/empty pairs, zero drift. The search primitive is region-matched inside the reference page, not composed in the Library dialog |
+> | Library picker layout | `library-picker-r92.html` | **Reassigned to Sprint 003 Story 3** by the user on 2026-10-28; not built in Sprint 002. The Library dialog has no header/search, categories or tiles yet, and a successful read renders nothing. Integration review found the header/search had been overstated as delivered; corrected here |
 > | Storyboard; Videos; material input; Export | — | Later owners: Sprint 003 Stories 1–4 |
 > | Editor/Project/scene playback | — | Excluded |
 >
@@ -352,6 +352,7 @@ Record reference → actual component/page → screenshot pair → result or exp
 > - [ ] The "Open conversation" sidebar link. It appears only when a conversation ID is supplied, which only test compositions do in Phase 2, and is not in the approved copy.
 > - [ ] Known Phase 3 gaps: untyped Script/reference content and proposal input display names (B-003). Production fails closed; rich content comes only from labelled read-only test prerequisites.
 > - [ ] B-001 and B-002 must be resolved before Phase 3 native-runtime qualification and any shared or public deployment.
+> - [ ] Same-scope workspace re-read (found in integration review). A new read in the same account and conversation shows the loading skeleton in place of the tab content, discarding open Script drafts. No Phase 2 path triggers it: `main.tsx` creates one connection and nothing re-reads. Phase 3 must design re-read and refresh presentation (stale content versus skeleton) before adding refreshes after saves or turns.
 >
 > ### Delivered
 >
