@@ -15,18 +15,18 @@ for (const width of [1440, 390, 820, 821]) for (const view of ['script', 'edit',
   await page.goto('/references/flow2-step2-r74.html');
   await page.addStyleTag({ content: fonts });
   await page.evaluate((view) => {
-    const require = (selector: string) => { const element = document.querySelector(selector); if (!element) throw new Error(`Missing reference ${selector}`); return element; };
-    require('#p-script > section:first-child > p').textContent = 'Mercer and Vale sit side by side on the gallery bench.';
-    require('.breakdown li:first-child p').textContent = 'Both of them, seen together from the front.';
-    require('.breakdown li:nth-child(2) p').textContent = 'Close on Vale as he recognises Mercer.';
-    require('.breakdown li:nth-child(3)').remove();
+    const required = (selector: string) => { const element = document.querySelector(selector); if (!element) throw new Error(`Missing reference ${selector}`); return element; };
+    required('#p-script > section:first-child > p').textContent = 'Mercer and Vale sit side by side on the gallery bench.';
+    required('.breakdown li:first-child p').textContent = 'Both of them, seen together from the front.';
+    required('.breakdown li:nth-child(2) p').textContent = 'Close on Vale as he recognises Mercer.';
+    required('.breakdown li:nth-child(3)').remove();
     // Exact-version read-only prerequisites supply no shot-list editor or look mutations.
-    require('#p-script > section:nth-child(2) .edit').remove();
+    required('#p-script > section:nth-child(2) .edit').remove();
     document.querySelectorAll('#p-script .chip .x,#p-script .chip.add,.ptabs .dot').forEach((element) => element.matches('.dot') ? element.classList.remove('dot') : element.remove());
-    require('#p-script').insertAdjacentHTML('beforeend', `<details class="take-hist" ${view === 'history' ? 'open' : ''}><summary>Version history · 1 earlier</summary><div class="th-row" style="grid-template-columns:1fr auto"><span class="ftitle"><b>Version 6</b></span><button class="use" disabled style="opacity:.45">Use this version</button></div></details>`);
+    required('#p-script').insertAdjacentHTML('beforeend', `<details class="take-hist" ${view === 'history' ? 'open' : ''}><summary>Version history · 1 earlier</summary><div class="th-row" style="grid-template-columns:1fr auto"><span class="ftitle"><b>Version 6</b></span><button class="use" disabled style="opacity:.45">Use this version</button></div></details>`);
     if (view === 'edit') {
-      require('#p-script > section:first-child > p').outerHTML = '<textarea rows="6" aria-label="What happens" style="display:block;width:100%;padding:8px 12px;border:1px solid var(--input-border);border-radius:10px;background:var(--bg);color:var(--fg);font:inherit;font-size:14px;line-height:1.5;resize:none">Mercer and Vale sit side by side on the gallery bench.</textarea><div class="approved-edit-actions" style="display:flex;align-items:center;gap:8px;margin-top:10px"><button class="choice">Cancel</button><button class="send" disabled>Save</button></div>';
-      require('#p-script > section:first-child .edit').remove();
+      required('#p-script > section:first-child > p').outerHTML = '<textarea rows="6" aria-label="What happens" style="display:block;width:100%;padding:8px 12px;border:1px solid var(--input-border);border-radius:10px;background:var(--bg);color:var(--fg);font:inherit;font-size:14px;line-height:1.5;resize:none">Mercer and Vale sit side by side on the gallery bench.</textarea><div class="approved-edit-actions" style="display:flex;align-items:center;gap:8px;margin-top:10px"><button class="choice">Cancel</button><button class="send" disabled>Save</button></div>';
+      required('#p-script > section:first-child .edit').remove();
     }
   }, view);
   const selectors = ['.panel', '.ptabs,.wp-tabs', '#p-script > section:first-child,.wp-script > section:first-child', '.breakdown,.wp-script-shots', '.chips,.wp-script-look', '.take-hist,.wp-version-history', ...(view === 'edit' ? ['textarea', '.approved-edit-actions,.wp-version-edit-actions'] : []), ...(view === 'history' ? ['.th-row,.wp-version-history-row', '.use,.wp-version-use .wp-button-secondary'] : [])];
