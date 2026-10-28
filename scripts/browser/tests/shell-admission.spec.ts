@@ -18,13 +18,18 @@ test('shell workspace and Library use real admission; native navigation never ca
       });
       await page.goto('/shell.html');
       await page.waitForFunction(() => !!(window as unknown as { shellTest?: unknown }).shellTest);
+      const workspaceResponse = page.waitForResponse((response) => response.url() === `${origin}/v1/conversations/read-only-conversation/workspace`);
       await page.evaluate((value) => (window as unknown as { shellTest: { configure(value: unknown): void } }).shellTest.configure(value), { apiOrigin: origin, token: accessTokens[0], session: { accountId: 'admission-account-a', name: 'Creator A' }, conversationId: 'read-only-conversation' });
-      await expect(page.getByRole('status')).toContainText('Conversation loading is not available yet.');
+      expect((await workspaceResponse).status()).toBe(501);
+      await expect(page.getByRole('main')).toHaveAttribute('aria-busy', 'false');
+      await expect(page.getByRole('main')).not.toContainText('Conversation loading is not available yet.');
       expect(requests).toEqual(['GET /v1/conversations/read-only-conversation/workspace']);
       for (const name of ['New video', 'Recents', 'Open conversation']) {
         await page.getByRole('button', { name, exact: true }).focus();
         await page.keyboard.press('Enter');
         await expect(page.getByRole('dialog')).toBeVisible();
+        if (name === 'Open conversation') await expect(page.getByRole('dialog')).toContainText('Conversation loading is not available yet.The current workspace is unchanged.');
+        await expect(page.getByRole('main', { includeHidden: true })).not.toContainText('Conversation loading is not available yet.');
         await page.keyboard.press('Escape');
         await expect(page.getByRole('dialog')).toBeHidden();
       }
