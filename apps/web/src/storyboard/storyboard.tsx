@@ -10,7 +10,7 @@ import { useExactVersion } from '../versions/reads.js';
 import { PlanningEditor, emptyPlanningDraft } from './planning-editor.js';
 import type { PlanningDraft, PlanningTarget } from './planning-editor.js';
 import type { SetStateAction } from 'react';
-import { orderedStoryboard } from './projection.js';
+import { orderedStoryboard } from '../workspace/projection.js';
 import type { StoryboardPrerequisites } from './presentation.js';
 import './storyboard.css';
 
