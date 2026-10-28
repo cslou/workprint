@@ -1,5 +1,13 @@
 # Workprint — Application Design History
 
+## Single-clip playback and unavailable media — 2026-10-29
+
+**Provisionally approved by the orchestrator on 2026-10-29 under Lou's delegation; pending Lou's ratification at the Phase 2 handoff.** The Story 2 layouts reuse the approved single-clip playback appearance in `flow1-step9-r90.html#take-1`, with the exact-version Videos row treatment from `flow1-step9-r90.html#p-takes` and `flow2-step10-r82.html#p-takes`. The existing Videos metadata line becomes a quiet exact-version trigger with unchanged visible text and accessible name `View Shot 1 version 2`. The shared viewer shows the exact version with the approved 16:9 surface, 64px play control, 4px progress track and time from the supplied source only; title `Version 2`, caption `Shot 1 · Version 2`, controls `Play`, `Pause`, `Seek`, and the existing **Use this version**. Opening, viewing, playing, seeking and closing select nothing.
+
+Loading is `Loading this video…` in a 16:9 dashed surface with no player chrome. The approved workspace-read lines are reused unchanged: 401 `Sign-in required to load this video.`, 501 `Loading this video is not available yet.`, and source/transport/decode failure `This video could not be loaded. Nothing was changed.` No banner, retry or recovery control is added, and no loaded media or pretend progress appears on failure. Download, scene/sequential playback, Play all, comparison, Editor and Export remain excluded.
+
+The ignored `outputs/verification/sprint-003/design-proposals/story2/` previews are historical evidence only; implementation and comparisons use the tracked references plus this substitution. Supplied-source playback is verified with a generated local clip, not private media; decoded frames are not claimed as pixel comparisons. This is design approval, not implementation acceptance.
+
 ## Storyboard, Videos and request controls — 2026-10-28
 
 The user approved the Story 1 layouts: an exact Panel-version shared viewer with `Shot 1 · Panel 1.1 · Version 1`-style captions and **Use this version**; Shot intent and Panel description editing inside the storyboard dialog with the Script typing box and **Cancel, then Save**; and a Videos **Generation requests** list with exact-target cards, status pills, **Request details** and **Cancel request** only on unfinished requests.
