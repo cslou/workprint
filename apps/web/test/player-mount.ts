@@ -7,6 +7,12 @@ HTMLMediaElement.prototype.load = function load(this: HTMLMediaElement) { loadCo
 const video = document.createElement('video');
 video.preload = 'metadata';
 video.setAttribute('data-player-test', 'true');
+const added: { type: string; listener: EventListenerOrEventListenerObject }[] = [];
+const removed: { type: string; listener: EventListenerOrEventListenerObject }[] = [];
+const nativeAdd = video.addEventListener.bind(video);
+const nativeRemove = video.removeEventListener.bind(video);
+video.addEventListener = ((type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) => { added.push({ type, listener }); nativeAdd(type, listener, options); }) as typeof video.addEventListener;
+video.removeEventListener = ((type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions) => { removed.push({ type, listener }); nativeRemove(type, listener, options); }) as typeof video.removeEventListener;
 document.body.append(video);
 const player = createSingleClipPlayer(video);
 let events = 0;
@@ -16,6 +22,7 @@ const nativePlay = video.play.bind(video);
 (window as unknown as { playerTest: unknown }).playerTest = {
   setSource(source: PlayerSource) { player.setSource(source); },
   play() { player.play(); },
+  pause() { player.pause(); },
   seek(positionMs: number) { player.seek(positionMs); },
   dispose() { player.dispose(); },
   snapshot(): PlayerSnapshot { return player.current(); },
@@ -29,4 +36,5 @@ const nativePlay = video.play.bind(video);
   paused() { return video.paused; },
   loadCalls() { return loadCount; },
   readyState() { return video.readyState; },
+  listeners() { return { added: added.length, removed: removed.length, remaining: added.filter((entry) => !removed.some((gone) => gone.type === entry.type && gone.listener === entry.listener)).length }; },
 };

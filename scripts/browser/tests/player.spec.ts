@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-type Harness = { playerTest: { setSource(value: unknown): void; play(): void; seek(value: number): void; dispose(): void; snapshot(): { status: string; durationMs: number | null; positionMs: number }; events(): number; deferPlay(): void; rejectPlay(name: string): void; resolvePlay(): void; resetPlay(): void; dispatch(type: string): void; src(): string | null; paused(): boolean; loadCalls(): number; readyState(): number } };
+type Harness = { playerTest: { setSource(value: unknown): void; play(): void; seek(value: number): void; dispose(): void; snapshot(): { status: string; durationMs: number | null; positionMs: number }; events(): number; deferPlay(): void; rejectPlay(name: string): void; resolvePlay(): void; resetPlay(): void; dispatch(type: string): void; src(): string | null; paused(): boolean; loadCalls(): number; readyState(): number; pause(): void; listeners(): { added: number; removed: number; remaining: number } } };
 const source = (sourceId: string, url = '/fixtures/clip.webm') => ({ sourceId, url, posterUrl: '/fixtures/clip-poster.png' });
 const ready = async (page: import('@playwright/test').Page) => expect.poll(() => page.evaluate(() => (window as unknown as Harness).playerTest.snapshot().status)).toBe('ready');
 
@@ -26,6 +26,21 @@ test('rejections and failed state are truthful, sticky and stale-safe', async ({
   await ready(page);
   await page.evaluate(() => (window as unknown as Harness).playerTest.rejectPlay('NotSupportedError'));
   await expect.poll(async () => (await harness()).status).toBe('ready');
+});
+
+test('an AbortError from a pending play is an interruption, not a failure', async ({ page }) => {
+  await page.goto('/player.html');
+  await page.waitForFunction(() => !!(window as unknown as { playerTest?: unknown }).playerTest);
+  await page.evaluate((value) => (window as unknown as Harness).playerTest.setSource(value), source('interrupt'));
+  await ready(page);
+  await page.evaluate(() => { const test = (window as unknown as Harness).playerTest; test.deferPlay(); test.play(); test.pause(); test.rejectPlay('AbortError'); });
+  await expect.poll(() => page.evaluate(() => (window as unknown as Harness).playerTest.snapshot().status)).toBe('paused');
+  expect(await page.evaluate(() => (window as unknown as Harness).playerTest.snapshot().status)).not.toBe('failed');
+  await page.evaluate(() => (window as unknown as Harness).playerTest.resetPlay());
+  await page.evaluate(() => (window as unknown as Harness).playerTest.play());
+  await expect.poll(() => page.evaluate(() => (window as unknown as Harness).playerTest.snapshot().status)).toBe('playing');
+  await page.evaluate(() => (window as unknown as Harness).playerTest.pause());
+  await expect.poll(() => page.evaluate(() => (window as unknown as Harness).playerTest.snapshot().status)).toBe('paused');
 });
 
 test('supplied duration is normalized and seeking after ended derives status', async ({ page }) => {
@@ -56,4 +71,8 @@ test('dispose clears the resource and removes listeners', async ({ page }) => {
   const after = await page.evaluate(() => (window as unknown as Harness).playerTest.events());
   await page.evaluate(() => { const test = (window as unknown as Harness).playerTest; test.dispatch('timeupdate'); test.dispatch('play'); test.dispatch('ended'); });
   expect(await page.evaluate(() => (window as unknown as Harness).playerTest.events())).toBe(after);
+  const listeners = await page.evaluate(() => (window as unknown as Harness).playerTest.listeners());
+  expect(listeners.added).toBeGreaterThan(0);
+  expect(listeners.removed).toBeGreaterThanOrEqual(listeners.added);
+  expect(listeners.remaining).toBe(0);
 });

@@ -36,6 +36,7 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
   let snapshot: PlayerSnapshot = idle;
   let disposed = false;
   let generation = 0;
+  let playAttempt = 0;
   const listeners = new Set<(value: PlayerSnapshot) => void>();
 
   const emit = () => { for (const listener of [...listeners]) listener(snapshot); };
@@ -91,6 +92,7 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
     setSource(next) {
       if (disposed) return;
       generation += 1;
+      playAttempt += 1;
       source = null;
       release();
       if (!next) { publish(idle); return; }
@@ -103,16 +105,20 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
     play() {
       const value = currentSource();
       if (!value) return;
-      const token = generation;
+      const token = ++playAttempt;
+      const sourceGeneration = generation;
       void media.play().catch((error: unknown) => {
-        if (disposed || token !== generation || !currentSource() || snapshot.status === 'failed') return;
+        if (disposed || token !== playAttempt || sourceGeneration !== generation || !currentSource() || snapshot.status === 'failed') return;
         if (error instanceof DOMException && error.name === 'NotAllowedError') { observe(new Event('pause')); return; }
+        if (error instanceof DOMException && error.name === 'AbortError') return;
         publish({ status: 'failed', sourceId: value.sourceId, positionMs: 0, durationMs: null, failure: 'source' });
       });
     },
     pause() {
       if (!currentSource()) return;
+      playAttempt += 1;
       try { media.pause(); } catch { /* no media resource to pause */ }
+      if (snapshot.status === 'ready' || snapshot.status === 'playing') publish({ status: 'paused', sourceId: source!.sourceId, positionMs: position(), durationMs: measuredDuration(source!), failure: null });
     },
     seek(positionMs) {
       const value = currentSource();
@@ -131,6 +137,7 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
       if (disposed) return;
       disposed = true;
       generation += 1;
+      playAttempt += 1;
       source = null;
       release();
       for (const name of mediaEvents) media.removeEventListener(name, observe);
