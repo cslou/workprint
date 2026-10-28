@@ -1,0 +1,5 @@
+.wp-asset-row { display: grid; grid-template-columns: var(--size-media-asset-key) 1fr auto; gap: var(--space-12); align-items: center; width: 100%; text-align: left; font: inherit; color: var(--color-text-primary); padding: var(--space-10) var(--space-12); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-md); margin-bottom: var(--space-8); background: var(--color-bg-canvas); cursor: pointer; }
+.wp-asset-row > img { width: var(--size-media-asset-key); height: var(--size-media-asset-key); object-fit: cover; border-radius: var(--radius-md); border: var(--border-width-default) solid var(--color-border-default); }
+.wp-asset-row b { display: block; font-weight: var(--font-weight-semibold); }
+.wp-asset-row small { display: block; color: var(--color-text-subtle); font-size: var(--font-size-12); }
+.wp-asset-row[data-focus-visible] { outline: var(--border-width-focus) solid var(--color-border-focus); outline-offset: var(--border-width-focus-offset); }

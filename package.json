@@ -17,7 +17,7 @@
     "test:security": "node scripts/test.mjs security",
     "test:contracts": "node scripts/test.mjs contracts",
     "qualify:ingress": "node scripts/test.mjs ingress-qualification",
-    "test:browser": "node scripts/test.mjs compile && playwright test --config scripts/browser/playwright.config.ts interaction.spec.ts config.spec.ts connectivity.spec.ts shell.spec.ts shell-admission.spec.ts chat.spec.ts question.spec.ts version.spec.ts",
+    "test:browser": "node scripts/test.mjs compile && playwright test --config scripts/browser/playwright.config.ts interaction.spec.ts config.spec.ts connectivity.spec.ts shell.spec.ts shell-admission.spec.ts chat.spec.ts question.spec.ts version.spec.ts material.spec.ts",
     "test:visual": "playwright test --config scripts/browser/playwright.config.ts visual.spec.ts"
   },
   "devDependencies": {
