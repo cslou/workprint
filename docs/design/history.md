@@ -1,5 +1,13 @@
 # Workprint — Application Design History
 
+## Storyboard, Videos and request controls — 2026-10-28
+
+The user approved the Story 1 layouts: an exact Panel-version shared viewer with `Shot 1 · Panel 1.1 · Version 1`-style captions and **Use this version**; Shot intent and Panel description editing inside the storyboard dialog with the Script typing box and **Cancel, then Save**; and a Videos **Generation requests** list with exact-target cards, status pills, **Request details** and **Cancel request** only on unfinished requests.
+
+Copy was approved with two removals: no per-card **Last known request state** line, and no extra cancelled-card line beyond the `Cancelled` pill. The single list footer is `Request status does not confirm that remote work or charges have stopped.` The list/detail/cancel empty, loading, 401, 501 and error copy is recorded exactly in [the shell/Phase 2 section](design.md#shell-and-remaining-phase-2-feedback), together with the unchanged approved Save, Use-version, workspace-read and empty-state reuse. Video and Panel choice are exact `useVersion` actions; request cancellation is `cancelGeneration`, separate from assistant Stop. Failed actions do not change authority or discard planning input.
+
+That section records tracked demo 12–13, 15–18 and Flow 2 references plus the precise substitutions, including the shared image-viewer reference. The ignored `outputs/verification/sprint-003/design-proposals/story1/` previews are historical evidence only. Their `Example media omitted` / `Layout reference only` box is not product copy. No Play all/comparison, sequential playback, Editor, inferred opaque-content schema, actual generation/cancellation or stopped-charge promise is approved. This is design approval, not implementation acceptance.
+
 ## Script inline edit — 2026-10-28
 
 The user approved the Story 5 inline Script edit preview with one correction: the action order is **Cancel, then Save**. Clicking a section's pencil turns that section's text into a typing box in the same panel, with the same fonts and colours. Cancel restores the displayed version unchanged. Save retains typed text and uses the already-approved unavailable, 401 and error feedback as one plain line beneath the controls. Nothing else is newly approved, and the draft label is not product copy.
