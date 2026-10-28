@@ -27,7 +27,8 @@ test('Vite serves browser modules but denies private research and fixture creden
     const origin = `http://127.0.0.1:${port}`;
     assert.match(await (await server.response(origin)).text(), /src\/main.tsx/);
     const module = await (await server.response(`${origin}/src/main.tsx`)).text();
-    assert.match(module, /Workprint/);
+    assert.match(module, /import \{ Shell \} from/);
+    assert.match(await (await server.response(`${origin}/src/shell/shell.tsx`)).text(), /Workprint/);
     const dependency = module.match(/from "([^"]*react-dom[^"]*)"/)?.[1];
     assert.ok(dependency, 'Transformed module uses a real React dependency');
     assert.equal((await fetch(new URL(dependency, origin))).status, 200);

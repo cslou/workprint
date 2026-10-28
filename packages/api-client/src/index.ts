@@ -8,6 +8,8 @@ const nativeNames = ['createConversation', 'listConversations', 'loadConversatio
 type NativeMethods = Record<(typeof nativeNames)[number], () => Promise<ClientResult<never>>>;
 export type ApiClient = ApplicationMethods & { native: NativeMethods };
 const fail = (code: ClientError['code'], message: string): ClientResult<never> => ({ ok: false, error: { code, message } });
+// Native availability is independent of an application HTTP origin or session.
+export const nativeConversations = Object.fromEntries(nativeNames.map((name) => [name, async () => ({ ok: false, error: applicationError('not_implemented', 'Native conversations are unavailable').error })])) as NativeMethods;
 
 /** One bounded application transport. No retries, native protocol or human authority. */
 export function createApiClient(config: { baseUrl: string; getAccessToken: () => Promise<string | null>; timeoutMs?: number }): ApiClient {
@@ -76,6 +78,5 @@ export function createApiClient(config: { baseUrl: string; getAccessToken: () =>
     finally { if (timer !== undefined) clearTimeout(timer); options.signal?.removeEventListener('abort', onAbort); }
   }
   const methods = Object.fromEntries((Object.keys(operations) as OperationName[]).map((name) => [name, (input: OperationRequest<typeof name>, options?: CallOptions) => call(name, input, options)])) as ApplicationMethods;
-  const native = Object.fromEntries(nativeNames.map((name) => [name, async () => ({ ok: false, error: applicationError('not_implemented', 'Native conversations are unavailable').error })])) as NativeMethods;
-  return { ...methods, native };
+  return { ...methods, native: nativeConversations };
 }
