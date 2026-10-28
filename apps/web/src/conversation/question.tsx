@@ -5,17 +5,17 @@ import { nativeConversations } from '@workprint/api-client';
 import type { OperationResponse, Proposal, Question, Version } from '@workprint/contracts';
 import type { BrowserClient } from '../api/client.js';
 import type { ReadScope } from '../api/use-scoped-read.js';
-import { Composer } from './composer.js';
+import { Composer, type ComposerDraft } from './composer.js';
 import { Button } from '../ui/controls.js';
 import { ProposalCard, proposalLines, deriveProposalDisplayFacts, type ProposalInputNames } from './proposal.js';
 import { useQuestionRead, useProposalRead, useInputVersions } from './review-reads.js';
 import './question.css';
 
-export type QuestionReviewProps = { connection: BrowserClient; scope: ReadScope | null; question: Question; proposalPrerequisite?: Proposal; workspace?: OperationResponse<'workspace'>; inputNames?: ProposalInputNames; versionPrerequisites?: readonly Version[] };
+export type QuestionReviewProps = { connection: BrowserClient; scope: ReadScope | null; question: Question; proposalPrerequisite?: Proposal; workspace?: OperationResponse<'workspace'>; inputNames?: ProposalInputNames; versionPrerequisites?: readonly Version[]; draft?: ComposerDraft };
 export function QuestionReview(props: QuestionReviewProps) {
   return <ScopedQuestion key={JSON.stringify([props.scope?.accountId, props.scope?.conversationId])} {...props} />;
 }
-function ScopedQuestion({ connection, scope, question, proposalPrerequisite, workspace, inputNames = {}, versionPrerequisites = [] }: QuestionReviewProps) {
+function ScopedQuestion({ connection, scope, question, proposalPrerequisite, workspace, inputNames = {}, versionPrerequisites = [], draft }: QuestionReviewProps) {
   const client = connection.kind === 'configured' ? connection.client : null;
   const native: ApiClient['native'] = client?.native ?? nativeConversations;
   const observed = useQuestionRead(client, scope, question.id);
@@ -57,6 +57,6 @@ function ScopedQuestion({ connection, scope, question, proposalPrerequisite, wor
     <div className="wp-question-options">{current.options.map((option, index) => <AriaButton key={option.id} className="wp-question-option" isDisabled={!client || !scope?.conversationId || current.status !== 'pending' || submitting || acknowledged || (!!current.scope.proposalId && !completeProposal)} onPress={() => void answer(option.id)}><span className="wp-question-key" aria-hidden="true">{String.fromCharCode(65 + index)}</span><span>{option.label}</span></AriaButton>)}</div>
     {feedback && <p className="wp-question-feedback" role="status">{feedback}</p>}
     </>}
-    <Composer native={native} docked placeholder="Pick an option, type your own answer, or ask something else…" />
+    <Composer native={native} {...(draft ? { draft } : {})} docked placeholder="Pick an option, type your own answer, or ask something else…" />
   </section>;
 }

@@ -27,6 +27,8 @@ export function Shell(props: ShellProps) {
 function ScopedShell({ connection, session, conversationId, workspaceContent, materialPrerequisites }: ShellProps) {
   const [surface, setSurface] = useState<Surface>(null);
   const [tab, setTab] = useState<WorkspaceTab>('script');
+  const [composerText, setComposerText] = useState('');
+  const draft = { value: composerText, onChange: setComposerText };
   const dialogHead = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => { if (surface) dialogHead.current?.querySelector('button')?.focus(); }, [surface]);
   const scope = session ? { accountId: session.accountId, ...(conversationId === undefined ? {} : { conversationId }) } : null;
@@ -57,7 +59,7 @@ function ScopedShell({ connection, session, conversationId, workspaceContent, ma
       </nav>
       <main className="wp-main" aria-label="New video" aria-busy={workspace.kind === 'loading'}>
         <div className="wp-thread"><div className="wp-welcome"><h1>What would you like to make?</h1><p className="wp-lead">Describe the moment you want to see. Rough is fine; I'll ask about anything I need.</p><div className="wp-hints" aria-label="Things that help">{["Who's in it", 'Where it happens', 'What happens', 'Anything they say', 'Look or mood'].map((hint) => <span key={hint}>{hint}</span>)}</div><p className="wp-aside-note">Have photos of the people or places? You can attach them now or later.</p></div></div>
-        {workspace.kind === 'settled' && workspace.result.ok && workspace.result.value.pendingQuestion ? <QuestionReview connection={connection} scope={scope} question={workspace.result.value.pendingQuestion} workspace={workspace.result.value} /> : <Composer native={native} />}
+        {workspace.kind === 'settled' && workspace.result.ok && workspace.result.value.pendingQuestion ? <QuestionReview connection={connection} scope={scope} question={workspace.result.value.pendingQuestion} workspace={workspace.result.value} draft={draft} /> : <Composer native={native} draft={draft} />}
       </main>
       <aside className="wp-workspace" aria-label="This video"><MaterialPanel connection={connection} scope={scope} workspace={projection} {...(materialPrerequisites ? { prerequisites: materialPrerequisites } : {})} placeholder={placeholder} selectedKey={tab} onSelectionChange={(key) => setTab(key as WorkspaceTab)} {...(content === undefined ? {} : { contentOverride: content })} /></aside>
     </div>
