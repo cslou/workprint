@@ -34,7 +34,9 @@ test('actual Videos Export, history, detail and download receive built 401/501 w
         await expect(page.getByText(status === 501 ? 'Generation requests are not available yet.' : 'Sign-in required to load generation requests.', { exact: true })).toBeVisible();
         const initialChoice = await choiceIds(page);
         expect(initialChoice).toEqual(['video-earlier']);
+        const firstHistory = page.waitForResponse(value => value.request().method() === 'GET' && value.url() === `${origin}/v1/conversations/conversation-a/exports`);
         await page.getByRole('button', { name: 'Export history', exact: true }).click();
+        expect((await firstHistory).status()).toBe(status);
         await expect(page.getByText('No export records were loaded.', { exact: true })).toBeVisible();
         const before = await page.locator('.wp-export-card').allTextContents();
         expect(before).toHaveLength(2);
@@ -56,7 +58,9 @@ test('actual Videos Export, history, detail and download receive built 401/501 w
         }
         expect(commands).toEqual(Array.from({ length: 2 }, () => ({ operationId: expect.stringMatching(/^[0-9a-f-]{36}$/), selectionRevision: 17 })));
         expect((commands[0] as { operationId: string }).operationId).not.toBe((commands[1] as { operationId: string }).operationId);
+        const repeatedHistory = page.waitForResponse(value => value.request().method() === 'GET' && value.url() === `${origin}/v1/conversations/conversation-a/exports`);
         await page.getByRole('button', { name: 'Export history', exact: true }).click();
+        expect((await repeatedHistory).status()).toBe(status);
         await expect(page.getByText('No export records were loaded.', { exact: true })).toBeVisible();
         expect(await page.locator('.wp-export-card').allTextContents()).toEqual(before);
         const detail = page.waitForResponse(value => value.url() === `${origin}/v1/exports/export-exact`);
@@ -78,6 +82,22 @@ test('actual Videos Export, history, detail and download receive built 401/501 w
       }
     }, { browserOrigin: local });
   } finally { for (const finish of cleanup.reverse()) await finish(); }
+});
+
+test('successful cross-origin media access still cannot download or navigate in Phase 2', async ({ page, context, materialNetwork }, info) => {
+  await info.attach('prerequisite', { body: 'Controlled schema-valid media success for an exact output-version prerequisite. The cross-origin URL is a trap, never fetched; trusted attachment delivery is not qualified in Phase 2.', contentType: 'text/plain' });
+  const trap = 'https://download-trap.invalid/never-created.mp4';
+  materialNetwork.expectOperations({ origin: local, method: 'GET', path: '/v1/versions/output-exact/media', count: 1, query: {} });
+  await page.route('**/v1/versions/output-exact/media', route => route.fulfill({ json: { url: trap, expiresAt: '2099-01-01T00:00:00Z', measured: { width: 640, height: 360 } } }));
+  await page.goto('/exports.html'); await page.waitForFunction(() => !!(window as unknown as Harness).exportsTest);
+  let navigations = 0, downloads = 0, popups = 0;
+  page.on('framenavigated', () => { navigations++; }); page.on('download', () => { downloads++; }); context.on('page', () => { popups++; });
+  await page.evaluate(() => (window as unknown as Harness).exportsTest.configure({ apiOrigin: 'http://127.0.0.1:4179', mode: 'download' }));
+  await expect(page.locator('.wp-export-unavailable')).toHaveText('Download is not available yet.No file was downloaded.');
+  await expect(page.locator('.wp-panel-body a')).toHaveCount(0);
+  expect(navigations).toBe(0); expect(downloads).toBe(0); expect(popups).toBe(0);
+  expect(materialNetwork.entries.filter(entry => entry.url.origin === new URL(trap).origin)).toEqual([]);
+  materialNetwork.assertSafe();
 });
 
 test('display fields are exact read-only projections with no opaque IDs or internal revisions', async ({ page, materialNetwork }, info) => {

@@ -49,9 +49,7 @@ export function ExportFacts(props: ExportContext & { record: ExportRecord }) {
 }
 export function ExportDownload({ connection, scope, versionId }: Pick<ExportContext, 'connection' | 'scope'> & { versionId: string }) {
   const media = useVersionMedia(connection.kind === 'configured' ? connection.client : null, scope, versionId, true);
-  const result = media.state.kind === 'settled' ? media.state.result : null;
-  const source = result?.ok && !media.expired ? result.value : null;
-  const protocol = source ? new URL(source.url).protocol : null;
-  if (source && (protocol === 'https:' || protocol === 'http:')) return <a href={source.url} download>Download</a>;
+  // Phase 2 qualifies exact access wiring only. Trusted attachment delivery
+  // belongs to Phase 3, so even successful access must not expose a URL/link.
   return media.state.kind === 'loading' ? <EmptyState>Loading download…</EmptyState> : <ExportUnavailable surface="Download" />;
 }

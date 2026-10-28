@@ -5,7 +5,7 @@ import { GenerationRequests } from '../src/videos/requests.js';
 import { createBrowserClient, type BrowserClient } from '../src/api/client.js';
 import { workspace, video, videoWorkspace } from './storyboard-fixtures.js';
 import { Storyboard } from '../src/storyboard/storyboard.js';
-import { Videos } from '../src/videos/videos.js';
+import { WorkspaceVideos } from '../src/shell/workspace-videos.js';
 import '../src/ui/tokens.css';
 import '../src/ui/foundations.css';
 
@@ -21,7 +21,7 @@ const root = createRoot(node);
     const connection: BrowserClient = input.origin ? createBrowserClient(input.origin, async () => input.token ?? null) : { kind: 'missing' };
     const scope = { accountId: 'read-only-account', conversationId: 'read-only-conversation' };
     const board = <Storyboard connection={connection} scope={scope} workspace={workspace} />;
-    const content = input.view === 'videos' ? <Videos connection={connection} scope={scope} workspace={videoWorkspace()} prerequisites={{ versions: [video] }} /> : <GenerationRequests connection={connection} scope={scope} workspace={workspace} />;
+    const content = input.view === 'videos' ? <WorkspaceVideos connection={connection} scope={scope} workspace={videoWorkspace()} videoPrerequisites={{ versions: [video] }} /> : <GenerationRequests connection={connection} scope={scope} workspace={workspace} />;
     root.render(<WorkspacePanel selectedKey={input.view === 'storyboard' || input.view === 'panel' || input.view === 'board' ? 'storyboard' : 'videos'} content={{ storyboard: board, videos: content }} />);
   },
 };

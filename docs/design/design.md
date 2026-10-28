@@ -709,7 +709,7 @@ Attach lines use the same plain line beneath the tray as the approved Use-versio
 | Detail | `Export details are not available yet.` / `No export record was loaded.` |
 | Download | `Download is not available yet.` / `No file was downloaded.` |
 
-The four unavailable pairs retain the same shared two-line empty treatment. Download uses its pair on 501, 401 or any error, with no navigation or file. Loading uses the existing shared treatment without progress or a fabricated record.
+The four unavailable pairs retain the same shared two-line empty treatment. Download uses its pair on every settled outcome, including successful media access, with no anchor, navigation or file. Phase 2 qualifies the exact media-access call only; trusted origin and attachment delivery remain P3-S10. Loading uses the existing shared treatment without progress or a fabricated record.
 
 - **Status pill:** capitalize the exact typed value: `Queued`, `Processing`, `Succeeded`, `Failed`, `Cancelled`. Technical success is not approval.
 - **History card:** title `Export`, status pill, then only the typed `current` boolean: true → `Uses your current chosen versions.`; false → `Uses earlier chosen versions.` Then visible `Export details`, with a position-distinguishing accessible name such as `Export details, export 2 of 3`. No ID or revision number.

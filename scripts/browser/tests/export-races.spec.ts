@@ -55,6 +55,24 @@ test('pending Export is latched and remount/reconnect never replay it', async ({
   materialNetwork.assertSafe();
 });
 
+for (const stage of ['pending', 'failed'] as const) test(`same-mount reconnect never resubmits a ${stage} Export`, async ({ page, materialNetwork }, info) => {
+  await info.attach('prerequisite', { body: 'Controlled pending/failure boundary only. No remount occurs: reconnect runs on the same actual Export consumer and exactly one POST is allowed.', contentType: 'text/plain' });
+  materialNetwork.expectOperations({ origin, method: 'POST', path: '/v1/conversations/conversation-a/exports', count: 1, query: {} });
+  const held: (() => Promise<void>)[] = [];
+  await page.route('**/v1/**', route => new Promise<void>(resolve => held.push(async () => { await route.fulfill({ status: 501, json: { error: { code: 'not_implemented', message: 'Controlled reconnect boundary' } } }); resolve(); })));
+  await setup(page); await configure(page, { apiOrigin: origin, mode: 'entry' });
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await expect.poll(() => held.length).toBe(1);
+  if (stage === 'failed') { await held[0]!(); await expect(page.getByText('No export was queued and no file was created.', { exact: true })).toBeVisible(); }
+  else await expect(page.getByText('Requesting export…', { exact: true })).toBeVisible();
+  await page.evaluate(async () => { dispatchEvent(new Event('offline')); dispatchEvent(new Event('online')); await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))); });
+  materialNetwork.assertSafe();
+  expect(materialNetwork.entries.filter(entry => entry.method === 'POST')).toHaveLength(1);
+  if (stage === 'pending') await held[0]!();
+  await expect(page.getByText('No export was queued and no file was created.', { exact: true })).toBeVisible();
+  expect(materialNetwork.entries.filter(entry => entry.method === 'POST')).toHaveLength(1);
+});
+
 test('Export sends the revision of the newly displayed Videos choice, not the older workspace', async ({ page, materialNetwork }, info) => {
   await info.attach('prerequisite', { body: 'Read-only exact video/workspace and controlled useVersion acknowledgement to reach an otherwise unavailable selection branch. Export itself fails, never produces a record.', contentType: 'text/plain' });
   materialNetwork.expectOperations(

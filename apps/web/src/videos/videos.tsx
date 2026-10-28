@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { OperationResponse, Version } from '@workprint/contracts';
 import type { BrowserClient } from '../api/client.js';
 import type { ReadScope } from '../api/use-scoped-read.js';
@@ -10,13 +11,13 @@ import { VersionReview } from '../versions/review.js';
 import { VersionUse } from '../versions/use.js';
 import { useExactVersion } from '../versions/reads.js';
 import { orderedStoryboard } from '../workspace/projection.js';
-import { Exports, type ExportPrerequisites } from '../exports/exports.js';
 import { GenerationRequests } from './requests.js';
 import './videos.css';
 
 /** Exact public version projections and optional image facts, isolated and labelled by the caller. */
-export type VideoPrerequisites = Readonly<{ versions: readonly Version[]; exports?: ExportPrerequisites; images?: readonly Readonly<{ versionId: string; revision: number; src: string; alt: string }>[] }>;
-type Props = { connection: BrowserClient; scope: ReadScope | null; workspace: OperationResponse<'workspace'>; prerequisites?: VideoPrerequisites };
+export type VideoPrerequisites = Readonly<{ versions: readonly Version[]; images?: readonly Readonly<{ versionId: string; revision: number; src: string; alt: string }>[] }>;
+export type VideosSnapshot = Readonly<{ selectionRevision: number; workspace: OperationResponse<'workspace'>; versions: readonly Version[] }>;
+type Props = { connection: BrowserClient; scope: ReadScope | null; workspace: OperationResponse<'workspace'>; prerequisites?: VideoPrerequisites; renderActions?: (snapshot: VideosSnapshot) => ReactNode };
 export function Videos(props: Props) {
   return <ScopedVideos key={JSON.stringify([props.scope?.accountId, props.scope?.conversationId])} {...props} />;
 }
@@ -41,7 +42,7 @@ function ScopedVideos(props: Props) {
     return [{ id, shotId: shot.shotId, number, title: shot.intent ?? `Shot ${number}`, selected: shot.chosenVideoVersionId }];
   })) ?? [];
   const selectionRevision = Math.max(props.workspace.selectionRevision, ...[...choices.values()].map(value => value.selectionRevision));
-  return <div className="wp-videos"><Exports connection={props.connection} scope={props.scope} workspace={props.workspace} selectionRevision={selectionRevision} versions={[...loaded.values()]} {...(props.prerequisites?.exports ? { prerequisites: props.prerequisites.exports } : {})} />{candidates.length ? candidates.map(row => <VideoCandidate key={JSON.stringify([row.shotId, row.id])} {...props} row={row} choice={choices.get(row.shotId) ?? null} onLoaded={observe} onUsed={value => choose(row.shotId, value)} />) : <WorkspaceEmpty tab="videos" />}<GenerationRequests connection={props.connection} scope={props.scope} workspace={props.workspace} /></div>;
+  return <div className="wp-videos">{props.renderActions?.({ selectionRevision, workspace: props.workspace, versions: [...loaded.values()] })}{candidates.length ? candidates.map(row => <VideoCandidate key={JSON.stringify([row.shotId, row.id])} {...props} row={row} choice={choices.get(row.shotId) ?? null} onLoaded={observe} onUsed={value => choose(row.shotId, value)} />) : <WorkspaceEmpty tab="videos" />}<GenerationRequests connection={props.connection} scope={props.scope} workspace={props.workspace} /></div>;
 }
 function VideoCandidate({ connection, scope, workspace, prerequisites, row, choice, onUsed, onLoaded }: Props & { row: { id: string; shotId: string; number: number; title: string; selected: string | null }; choice: OperationResponse<'useVersion'> | null; onUsed(value: OperationResponse<'useVersion'>): void; onLoaded(version: Version): void }) {
   const read = useExactVersion(connection.kind === 'configured' ? connection.client : null, scope, row.id);

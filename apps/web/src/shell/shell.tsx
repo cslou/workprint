@@ -13,7 +13,8 @@ import { MaterialPanel } from '../materials/panel.js';
 import type { MaterialPrerequisites } from '../materials/presentation.js';
 import { Storyboard } from '../storyboard/storyboard.js';
 import type { StoryboardPrerequisites } from '../storyboard/presentation.js';
-import { Videos, type VideoPrerequisites } from '../videos/videos.js';
+import type { VideoPrerequisites } from '../videos/videos.js';
+import { WorkspaceVideos } from './workspace-videos.js';
 import { Composer } from '../conversation/composer.js';
 import { QuestionReview } from '../conversation/question.js';
 import { useWorkspace } from './workspace.js';
@@ -66,7 +67,7 @@ function ScopedShell({ connection, session, conversationId, workspaceContent, ma
         <div className="wp-thread"><div className="wp-welcome"><h1>What would you like to make?</h1><p className="wp-lead">Describe the moment you want to see. Rough is fine; I'll ask about anything I need.</p><div className="wp-hints" aria-label="Things that help">{["Who's in it", 'Where it happens', 'What happens', 'Anything they say', 'Look or mood'].map((hint) => <span key={hint}>{hint}</span>)}</div><p className="wp-aside-note">Have photos of the people or places? You can attach them now or later.</p></div></div>
         {workspace.kind === 'settled' && workspace.result.ok && workspace.result.value.pendingQuestion ? <QuestionReview connection={connection} scope={scope} question={workspace.result.value.pendingQuestion} workspace={workspace.result.value} draft={draft} /> : <Composer native={native} draft={draft} connection={connection} scope={scope} />}
       </main>
-      <aside className="wp-workspace" aria-label="This video"><MaterialPanel connection={connection} scope={scope} workspace={projection} {...(projection ? { additionalContent: { storyboard: <Storyboard connection={connection} scope={scope} workspace={projection} {...(storyboardPrerequisites ? { prerequisites: storyboardPrerequisites } : {})} />, videos: <Videos connection={connection} scope={scope} workspace={projection} {...(videoPrerequisites ? { prerequisites: videoPrerequisites } : {})} /> } } : {})} {...(materialPrerequisites ? { prerequisites: materialPrerequisites } : {})} placeholder={placeholder} selectedKey={tab} onSelectionChange={(key) => setTab(key as WorkspaceTab)} {...(content === undefined ? {} : { contentOverride: content })} /></aside>
+      <aside className="wp-workspace" aria-label="This video"><MaterialPanel connection={connection} scope={scope} workspace={projection} {...(projection ? { additionalContent: { storyboard: <Storyboard connection={connection} scope={scope} workspace={projection} {...(storyboardPrerequisites ? { prerequisites: storyboardPrerequisites } : {})} />, videos: <WorkspaceVideos connection={connection} scope={scope} workspace={projection} {...(videoPrerequisites ? { videoPrerequisites } : {})} /> } } : {})} {...(materialPrerequisites ? { prerequisites: materialPrerequisites } : {})} placeholder={placeholder} selectedKey={tab} onSelectionChange={(key) => setTab(key as WorkspaceTab)} {...(content === undefined ? {} : { contentOverride: content })} /></aside>
     </div>
     <ModalOverlay className="wp-modal-overlay" isOpen={surface !== null} onOpenChange={(open) => { if (!open) setSurface(null); }} isDismissable><Modal className="wp-modal"><Dialog className="wp-dialog"><div className="wp-dialog-head" ref={dialogHead}><Heading slot="title">{title}</Heading><Button variant="icon" aria-label="Close" autoFocus onPress={() => setSurface(null)}>×</Button></div>
       {surface === 'navigation' && <div className="wp-navigation-dialog">{nav()}{recent}{account}</div>}

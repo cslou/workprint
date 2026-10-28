@@ -3,7 +3,7 @@ import type { OperationResponse } from '@workprint/contracts';
 import { createBrowserClient, type BrowserClient } from '../src/api/client.js';
 import { Exports, ExportHistory } from '../src/exports/exports.js';
 import { ExportDetails, ExportDownload } from '../src/exports/record.js';
-import { Videos } from '../src/videos/videos.js';
+import { WorkspaceVideos } from '../src/shell/workspace-videos.js';
 import { WorkspacePanel } from '../src/ui/panel.js';
 import { ViewerDialog } from '../src/ui/overlays.js';
 import { Button } from '../src/ui/controls.js';
@@ -42,7 +42,7 @@ function configure(input: Input) {
     : input.mode === 'detail' ? <ExportDetails {...props} id={input.recordId ?? 'export-exact'} {...(records ? { prerequisite: records.find(record => record.id === (input.recordId ?? 'export-exact'))! } : {})} />
     : input.mode === 'download' ? <ExportDownload connection={connection} scope={scope} versionId="output-exact" />
     : input.mode === 'entry' ? <Exports {...props} selectionRevision={workspace.selectionRevision} {...(records ? { prerequisites: records } : {})} />
-    : <Videos connection={connection} scope={scope} workspace={workspace} prerequisites={{ versions: [exportVideo], ...(records ? { exports: records } : {}) }} />;
+    : <WorkspaceVideos connection={connection} scope={scope} workspace={workspace} videoPrerequisites={{ versions: [exportVideo] }} {...(records ? { exportPrerequisites: records } : {})} />;
   root.render(<WorkspacePanel key={generation} selectedKey="videos" content={{ videos: input.dialogTitle ? <ViewerDialog title={input.dialogTitle} trigger={<Button>Open dialog</Button>}>{content}</ViewerDialog> : content }} />);
 }
 (window as unknown as { exportsTest: unknown }).exportsTest = { configure, unmount() { root.render(null); }, remount() { generation++; configure(current); } };
