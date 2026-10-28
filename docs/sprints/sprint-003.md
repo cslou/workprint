@@ -69,6 +69,25 @@
   3. Add browser identity/no-effect checks and reference screenshot comparisons.
 - **Technical notes:** share exact-version views, not authority logic. Do not add workflows, provider APIs or backend domain writes merely to animate controls.
 
+**Story 1 delivery:** [PR #19](https://github.com/cslou/workprint/pull/19), accepted code head `75e3fcc81fcebd6fef0d9b6acb38cd83312e329e`, merged into sprint-003 at `56744113dc6b6c82f2590662b225cb87e34093ab`. Before implementation, the user approved three new layouts (2026-10-28):
+- the shared viewer dialog for an exact Panel version, captioned like "Shot 1 · Panel 1.1 · Version 1", with "Use this version";
+- Shot intent and Panel description editing inside the storyboard dialog, reusing the Script edit box with Cancel then Save;
+- a Videos "Generation requests" list: one card per request, a status pill, a "Request details" disclosure, and Cancel only on unfinished requests.
+
+The request copy was approved with two simplifications: no per-card "Last known request state" line, and no extra line on cancelled cards. The approved Save, Use-version, workspace-read and empty texts are reused. Recorded in `docs/design/design.md` and `history.md` (`4d8d084`). Video choice is `useVersion` with `shot_video`, Panel choice `panel_image`, and cancellation `cancelGeneration`, never assistant Stop. Untyped fields (camera, duration, rich text, images) come only from labelled read-only prerequisites, and production fails closed.
+
+Initial review at `948eed1` (seven checks) scored 2/5 with six P1s:
+- P1-A: an older detail could downgrade a request, and closing the details disclosure brought Cancel back on a finished request.
+- P1-B: candidates for the same Shot could each show Chosen.
+- P1-C: a delayed list dropped requests known from a newer workspace.
+- P1-D: no edit-view pairs.
+- P1-E: display fields and exact-version bindings were unproven.
+- P1-F: the planning transport-failure path was unproven.
+
+Fix cycle 1 added scope-owned monotonic request observations, per-Shot selection, identity-merged membership, edit pairs at 1440/390 (a representative state, so not the 820/821 boundary) and the missing proofs. Red at `948eed1` showed 4 failing; all passed after. `/review-fix` coverage was complete, all P1s resolved, 4/5. One P2 is carried to Story 2: `scripts/browser/tests/display-prerequisites.spec.ts` imports `Version` from `contracts/src/models.js` instead of the public entry. A sixth commit fixed a nondeterministic 1-pixel board capture (20/20 repeat proof) without changing tolerance. Captures now go to `outputs/verification/sprint-003/<sha>/` through `WORKPRINT_BROWSER_OUTPUT`.
+
+Current-head aggregate 13/13, browser 101/101, visual 165/165 (166 comparison records; the 136 prior comparisons unchanged; new pairs zero drift with two-sided geometry). Check, build and frozen install passed. `pnpm audit` was NON-PASS under B-002 and two B-001 ingress leaves still failed; both are reported separately. Post-merge check passed. No planning file was changed by the worker, and no main merge occurred.
+
 #### Story 2: Single-clip playback interface and unavailable media (P2-S6)
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
   - [x] Follows sprint template
