@@ -24,7 +24,7 @@ const pendingUses: { versionId: string; resolve(value: ClientResult<OperationRes
     if (input.useRace && connection.kind === 'configured') connection = { kind: 'configured', client: { ...connection.client, useVersion(request) { return new Promise((resolve) => pendingUses.push({ versionId: request.body.versionId, resolve })); } } };
     const scope = { accountId: input.accountId ?? 'read-only-account', conversationId: input.conversationId ?? 'read-only-conversation' };
     const current = input.version ?? version;
-    const editor = (value: Version) => <VersionEditor connection={connection} scope={scope} version={value} field={input.field ?? 'synopsis'} label="What happens" />;
+    const editor = (value: Version, editable = true) => <VersionEditor connection={connection} scope={scope} version={value} field={input.field ?? 'synopsis'} label="What happens" readOnly={!editable} />;
     const earlier = versionSchema.parse({ ...version, id: 'script-v6', revision: 6, content: { synopsis: 'Earlier Script text.', retained: 'Earlier unrelated field.' } });
     root.render(<div className="wp-panel-body" style={{ width: 380 }}>{input.review ? <VersionReview connection={connection} scope={scope} version={current} binding={{ purpose: 'script' }} currentUse={{ id: 'use-current', versionId: current.id, state: 'approved', binding: { purpose: 'script' } }} selectionRevision={9} historyPrerequisite={input.useRace ? [earlier, versionSchema.parse({ ...earlier, id: 'script-v5', revision: 5 })] : [earlier]}>{editor}</VersionReview> : editor(current)}</div>);
   },

@@ -9,7 +9,7 @@ import { useExactVersion, useVersionHistory } from './reads.js';
 import './review.css';
 
 type Use = OperationResponse<'useVersion'>['use'];
-export type VersionReviewProps = { connection: BrowserClient; scope: ReadScope | null; version: Version; currentUse: Use | null; selectionRevision: number; binding: VersionUseProps['binding']; historyPrerequisite?: readonly Version[]; children: (version: Version) => ReactNode };
+export type VersionReviewProps = { connection: BrowserClient; scope: ReadScope | null; version: Version; currentUse: Use | null; selectionRevision: number; binding: VersionUseProps['binding']; historyPrerequisite?: readonly Version[]; children: (version: Version, editable: boolean) => ReactNode };
 export function VersionReview(props: VersionReviewProps) {
   return <ScopedReview key={JSON.stringify([props.scope?.accountId, props.scope?.conversationId, props.version.artifactId])} {...props} />;
 }
@@ -32,7 +32,8 @@ function ScopedReview({ connection, scope, version, binding, currentUse, selecti
   const rows = valid ? [...earlier].sort((a, b) => b.revision - a.revision) : [];
   const selection = used && (used.value.selectionRevision > selectionRevision || (used.value.selectionRevision === selectionRevision && used.basis === basis)) ? used.value : { use: currentUse, selectionRevision };
   return <div className="wp-version-review" data-displayed-version-id={visible.id}>
-    {children(visible)}
+    <div className="wp-version-body" hidden={!!selected} inert={!!selected}>{children(selected ? version : visible, true)}</div>
+    {selected && <div className="wp-version-body">{children(visible, false)}</div>}
     <details className="wp-version-history" onToggle={(event) => { const expanded = event.currentTarget.open; setOpen(expanded); if (!expanded) setSelected(null); }}><summary>Version history{rows.length > 0 && (history.kind !== 'settled' || !history.result.ok || history.result.value.nextCursor === null) ? ` · ${rows.length} earlier` : ''}</summary>
       {rows.map((item) => <div className="wp-version-history-row" key={item.id}><Button variant="quiet" aria-label={`View version ${item.revision}`} onPress={() => setSelected(item)}>Version {item.revision}</Button><VersionUse connection={connection} scope={scope} version={item} binding={binding} currentUse={selection.use} selectionRevision={selection.selectionRevision} onUsed={(value) => setUsed((previous) => previous && previous.value.selectionRevision > value.selectionRevision ? previous : { basis, value })} /></div>)}
     </details>

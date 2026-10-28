@@ -6,7 +6,7 @@ import { PanelSection } from '../ui/panel.js';
 import { Button } from '../ui/controls.js';
 import './editor.css';
 
-export type VersionEditorProps = { connection: BrowserClient; scope: ReadScope | null; version: Version; field: string; label: string };
+export type VersionEditorProps = { connection: BrowserClient; scope: ReadScope | null; version: Version; field: string; label: string; readOnly?: boolean };
 type ContentVersion = Extract<Version, { content: unknown }>;
 const saveFeedback = (code: string) => code === 'unauthenticated' ? 'Sign-in required to save. Your unsaved text is retained.' : code === 'not_implemented' ? 'Saving is not available yet. Your unsaved text is retained.' : 'Changes were not saved. Your unsaved text is retained.';
 
@@ -14,6 +14,7 @@ const saveFeedback = (code: string) => code === 'unauthenticated' ? 'Sign-in req
 export function VersionEditor(props: VersionEditorProps) {
   const { version, field, scope } = props;
   if (!('content' in version) || !Object.hasOwn(version.content, field) || typeof version.content[field] !== 'string') return null;
+  if (props.readOnly) return <PanelSection title={props.label}><div className="wp-version-editor" data-version-id={version.id} data-version-revision={version.revision}><p className="wp-version-display">{String(version.content[field])}</p></div></PanelSection>;
   return <BoundEditor key={JSON.stringify([scope?.accountId, scope?.conversationId, version.id, version.revision, field])} {...props} version={version} />;
 }
 function BoundEditor({ connection, scope, version, field, label }: VersionEditorProps & { version: ContentVersion }) {
