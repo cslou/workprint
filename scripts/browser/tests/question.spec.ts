@@ -182,6 +182,38 @@ for (const status of ['answered', 'superseded'] as const) for (const timing of [
   expect(posts).toBe(0);
 });
 
+for (const status of ['answered', 'superseded'] as const) for (const kind of ['newer', 'older', 'foreign'] as const) test(`revision precedence: ${status} prop versus ${kind} pending read`, async ({ page }, info) => {
+  await info.attach('prerequisite', { body: 'Labelled read-only revision precedence; controlled server reads and unavailable answers, not persisted decisions.', contentType: 'text/plain' });
+  await page.goto('/question.html');
+  await page.waitForFunction(() => !!(window as unknown as { questionTest?: unknown }).questionTest);
+  const question = { id: 'revision-question', revision: 7, status, scope: {}, prompt: 'Terminal revision 7', options: [{ id: 'terminal-choice', label: 'Terminal option' }] };
+  const server = { ...question, id: kind === 'foreign' ? 'different-question' : question.id, revision: kind === 'older' ? 6 : 8, status: 'pending', prompt: 'Server question', options: [{ id: 'server-choice', label: 'Server option' }] };
+  const posts: { path: string; body: unknown }[] = [];
+  await page.route('**/v1/**', async (route) => {
+    if (route.request().method() === 'POST') {
+      posts.push({ path: new URL(route.request().url()).pathname, body: route.request().postDataJSON() });
+      await route.fulfill({ status: 501, json: { error: { code: 'not_implemented', message: 'Controlled revision answer' } } });
+    } else await route.fulfill({ json: server });
+  });
+  const response = page.waitForResponse((value) => value.url().endsWith('/v1/questions/revision-question'));
+  await page.evaluate((question) => (window as unknown as { questionTest: { configure(value: unknown): void } }).questionTest.configure({ apiOrigin: 'http://127.0.0.1:4179', question, sync: true }), question);
+  await (await response).finished();
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  if (kind === 'newer') {
+    await expect(page.getByRole('heading', { name: 'Server question', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Server option', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: 'Server option', exact: true }).click();
+    await expect(page.getByRole('status')).toHaveText('Answering is not available yet. The question stays pending.');
+    expect(posts).toEqual([{ path: '/v1/questions/revision-question/answers', body: { operationId: expect.stringMatching(/^[0-9a-f-]{36}$/), questionRevision: 8, optionId: 'server-choice' } }]);
+  } else {
+    await expect(page.getByRole('heading', { name: 'Terminal revision 7', exact: true })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Question' })).toHaveAttribute('data-question-status', status);
+    await expect(page.getByRole('button', { name: 'Terminal option', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Server option', exact: true })).toHaveCount(0);
+    expect(posts).toHaveLength(0);
+  }
+});
+
 test('inherited display-name entries cannot authorize a proposal input', () => {
   const proposal = proposalSchema.parse({ id: 'p', revision: 1, questionId: 'q', purpose: 'reference_image', target: { role: 'character' }, provider: 'provider', model: 'model', prompt: 'Prompt', settings: {}, candidateCount: 1, inputs: [{ versionId: 'constructor', role: 'character_reference', order: 0 }], disclosures: [], estimate: { basis: 'unknown' } });
   const version = versionSchema.parse({ id: 'constructor', artifactId: 'artifact', revision: 1, kind: 'reference', content: {}, createdBy: 'human', createdAt: '2026-10-28T00:00:00Z', dependencies: [] });

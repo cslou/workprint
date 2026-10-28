@@ -20,8 +20,8 @@ function ScopedQuestion({ connection, scope, question, proposalPrerequisite, wor
   const native: ApiClient['native'] = client?.native ?? nativeConversations;
   const observed = useQuestionRead(client, scope, question.id);
   const read = observed.kind === 'settled' && observed.result.ok ? observed.result.value : null;
-  const current = read && read.id === question.id && read.revision >= question.revision
-    && (question.status === 'pending' || (read.status !== 'pending' && read.revision > question.revision))
+  const current = read && read.id === question.id
+    && (read.revision > question.revision || (read.revision === question.revision && question.status === 'pending'))
     ? read : question;
   const proposalRead = useProposalRead(client, scope, current.scope.proposalId);
   const proposal = proposalRead.kind === 'settled' && proposalRead.result.ok ? proposalRead.result.value : proposalPrerequisite;
