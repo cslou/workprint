@@ -230,3 +230,40 @@ test('picker without facts guesses nothing and attach needs a current conversati
   await expect(page.getByRole('button', { name: 'Attach (1)', exact: true })).toBeDisabled();
   expect(seen).toEqual([]);
 });
+
+test('controlled partial success attaches one exact version and keeps the rest selected', async ({ page }) => {
+  await openPicker(page, 'http://127.0.0.1:4179', 'token', { conversationId: 'conversation-a' });
+  const bodies: Record<string, unknown>[] = [];
+  await page.route('**/v1/conversations/conversation-a/uses', async (route) => {
+    const body = JSON.parse(route.request().postData() ?? '{}') as Record<string, unknown>;
+    bodies.push(body);
+    if (bodies.length === 1) await route.fulfill({ status: 200, json: { use: { id: 'use-1', versionId: body.versionId, binding: { purpose: 'reference' }, state: 'approved' }, selectionRevision: 1 } });
+    else await route.fulfill({ status: 501, json: { error: { code: 'not_implemented', message: 'Controlled partial prerequisite' } } });
+  });
+  await page.locator('.wp-picker-tile').filter({ hasText: 'Vale' }).click();
+  await page.locator('.wp-picker-tile').filter({ hasText: 'Bench' }).click();
+  await page.getByRole('button', { name: 'Attach (2)', exact: true }).click();
+  await expect(page.locator('.wp-picker-feedback')).toHaveText('Attached 1 of 2. The rest were not attached.');
+  expect(bodies.map((body) => body.versionId)).toEqual(['vale-v1', 'bench-v2']);
+  expect(bodies.every((body) => body.purpose === 'reference')).toBe(true);
+  await expect(page.locator('.wp-picker-chip')).toHaveText(['Bench×']);
+  await expect(page.locator('.wp-picker-tile[aria-pressed="true"]')).toHaveText([/Bench/]);
+});
+
+test('controlled full success clears the selection and claims nothing else locally', async ({ page }) => {
+  await openPicker(page, 'http://127.0.0.1:4179', 'token', { conversationId: 'conversation-a' });
+  const bodies: Record<string, unknown>[] = [];
+  await page.route('**/v1/conversations/conversation-a/uses', async (route) => {
+    const body = JSON.parse(route.request().postData() ?? '{}') as Record<string, unknown>;
+    bodies.push(body);
+    await route.fulfill({ status: 200, json: { use: { id: `use-${bodies.length}`, versionId: body.versionId, binding: { purpose: 'reference' }, state: 'approved' }, selectionRevision: bodies.length } });
+  });
+  await page.locator('.wp-picker-tile').filter({ hasText: 'Vale' }).click();
+  await page.locator('.wp-picker-tile').filter({ hasText: 'Bench' }).click();
+  await page.getByRole('button', { name: 'Attach (2)', exact: true }).click();
+  await expect(page.locator('.wp-picker-count')).toHaveText('Nothing selected yet');
+  await expect(page.locator('.wp-picker-chip')).toHaveCount(0);
+  await expect(page.locator('.wp-picker-feedback')).toHaveCount(0);
+  expect(bodies.map((body) => body.versionId)).toEqual(['vale-v1', 'bench-v2']);
+  await expect(page.locator('.wp-picker-tile img')).toHaveCount(4);
+});
