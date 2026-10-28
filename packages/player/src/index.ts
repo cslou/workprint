@@ -37,6 +37,7 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
   let disposed = false;
   let generation = 0;
   let playAttempt = 0;
+  let pauseRequested = false;
   const listeners = new Set<(value: PlayerSnapshot) => void>();
 
   const emit = () => { for (const listener of [...listeners]) listener(snapshot); };
@@ -65,6 +66,7 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
         return;
       case 'play':
       case 'playing':
+        if (pauseRequested) { try { media.pause(); } catch { /* no resource */ } publish({ status: 'paused', sourceId: value.sourceId, positionMs: position(), durationMs: measuredDuration(value), failure: null }); return; }
         publish({ status: 'playing', sourceId: value.sourceId, positionMs: position(), durationMs: measuredDuration(value), failure: null });
         return;
       case 'pause':
@@ -93,6 +95,7 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
       if (disposed) return;
       generation += 1;
       playAttempt += 1;
+      pauseRequested = false;
       source = null;
       release();
       if (!next) { publish(idle); return; }
@@ -107,7 +110,13 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
       if (!value) return;
       const token = ++playAttempt;
       const sourceGeneration = generation;
-      void media.play().catch((error: unknown) => {
+      pauseRequested = false;
+      const attempt = media.play();
+      void attempt.then(() => {
+        if (disposed || token !== playAttempt || sourceGeneration !== generation || !currentSource() || !pauseRequested) return;
+        try { media.pause(); } catch { /* no media resource to pause */ }
+        if (snapshot.status === 'playing' || snapshot.status === 'ready') publish({ status: 'paused', sourceId: value.sourceId, positionMs: position(), durationMs: measuredDuration(value), failure: null });
+      }).catch((error: unknown) => {
         if (disposed || token !== playAttempt || sourceGeneration !== generation || !currentSource() || snapshot.status === 'failed') return;
         if (error instanceof DOMException && error.name === 'NotAllowedError') { observe(new Event('pause')); return; }
         if (error instanceof DOMException && error.name === 'AbortError') return;
@@ -117,6 +126,7 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
     pause() {
       if (!currentSource()) return;
       playAttempt += 1;
+      pauseRequested = true;
       try { media.pause(); } catch { /* no media resource to pause */ }
       if (snapshot.status === 'ready' || snapshot.status === 'playing') publish({ status: 'paused', sourceId: source!.sourceId, positionMs: position(), durationMs: measuredDuration(source!), failure: null });
     },
