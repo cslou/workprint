@@ -16,7 +16,7 @@ let connection: BrowserClient = { kind: 'missing' };
 let scope: ReadScope | null = null;
 let accessToken: string | null = null;
 let confirmation = '';
-const render = () => root.render(<div style={{ width: 720 }}><Composer key={JSON.stringify([scope?.accountId ?? null, scope?.conversationId ?? null])} native={nativeConversations} connection={connection} scope={scope} /><p data-confirm role="status">{confirmation}</p></div>);
+const render = () => root.render(<div style={{ width: 'min(720px, 100%)' }}><Composer key={JSON.stringify([scope?.accountId ?? null, scope?.conversationId ?? null])} native={nativeConversations} connection={connection} scope={scope} /><p className="wp-chat-feedback" data-confirm role="status">{confirmation}</p></div>);
 (window as unknown as { uploadsTest: unknown }).uploadsTest = {
   configure({ apiOrigin, token = null, accountId, conversationId }: { apiOrigin?: string; token?: string | null; accountId: string; conversationId?: string }) {
     accessToken = token;
