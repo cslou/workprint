@@ -12,3 +12,6 @@ for (const width of [1440, 390]) {
 for (const state of ['search', 'no-match'] as const) test(`${state} picker reference at 1440`, async ({ page }, info) => {
   await capturePickerPair(page, info, 1440, state);
 });
+for (const width of [1440, 390]) test(`attach unavailable picker reference at ${width}`, async ({ page }, info) => {
+  await capturePickerPair(page, info, width, 'attach-unavailable');
+});

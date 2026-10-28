@@ -5,7 +5,7 @@ import { settleCapture } from './capture.js';
 
 const fonts = ':root{--font-sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-display:Georgia,"Times New Roman",serif}';
 const image = '/fixtures/library-tile.png';
-export type PickerState = 'populated' | 'filtered' | 'selected' | 'search' | 'no-match' | 'no-facts';
+export type PickerState = 'populated' | 'filtered' | 'selected' | 'search' | 'no-match' | 'no-facts' | 'attach-unavailable';
 const facts = [
   { name: 'Vale', sub: 'Character', category: 'Characters' },
   { name: 'Mercer', sub: 'Character', category: 'Characters' },
@@ -24,6 +24,7 @@ const stateData = (state: PickerState) => {
   if (state === 'search') return { pills: ['All', 'Characters', 'Places', 'Props'], active: 'All', tiles: facts.slice(0, 1), empty: false, query: 'val', selected: [] as string[] };
   if (state === 'no-match') return { pills: ['All', 'Characters', 'Places', 'Props'], active: 'All', tiles: [], empty: true, query: 'zzz', selected: [] as string[] };
   if (state === 'selected') return { pills: ['All', 'Characters', 'Places', 'Props'], active: 'All', tiles: facts, empty: false, query: '', selected: ['Vale', 'Bench'] };
+  if (state === 'attach-unavailable') return { pills: ['All', 'Characters', 'Places', 'Props'], active: 'All', tiles: facts, empty: false, query: '', selected: ['Vale'] };
   return { pills: ['All', 'Characters', 'Places', 'Props'], active: 'All', tiles: facts, empty: false, query: '', selected: [] as string[] };
 };
 const style = `<style>
@@ -58,6 +59,8 @@ const style = `<style>
 .pk-count{font-size:13px;color:var(--fg-muted);margin-right:4px}
 .pk-chip{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border:1px solid var(--border);border-radius:9999px;font-size:12px}
 .pk-chip button{border:0;background:transparent;color:var(--fg-subtle);font:inherit;padding:0}
+.pk-send.on{background:var(--primary);color:var(--primary-fg)}
+.pk-line{margin:0;padding:0 16px 12px;color:var(--fg-subtle);font-size:13px}
 .pk-send{margin-left:auto;height:32px;padding:0 16px;border-radius:9999px;border:0;background:#94b4d1;color:#fefefe;font:600 13px/1.5 var(--font-sans);display:inline-grid;place-items:center}
 @media(max-width:820px){.pk-overlay{padding:0}.pk-panel{width:100%;height:100%;border-radius:0}.pk-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.pk-search{display:none}}
 </style>`;
@@ -67,7 +70,7 @@ const referenceMarkup = (state: PickerState) => {
   const pills = data.pills.length === 0 ? '' : `<div class="pk-pills">${data.pills.map((label) => `<span class="pk-pill${label === (data as { active?: string }).active ? ' on' : ''}">${label}</span>`).join('')}</div>`;
   const body = data.empty ? '<div class="pk-empty"><b>No matching items</b><span>Search only looks at the names shown here.</span></div>' : `<div class="pk-grid">${data.tiles.map((item) => tile(item, { selected: data.selected.includes(item.name), image: state !== 'no-facts' })).join('')}</div>`;
   const chips = data.selected.map((name) => `<span class="pk-chip">${name}<button type="button" aria-label="Remove ${name}">×</button></span>`).join('');
-  return `${style}<div class="pk-overlay" role="dialog" aria-label="Library"><div class="pk-panel"><div class="pk-head"><h2>Library</h2><span class="qclose">×</span></div><div class="pk-bar">${pills}<div class="pk-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>${data.query ? `<input value="${data.query}" aria-label="Search Library">` : '<input placeholder="Search" aria-label="Search Library">'}</div></div><div class="pk-body">${body}</div><div class="pk-tray"><span class="pk-count">${data.selected.length === 0 ? 'Nothing selected yet' : `${data.selected.length} selected`}</span>${chips}<button class="pk-send" type="button" aria-disabled="true">${data.selected.length === 0 ? 'Attach' : `Attach (${data.selected.length})`}</button></div></div></div>`;
+  return `${style}<div class="pk-overlay" role="dialog" aria-label="Library"><div class="pk-panel"><div class="pk-head"><h2>Library</h2><span class="qclose">×</span></div><div class="pk-bar">${pills}<div class="pk-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>${data.query ? `<input value="${data.query}" aria-label="Search Library">` : '<input placeholder="Search" aria-label="Search Library">'}</div></div><div class="pk-body">${body}</div><div class="pk-tray"><span class="pk-count">${data.selected.length === 0 ? 'Nothing selected yet' : `${data.selected.length} selected`}</span>${chips}<button class="pk-send${state === 'attach-unavailable' ? ' on' : ''}" type="button" aria-disabled="${state === 'attach-unavailable' ? 'false' : 'true'}">${data.selected.length === 0 ? 'Attach' : `Attach (${data.selected.length})`}</button></div>${state === 'attach-unavailable' ? '<p class="pk-line" role="status">Attaching from your Library is not available yet. Nothing was attached.</p>' : ''}</div></div>`;
 };
 const libraryPage = () => {
   const version = (id: string, revision: number, kind: 'reference' | 'image') => kind === 'reference'
@@ -97,13 +100,15 @@ export async function capturePickerPair(page: Page, info: TestInfo, width: numbe
   await page.addStyleTag({ content: fonts });
   await page.evaluate((markup) => { const account = document.querySelector('.account'); if (account) account.innerHTML = '<span class="avatar">C</span>Creator A'; document.querySelectorAll('.lightbox').forEach((node) => node.remove()); document.body.insertAdjacentHTML('beforeend', markup); }, referenceMarkup(state));
   await settleCapture(page);
-  const referenceSelectors = ['.pk-panel', '.pk-head', '.pk-bar', '.pk-search', '.pk-body', '.pk-tray', '.pk-count', '.pk-send', ...(state === 'no-facts' ? [] : ['.pk-pill', ...(state === 'no-match' ? [] : ['.pk-pill.on'])]), ...(state === 'no-match' ? ['.pk-empty'] : ['.pk-grid', '.pk-tile', '.pk-media']), ...(state === 'selected' ? ['.pk-chip'] : [])];
+  const referenceSelectors = ['.pk-panel', '.pk-head', '.pk-bar', '.pk-search', '.pk-body', '.pk-tray', '.pk-count', '.pk-send', ...(state === 'attach-unavailable' ? ['.pk-line'] : []), ...(state === 'no-facts' ? [] : ['.pk-pill', ...(state === 'no-match' ? [] : ['.pk-pill.on'])]), ...(state === 'no-match' ? ['.pk-empty'] : ['.pk-grid', '.pk-tile', '.pk-media']), ...(state === 'selected' || state === 'attach-unavailable' ? ['.pk-chip'] : [])];
   const referenceGeometry = await measure(page, referenceSelectors);
-  const reference = await page.screenshot({ path: info.outputPath('reference-full.png'), fullPage: true, animations: 'disabled' });
+  const referenceClip = state === 'attach-unavailable' ? await page.locator('.pk-panel').boundingBox() : null;
+  const reference = await page.screenshot({ path: info.outputPath('reference-full.png'), ...(referenceClip ? { clip: referenceClip } : { fullPage: true }), animations: 'disabled' });
   await page.goto('/shell.html');
   await page.waitForFunction(() => !!(window as unknown as { shellTest?: unknown }).shellTest);
   await page.route('**/v1/library*', async (route) => { await route.fulfill({ status: 200, json: libraryPage() }); });
-  await page.evaluate((input) => (window as unknown as { shellTest: { configure(value: unknown): void } }).shellTest.configure(input), { session: { accountId: 'visual-account', name: 'Creator A' }, apiOrigin: 'http://127.0.0.1:4179', token: 'token', libraryPrerequisites: { display: state === 'no-facts' ? {} : display } });
+  if (state === 'attach-unavailable') await page.route('**/v1/conversations/visual-conversation/uses', async (route) => { await route.fulfill({ status: 501, json: { error: { code: 'not_implemented', message: 'Controlled visual prerequisite matched to the built backend 501' } } }); });
+  await page.evaluate((input) => (window as unknown as { shellTest: { configure(value: unknown): void } }).shellTest.configure(input), { session: { accountId: 'visual-account', name: 'Creator A' }, ...(state === 'attach-unavailable' ? { conversationId: 'visual-conversation' } : {}), apiOrigin: 'http://127.0.0.1:4179', token: 'token', libraryPrerequisites: { display: state === 'no-facts' ? {} : display } });
   if (width <= 820) await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await (width <= 820 ? page.getByRole('dialog') : page).getByRole('button', { name: 'Library', exact: true }).click();
   await page.locator('.wp-picker').waitFor();
@@ -114,11 +119,18 @@ export async function capturePickerPair(page: Page, info: TestInfo, width: numbe
     await page.locator('.wp-picker-tile').filter({ hasText: 'Vale' }).click();
     await page.locator('.wp-picker-tile').filter({ hasText: 'Bench' }).click();
   }
+  if (state === 'attach-unavailable') {
+    await page.locator('.wp-picker-tile').filter({ hasText: 'Vale' }).click();
+    await page.getByRole('button', { name: 'Attach (1)', exact: true }).click();
+    await page.locator('.wp-picker-feedback').waitFor();
+  }
   await settleCapture(page);
-  const actualSelectors = ['.wp-modal', '.wp-dialog-head', '.wp-picker-bar', '.wp-search-field', '.wp-picker-body', '.wp-picker-tray', '.wp-picker-count', '.wp-picker-tray .wp-button', ...(state === 'no-facts' ? [] : ['.wp-picker-pill', ...(state === 'no-match' ? [] : ['.wp-picker-pill.on'])]), ...(state === 'no-match' ? ['.wp-picker-empty'] : ['.wp-picker-grid', '.wp-picker-tile', '.wp-picker-media']), ...(state === 'selected' ? ['.wp-picker-chip'] : [])];
+  const actualSelectors = ['.wp-modal', '.wp-dialog-head', '.wp-picker-bar', '.wp-search-field', '.wp-picker-body', '.wp-picker-tray', '.wp-picker-count', '.wp-picker-tray .wp-button', ...(state === 'attach-unavailable' ? ['.wp-picker-feedback'] : []), ...(state === 'no-facts' ? [] : ['.wp-picker-pill', ...(state === 'no-match' ? [] : ['.wp-picker-pill.on'])]), ...(state === 'no-match' ? ['.wp-picker-empty'] : ['.wp-picker-grid', '.wp-picker-tile', '.wp-picker-media']), ...(state === 'selected' || state === 'attach-unavailable' ? ['.wp-picker-chip'] : [])];
   const actualGeometry = await measure(page, actualSelectors);
   expect(actualGeometry.map((row) => row.boxes)).toEqual(referenceGeometry.map((row) => row.boxes));
-  const actual = await page.screenshot({ path: info.outputPath('actual-full.png'), fullPage: true, animations: 'disabled' });
+  const actualClip = state === 'attach-unavailable' ? await page.locator('.wp-modal').boundingBox() : null;
+  if (referenceClip && actualClip) expect(actualClip).toEqual(referenceClip);
+  const actual = await page.screenshot({ path: info.outputPath('actual-full.png'), ...(actualClip ? { clip: actualClip } : { fullPage: true }), animations: 'disabled' });
   const changed = await compare(reference, actual, info.outputPath('comparison'));
   await writeFile(info.outputPath('result.json'), JSON.stringify({ state, width, changedPixels: changed, tolerance: 0, reference: 'docs/design/flow2-step1-r73.html shell + library-picker-r92.html#lib-yours picker panel', substitutions: 'Library heading at 15px, Examples source removed, search at the pill row, wordless /fixtures/library-tile.png on both sides, no current conversation so Attach is disabled', revision: info.config.metadata, geometry: { reference: referenceGeometry, actual: actualGeometry } }, null, 2));
   expect(changed).toBe(0);
