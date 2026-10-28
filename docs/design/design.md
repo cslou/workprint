@@ -674,6 +674,32 @@ Camera/lens/duration, rich text and images are not inferred from opaque JSON: an
 - **401:** `Sign-in required to load this video.` **501:** `Loading this video is not available yet.` **Source, transport or decode failure:** `This video could not be loaded. Nothing was changed.` These reuse the approved workspace-read lines unchanged in the existing dashed box; no player chrome, banner, retry or recovery control. No loaded media or pretend timeline progress is shown.
 - **Facts and limits:** time and duration come only from the supplied source response. No resolution, frame-rate, sound, private-media or R2 claim is made. Reacquire targets the same exact version when the supplied URL expires while open and on reopen. The supplied-source play/pause/seek evidence uses a generated local clip; it is not private-transport or provider qualification. Playing is functional evidence, not a pixel-claimed decoded frame.
 
+**Material inputs and the populated Library picker — 003/Story 3.** **Provisionally approved by the orchestrator on 2026-10-29 under Lou's delegation; pending Lou's ratification at the Phase 2 handoff.** Layouts reuse `library-picker-r92.html#lib-yours` and its `#attached` tray for the picker, and `flow2-step1-r73.html`'s composer for paste and file feedback. Substitutions: the dialog heading is the approved `Library` title at the approved 15px modal-heading size; the Examples source switch and panes are removed; the populated read uses `--size-layout-picker-w` × `--size-layout-picker-h` (full screen at ≤820px), while loading, 401, 501, transport-error and empty-success presentations keep the existing 560px dialog and unchanged copy; the picker search is hidden at ≤820px exactly as in the tracked reference.
+
+Categories, names and images come only from labelled read-only display facts keyed by the exact `latestVersion.id`; no category, name or thumbnail is inferred from untyped content. Without facts there are no category pills, and each tile shows only the typed Library kind and latest revision with an empty dashed media square. The neutral reference placeholder (`Example media omitted` / `Layout reference only`) is never product copy; comparisons substitute one documented wordless local test image in both the reference media slots and the supplied image facts.
+
+| State | Exact copy and controls |
+| --- | --- |
+| All tiles | Pills `All` plus the categories present in the display facts; tray `Nothing selected yet` and disabled `Attach` |
+| Filter | The selected pill is inverted; only tiles carrying exactly that fact category are shown |
+| Selection | Pressed tile ring and check; tray `{n} selected`, chips, `Attach ({n})`; selection alone sends no request |
+| Search | Field placeholder `Search`, accessible name `Search Library`; filters only loaded tiles by displayed name; hidden ≤820px |
+| No match | `No matching items` / `Search only looks at the names shown here.` in the approved 4px-gap, 240px-minimum two-line empty treatment |
+| Loading | Approved `Loading Library…` feedback unchanged |
+| Attach 501 | `Attaching from your Library is not available yet. Nothing was attached.` |
+| Attach 401 | `Sign-in required to attach from your Library. Nothing was attached.` |
+| Attach error | `Nothing was attached. Your existing attachments are unchanged.` |
+| Attach partial | `Attached {k} of {n}. The rest were not attached.` Successful items leave the selection; failed and remaining items stay selected |
+| Attach success | Clear the selection; no fabricated attached chip or other local claim |
+| Paste | Pasted prose stays ordinary composer text; existing `Sending messages is not available yet. Your message is kept.` |
+| Upload 501 | `Uploading files is not available yet. The file was not sent.` |
+| Upload 401 | `Sign-in required to upload a file. The file was not sent.` |
+| Upload error | `The file was not uploaded. Nothing was changed.` |
+| Unsupported file | `That file is not an image or video. The file was not sent.` |
+| Isolated confirmation 501 | `Confirming this upload is not available yet. No version was created.` |
+
+Attach lines use the same plain line beneath the tray as the approved Use-version feedback, but attaching a reference is not selection: no line says the selection changed. A selected local file shows no chip, filename, thumbnail, progress or attachment; the input is cleared after the attempt. Attaching sends each exact version with purpose `reference`; with no current conversation the tray stays disabled and no `useVersion` or `requestUpload` is sent. Real transfer, validation, partial-success recovery and confirmation remain P3-S3/S4, not this wiring milestone. The ignored `outputs/verification/sprint-003/design-proposals/story3/` previews are historical evidence only, never runtime or comparison dependencies.
+
 **003/Story 4 — approved for later, not implemented here.** Reuse `demo-18.html#p-takes`'s direct Videos Export direction and the shared viewer dialog, excluding Editor/scene playback. Card: `Chosen source versions`, then `Export` and `Export history`. Remove displayed selection revision and test prerequisite lines. No settings profile, fake record/progress, generated URL or download is authorized.
 
 | Surface | Exact unavailable text |
