@@ -1,5 +1,11 @@
 # Workprint — Application Design History
 
+## Shell and remaining Phase 2 states — 2026-10-28
+
+The user approved the layouts displayed in the local `outputs/verification/sprint-002/design-proposals/` set (source `2e03eba`), with explicit copy corrections. The exact texts and owning stories are recorded in [the guide](design.md#shell-and-remaining-phase-2-feedback). Only 002/Story 3 is authorized for implementation now; question/proposal disclosure, the nine answer/save/use feedback states and 003/Story 4 Export remain later-story approvals, not implemented capabilities.
+
+Removed from the approved design: preview markers, test-fixture wording, the local-clear button and its result, the separate switch-unavailable state, visible proposal/question IDs/revisions, and Export selection-revision/test-prerequisite lines. Sign out and Switch account share the unchanged-session unavailable response. Internal scope invalidation remains required. Existing tokens, desktop navigation, empty/loading states and Library feedback stay approved. Reproducible comparisons use tracked flow/demo references plus approved substitutions; ignored screenshots are historical display evidence, never runtime prerequisites. No actual Auth, model integration, spending gate, credits, model selector, working Export, new banner or recovery design is approved by this record.
+
 ## Library feedback — 2026-10-28
 
 The user approved the scoped Library feedback proposal in the Story 2 implementation continuation: reuse `demo-05.html#lib-yours`'s existing two-line empty styling for unauthenticated (401), unavailable (501), loading, transport/error and missing-configuration states. The exact copy and bounds are recorded in [the guide](design.md#library-feedback). Local proposal captures remain under ignored `outputs/verification/sprint-002/story-2-feedback-proposal/`; they are not required runtime assets.
