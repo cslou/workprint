@@ -186,23 +186,42 @@ test('closing and switching versions during playback releases the retained eleme
   expect(await page.evaluate(() => (window as unknown as MediaHarness).mediaTest.requested())).toEqual(before);
 });
 
-test('account and conversation scope changes reject pending sources in adversarial order', async ({ page }) => {
+for (const change of ['account', 'conversation'] as const) for (const order of ['old-first', 'old-last'] as const) test(`pending ${change} change releases the ${order} source`, async ({ page }) => {
   await openClip(page);
   await expect.poll(() => page.evaluate(() => (window as unknown as MediaHarness).mediaTest.pending())).toEqual(['video-v2']);
-  await page.evaluate(() => (window as unknown as MediaHarness).mediaTest.switchScope('other-account', 'other-conversation'));
+  await page.evaluate((selected) => {
+    const test = (window as unknown as MediaHarness).mediaTest;
+    if (selected === 'account') test.switchScope('other-account', 'read-only-conversation');
+    else test.switchScope('read-only-account', 'other-conversation');
+  }, change);
   await page.getByRole('button', { name: 'View Shot 1 version 2', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as unknown as MediaHarness).mediaTest.pending())).toEqual(['video-v2', 'video-v2']);
-  await releaseClip(page, 0, { url: '/fixtures/clip.webm?old', durationMs: 9000 });
-  await expect(page.locator('.wp-clip-media')).toHaveCount(0);
-  await releaseClip(page, 1, { url: '/fixtures/clip.webm?new', durationMs: 2000 });
-  await expect(page.locator('.wp-clip-time')).toHaveText('0:00 / 0:02');
-  await page.evaluate(() => (window as unknown as MediaHarness).mediaTest.switchScope('third-account', 'third-conversation'));
-  await page.getByRole('button', { name: 'View Shot 1 version 2', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => (window as unknown as MediaHarness).mediaTest.pending())).toEqual(['video-v2', 'video-v2', 'video-v2']);
-  await releaseClip(page, 2, { url: '/fixtures/clip.webm?newest', durationMs: 2000 });
-  await expect(page.locator('.wp-clip-time')).toHaveText('0:00 / 0:02');
-  await releaseClip(page, 1, { url: '/fixtures/clip.webm?stale', durationMs: 9000 });
-  await expect(page.locator('.wp-clip-time')).toHaveText('0:00 / 0:02');
+  if (order === 'old-first') {
+    await releaseClip(page, 0, { url: '/fixtures/clip.webm?old' });
+    await expect(page.locator('video')).toHaveCount(0);
+    await releaseClip(page, 1, { url: '/fixtures/clip.webm?new' });
+  } else {
+    await releaseClip(page, 1, { url: '/fixtures/clip.webm?new' });
+    await expect(page.locator('.wp-clip-surface[data-ready="true"]')).toHaveCount(1);
+    await releaseClip(page, 0, { url: '/fixtures/clip.webm?old' });
+  }
+  await expect(page.locator('video')).toHaveAttribute('src', '/fixtures/clip.webm?new');
+  await expect(page.locator('video')).not.toHaveAttribute('src', /old/);
+});
+
+test('unmounting while media is pending creates no player or request', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
+  await openClip(page);
+  await expect.poll(() => page.evaluate(() => (window as unknown as MediaHarness).mediaTest.pending())).toEqual(['video-v2']);
+  const before = await page.evaluate(() => ({ requested: (window as unknown as MediaHarness).mediaTest.requested(), loads: (window as unknown as MediaHarness).mediaTest.loadCalls() }));
+  await page.evaluate(() => (window as unknown as MediaHarness).mediaTest.unmount());
+  await page.evaluate(() => { const test = (window as unknown as MediaHarness).mediaTest; test.release(0, { ok: true, value: test.source('video-v2') }); });
+  await page.waitForTimeout(400);
+  expect(await page.locator('.wp-clip-surface, video').count()).toBe(0);
+  expect(await page.evaluate(() => (window as unknown as MediaHarness).mediaTest.requested())).toEqual(before.requested);
+  expect(await page.evaluate(() => (window as unknown as MediaHarness).mediaTest.loadCalls())).toBe(before.loads);
+  expect(errors).toEqual([]);
 });
 
 test('a successful reacquire replaces the source and a failed playing reacquire stops playback', async ({ page }) => {
