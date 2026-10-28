@@ -7,6 +7,7 @@ import type { BrowserClient } from '../api/client.js';
 import { Button } from '../ui/controls.js';
 import { WorkspacePanel, type WorkspaceTab } from '../ui/panel.js';
 import { Library } from '../library/library.js';
+import { Composer } from '../conversation/composer.js';
 import { useWorkspace } from './workspace.js';
 import { WorkspaceReadPlaceholder } from './workspace-placeholder.js';
 import './shell.css';
@@ -52,7 +53,7 @@ function ScopedShell({ connection, session, conversationId, workspaceContent }: 
       </nav>
       <main className="wp-main" aria-label="New video" aria-busy={workspace.kind === 'loading'}>
         <div className="wp-thread"><div className="wp-welcome"><h1>What would you like to make?</h1><p className="wp-lead">Describe the moment you want to see. Rough is fine; I'll ask about anything I need.</p><div className="wp-hints" aria-label="Things that help">{["Who's in it", 'Where it happens', 'What happens', 'Anything they say', 'Look or mood'].map((hint) => <span key={hint}>{hint}</span>)}</div><p className="wp-aside-note">Have photos of the people or places? You can attach them now or later.</p></div></div>
-        <div className="wp-opening-composer" aria-hidden="true"><div className="wp-opening-field">Describe your video…</div><div className="wp-opening-bar"><span className="wp-opening-attach"><span>+</span>Attach photos</span><Button isDisabled>Send</Button></div></div>
+        <Composer native={native} />
       </main>
       <aside className="wp-workspace" aria-label="This video"><WorkspacePanel placeholder={placeholder} selectedKey={tab} onSelectionChange={(key) => setTab(key as WorkspaceTab)} {...(content === undefined ? {} : { content })} /></aside>
     </div>
