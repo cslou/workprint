@@ -1,5 +1,11 @@
 # Workprint — Application Design History
 
+## Script inline edit — 2026-10-28
+
+The user approved the Story 5 inline Script edit preview with one correction: the action order is **Cancel, then Save**. Clicking a section's pencil turns that section's text into a typing box in the same panel, with the same fonts and colours. Cancel restores the displayed version unchanged. Save retains typed text and uses the already-approved unavailable, 401 and error feedback as one plain line beneath the controls. Nothing else is newly approved, and the draft label is not product copy.
+
+The exact layout and tracked-reference substitution are recorded in [the existing shell/Phase 2 section](design.md#shell-and-remaining-phase-2-feedback). The local `outputs/verification/sprint-002/design-proposals/story5/` previews are historical display evidence only; implementation and comparisons use the tracked Script reference plus the approved substitution, not those ignored files.
+
 ## Chat unavailable feedback — 2026-10-28
 
 The user approved 002/Story 4 Send feedback as one plain action-feedback line beneath the chat box: “Sending messages is not available yet. Your message is kept.” This applies to every Send, including opening and queued typing, and retains the typed text. Stop feedback is “Stopping is not available yet.” in the same style; Stop is visible only while the assistant works, reachable in Phase 2 only from an isolated labelled read-only working prerequisite. No successful native turn/stop, banner, colors or recovery flow is implied. Exact bounds are recorded in [the existing shell/Phase 2 section](design.md#shell-and-remaining-phase-2-feedback).
