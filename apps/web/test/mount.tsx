@@ -37,7 +37,8 @@ else {
     const host = document.createElement('span'); send.replaceWith(host);
     createRoot(host).render(<Button isDisabled>Send</Button>);
   }
-  if (['assets', 'assets-ready', 'versions'].includes(context)) document.querySelectorAll('.status').forEach((element) => { const state = element.textContent === 'Chosen' ? 'chosen' : element.classList.contains('ready') ? 'ready' : element.classList.contains('draft') ? 'draft' : 'empty'; createRoot(element).render(<StatusPill state={state} />); element.className = ''; (element as HTMLElement).style.display = 'contents'; });
+  const statusElements = ['assets', 'assets-ready', 'versions'].includes(context) ? [...document.querySelectorAll('.status')] : [];
+  for (const element of statusElements) { const state = element.textContent === 'Chosen' ? 'chosen' : element.classList.contains('ready') ? 'ready' : element.classList.contains('draft') ? 'draft' : 'empty'; createRoot(element).render(<StatusPill state={state} />); element.className = ''; (element as HTMLElement).style.display = 'contents'; }
   if (context === 'viewer') {
     document.querySelectorAll('.lightbox').forEach((element) => element.remove());
     const tile = document.querySelector('.tile[href="#look-a"]');
@@ -55,7 +56,7 @@ else {
   // Explicitly expose readiness after React/layout and stylesheet have settled.
   await document.fonts.ready;
   if (context === 'opening') await new Promise<void>((resolve) => { const poll = () => document.querySelector('[role="tab"]') ? resolve() : requestAnimationFrame(poll); poll(); });
-  if (['assets', 'assets-ready', 'versions'].includes(context)) await new Promise<void>((resolve) => { const poll = () => document.querySelector('.wp-status') ? resolve() : requestAnimationFrame(poll); poll(); });
+  if (statusElements.length > 0) await new Promise<void>((resolve) => { const poll = () => document.querySelectorAll('.wp-status').length === statusElements.length ? resolve() : requestAnimationFrame(poll); poll(); });
   if (context === 'search') await new Promise<void>((resolve) => { const poll = () => document.querySelector('input') ? resolve() : requestAnimationFrame(poll); poll(); });
   if (context === 'assets-ready') location.hash = 'p-assets';
   if (context === 'versions') location.hash = 'p-takes';
