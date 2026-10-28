@@ -1,5 +1,9 @@
 # Workprint — Application Design History
 
+## Chat unavailable feedback — 2026-10-28
+
+The user approved 002/Story 4 Send feedback as one plain action-feedback line beneath the chat box: “Sending messages is not available yet. Your message is kept.” This applies to every Send, including opening and queued typing, and retains the typed text. Stop feedback is “Stopping is not available yet.” in the same style; Stop is visible only while the assistant works, reachable in Phase 2 only from an isolated labelled read-only working prerequisite. No successful native turn/stop, banner, colors or recovery flow is implied. Exact bounds are recorded in [the existing shell/Phase 2 section](design.md#shell-and-remaining-phase-2-feedback).
+
 ## Workspace-read feedback addition — 2026-10-28
 
 The user approved 002/Story 3 workspace HTTP-read failures as text substitutions in the current tab's existing dashed empty box: 401 — “Sign-in required to load this video.”; 501 — “Loading this video is not available yet.”; all other failures, including transport and timeout — “This video could not be loaded. Nothing was changed.” Loading keeps the approved skeleton and its static reduced-motion alternative; absent session or conversation keeps the existing empty text. No banner, colors or recovery controls. Native-load copy remains only in its dialog. Exact instructions and tracked reference substitutions are in [the existing shell section](design.md#shell-and-remaining-phase-2-feedback).

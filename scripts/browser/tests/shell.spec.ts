@@ -67,6 +67,19 @@ for (const width of [1440, 390, 820, 821]) test(`shell navigation, session and n
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
+test('opening Send is local, retains the message and never answers a question', async ({ page }) => {
+  await page.goto('/shell.html');
+  await configure(page, { session: null });
+  let requests = 0;
+  await page.route('**/v1/**', async (route) => { requests++; await route.abort(); });
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Keep this unsent message');
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Sending messages is not available yet. Your message is kept.');
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('Keep this unsent message');
+  expect(requests).toBe(0);
+  expect(await page.evaluate(() => (window as unknown as { shellTest: { tokenCalls(): number } }).shellTest.tokenCalls())).toBe(0);
+});
+
 const emptyWorkspace = (revision: number) => ({ script: null, assets: [], storyboard: { work: null, shots: [] }, videos: [], pendingQuestion: null, activeWork: [], selectionRevision: revision });
 const reads = (page: Page) => page.evaluate(() => (window as unknown as { shellTest: { reads(): { call: number; conversationId: string; settled: boolean; code: string | null }[] } }).shellTest.reads());
 

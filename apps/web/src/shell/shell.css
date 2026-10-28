@@ -26,11 +26,7 @@ html, body, #root { min-height: 100%; }
 .wp-hints { display: flex; gap: var(--space-6); flex-wrap: wrap; }
 .wp-hints span { font-size: var(--font-size-12); color: var(--color-text-secondary); background: var(--color-bg-surface); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-pill); padding: calc(var(--space-2) + var(--border-width-default)) calc(var(--space-10) + var(--border-width-default)); }
 .wp-aside-note { font-size: var(--font-size-12); color: var(--color-text-subtle); }
-.wp-opening-composer { margin: 0 auto var(--space-24); width: min(var(--size-layout-chat), calc(100% - 2 * var(--space-16))); background: var(--color-bg-surface); border: var(--border-width-default) solid var(--color-border-input); border-radius: var(--radius-2xl); padding: var(--space-14) var(--space-12) var(--space-10) var(--space-16); display: flex; flex-direction: column; gap: var(--space-12); box-shadow: var(--shadow-input); }
-.wp-opening-field { font-size: var(--font-size-15); color: var(--color-text-subtle); min-height: calc(var(--space-22) * 2); }
-.wp-opening-bar { display: flex; justify-content: space-between; align-items: center; }
-.wp-opening-attach { display: flex; align-items: center; gap: var(--space-8); font-size: var(--font-size-12); color: var(--color-text-secondary); }
-.wp-opening-attach > span { width: var(--size-control-attach); height: var(--size-control-attach); border-radius: var(--radius-pill); border: var(--border-width-default) solid var(--color-border-strong); display: grid; place-items: center; font-size: 0; background: linear-gradient(currentColor, currentColor) center/calc(var(--space-10) + var(--border-width-default)) calc(1.5 * var(--border-width-default)) no-repeat, linear-gradient(currentColor, currentColor) center/calc(1.5 * var(--border-width-default)) calc(var(--space-10) + var(--border-width-default)) no-repeat; }
+.wp-main > .wp-chat-feedback { width: min(var(--size-layout-chat), calc(100% - 2 * var(--space-16))); margin: calc(-1 * var(--space-14)) auto var(--space-24); }
 .wp-workspace { background: var(--color-bg-surface); border-left: var(--border-width-default) solid var(--color-border-default); display: flex; flex-direction: column; min-height: 0; }
 .wp-session-content { display: grid; gap: var(--space-12); color: var(--color-text-secondary); font-size: var(--font-size-13); overflow-wrap: anywhere; }
 .wp-session-content b { font-weight: var(--font-weight-semibold); }
