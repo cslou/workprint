@@ -24,6 +24,10 @@ const pending: Pending[] = [];
 const requested: string[] = [];
 const commands: string[] = [];
 let accountId = 'read-only-account';
+let conversationId = 'read-only-conversation';
+const nativeLoad = HTMLMediaElement.prototype.load;
+let loadCount = 0;
+HTMLMediaElement.prototype.load = function load(this: HTMLMediaElement) { loadCount += 1; return nativeLoad.call(this); };
 let connection = createBrowserClient('http://127.0.0.1:4179', async () => null);
 const node = document.getElementById('root');
 if (!node) throw new Error('Missing media test root');
@@ -31,7 +35,7 @@ const root = createRoot(node);
 const render = () => {
   if (connection.kind !== 'configured') throw new Error('Media composition needs a loopback client');
   const client = connection.client;
-  root.render(<div className="wp-panel-body" style={{ width: 380 }}><Videos connection={{ kind: 'configured', client }} scope={{ accountId, conversationId: 'read-only-conversation' }} workspace={projection} prerequisites={{ versions: [second, first] }} /></div>);
+  root.render(<div className="wp-panel-body" style={{ width: 380 }}><Videos connection={{ kind: 'configured', client }} scope={{ accountId, conversationId }} workspace={projection} prerequisites={{ versions: [second, first] }} /></div>);
 };
 (window as unknown as { mediaTest: unknown }).mediaTest = {
   configure(input: { apiOrigin?: string; token?: string | null; controlled?: boolean; accountId?: string }) {
@@ -55,6 +59,7 @@ const render = () => {
   pending() { return pending.map((item) => item.id); },
   requested() { return [...requested]; },
   commands() { return [...commands]; },
-  switchScope(account: string) { accountId = account; render(); },
+  switchScope(account: string, conversation = 'read-only-conversation') { accountId = account; conversationId = conversation; render(); },
+  loadCalls() { return loadCount; },
   unmount() { root.render(null); },
 };

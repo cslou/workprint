@@ -12,3 +12,5 @@ ffmpeg -i clip.webm -frames:v 1 -y clip-poster.png
 ```
 
 `clip-poster.png` is the first frame, used only as the supplied poster in deterministic visual comparisons. It is not a decoded-frame pixel claim. Playwright's bundled Chromium supports VP8 WebM; no universal codec claim is made.
+
+`corrupt.webm` is deliberately invalid bytes, used only to exercise the native player error path. It is not media, must never gain a valid codec claim, and is not a visual comparison asset.

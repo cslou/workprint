@@ -124,3 +124,111 @@ test('a generated local clip proves supplied-source play, pause, seek and teardo
   await expect(page.locator('.wp-clip-surface')).toHaveCount(0);
   expect(await page.evaluate(() => (window as unknown as Harness).mediaTest.commands())).toEqual([]);
 });
+
+type MediaHarness = { mediaTest: { configure(input: unknown): void; source(id: string, input?: Record<string, unknown>): OperationResponse<'media'>; release(index: number, result: unknown): void; pending(): string[]; requested(): string[]; commands(): string[]; switchScope(account: string, conversation?: string): void; unmount(): void; loadCalls(): number } };
+const openClip = async (page: import('@playwright/test').Page) => {
+  await page.goto('/media.html');
+  await page.waitForFunction(() => !!(window as unknown as { mediaTest?: unknown }).mediaTest);
+  await page.evaluate(() => (window as unknown as MediaHarness).mediaTest.configure({ controlled: true }));
+  await page.getByRole('button', { name: 'View Shot 1 version 2', exact: true }).click();
+};
+const releaseClip = (page: import('@playwright/test').Page, index: number, input?: Record<string, unknown>) => page.evaluate(({ index, input }) => {
+  const harness = (window as unknown as MediaHarness).mediaTest;
+  harness.release(index, { ok: true, value: harness.source('video-v2', input) });
+}, { index, input });
+
+test('loading feedback exactly fills the 16:9 surface', async ({ page }) => {
+  await openClip(page);
+  const boxes = await page.evaluate(() => {
+    const surface = document.querySelector('.wp-clip-surface')?.getBoundingClientRect();
+    const note = document.querySelector('.wp-clip-note')?.getBoundingClientRect();
+    return { surface: surface?.toJSON() ?? null, note: note?.toJSON() ?? null };
+  });
+  expect(boxes.surface).not.toBeNull(); expect(boxes.note).not.toBeNull();
+  expect(boxes.note!.x).toBeCloseTo(boxes.surface!.x, 1);
+  expect(boxes.note!.y).toBeCloseTo(boxes.surface!.y, 1);
+  expect(boxes.note!.width).toBeCloseTo(boxes.surface!.width, 1);
+  expect(boxes.note!.height).toBeCloseTo(boxes.surface!.height, 1);
+  expect(boxes.surface!.width / boxes.surface!.height).toBeCloseTo(16 / 9, 2);
+});
+
+test('an expired source reacquires once and then stops without more requests', async ({ page }) => {
+  await openClip(page);
+  await releaseClip(page, 0, { expiresAt: new Date(Date.now() - 1000).toISOString() });
+  await expect.poll(() => page.evaluate(() => (window as unknown as MediaHarness).mediaTest.requested())).toEqual(['video-v2', 'video-v2']);
+  await releaseClip(page, 1, { expiresAt: new Date(Date.now() - 1000).toISOString() });
+  await expect(page.locator('.wp-clip-note')).toHaveText('This video could not be loaded. Nothing was changed.');
+  await page.waitForTimeout(1200);
+  expect(await page.evaluate(() => (window as unknown as MediaHarness).mediaTest.requested())).toEqual(['video-v2', 'video-v2']);
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => (window as unknown as MediaHarness).mediaTest.requested())).toEqual(['video-v2', 'video-v2']);
+});
+
+test('closing and switching versions during playback releases the retained element', async ({ page }) => {
+  await openClip(page);
+  await releaseClip(page, 0);
+  await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect.poll(() => page.locator('.wp-clip-surface').getAttribute('data-player-status')).toBe('playing');
+  await page.evaluate(() => { (window as unknown as { oldVideo: HTMLVideoElement }).oldVideo = document.querySelector('video')!; });
+  const loads = await page.evaluate(() => (window as unknown as MediaHarness).mediaTest.loadCalls());
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as MediaHarness).mediaTest.loadCalls())).toBeGreaterThan(loads);
+  const released = await page.evaluate(() => { const video = (window as unknown as { oldVideo: HTMLVideoElement }).oldVideo; return { paused: video.paused, src: video.getAttribute('src') }; });
+  expect(released).toEqual({ paused: true, src: null });
+  await page.evaluate(() => { const video = (window as unknown as { oldVideo: HTMLVideoElement }).oldVideo; video.dispatchEvent(new Event('timeupdate')); video.dispatchEvent(new Event('play')); });
+  await page.getByRole('button', { name: 'View Shot 1 version 1', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as MediaHarness).mediaTest.pending())).toEqual(['video-v2', 'video-v1']);
+  const before = await page.evaluate(() => (window as unknown as MediaHarness).mediaTest.requested());
+  await page.evaluate(() => (window as unknown as MediaHarness).mediaTest.unmount());
+  await page.waitForTimeout(400);
+  expect(await page.evaluate(() => (window as unknown as MediaHarness).mediaTest.requested())).toEqual(before);
+});
+
+test('account and conversation scope changes reject pending sources in adversarial order', async ({ page }) => {
+  await openClip(page);
+  await expect.poll(() => page.evaluate(() => (window as unknown as MediaHarness).mediaTest.pending())).toEqual(['video-v2']);
+  await page.evaluate(() => (window as unknown as MediaHarness).mediaTest.switchScope('other-account', 'other-conversation'));
+  await page.getByRole('button', { name: 'View Shot 1 version 2', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as MediaHarness).mediaTest.pending())).toEqual(['video-v2', 'video-v2']);
+  await releaseClip(page, 0, { url: '/fixtures/clip.webm?old', durationMs: 9000 });
+  await expect(page.locator('.wp-clip-media')).toHaveCount(0);
+  await releaseClip(page, 1, { url: '/fixtures/clip.webm?new', durationMs: 2000 });
+  await expect(page.locator('.wp-clip-time')).toHaveText('0:00 / 0:02');
+  await page.evaluate(() => (window as unknown as MediaHarness).mediaTest.switchScope('third-account', 'third-conversation'));
+  await page.getByRole('button', { name: 'View Shot 1 version 2', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as MediaHarness).mediaTest.pending())).toEqual(['video-v2', 'video-v2', 'video-v2']);
+  await releaseClip(page, 2, { url: '/fixtures/clip.webm?newest', durationMs: 2000 });
+  await expect(page.locator('.wp-clip-time')).toHaveText('0:00 / 0:02');
+  await releaseClip(page, 1, { url: '/fixtures/clip.webm?stale', durationMs: 9000 });
+  await expect(page.locator('.wp-clip-time')).toHaveText('0:00 / 0:02');
+});
+
+test('a successful reacquire replaces the source and a failed playing reacquire stops playback', async ({ page }) => {
+  await openClip(page);
+  await releaseClip(page, 0, { url: '/fixtures/clip.webm?first', expiresAt: new Date(Date.now() + 800).toISOString() });
+  await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (window as unknown as MediaHarness).mediaTest.requested())).toEqual(['video-v2', 'video-v2']);
+  await releaseClip(page, 1, { url: '/fixtures/clip.webm?second', expiresAt: new Date(Date.now() + 1200).toISOString() });
+  await expect.poll(() => page.evaluate(() => document.querySelector('video')?.getAttribute('src'))).toContain('?second');
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect.poll(() => page.locator('.wp-clip-surface').getAttribute('data-player-status')).toBe('playing');
+  await page.evaluate(() => { (window as unknown as { oldVideo: HTMLVideoElement }).oldVideo = document.querySelector('video')!; });
+  await expect.poll(() => page.evaluate(() => (window as unknown as MediaHarness).mediaTest.requested()), { timeout: 5000 }).toEqual(['video-v2', 'video-v2', 'video-v2']);
+  await page.evaluate(() => (window as unknown as MediaHarness).mediaTest.release(2, { ok: false, error: { code: 'not_implemented', message: 'Read unavailable' } }));
+  await expect(page.locator('.wp-clip-note')).toHaveText('Loading this video is not available yet.');
+  await expect(page.locator('.wp-clip-time')).toHaveCount(0);
+  const released = await page.evaluate(() => { const video = (window as unknown as { oldVideo: HTMLVideoElement }).oldVideo; return { paused: video.paused, src: video.getAttribute('src') }; });
+  expect(released).toEqual({ paused: true, src: null });
+});
+
+test('a corrupt local source exercises the native error path and cleans up', async ({ page }) => {
+  await openClip(page);
+  await releaseClip(page, 0, { url: '/fixtures/corrupt.webm' });
+  await expect(page.locator('.wp-clip-note')).toHaveText('This video could not be loaded. Nothing was changed.');
+  await expect(page.getByRole('button', { name: 'Play', exact: true })).toHaveCount(0);
+  await expect(page.locator('.wp-clip-time')).toHaveCount(0);
+  const released = await page.evaluate(() => { const video = document.querySelector('video'); return video ? { paused: video.paused, src: video.getAttribute('src') } : null; });
+  expect(released).toEqual({ paused: true, src: null });
+});
