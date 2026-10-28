@@ -17,16 +17,27 @@ const workspace = workspaceSchema.parse({ script: { version: script, use: { id: 
 const prerequisites: MaterialPrerequisites = { presentations: [
   { versionId: script.id, revision: 7, sections: [{ label: 'What happens', text: 'Mercer and Vale sit side by side on the gallery bench.', field: 'synopsis' }], shots: [{ shotId: 'shot-1', description: 'Both of them, seen together from the front.' }, { shotId: 'shot-2', description: 'Close on Vale as he recognises Mercer.', dialogue: 'Vale: “You must be Mercer.”' }], duration: 'About 13 seconds in all.', look: ['Natural colour', 'Soft daylight', 'Widescreen'] },
   { versionId: reference.id, revision: 2, name: 'Vale reference', description: 'Character sheet', thumbnail: { src: '/references/assets/media-placeholder.svg', alt: 'Vale thumbnail' }, sheet: { kicker: 'Character reference', name: 'Vale', summary: 'Dark navy overcoat · charcoal suit', sections: [{ title: 'Identity', layout: 'hero', text: 'Late forties, light stubble.', figures: [{ src: '/references/assets/media-placeholder.svg', alt: 'Vale front view', caption: 'Front · neutral expression' }] }, { title: 'Wardrobe', text: 'Navy overcoat over a charcoal suit.' }, { title: 'Missing views', text: 'Side and back views are not supplied.' }] } },
-], history: [] };
-const node = document.getElementById('root');
+], history: [versionSchema.parse({ ...script, id: 'script-v6', revision: 6, content: { synopsis: 'Earlier Script text.' } })] };
+const context = new URLSearchParams(location.search).has('reference');
+if (context) {
+  const response = await fetch('/references/flow2-step2-r74.html');
+  if (!response.ok) throw new Error('Missing tracked material reference');
+  const source = new DOMParser().parseFromString(await response.text(), 'text/html');
+  source.querySelectorAll('[src]').forEach((element) => element.setAttribute('src', `/references/${element.getAttribute('src')}`));
+  document.body.innerHTML = source.body.innerHTML;
+  const style = document.createElement('link'); style.rel = 'stylesheet'; style.href = '/references/app-r11.css';
+  const loaded = new Promise<void>((resolve, reject) => { style.onload = () => resolve(); style.onerror = () => reject(new Error('Missing reference stylesheet')); });
+  document.head.prepend(style); await loaded;
+}
+const node = document.querySelector(context ? '.panel' : '#root');
 if (!node) throw new Error('Missing material test root');
 const root = createRoot(node);
 let connection: BrowserClient = { kind: 'missing' };
 let token: string | null = null;
-type Input = { apiOrigin?: string; token?: string | null; accountId?: string; conversationId?: string; prerequisites?: boolean; workspace?: OperationResponse<'workspace'> };
+type Input = { apiOrigin?: string; token?: string | null; accountId?: string; conversationId?: string; prerequisites?: boolean; workspace?: OperationResponse<'workspace'>; tab?: WorkspaceTab };
 function Harness({ input }: { input: Input }) {
-  const [tab, setTab] = useState<WorkspaceTab>('script');
-  return <div style={{ width: 'min(380px,100%)' }}><MaterialPanel connection={connection} scope={{ accountId: input.accountId ?? 'read-only-account', conversationId: input.conversationId ?? 'read-only-conversation' }} workspace={input.workspace ?? workspace} {...(input.prerequisites ? { prerequisites } : {})} selectedKey={tab} onSelectionChange={(key) => setTab(key as WorkspaceTab)} /></div>;
+  const [tab, setTab] = useState<WorkspaceTab>(input.tab ?? 'script');
+  return <div style={context ? { display: 'contents' } : { width: 'min(380px,100%)' }}><MaterialPanel connection={connection} scope={{ accountId: input.accountId ?? 'read-only-account', conversationId: input.conversationId ?? 'read-only-conversation' }} workspace={input.workspace ?? workspace} {...(input.prerequisites ? { prerequisites } : {})} selectedKey={tab} onSelectionChange={(key) => setTab(key as WorkspaceTab)} /></div>;
 }
 (window as unknown as { materialTest: unknown }).materialTest = {
   configure(input: Input) {

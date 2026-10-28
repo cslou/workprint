@@ -30,6 +30,7 @@ body { margin: 0; background: var(--color-bg-canvas); color: var(--color-text-pr
 .wp-tab[data-selected] { background: var(--color-bg-inverse); color: var(--color-text-inverse); }
 .wp-tab-update { position: absolute; top: 0; right: 0; width: calc(var(--space-6) + var(--border-width-default)); height: calc(var(--space-6) + var(--border-width-default)); border-radius: 50%; background: var(--color-action-primary-bg); }
 .wp-panel-body { flex: 1; overflow: auto; padding: var(--space-18) var(--space-20); outline: none; }
+.wp-panel-body[inert] { display: none; }
 .wp-empty { border: var(--border-dashed); border-radius: var(--radius-md); padding: var(--space-18); text-align: center; color: var(--color-text-subtle); font-size: var(--font-size-13); }
 .wp-panel-section { padding: var(--space-14) 0; border-top: var(--border-width-default) solid var(--color-border-default); }
 .wp-panel-section:first-of-type { border-top: 0; padding-top: var(--space-2); }
