@@ -188,6 +188,49 @@ Current-head results: aggregate 13/13, browser 121/121, visual 177/177. That is 
   - Selection: pressing a tile toggles only its pressed state (and any approved selection count); selection alone sends no request and creates no attachment. Attaching sends the exact version and purpose. On 401, 501 or error, the selection and existing attachments are unchanged.
   - Proof: browser assertions for each condition above, plus full-page pairs of the populated picker at 1440, 390 and 820/821.
 
+**Story 3 delivery:** [PR #21](https://github.com/cslou/workprint/pull/21), accepted head `13f1474bdd7985b8dc430663b200d6b942ddb579`, merged into sprint-003 at `5a72c1040cd2386437aca26cc711a6d81db4a92a`.
+
+Implementers:
+- `deepseek/deepseek-flash` at `max` thinking (the user's trial override) built the design gate and the implementation.
+- The orchestrator then switched back to `openai-codex/gpt-6.1-sol` at `xhigh` for all three fix cycles. The trigger had been declared before the story: proof weaker than specified (the binding red→green rule was only partly followed) and an approved plan item not delivered (the shared `useVersion` path).
+
+Design: the user was away and had delegated decisions, so the orchestrator provisionally approved the following (2026-10-29), pending Lou's ratification at the Phase 2 handoff. Recorded in `docs/design/design.md` and `history.md` (`3d008e7`).
+- **Picker:** the populated picker from `library-picker-r92.html#lib-yours`/`#attached`, titled "Library", with Examples removed. Picker geometry applies only to a populated read; every other Library state keeps the approved 560px dialog.
+- **Facts:** categories, singular tile labels, names and images come only from labelled read-only facts keyed by exact `latestVersion.id`, with a typed-kind fallback.
+- **Search:** local only, hidden at ≤820.
+- **Attach:** attach-specific copy, rather than the Use-version "selection" lines, because attaching is not selection. A partial-success line covers sequential multi-attach. With no conversation, Attach is disabled.
+- **Upload:** four upload lines and a confirm line.
+- **No match:** a no-match state.
+
+Behavior:
+- Paste stays composer text on the unavailable native send.
+- The composer's file input calls `requestUpload` with the exact kind, filename, contentType, byteSize and reference use. There is no transfer or confirm.
+- `confirmUpload` is a production consumer exercised only by an isolated mount.
+- Attach sends one `useVersion` (`purpose: 'reference'`) per selected exact version through a new shared `apps/web/src/api/use-version.ts`, which `VersionUse` also uses. Selection is latched while attaching, and only succeeded IDs leave the selection.
+- Exact consumable request allowances, including Library query shape, prove that pills, search, selection, close, unmount, the chooser and stale scope resends send nothing extra.
+
+**Visual determinism root cause, sprint-wide.** A pre-existing intermittent flake (`versions reference parity at 1440`, 8/20 failing at base) and the new picker pairs were traced by orchestrator probes to Chromium capturing a stale text re-raster on either side. GPU flags had no effect. A CDP LayerTree compositor-commit pulse in the shared `settleCapture` fixes it, and every visual spec now settles through it. Evidence: 40/40 per flaky test and 567/567 over three full visual repeats, with no tolerance, masks or retries. Story 2's `c998ffe` font-smoothing change was likely a response to the same flake.
+
+Review:
+- **Initial review** at `b48964a` scored 2/5, with eight P1s:
+  - an attach race;
+  - the shared path not extracted;
+  - the compositor fix bypassed by two specs;
+  - five verification gaps: request-spy blind spots, missing real 401s, unobserved existing state, partial red→green, and weak category/search proof.
+- **Fix cycle 1** resolved seven. Two of the trial model's "red" logs were found to have passed and were relabelled.
+- **Fix cycle 2** made the request allowances consumable and moved three older Sprint 002 visual specs onto `settleCapture` (a pre-existing item).
+- **Fix cycle 3** put the three race specs under the observer, with stale-resend red controls. `/review-fix` coverage was complete, scoring **5/5**.
+
+The PR has 28 commits: 21 from the trial phase, including two disclosed empty commits (`f5f1f6e`, `67768ab`), and seven fix commits. All are append-only.
+
+Current-head results: aggregate 13/13, browser 141/141, visual 195/195 (196 zero-drift records; prior pairs unchanged). New pairs:
+- the populated picker at 1440/390/820/821;
+- filtered, selected and no-facts at 1440/390;
+- search and no-match at 1440 only, because search is hidden at ≤820;
+- attach, upload and confirm 501 at 1440/390.
+
+Check, build and frozen install passed. `pnpm audit` was NON-PASS under B-002, and the two B-001 ingress leaves still failed; both are reported separately. Post-merge check passed. No planning file was changed by either worker, and no main merge occurred.
+
 #### Story 4: Direct Export, history/status and download consumers (P2-S8)
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
   - [x] Follows sprint template
