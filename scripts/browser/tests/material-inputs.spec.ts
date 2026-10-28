@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, test } from '../material-network.js';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
@@ -6,7 +7,7 @@ import type { verifyBuiltAdmission as VerifyBuiltAdmission } from '../../../apps
 import type { Version } from '../../../packages/contracts/src/index.js';
 
 type UploadsHarness = { uploadsTest: { configure(input: unknown): void; confirm(uploadId: string): Promise<string>; unmount(): void } };
-type ShellHarness = { shellTest: { configure(input: unknown): void } };
+type ShellHarness = { shellTest: { configure(input: unknown): void; unmount(): void } };
 const libraryItems = (() => {
   const version = (id: string, revision: number, kind: 'reference' | 'image' | 'video'): Version => kind === 'reference'
     ? { id, artifactId: `artifact-${id}`, revision, kind, content: { searchTrap: 'secret-content-token' }, createdBy: 'human', createdAt: '2026-10-29T00:00:00Z', dependencies: [] }
@@ -58,7 +59,7 @@ test('pasted prose stays ordinary text and Send keeps it with zero network', asy
   expect(requests).toEqual([]);
 });
 
-test('the actual file input initiates the exact metadata and never transfers or confirms', async ({ page }, info) => {
+test('the actual file input initiates the exact metadata and never transfers or confirms', async ({ page, materialNetwork }, info) => {
   test.setTimeout(120000);
   await info.attach('prerequisite', { body: 'Synthetic local image and video files; the initiation request is continued to the built loopback backend, never fulfilled with a success.', contentType: 'text/plain' });
   const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
@@ -69,6 +70,7 @@ test('the actual file input initiates the exact metadata and never transfers or 
       await page.goto('/uploads.html');
       await page.waitForFunction(() => !!(window as unknown as UploadsHarness).uploadsTest);
       await page.evaluate((input) => (window as unknown as UploadsHarness).uploadsTest.configure(input), { apiOrigin: origin, token, accountId: 'account-a', conversationId: 'conversation-a' });
+      materialNetwork.allowPost(origin, '/v1/conversations/conversation-a/uploads');
       const input = page.getByLabel('Choose an image or video', { exact: true });
       const text = page.getByRole('textbox', { name: 'Message', exact: true });
       await text.fill('A quiet moment in the gallery.');
@@ -77,13 +79,16 @@ test('the actual file input initiates the exact metadata and never transfers or 
         const url = new URL(route.request().url());
         expect(url.origin).toBe(origin);
         seen.push({ method: route.request().method(), path: url.pathname, body: JSON.parse(route.request().postData() ?? '{}') as Record<string, unknown> });
-        await route.continue();
+        await route.fallback();
       });
       const image = await readFile('apps/web/test/fixtures/library-tile.png');
       const response = page.waitForResponse((value) => new URL(value.url()).pathname === '/v1/conversations/conversation-a/uploads');
-      await input.setInputFiles({ name: 'vale portrait.png', mimeType: 'image/png', buffer: image });
+      const chooser = page.waitForEvent('filechooser');
+      await page.getByRole('button', { name: 'Attach a file', exact: true }).click();
+      await (await chooser).setFiles({ name: 'vale portrait.png', mimeType: 'image/png', buffer: image });
       expect((await response).status()).toBe(501);
       await expect(page.locator('.wp-chat-feedback')).toHaveText('Uploading files is not available yet. The file was not sent.');
+      materialNetwork.assertSafe();
       expect(seen).toHaveLength(1);
       expect(seen[0]).toMatchObject({ method: 'POST', path: '/v1/conversations/conversation-a/uploads' });
       expect(seen[0]!.body).toMatchObject({ kind: 'image', filename: 'vale portrait.png', contentType: 'image/png', byteSize: image.byteLength, intendedUse: { purpose: 'reference' } });
@@ -98,6 +103,7 @@ test('the actual file input initiates the exact metadata and never transfers or 
       expect(seen[1]!.body).toMatchObject({ kind: 'video', filename: 'clip.webm', contentType: 'video/webm', byteSize: video.byteLength });
       expect(seen.every((entry) => entry.path === '/v1/conversations/conversation-a/uploads' && entry.method === 'POST')).toBe(true);
       expect(seen.some((entry) => /\/confirm$/.test(entry.path))).toBe(false);
+      materialNetwork.assertSafe();
       await page.evaluate((input) => (window as unknown as UploadsHarness).uploadsTest.configure(input), { apiOrigin: origin, token: null, accountId: 'account-a', conversationId: 'conversation-a' });
       await text.fill('A quiet moment in the gallery.');
       const unauthorized = page.waitForResponse((value) => new URL(value.url()).pathname === '/v1/conversations/conversation-a/uploads');
@@ -106,12 +112,15 @@ test('the actual file input initiates the exact metadata and never transfers or 
       await expect(page.locator('.wp-chat-feedback')).toHaveText('Sign-in required to upload a file. The file was not sent.');
       expect(seen[2]!.body).toMatchObject({ kind: 'image', filename: 'vale portrait.png', contentType: 'image/png', byteSize: image.byteLength });
       await expect(text).toHaveValue('A quiet moment in the gallery.');
-      await page.unroute('**/v1/**');
+      materialNetwork.assertSafe();
+      await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.unmount());
     }, { browserOrigin: 'http://127.0.0.1:4179' });
   } finally { for (const finish of cleanup.reverse()) await finish(); }
 });
 
-test('upload 401, transport failure, unsupported type and no conversation send nothing they must not', async ({ page }) => {
+test('upload transport failure, unsupported type and no conversation send nothing they must not', async ({ page, materialNetwork }, info) => {
+  await info.attach('prerequisite', { body: 'Synthetic local files and a labelled isolated initiation acknowledgement with a loopback transfer trap URL. No bytes are transferred and no confirmation or persistence is simulated.', contentType: 'text/plain' });
+  materialNetwork.allowPost('http://127.0.0.1:4179', '/v1/conversations/conversation-a/uploads');
   await page.goto('/uploads.html');
   await page.waitForFunction(() => !!(window as unknown as UploadsHarness).uploadsTest);
   const input = page.getByLabel('Choose an image or video', { exact: true });
@@ -123,19 +132,27 @@ test('upload 401, transport failure, unsupported type and no conversation send n
   await text.fill('Retained while the upload fails.');
   await input.setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: image });
   await expect(page.locator('.wp-chat-feedback')).toHaveText('The file was not uploaded. Nothing was changed.');
-  await page.unroute('**/v1/**');
+  materialNetwork.assertSafe();
   const before = seen.length;
   await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.configure({ apiOrigin: 'http://127.0.0.1:4179', token: 'token', accountId: 'account-a', conversationId: 'conversation-a' }));
   await input.setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not media') });
   await expect(page.locator('.wp-chat-feedback')).toHaveText('That file is not an image or video. The file was not sent.');
+  materialNetwork.assertSafe();
   await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.configure({ apiOrigin: 'http://127.0.0.1:4179', token: 'token', accountId: 'account-a' }));
   await input.setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: image });
   await expect(page.locator('.wp-chat-feedback')).toHaveText('Uploading files is not available yet. The file was not sent.');
   expect(seen.slice(before)).toEqual([]);
   expect(seen.some((entry) => /confirm$/.test(entry.path))).toBe(false);
+  materialNetwork.assertSafe();
+  await page.route('**/v1/conversations/*/uploads', route => route.fulfill({ json: { uploadId: 'read-only-initiation', url: 'http://127.0.0.1:4179/forbidden-transfer', expiresAt: '2099-01-01T00:00:00Z', maxBytes: 4096 } }));
+  await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.configure({ apiOrigin: 'http://127.0.0.1:4179', token: null, accountId: 'account-a', conversationId: 'conversation-a' }));
+  await input.setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: image });
+  await expect(page.locator('.wp-chat-feedback')).toHaveText('Uploading files is not available yet. The file was not sent.');
+  materialNetwork.assertSafe();
+  await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.unmount());
 });
 
-test('the isolated confirmation consumer calls the real route and exposes no version on 501', async ({ page }, info) => {
+test('the isolated confirmation consumer calls the real route and exposes no version on 401/501', async ({ page, materialNetwork }, info) => {
   test.setTimeout(120000);
   await info.attach('prerequisite', { body: 'Read-only synthetic upload identity supplied by the isolated mount. No transfer, initiation success or product control is fabricated.', contentType: 'text/plain' });
   const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
@@ -146,20 +163,27 @@ test('the isolated confirmation consumer calls the real route and exposes no ver
       await page.goto('/uploads.html');
       await page.waitForFunction(() => !!(window as unknown as UploadsHarness).uploadsTest);
       await page.evaluate((input) => (window as unknown as UploadsHarness).uploadsTest.configure(input), { apiOrigin: origin, token, accountId: 'account-a', conversationId: 'conversation-a' });
+      materialNetwork.allowPost(origin, '/v1/uploads/read-only-upload-identity/confirm');
       const seen: { method: string; path: string; body: unknown }[] = [];
-      await page.route('**/v1/**', async (route) => { seen.push({ method: route.request().method(), path: new URL(route.request().url()).pathname, body: JSON.parse(route.request().postData() ?? '{}') }); await route.continue(); });
+      await page.route('**/v1/**', async (route) => { seen.push({ method: route.request().method(), path: new URL(route.request().url()).pathname, body: JSON.parse(route.request().postData() ?? '{}') }); await route.fallback(); });
       const outcome = await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.confirm('read-only-upload-identity'));
       expect(outcome).toBe('unavailable');
       await expect(page.locator('[data-confirm]')).toHaveText('Confirming this upload is not available yet. No version was created.');
       expect(seen).toHaveLength(1);
       expect(seen[0]).toMatchObject({ method: 'POST', path: '/v1/uploads/read-only-upload-identity/confirm' });
       expect(typeof (seen[0]!.body as Record<string, unknown>).operationId).toBe('string');
-      await page.unroute('**/v1/**');
+      await page.evaluate(input => (window as unknown as UploadsHarness).uploadsTest.configure(input), { apiOrigin: origin, token: null, accountId: 'account-a', conversationId: 'conversation-a' });
+      const unauthorized = page.waitForResponse(response => new URL(response.url()).pathname.endsWith('/confirm'));
+      expect(await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.confirm('read-only-upload-identity'))).toBe('unauthenticated');
+      expect((await unauthorized).status()).toBe(401);
+      await expect(page.locator('[data-confirm]')).toHaveText('Sign-in required to confirm this upload. No version was created.');
+      materialNetwork.assertSafe();
+      await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.unmount());
     }, { browserOrigin: 'http://127.0.0.1:4179' });
   } finally { for (const finish of cleanup.reverse()) await finish(); }
 });
 
-test('picker filters and selects locally and attaches the exact versions against the built backend', async ({ page }, info) => {
+test('picker filters and selects locally and attaches the exact versions against the built backend', async ({ page, materialNetwork }, info) => {
   test.setTimeout(120000);
   await info.attach('prerequisite', { body: 'Read-only Library item page and labelled display facts supplied by the isolated composition. Production Library reads remain unavailable; attach is sent to the built loopback backend and is not fulfilled.', contentType: 'text/plain' });
   const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
@@ -167,6 +191,7 @@ test('picker filters and selects locally and attaches the exact versions against
   try {
     await verifyBuiltAdmission({ diagnostic(message) { console.log(message); }, after(fn) { cleanup.push(fn); } }, async ({ origin, accessTokens }) => {
       const token = accessTokens[0]!;
+      materialNetwork.allowPost(origin, '/v1/conversations/conversation-a/uses');
       requests.length = 0;
       await openPicker(page, origin, token, { conversationId: 'conversation-a' });
       await expect(page.getByRole('heading', { name: 'Library', exact: true })).toBeVisible();
@@ -194,11 +219,14 @@ test('picker filters and selects locally and attaches the exact versions against
       const seen: { method: string; path: string; body: Record<string, unknown> }[] = [];
       await page.route('**/v1/**', async (route) => {
         const url = new URL(route.request().url());
-        if (url.pathname === '/v1/library') { await route.continue(); return; }
+        if (url.pathname === '/v1/library') { await route.fallback(); return; }
         seen.push({ method: route.request().method(), path: url.pathname, body: JSON.parse(route.request().postData() ?? '{}') as Record<string, unknown> });
-        await route.continue();
+        await route.fallback();
       });
       await page.locator('.wp-picker-tile').filter({ hasText: 'Vale' }).click();
+      await page.locator('.wp-picker-tile').filter({ hasText: 'Bench' }).click();
+      await page.locator('.wp-picker-tile').filter({ hasText: 'Bench' }).click();
+      await expect(page.locator('.wp-picker-tile').filter({ hasText: 'Bench' })).toHaveAttribute('aria-pressed', 'false');
       await page.locator('.wp-picker-tile').filter({ hasText: 'Bench' }).click();
       await expect(page.locator('.wp-picker-tile[aria-pressed="true"]')).toHaveCount(2);
       await expect(page.locator('.wp-picker-count')).toHaveText('2 selected');
@@ -220,7 +248,15 @@ test('picker filters and selects locally and attaches the exact versions against
       await expect(page.locator('.wp-picker-chip')).toHaveText(['Vale×', 'Bench×']);
       await page.getByRole('button', { name: 'Close', exact: true }).click();
       await expect(page.locator('.wp-picker')).toHaveCount(0);
-      await page.unroute('**/v1/**');
+      await openPicker(page, origin, null, { conversationId: 'conversation-a' });
+      await page.locator('.wp-picker-tile').filter({ hasText: 'Vale' }).click();
+      const unauthorized = page.waitForResponse(response => new URL(response.url()).pathname.endsWith('/uses'));
+      await page.getByRole('button', { name: 'Attach (1)', exact: true }).click();
+      expect((await unauthorized).status()).toBe(401);
+      await expect(page.locator('.wp-picker-feedback')).toHaveText('Sign-in required to attach from your Library. Nothing was attached.');
+      await expect(page.locator('.wp-picker-chip')).toHaveText(['Vale×']);
+      materialNetwork.assertSafe();
+      await page.evaluate(() => (window as unknown as ShellHarness).shellTest.unmount());
     }, { browserOrigin: 'http://127.0.0.1:4179' });
   } finally { for (const finish of cleanup.reverse()) await finish(); }
 });
@@ -241,7 +277,8 @@ test('picker without facts guesses nothing and attach needs a current conversati
   expect(seen).toEqual([]);
 });
 
-test('controlled partial success attaches one exact version and keeps the rest selected', async ({ page }) => {
+test('controlled partial success attaches one exact version and keeps the rest selected', async ({ page, materialNetwork }) => {
+  materialNetwork.allowPost('http://127.0.0.1:4179', '/v1/conversations/conversation-a/uses');
   await openPicker(page, 'http://127.0.0.1:4179', 'token', { conversationId: 'conversation-a' });
   const bodies: Record<string, unknown>[] = [];
   await page.route('**/v1/conversations/conversation-a/uses', async (route) => {
@@ -260,7 +297,8 @@ test('controlled partial success attaches one exact version and keeps the rest s
   await expect(page.locator('.wp-picker-tile[aria-pressed="true"]')).toHaveText([/Bench/]);
 });
 
-test('controlled full success clears the selection and claims nothing else locally', async ({ page }) => {
+test('controlled full success clears the selection and claims nothing else locally', async ({ page, materialNetwork }) => {
+  materialNetwork.allowPost('http://127.0.0.1:4179', '/v1/conversations/conversation-a/uses');
   await openPicker(page, 'http://127.0.0.1:4179', 'token', { conversationId: 'conversation-a' });
   const bodies: Record<string, unknown>[] = [];
   await page.route('**/v1/conversations/conversation-a/uses', async (route) => {
