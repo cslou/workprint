@@ -16,10 +16,10 @@ test('proposal cost keeps missing/unknown amounts unknown and display facts bind
 test('workspace order positions supply numbering and ambiguous or mismatched targets fail closed', () => {
   const proposal = proposalSchema.parse({ id: 'p', revision: 1, questionId: 'q', purpose: 'panel_image', target: { shotId: 'target', panelId: 'panel' }, provider: 'provider', model: 'model', prompt: 'Prompt', settings: {}, candidateCount: 1, inputs: [], disclosures: [], estimate: { basis: 'unknown' } });
   const panel = { panelId: 'panel', order: 40, description: '', references: [], candidateImageVersions: [], approvedImageVersionId: null };
-  const workspace = workspaceSchema.parse({ script: null, assets: [], storyboard: { work: null, shots: [{ shotId: 'target', order: 80, panels: [panel], chosenVideoVersionId: null }, { shotId: 'first', order: 10, panels: [], chosenVideoVersionId: null }] }, videos: [], pendingQuestion: null, activeWork: [], selectionRevision: 0 });
+  const workspace = workspaceSchema.parse({ script: null, assets: [], storyboard: { work: null, shots: [{ shotId: 'target', order: 80, panels: [panel, { ...panel, panelId: 'earlier-panel', order: 10 }, { ...panel, panelId: 'later-panel', order: 90 }], chosenVideoVersionId: null }, { shotId: 'first', order: 10, panels: [], chosenVideoVersionId: null }] }, videos: [], pendingQuestion: null, activeWork: [], selectionRevision: 0 });
   const facts = deriveProposalDisplayFacts(proposal, workspace, {});
   expect(facts?.shot).toEqual({ id: 'target', number: 2 });
-  expect(facts?.panel).toEqual({ id: 'panel', number: 1 });
+  expect(facts?.panel).toEqual({ id: 'panel', number: 2 });
   for (const defect of ['missing-shot', 'missing-panel', 'duplicate-shot-order', 'duplicate-panel-order']) {
     const invalid = structuredClone(workspace);
     const target = invalid.storyboard.shots[0]!;
@@ -134,6 +134,12 @@ test('record-owned options, generic client error and missing display facts canno
   await page.getByRole('button', { name: 'A label supplied by this record', exact: true }).click();
   await expect(page.getByRole('status')).toHaveText('The answer was not submitted. The question stays pending.');
   await expect(page.getByRole('region', { name: 'Question' })).toHaveAttribute('data-question-status', 'pending');
+  await page.getByRole('textbox', { name: 'Message' }).fill('Keep this separate message');
+  await page.getByRole('button', { name: 'Fold the question' }).click();
+  await expect(page.getByRole('button', { name: 'A label supplied by this record', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Show', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'A label supplied by this record', exact: true })).toBeEnabled();
+  await expect(page.getByRole('textbox', { name: 'Message' })).toHaveValue('Keep this separate message');
   await page.evaluate(() => (window as unknown as { questionTest: { configure(value: unknown): void } }).questionTest.configure({ withProposal: true, missingFacts: true, accountId: 'new-scope' }));
   await expect(page.getByRole('button', { name: 'Request a different framing', exact: true })).toBeDisabled();
 });
