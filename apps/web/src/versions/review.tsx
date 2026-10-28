@@ -10,11 +10,11 @@ import './review.css';
 
 type Use = OperationResponse<'useVersion'>['use'];
 export type ReviewSelection = { currentUse: Use | null; selectionRevision: number; onUsed(value: OperationResponse<'useVersion'>): void };
-export type VersionReviewProps = { connection: BrowserClient; scope: ReadScope | null; version: Version; currentUse: Use | null; selectionRevision: number; selectedVersionId?: string | null; binding: VersionUseProps['binding']; historyPrerequisite?: readonly Version[]; children: (version: Version, editable: boolean, selection: ReviewSelection) => ReactNode };
+export type VersionReviewProps = { connection: BrowserClient; scope: ReadScope | null; version: Version; currentUse: Use | null; selectionRevision: number; selectedVersionId?: string | null; binding: VersionUseProps['binding']; historyPrerequisite?: readonly Version[]; onUsed?: (value: OperationResponse<'useVersion'>) => void; children: (version: Version, editable: boolean, selection: ReviewSelection) => ReactNode };
 export function VersionReview(props: VersionReviewProps) {
   return <ScopedReview key={JSON.stringify([props.scope?.accountId, props.scope?.conversationId, props.version.artifactId])} {...props} />;
 }
-function ScopedReview({ connection, scope, version, binding, currentUse, selectionRevision, selectedVersionId, historyPrerequisite = [], children }: VersionReviewProps) {
+function ScopedReview({ connection, scope, version, binding, currentUse, selectionRevision, selectedVersionId, historyPrerequisite = [], onUsed: notifyUsed, children }: VersionReviewProps) {
   const [selected, setSelected] = useState<Version | null>(null);
   const [open, setOpen] = useState(false);
   const [used, setUsed] = useState<{ basis: string; value: OperationResponse<'useVersion'> } | null>(null);
@@ -32,7 +32,10 @@ function ScopedReview({ connection, scope, version, binding, currentUse, selecti
   const valid = earlier.every((item) => { if (ids.has(item.id) || revisions.has(item.revision)) return false; ids.add(item.id); revisions.add(item.revision); return true; });
   const rows = valid ? [...earlier].sort((a, b) => b.revision - a.revision) : [];
   const selection = used && (used.value.selectionRevision > selectionRevision || (used.value.selectionRevision === selectionRevision && used.basis === basis)) ? used.value : { use: currentUse, selectionRevision };
-  const onUsed = (value: OperationResponse<'useVersion'>) => setUsed(previous => previous && previous.value.selectionRevision > value.selectionRevision ? previous : { basis, value });
+  const onUsed = (value: OperationResponse<'useVersion'>) => {
+    setUsed(previous => previous && previous.value.selectionRevision > value.selectionRevision ? previous : { basis, value });
+    notifyUsed?.(value);
+  };
   const context: ReviewSelection = { currentUse: selection.use, selectionRevision: selection.selectionRevision, onUsed };
   return <div className="wp-version-review" data-displayed-version-id={visible.id}>
     <div className="wp-version-body" hidden={!!selected} inert={!!selected}>{children(selected ? version : visible, true, context)}</div>
