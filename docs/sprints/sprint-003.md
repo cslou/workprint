@@ -2,9 +2,9 @@
 
 **Date:** Authorized 2026-10-28; begins after Sprint 002 integrates into phase-2
 **Goal:** Complete the approved Storyboard/Videos, playback, material-input and export consumers, and demonstrate every intended Phase 2 application surface through actual frontend wiring with complete visual comparison evidence.
-**Status:** 🟡 Planning
+**Status:** 🔵 In Progress
 
-**Planning result:** independent pass 2 scored **5/5**, no findings in this plan; the earlier delta-reporting clarification is resolved. Execution is authorized but waits for Sprint 002 acceptance/integration into phase-2 and a fresh baseline check. Confirm the start checklists then; prior review notes below remain historical.
+**Planning result:** independent pass 2 scored **5/5**, no findings in this plan; the earlier delta-reporting clarification is resolved. Execution is authorized but waits for Sprint 002 acceptance/integration into phase-2 and a fresh baseline check. Confirm the start checklists then; prior review notes below remain historical. **Start (2026-10-28):** Sprint 002 integrated into `phase-2` at `1b5aa39`; `sprint-003` branched from it. Baseline refreshed in Current state. A sprint-doc-reviewer start re-check scored 4/5 ("Ready to start") with one Story 3 P2, resolved below. Start checklists confirmed.
 
 ---
 
@@ -13,7 +13,7 @@
 ### Project Context
 - **Repo:** `/Users/lou/projects/workprint`
 - **Tech stack:** React/Vite/TypeScript, React Aria and the pinned browser test toolchain delivered by Sprint 002; framework-free api-client/contracts; one Mastra backend with real Supabase admission/Postgres. Framework-free `player` is introduced only for an actual single-clip interface, not an empty package.
-- **Current state:** at planning time only Sprint 001 is merged (`71dd8a4`, PR #9); Sprint 002 is a plan, not implemented capability. Its acceptance and merge are required before this sprint starts. Refresh actual code, dependency pins, browser infrastructure and test counts at that transition; do not claim planned tests passed. Sprint 001 historical baseline is 13 passing aggregate cases and two separately failing ingress qualification cases, with no product browser coverage.
+- **Current state:** Sprint 002 is accepted and merged into `phase-2` at `1b5aa39` (integration [PR #17](https://github.com/cslou/workprint/pull/17); stories PRs #11–#16, plus integration fixes PR #18). Delivered and reusable: canonical tokens; React Aria primitives (`apps/web/src/ui/`); public API-origin config and the scoped-read/settlement hook (`api/`); the responsive Shell with session/native-unavailable presentation and four tabs (`shell/`); the Library read consumer with feedback/empty states (`library/`); question/proposal review and the composer with a scope-owned draft (`conversation/`); and Script/Assets/reference viewer with exact-version edit/history/use (`materials/`, `versions/`). Storyboard and Videos tabs show only their approved empty text. The Library dialog renders nothing for a successful read, and has no picker header/search, categories or tiles; Story 3 now owns these (user decision 2026-10-28). Verification toolchain: `pnpm test:browser` and `pnpm test:visual` (Playwright 1.64.1, pngjs comparator, test mounts under `apps/web/test/` with a shared reference loader). **Fresh baseline at the `phase-2` tree (identical to the fully verified `02c4cf8`):** frozen install, check and build PASS; aggregate 13/13; browser 75/75; visual 136/136 with zero drift. `pnpm qualify:ingress` NON-PASS (B-001, two leaves) and `pnpm audit` NON-PASS (B-002). Post-merge `pnpm check` PASS at `1b5aa39`. Open Phase 2 handoff items carried from the Sprint 002 Final Review: human main-page review, the test-only "Open conversation" link, untyped content and input display names (B-003), and same-scope re-read presentation (Phase 3).
 - **Implementation spec:** `docs/specs/implementation-spec-001.md`, Phase 2 P2-S5–S9; §§4 and 8.2/8.4–8.7. Prerequisite plan: `docs/sprints/sprint-002.md`.
 
 ### Sprint-Wide Context
@@ -40,13 +40,13 @@
 
 #### Story 1: Storyboard, Videos and request cancellation controls (P2-S5)
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
-  - [ ] Follows sprint template
-  - [ ] Acceptance criteria are specific and testable
-  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
-  - [ ] Story is small enough to review and merge independently
-  - [ ] Reviewed by sub-agent
-  - [ ] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Follows sprint template
+  - [x] Acceptance criteria are specific and testable
+  - [x] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
+  - [x] Story is small enough to review and merge independently
+  - [x] Reviewed by sub-agent
+  - [x] Review findings addressed or explicitly recorded
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: None — independent sprint-doc-reviewer pass 1 found no Story 1 issues.
   - Resolution: N/A. Overall plan scored 4/5; final-story reporting clarification addressed below. Start checklist is confirmed after Sprint 002 acceptance and execution authorization.
@@ -71,13 +71,13 @@
 
 #### Story 2: Single-clip playback interface and unavailable media (P2-S6)
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
-  - [ ] Follows sprint template
-  - [ ] Acceptance criteria are specific and testable
-  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
-  - [ ] Story is small enough to review and merge independently
-  - [ ] Reviewed by sub-agent
-  - [ ] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Follows sprint template
+  - [x] Acceptance criteria are specific and testable
+  - [x] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
+  - [x] Story is small enough to review and merge independently
+  - [x] Reviewed by sub-agent
+  - [x] Review findings addressed or explicitly recorded
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: None — independent sprint-doc-reviewer pass 1 found no Story 2 issues.
   - Resolution: N/A. Start checklist is confirmed after Sprint 002 acceptance and execution authorization.
@@ -102,16 +102,16 @@
 
 #### Story 3: Paste, upload and Library attachment consumers (P2-S7)
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
-  - [ ] Follows sprint template
-  - [ ] Acceptance criteria are specific and testable
-  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
-  - [ ] Story is small enough to review and merge independently
-  - [ ] Reviewed by sub-agent
-  - [ ] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Follows sprint template
+  - [x] Acceptance criteria are specific and testable
+  - [x] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
+  - [x] Story is small enough to review and merge independently
+  - [x] Reviewed by sub-agent
+  - [x] Review findings addressed or explicitly recorded
+  - [x] Ready for Lou
 - **Planning review:**
-  - Findings: None — independent sprint-doc-reviewer pass 1 found no Story 3 issues.
-  - Resolution: N/A. Start checklist is confirmed after Sprint 002 acceptance and execution authorization.
+  - Findings: None — independent sprint-doc-reviewer pass 1 found no Story 3 issues. Start re-check (2026-10-28, after the picker reassignment): P2/check-4, category and selection behaviour lacked explicit pass conditions.
+  - Resolution: Added the explicit picker pass conditions below ("Start refinements"); no executable scope or check weakened. Start re-check scored 4/5, ready to start.
 - **As a** creator, **I want** the approved material-input controls connected to their intended operations, **so that** unavailable inputs do not appear as saved or attached work.
 - **Dependencies:** Stories 1–2; Sprint 002 Library, Script/edit, conversation and request-state components.
 - **Acceptance criteria:**
@@ -131,16 +131,21 @@
   3. Add browser/no-transfer checks and complete input/picker visual evidence.
 - **Technical notes:** local browser file selection is not an Artifact Version. Do not persist test props in product state. Preserve scoped unsaved text without leaking it across account transitions.
 - **User decisions (2026-10-28):** the populated Library picker moves here from Sprint 002. Sprint 002 delivered the wired Library dialog and its approved feedback/empty states. The shared search control is only region-matched; the dialog has no picker header/search yet, and a successful read renders nothing (`apps/web/src/shell/shell.tsx`, Library children). This story builds the `library-picker-r92.html` layout in the actual Library dialog: header/search, category pills, tile grid and selection. Production Library reads stay 501, so items come from labelled read-only prerequisites. Check categories and selection behaviourally, and add full-page pairs at 1440, 390 and 820/821. No pretend attachment.
+- **Start refinements (2026-10-28, orchestrator):** explicit picker pass conditions. Category is not a typed Library field: `GET /library` accepts only `kind` (script, reference, storyboard, image, video), plus cursor and limit, and has no search term. Character, place, prop and look categories therefore live in untyped content, the same gap as Story 5 content and B-003.
+  - Categories: only from labelled read-only display facts in isolated compositions. With facts, a pill shows exactly the matching tiles and "All" shows every tile. Production never guesses categories from untyped content. If an honest production presentation without categories is not in the approved reference, the design gate applies before implementation. No pill sends a request with an invented `kind` or search term.
+  - Search: filters only the loaded tiles by displayed name, locally; no request carries a search term.
+  - Selection: pressing a tile toggles only its pressed state (and any approved selection count); selection alone sends no request and creates no attachment. Attaching sends the exact version and purpose. On 401, 501 or error, the selection and existing attachments are unchanged.
+  - Proof: browser assertions for each condition above, plus full-page pairs of the populated picker at 1440, 390 and 820/821.
 
 #### Story 4: Direct Export, history/status and download consumers (P2-S8)
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
-  - [ ] Follows sprint template
-  - [ ] Acceptance criteria are specific and testable
-  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
-  - [ ] Story is small enough to review and merge independently
-  - [ ] Reviewed by sub-agent
-  - [ ] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Follows sprint template
+  - [x] Acceptance criteria are specific and testable
+  - [x] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
+  - [x] Story is small enough to review and merge independently
+  - [x] Reviewed by sub-agent
+  - [x] Review findings addressed or explicitly recorded
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: None — independent sprint-doc-reviewer pass 1 found no Story 4 issues.
   - Resolution: N/A. Start checklist is confirmed after Sprint 002 acceptance and execution authorization.
@@ -165,13 +170,13 @@
 
 #### Story 5: Phase 2 browser walkthrough and surface stocktake (P2-S9)
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
-  - [ ] Follows sprint template
-  - [ ] Acceptance criteria are specific and testable
-  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
-  - [ ] Story is small enough to review and merge independently
-  - [ ] Reviewed by sub-agent
-  - [ ] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Follows sprint template
+  - [x] Acceptance criteria are specific and testable
+  - [x] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
+  - [x] Story is small enough to review and merge independently
+  - [x] Reviewed by sub-agent
+  - [x] Review findings addressed or explicitly recorded
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: None — independent sprint-doc-reviewer pass 1 found no Story 5 issues.
   - Resolution: N/A. Start checklist is confirmed after Sprint 002 acceptance and execution authorization.
@@ -197,10 +202,10 @@
 
 #### Final Story: Sprint Verification & Completion
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
-  - [ ] Uses the story sections above and the existing regression suite as the verification source of truth
-  - [ ] Defines where final verification evidence will be recorded
-  - [ ] Includes full regression verification, not only areas believed to be touched
-  - [ ] Ready for Lou
+  - [x] Uses the story sections above and the existing regression suite as the verification source of truth
+  - [x] Defines where final verification evidence will be recorded
+  - [x] Includes full regression verification, not only areas believed to be touched
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: Pass 1, P2/check-8 — explicitly require all canonical verification types, including zero-count rows and reasons for Unknown counts. Overall 4/5, ready to start subject to dependencies and authorization.
   - Resolution: Added the complete reporting requirement to the acceptance criterion below; no executable scope or checks weakened. Descriptive correction reviewed editorially.
