@@ -5,7 +5,7 @@ import type { ReadScope } from '../api/use-scoped-read.js';
 import { Button, TextField } from '../ui/controls.js';
 import './picker.css';
 
-export type LibraryDisplayFact = Readonly<{ name: string; category?: string; description?: string; image?: Readonly<{ src: string; alt: string }> }>;
+export type LibraryDisplayFact = Readonly<{ name: string; tileLabel?: string; category?: string; description?: string; image?: Readonly<{ src: string; alt: string }> }>;
 /** Labelled read-only display facts keyed by the exact latest version identity. Never product state. */
 export type LibraryPrerequisites = Readonly<{ display?: Readonly<Record<string, LibraryDisplayFact>> }>;
 
@@ -23,7 +23,7 @@ type Display = Readonly<{ name: string; sub: string; category?: string; image?: 
 const displayFor = (item: Item, facts: Readonly<Record<string, LibraryDisplayFact>> | undefined): Display => {
   const fact = own(facts, item.latestVersion.id);
   if (!fact) return { name: kindLabel[item.kind], sub: `Version ${item.latestVersion.revision}` };
-  return { name: fact.name, sub: fact.category ?? fact.description ?? kindLabel[item.kind], ...(fact.category === undefined ? {} : { category: fact.category }), ...(fact.image === undefined ? {} : { image: fact.image }) };
+  return { name: fact.name, sub: fact.tileLabel ?? fact.category ?? fact.description ?? kindLabel[item.kind], ...(fact.category === undefined ? {} : { category: fact.category }), ...(fact.image === undefined ? {} : { image: fact.image }) };
 };
 
 /** Local-only picker: categories, search and pressed state never carry a request. */
