@@ -42,9 +42,9 @@ export function SingleClipViewer(props: Props) {
 function ClipViewer({ connection, scope, version, caption, binding, currentUse, selectedVersionId, selectionRevision, onUsed }: Props) {
   const media = useVersionMedia(connection.kind === 'configured' ? connection.client : null, scope, version.id, true);
   const settled = media.state.kind === 'settled' ? media.state.result : null;
-  const source = settled?.ok ? settled.value : null;
+  const source = settled?.ok && !media.expired ? settled.value : null;
   return <div className="wp-clip-version" data-displayed-version-id={version.id}>
-    {source ? <ClipPlayer source={{ sourceId: version.id, url: source.url, ...(source.poster === undefined ? {} : { posterUrl: source.poster }), ...(source.measured.durationMs === undefined ? {} : { durationMs: source.measured.durationMs }) }} /> : <ClipEmpty>{media.state.kind === 'loading' ? copy.loading : settled && !settled.ok ? failureCopy(settled.error.code) : copy.failed}</ClipEmpty>}
+    {source ? <ClipPlayer source={{ sourceId: version.id, url: source.url, ...(source.poster === undefined ? {} : { posterUrl: source.poster }), ...(source.measured.durationMs === undefined ? {} : { durationMs: source.measured.durationMs }) }} /> : <ClipEmpty>{media.state.kind === 'loading' ? copy.loading : media.expired ? copy.failed : settled && !settled.ok ? failureCopy(settled.error.code) : copy.failed}</ClipEmpty>}
     <p>{caption}</p>
     <VersionUse connection={connection} scope={scope} version={version} binding={binding} currentUse={currentUse} selectedVersionId={selectedVersionId} selectionRevision={selectionRevision} presentation="viewer" onUsed={onUsed} />
   </div>;

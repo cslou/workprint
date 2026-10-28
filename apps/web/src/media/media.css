@@ -1,8 +1,8 @@
 .wp-clip-surface { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius-lg); overflow: hidden; }
-.wp-clip-media { display: block; width: 100%; height: 100%; object-fit: cover; }
+.wp-clip-media { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
 .wp-clip-surface[data-ready="false"] { border-radius: var(--radius-md); overflow: visible; }
 .wp-clip-surface[data-ready="false"] .wp-clip-media { visibility: hidden; }
-.wp-clip-note { display: grid; place-items: center; width: 100%; height: 100%; margin: 0; padding: var(--space-18); border: var(--border-dashed); border-radius: var(--radius-md); color: var(--color-text-subtle); font-size: var(--font-size-13); text-align: center; }
+.wp-clip-note { position: absolute; inset: 0; display: grid; place-items: center; width: 100%; height: 100%; margin: 0; padding: var(--space-18); border: var(--border-dashed); border-radius: var(--radius-md); color: var(--color-text-subtle); font-size: var(--font-size-13); text-align: center; }
 .wp-clip-toggle { position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; padding: 0; border: 0; border-radius: var(--radius-pill); background: var(--color-media-scrim); color: var(--color-media-on-scrim); display: grid; place-items: center; cursor: pointer; }
 .wp-clip-toggle svg { width: 24px; height: 24px; fill: currentColor; }
 .wp-clip-play-icon { margin-left: 2px; }
