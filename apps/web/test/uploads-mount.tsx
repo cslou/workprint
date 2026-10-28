@@ -16,9 +16,11 @@ let connection: BrowserClient = { kind: 'missing' };
 let scope: ReadScope | null = null;
 let accessToken: string | null = null;
 let confirmation = '';
+let mountGeneration = 0;
 const render = () => root.render(<div style={{ width: 'min(720px, 100%)' }}><Composer key={JSON.stringify([scope?.accountId ?? null, scope?.conversationId ?? null])} native={nativeConversations} connection={connection} scope={scope} /><p className={confirmation ? 'wp-chat-feedback' : undefined} data-confirm role="status">{confirmation}</p></div>);
 (window as unknown as { uploadsTest: unknown }).uploadsTest = {
   configure({ apiOrigin, token = null, accountId, conversationId }: { apiOrigin?: string; token?: string | null; accountId: string; conversationId?: string }) {
+    mountGeneration += 1;
     accessToken = token;
     if (apiOrigin !== undefined) connection = createBrowserClient(apiOrigin, async () => accessToken);
     scope = { accountId, ...(conversationId === undefined ? {} : { conversationId }) };
@@ -26,10 +28,13 @@ const render = () => root.render(<div style={{ width: 'min(720px, 100%)' }}><Com
     render();
   },
   async confirm(uploadId: string) {
+    const generation = mountGeneration;
     const outcome = await confirmUpload(connection, uploadId);
-    confirmation = outcome.kind === 'saved' ? `Confirmed ${outcome.value.version.id}` : outcome.feedback;
-    render();
+    if (generation === mountGeneration) {
+      confirmation = outcome.kind === 'saved' ? `Confirmed ${outcome.value.version.id}` : outcome.feedback;
+      render();
+    }
     return outcome.kind;
   },
-  unmount() { root.render(null); },
+  unmount() { mountGeneration += 1; root.render(null); },
 };
