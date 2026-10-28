@@ -64,7 +64,8 @@ test('the actual file input initiates the exact metadata and never transfers or 
   const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
   const cleanup: (() => void | Promise<void>)[] = [];
   try {
-    await verifyBuiltAdmission({ diagnostic(message) { console.log(message); }, after(fn) { cleanup.push(fn); } }, async ({ origin, accessTokens: [token] }) => {
+    await verifyBuiltAdmission({ diagnostic(message) { console.log(message); }, after(fn) { cleanup.push(fn); } }, async ({ origin, accessTokens }) => {
+      const token = accessTokens[0]!;
       await page.goto('/uploads.html');
       await page.waitForFunction(() => !!(window as unknown as UploadsHarness).uploadsTest);
       await page.evaluate((input) => (window as unknown as UploadsHarness).uploadsTest.configure(input), { apiOrigin: origin, token, accountId: 'account-a', conversationId: 'conversation-a' });
@@ -140,7 +141,8 @@ test('the isolated confirmation consumer calls the real route and exposes no ver
   const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
   const cleanup: (() => void | Promise<void>)[] = [];
   try {
-    await verifyBuiltAdmission({ diagnostic(message) { console.log(message); }, after(fn) { cleanup.push(fn); } }, async ({ origin, accessTokens: [token] }) => {
+    await verifyBuiltAdmission({ diagnostic(message) { console.log(message); }, after(fn) { cleanup.push(fn); } }, async ({ origin, accessTokens }) => {
+      const token = accessTokens[0]!;
       await page.goto('/uploads.html');
       await page.waitForFunction(() => !!(window as unknown as UploadsHarness).uploadsTest);
       await page.evaluate((input) => (window as unknown as UploadsHarness).uploadsTest.configure(input), { apiOrigin: origin, token, accountId: 'account-a', conversationId: 'conversation-a' });
@@ -163,7 +165,8 @@ test('picker filters and selects locally and attaches the exact versions against
   const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
   const cleanup: (() => void | Promise<void>)[] = [];
   try {
-    await verifyBuiltAdmission({ diagnostic(message) { console.log(message); }, after(fn) { cleanup.push(fn); } }, async ({ origin, accessTokens: [token] }) => {
+    await verifyBuiltAdmission({ diagnostic(message) { console.log(message); }, after(fn) { cleanup.push(fn); } }, async ({ origin, accessTokens }) => {
+      const token = accessTokens[0]!;
       requests.length = 0;
       await openPicker(page, origin, token, { conversationId: 'conversation-a' });
       await expect(page.getByRole('heading', { name: 'Library', exact: true })).toBeVisible();
