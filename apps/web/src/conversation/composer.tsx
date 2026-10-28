@@ -18,9 +18,8 @@ export function Composer({ native, working = false, docked = false, placeholder 
   const [pending, setPending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
-  const uploadAbort = useRef<AbortController | null>(null);
   const active = useRef(true);
-  useEffect(() => () => { active.current = false; uploadAbort.current?.abort(); }, []);
+  useEffect(() => () => { active.current = false; }, []);
   const send = async () => {
     if (pending || !text.trim()) return;
     setPending(true);
@@ -34,13 +33,10 @@ export function Composer({ native, working = false, docked = false, placeholder 
     const file = input.files?.[0] ?? null;
     input.value = '';
     if (!file || uploading) return;
-    uploadAbort.current?.abort();
-    const controller = new AbortController();
-    uploadAbort.current = controller;
     setUploading(true); setFeedback(null);
     try {
-      const outcome = await initiateUpload(connection ?? { kind: 'missing' }, scope?.conversationId, file, { signal: controller.signal });
-      if (!active.current || controller.signal.aborted) return;
+      const outcome = await initiateUpload(connection ?? { kind: 'missing' }, scope?.conversationId, file);
+      if (!active.current) return;
       // A successful initiation still has no transfer or confirmation in this build.
       setFeedback(outcome.kind === 'initiated' ? uploadFeedback.unavailable : outcome.feedback);
     } finally { if (active.current) setUploading(false); }
