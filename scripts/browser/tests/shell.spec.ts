@@ -115,15 +115,56 @@ for (const axis of ['account-only', 'conversation-only'] as const) test(`${axis}
   await expect(page.getByRole('tabpanel')).toHaveText('Workspace revision 2');
 });
 
-for (const failure of ['unauthenticated', 'not_implemented', 'transport_failure', 'timed_out'] as const) test(`workspace ${failure} never reuses native-load presentation`, async ({ page }) => {
+for (const failure of ['unauthenticated', 'not_implemented', 'transport_failure', 'timed_out', 'forbidden'] as const) test(`workspace ${failure} never reuses native-load presentation`, async ({ page }) => {
   await page.goto('/shell.html');
   await page.route('**/v1/conversations/*/workspace', async (route) => {
     if (failure === 'transport_failure') await route.abort();
-    else if (failure !== 'timed_out') await route.fulfill({ status: failure === 'unauthenticated' ? 401 : 501, json: { error: { code: failure, message: 'Controlled workspace read failure' } } });
+    else if (failure !== 'timed_out') await route.fulfill({ status: failure === 'unauthenticated' ? 401 : failure === 'forbidden' ? 403 : 501, json: { error: { code: failure, message: 'Controlled workspace read failure' } } });
   });
   await configure(page, { apiOrigin: 'http://127.0.0.1:4179', timeoutMs: 100, session: { accountId: 'account-a', name: 'Creator A' }, conversationId: 'conversation-a' });
   await expect.poll(async () => (await reads(page))[0]?.settled).toBe(true);
   expect((await reads(page))[0]?.code).toBe(failure);
   await expect(page.getByRole('main')).toHaveAttribute('aria-busy', 'false');
   await expect(page.getByRole('main')).not.toContainText('Conversation loading is not available yet.');
+  const expected = failure === 'unauthenticated' ? 'Sign-in required to load this video.' : failure === 'not_implemented' ? 'Loading this video is not available yet.' : 'This video could not be loaded. Nothing was changed.';
+  await expect(page.getByRole('tabpanel')).toHaveText(expected);
+  await expect(page.getByRole('tabpanel').locator('.wp-empty')).toHaveText(expected);
+  await page.getByRole('tab', { name: 'Assets', exact: true }).click();
+  await expect(page.getByRole('tabpanel')).toHaveText(expected);
+});
+
+test('workspace loading uses the approved skeleton until the read settles', async ({ page }) => {
+  await page.goto('/shell.html');
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  let started = false;
+  await page.route('**/v1/conversations/*/workspace', async (route) => { started = true; await gate; await route.fulfill({ json: emptyWorkspace(2) }); });
+  await configure(page, { apiOrigin: 'http://127.0.0.1:4179', session: { accountId: 'account-a', name: 'Creator A' }, conversationId: 'conversation-a' });
+  await expect.poll(() => started).toBe(true);
+  const skeleton = page.getByRole('progressbar', { name: 'Loading video' });
+  await expect(skeleton).toBeVisible();
+  await expect(skeleton.locator('i')).toHaveCount(7);
+  expect(await skeleton.locator('i').first().evaluate((node) => getComputedStyle(node).animationName)).toBe('none');
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  expect(await skeleton.locator('i').first().evaluate((node) => getComputedStyle(node).animationDuration)).toBe('1.2s');
+  release();
+  await expect.poll(async () => (await reads(page))[0]?.settled).toBe(true);
+  await expect(skeleton).toHaveCount(0);
+  await expect(page.getByRole('tabpanel')).toHaveText('Workspace revision 2');
+});
+
+for (const absent of ['session', 'conversation'] as const) test(`absent ${absent} retains approved empty tabs without a workspace read`, async ({ page }) => {
+  await page.goto('/shell.html');
+  let requests = 0;
+  await page.route('**/v1/**', async (route) => { requests++; await route.abort(); });
+  await configure(page, { apiOrigin: 'http://127.0.0.1:4179', ...(absent === 'session' ? { session: null, conversationId: 'conversation-a' } : { session: { accountId: 'account-a', name: 'Creator A' } }) });
+  for (const [tab, empty] of [['Script', 'Your script will appear here once you describe your video.'], ['Assets', 'Characters, places and props will appear here.'], ['Storyboard', 'The storyboard is planned once the script is agreed.'], ['Videos', 'No videos yet.']]) {
+    await page.getByRole('tab', { name: tab!, exact: true }).click();
+    await expect(page.getByRole('tabpanel')).toHaveText(empty!);
+  }
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  expect(requests).toBe(0);
+  expect(await reads(page)).toHaveLength(0);
+  expect(await page.evaluate(() => (window as unknown as { shellTest: { tokenCalls(): number } }).shellTest.tokenCalls())).toBe(0);
+  await expect(page.getByRole('progressbar')).toHaveCount(0);
 });

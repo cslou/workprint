@@ -8,6 +8,7 @@ import { Button } from '../ui/controls.js';
 import { WorkspacePanel, type WorkspaceTab } from '../ui/panel.js';
 import { Library } from '../library/library.js';
 import { useWorkspace } from './workspace.js';
+import { WorkspaceReadPlaceholder } from './workspace-placeholder.js';
 import './shell.css';
 
 export type SessionPresentation = { accountId: string; name: string };
@@ -40,6 +41,7 @@ function ScopedShell({ connection, session, conversationId, workspaceContent }: 
   const recent = <><AriaButton className="wp-nav-label" onPress={() => void runNative('recents')}>Recents</AriaButton><p className="wp-recents-empty">No videos yet.</p>{conversationId && <AriaButton className="wp-nav-item" onPress={() => void runNative('load')}>Open conversation</AriaButton>}</>;
   const account = <AriaButton className="wp-account" onPress={() => setSurface('account')}><span className="wp-avatar" aria-hidden="true">{session ? session.name.slice(0, 1) : ''}</span><span>{accountName}</span></AriaButton>;
   const content = workspace.kind === 'settled' && workspace.result.ok ? workspaceContent?.(workspace.result.value) : undefined;
+  const placeholder = workspace.kind === 'loading' ? <WorkspaceReadPlaceholder state="loading" /> : workspace.failure ? <WorkspaceReadPlaceholder state={workspace.failure} /> : undefined;
   const title = surface === 'navigation' ? 'Navigation' : surface === 'library' ? 'Library' : surface === 'new' ? 'New video' : surface === 'recents' ? 'Recents' : surface === 'load' ? 'Open conversation' : 'Account';
   return <>
     <div className="wp-shell">
@@ -52,7 +54,7 @@ function ScopedShell({ connection, session, conversationId, workspaceContent }: 
         <div className="wp-thread"><div className="wp-welcome"><h1>What would you like to make?</h1><p className="wp-lead">Describe the moment you want to see. Rough is fine; I'll ask about anything I need.</p><div className="wp-hints" aria-label="Things that help">{["Who's in it", 'Where it happens', 'What happens', 'Anything they say', 'Look or mood'].map((hint) => <span key={hint}>{hint}</span>)}</div><p className="wp-aside-note">Have photos of the people or places? You can attach them now or later.</p></div></div>
         <div className="wp-opening-composer" aria-hidden="true"><div className="wp-opening-field">Describe your video…</div><div className="wp-opening-bar"><span className="wp-opening-attach"><span>+</span>Attach photos</span><Button isDisabled>Send</Button></div></div>
       </main>
-      <aside className="wp-workspace" aria-label="This video"><WorkspacePanel selectedKey={tab} onSelectionChange={(key) => setTab(key as WorkspaceTab)} {...(content === undefined ? {} : { content })} /></aside>
+      <aside className="wp-workspace" aria-label="This video"><WorkspacePanel placeholder={placeholder} selectedKey={tab} onSelectionChange={(key) => setTab(key as WorkspaceTab)} {...(content === undefined ? {} : { content })} /></aside>
     </div>
     <ModalOverlay className="wp-modal-overlay" isOpen={surface !== null} onOpenChange={(open) => { if (!open) setSurface(null); }} isDismissable><Modal className="wp-modal"><Dialog className="wp-dialog"><div className="wp-dialog-head" ref={dialogHead}><Heading slot="title">{title}</Heading><Button variant="icon" aria-label="Close" autoFocus onPress={() => setSurface(null)}>×</Button></div>
       {surface === 'navigation' && <div className="wp-navigation-dialog">{nav()}{recent}{account}</div>}

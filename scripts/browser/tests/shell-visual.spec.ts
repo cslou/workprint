@@ -4,20 +4,26 @@ import { writeFile } from 'node:fs/promises';
 
 // Independent approved substitutions into the tracked opening/dialog references.
 // Never import component markup, production shell CSS or ignored proposal files.
-const states = ['opening', 'assets', 'storyboard', 'videos', 'library', 'signed-out', 'signed-in', 'account-unavailable', 'navigation', 'new', 'recents', 'load'] as const;
+const states = ['opening', 'assets', 'storyboard', 'videos', 'library', 'signed-out', 'signed-in', 'account-unavailable', 'navigation', 'new', 'recents', 'load', 'read-unauthenticated', 'read-unavailable', 'read-error'] as const;
+const workspaceCopy = { 'read-unauthenticated': 'Sign-in required to load this video.', 'read-unavailable': 'Loading this video is not available yet.', 'read-error': 'This video could not be loaded. Nothing was changed.' };
 for (const width of [1440, 390, 820, 821]) for (const state of states) {
-  if (state === 'navigation' && width > 820) continue;
+  if ((state === 'navigation' && width > 820) || (state.startsWith('read-') && width !== 1440 && width !== 390)) continue;
   test(`shell ${state} approved reference at ${width}`, async ({ page, context }, info) => {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
     await context.route('**/*', async (route) => { if (new URL(route.request().url()).origin !== 'http://127.0.0.1:4179') throw new Error('Unauthorized visual egress'); await route.continue(); });
     await page.goto('/references/flow2-step1-r73.html');
     await page.addStyleTag({ content: ':root{--font-sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-display:Georgia,"Times New Roman",serif}b,strong{font-weight:600}.approved-menu{display:none}.approved-rows{display:grid;gap:12px;color:var(--fg-muted);font-size:13px}.approved-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.approved-nav{display:flex;flex-direction:column;align-items:stretch;gap:4px}.approved-nav .navitem{display:flex!important}@media(max-width:820px){.approved-menu{display:block}}' });
     await page.evaluate(({ state }) => {
-      const signed = state === 'signed-in' || state === 'account-unavailable';
-      if (state === 'load') document.querySelector('.empty-note')!.insertAdjacentHTML('afterend', '<span class="navitem">Open conversation</span>');
+      const signed = state === 'signed-in' || state === 'account-unavailable' || state.startsWith('read-');
+      if (state === 'load' || state.startsWith('read-')) document.querySelector('.empty-note')!.insertAdjacentHTML('afterend', '<span class="navitem">Open conversation</span>');
       const account = document.querySelector('.account')!;
       account.innerHTML = `<span class="avatar">${signed ? 'C' : ''}</span>${signed ? 'Creator A' : 'Account'}`;
       document.querySelector('.navlist')!.insertAdjacentHTML('beforeend', '<button class="choice approved-menu" type="button">Menu</button>');
+      if (state === 'read-unauthenticated' || state === 'read-unavailable' || state === 'read-error') {
+        const copy = { 'read-unauthenticated': 'Sign-in required to load this video.', 'read-unavailable': 'Loading this video is not available yet.', 'read-error': 'This video could not be loaded. Nothing was changed.' };
+        document.querySelector('#p-script .pempty')!.textContent = copy[state];
+        return;
+      }
       if (state === 'opening' || state === 'assets' || state === 'storyboard' || state === 'videos') { if (state !== 'opening') location.hash = state === 'videos' ? 'p-takes' : `p-${state}`; return; }
       const copy = { new: ['New video', 'New video is not available yet.', 'No conversation was created.'], recents: ['Recents', 'Recents are not available yet.', 'No conversation list was loaded.'], load: ['Open conversation', 'Conversation loading is not available yet.', 'The current workspace is unchanged.'] };
       let title = 'Account', body = '';
@@ -33,8 +39,14 @@ for (const width of [1440, 390, 820, 821]) for (const state of states) {
     const reference = await page.screenshot({ path: info.outputPath('reference-full.png'), fullPage: true, animations: 'disabled' });
     await page.goto('/shell.html');
     await page.waitForFunction(() => !!(window as unknown as { shellTest?: unknown }).shellTest);
-    await page.evaluate((signed) => (window as unknown as { shellTest: { configure(value: unknown): void } }).shellTest.configure({ session: signed ? { accountId: 'visual-account', name: 'Creator A' } : null }), state === 'signed-in' || state === 'account-unavailable');
-    if (state === 'assets' || state === 'storyboard' || state === 'videos') {
+    await page.route('**/v1/conversations/*/workspace', async (route) => {
+      if (state === 'read-error') await route.abort();
+      else await route.fulfill({ status: state === 'read-unauthenticated' ? 401 : 501, json: { error: { code: state === 'read-unauthenticated' ? 'unauthenticated' : 'not_implemented', message: 'Controlled visual prerequisite' } } });
+    });
+    await page.evaluate(({ signed, workspace }) => (window as unknown as { shellTest: { configure(value: unknown): void } }).shellTest.configure({ session: signed ? { accountId: 'visual-account', name: 'Creator A' } : null, ...(workspace ? { apiOrigin: 'http://127.0.0.1:4179', conversationId: 'visual-conversation' } : {}) }), { signed: state === 'signed-in' || state === 'account-unavailable' || state.startsWith('read-'), workspace: state.startsWith('read-') });
+    if (state === 'read-unauthenticated' || state === 'read-unavailable' || state === 'read-error') {
+      await expect(page.getByRole('tabpanel')).toHaveText(workspaceCopy[state]);
+    } else if (state === 'assets' || state === 'storyboard' || state === 'videos') {
       await page.getByRole('tab', { name: state === 'assets' ? 'Assets' : state === 'storyboard' ? 'Storyboard' : 'Videos', exact: true }).click();
     } else if (state !== 'opening') {
       if (width <= 820) await page.getByRole('button', { name: 'Menu', exact: true }).click();

@@ -625,9 +625,19 @@ Empty success retains “Nothing saved yet” and “Characters, places and prop
 | Recents unavailable | `Recents are not available yet.` / `No conversation list was loaded.` |
 | Conversation load unavailable | `Conversation loading is not available yet.` / `The current workspace is unchanged.` |
 
+**Workspace-read addition — 2026-10-28, 002/Story 3.** On a failed workspace HTTP read, replace only the text in the current tab's existing dashed empty box, preserving its style. Native-load copy stays only in its native action dialog; it is never an HTTP-read fallback. No banner, colors or recovery controls are added.
+
+| Workspace read | Exact text |
+| --- | --- |
+| 401 | Sign-in required to load this video. |
+| 501 | Loading this video is not available yet. |
+| Any other failure, including transport and timeout | This video could not be loaded. Nothing was changed. |
+
+Loading retains the approved skeleton (`demo-02.html`, [Panel sections](#panel-sections)); motion has the existing static reduced-motion alternative. With no session or no conversation, retain the approved per-tab empty text and make no workspace request. Comparisons substitute these texts into `flow2-step1-r73.html`'s current `.pempty`, with no layout changes.
+
 Dropped: the local-clear button and cleared-session presentation, and the separate switch-unavailable state. Session/account/conversation changes still clear scoped views internally. No actual Auth, fake recents, guessed identity or hidden sample account is authorized.
 
-**002/Story 4 — approved for later, not implemented here.** Reuse `flow2-step6-r78.html#plan`'s question/plan/options and existing native disclosure treatment. Exact sample lines: `Shot 2 · Panel 2.1 · 1 image`; `Uses: Vale reference (version 1), Gallery reference (version 1)` (input order preserved); `Model: {provider} · {model}`; `Cost: $0.12 · estimate`. Basis words: provider → `provider price`, calculated → `calculated`, estimated → `estimate`. If basis is unknown, amount missing or currency missing: `Cost: unknown`. Follow with `For information only; not a quote.` The collapsible `Prompt and settings` holds the prompt, settings in words (for example `16:9 · still camera`) and any disclosures. Options: `Approve this exact request` / `Request changes`. Remove the visible proposal/question ID/revision line and illustrative-identifiers line; submitted answers still bind exact IDs and revisions. No spending gate, model selector, credits or provider qualification is implied.
+**002/Story 4 — approved for later, not implemented here.** Reuse `flow2-step6-r78.html#plan`'s question/plan/options and existing native disclosure treatment. Exact sample lines: `Shot 2 · Panel 2.1 · 1 image`; `Uses: Vale reference (version 1), Gallery reference (version 1)` (input order preserved); `Model: {provider} · {model}`; `Cost: $0.12 · estimate`. Basis words: provider → `provider price`, calculated → `calculated`, estimated → `estimate`. If basis is unknown, amount missing or currency missing: `Cost: unknown`. Follow with `For information only; not a quote.` The collapsible `Prompt and settings` holds the prompt, settings in words (for example `16:9 · still camera`) and any disclosures. Question cards render the options carried by the question record, using its labels. The option set and wording belong to the later-phase question producer (possibly an agent tool that generates the question UI), not to this design. Remove the visible proposal/question ID/revision line and illustrative-identifiers line; submitted answers still bind exact IDs and revisions. No spending gate, model selector, credits or provider qualification is implied.
 
 **002/Stories 4–5 — approved for later, not implemented here.** One plain line immediately under the owning answer, save or version-use controls. Reuse existing hint/activity typography and the owning question/Script/history layouts (`flow2-step2-r74.html`, `flow2-step10-r82.html#p-takes`), not a banner or recovery control. The Library approval alone did not cover these actions.
 

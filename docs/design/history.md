@@ -1,5 +1,11 @@
 # Workprint — Application Design History
 
+## Workspace-read feedback addition — 2026-10-28
+
+The user approved 002/Story 3 workspace HTTP-read failures as text substitutions in the current tab's existing dashed empty box: 401 — “Sign-in required to load this video.”; 501 — “Loading this video is not available yet.”; all other failures, including transport and timeout — “This video could not be loaded. Nothing was changed.” Loading keeps the approved skeleton and its static reduced-motion alternative; absent session or conversation keeps the existing empty text. No banner, colors or recovery controls. Native-load copy remains only in its dialog. Exact instructions and tracked reference substitutions are in [the existing shell section](design.md#shell-and-remaining-phase-2-feedback).
+
+The user also clarified that 002/Story 4 question cards use the options and labels in their question record; later-phase question producers own the option set/wording, not this design. All other recorded proposal-card lines remain unchanged; no Story 4 implementation is authorized here.
+
 ## Shell and remaining Phase 2 states — 2026-10-28
 
 The user approved the layouts displayed in the local `outputs/verification/sprint-002/design-proposals/` set (source `2e03eba`), with explicit copy corrections. The exact texts and owning stories are recorded in [the guide](design.md#shell-and-remaining-phase-2-feedback). Only 002/Story 3 is authorized for implementation now; question/proposal disclosure, the nine answer/save/use feedback states and 003/Story 4 Export remain later-story approvals, not implemented capabilities.

@@ -21,6 +21,7 @@ test('shell workspace and Library use real admission; native navigation never ca
       const workspaceResponse = page.waitForResponse((response) => response.url() === `${origin}/v1/conversations/read-only-conversation/workspace`);
       await page.evaluate((value) => (window as unknown as { shellTest: { configure(value: unknown): void } }).shellTest.configure(value), { apiOrigin: origin, token: accessTokens[0], session: { accountId: 'admission-account-a', name: 'Creator A' }, conversationId: 'read-only-conversation' });
       expect((await workspaceResponse).status()).toBe(501);
+      await expect(page.getByRole('tabpanel')).toHaveText('Loading this video is not available yet.');
       await expect(page.getByRole('main')).toHaveAttribute('aria-busy', 'false');
       await expect(page.getByRole('main')).not.toContainText('Conversation loading is not available yet.');
       expect(requests).toEqual(['GET /v1/conversations/read-only-conversation/workspace']);
@@ -39,6 +40,12 @@ test('shell workspace and Library use real admission; native navigation never ca
       await page.keyboard.press('Enter');
       await expect(page.getByRole('dialog')).toContainText('Library not available yet');
       expect(requests).toEqual(['GET /v1/conversations/read-only-conversation/workspace', 'GET /v1/library']);
+      await page.keyboard.press('Escape');
+      const deniedResponse = page.waitForResponse((response) => response.url() === `${origin}/v1/conversations/read-only-conversation/workspace`);
+      await page.evaluate(() => (window as unknown as { shellTest: { configure(value: unknown): void } }).shellTest.configure({ token: null, session: { accountId: 'admission-no-token', name: 'Creator B' }, conversationId: 'read-only-conversation' }));
+      expect((await deniedResponse).status()).toBe(401);
+      await expect(page.getByRole('tabpanel')).toHaveText('Sign-in required to load this video.');
+      expect(requests).toEqual(['GET /v1/conversations/read-only-conversation/workspace', 'GET /v1/library', 'GET /v1/conversations/read-only-conversation/workspace']);
       for (const token of accessTokens) expect((await page.content()).includes(token)).toBe(false);
     }, { browserOrigin: 'http://127.0.0.1:4179' });
   } finally { for (const fn of cleanup.reverse()) await fn(); }
