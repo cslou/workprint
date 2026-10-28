@@ -3,7 +3,14 @@ import { existingWorkspace, chosenVideo, approvedImage, reference, materialFacts
 
 for (const outcome of ['abort', 'acknowledged'] as const) test(`reference attachment preserves existing exact choices and approvals (${outcome})`, async ({ page, materialNetwork }, info) => {
   await info.attach('prerequisite', { body: 'Labelled read-only existing workspace, exact versions and reference presentation. Local workspace/request-list collaborators are observation prerequisites. Controlled approved acknowledgement exercises unreachable attachment reconciliation, not persistence or generation.', contentType: 'text/plain' });
-  materialNetwork.allowPost('http://127.0.0.1:4179', '/v1/conversations/conversation-a/uses');
+  const origin = 'http://127.0.0.1:4179';
+  materialNetwork.expectOperations(
+    { origin, method: 'GET', path: `/v1/versions/${chosenVideo.id}`, count: 2, query: {} },
+    { origin, method: 'GET', path: `/v1/versions/${approvedImage.id}`, count: 2, query: {} },
+    { origin, method: 'GET', path: `/v1/versions/${reference.id}`, count: 2, query: {} },
+    { origin, method: 'GET', path: '/v1/library', count: 1, query: {} },
+    { origin, method: 'POST', path: '/v1/conversations/conversation-a/uses', count: 1, query: {} },
+  );
   await page.route('**/v1/library*', route => route.fulfill({ json: { items: [{ id: 'new-reference', kind: 'reference', builtIn: false, latestVersion: { ...reference, id: 'attachment-candidate-v4', artifactId: 'attachment-candidate' } }], nextCursor: null } }));
   const commands: unknown[] = [];
   await page.route('**/v1/conversations/*/uses', async route => {

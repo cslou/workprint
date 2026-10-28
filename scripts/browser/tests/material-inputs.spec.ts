@@ -70,7 +70,7 @@ test('the actual file input initiates the exact metadata and never transfers or 
       await page.goto('/uploads.html');
       await page.waitForFunction(() => !!(window as unknown as UploadsHarness).uploadsTest);
       await page.evaluate((input) => (window as unknown as UploadsHarness).uploadsTest.configure(input), { apiOrigin: origin, token, accountId: 'account-a', conversationId: 'conversation-a' });
-      materialNetwork.allowPost(origin, '/v1/conversations/conversation-a/uploads');
+      materialNetwork.expectOperations({ origin, method: 'POST', path: '/v1/conversations/conversation-a/uploads', count: 3, query: {} });
       const input = page.getByLabel('Choose an image or video', { exact: true });
       const text = page.getByRole('textbox', { name: 'Message', exact: true });
       await text.fill('A quiet moment in the gallery.');
@@ -120,7 +120,7 @@ test('the actual file input initiates the exact metadata and never transfers or 
 
 test('upload transport failure, unsupported type and no conversation send nothing they must not', async ({ page, materialNetwork }, info) => {
   await info.attach('prerequisite', { body: 'Synthetic local files and a labelled isolated initiation acknowledgement with a loopback transfer trap URL. No bytes are transferred and no confirmation or persistence is simulated.', contentType: 'text/plain' });
-  materialNetwork.allowPost('http://127.0.0.1:4179', '/v1/conversations/conversation-a/uploads');
+  materialNetwork.expectOperations({ origin: 'http://127.0.0.1:4179', method: 'POST', path: '/v1/conversations/conversation-a/uploads', count: 2, query: {} });
   await page.goto('/uploads.html');
   await page.waitForFunction(() => !!(window as unknown as UploadsHarness).uploadsTest);
   const input = page.getByLabel('Choose an image or video', { exact: true });
@@ -163,7 +163,7 @@ test('the isolated confirmation consumer calls the real route and exposes no ver
       await page.goto('/uploads.html');
       await page.waitForFunction(() => !!(window as unknown as UploadsHarness).uploadsTest);
       await page.evaluate((input) => (window as unknown as UploadsHarness).uploadsTest.configure(input), { apiOrigin: origin, token, accountId: 'account-a', conversationId: 'conversation-a' });
-      materialNetwork.allowPost(origin, '/v1/uploads/read-only-upload-identity/confirm');
+      materialNetwork.expectOperations({ origin, method: 'POST', path: '/v1/uploads/read-only-upload-identity/confirm', count: 2, query: {} });
       const seen: { method: string; path: string; body: unknown }[] = [];
       await page.route('**/v1/**', async (route) => { seen.push({ method: route.request().method(), path: new URL(route.request().url()).pathname, body: JSON.parse(route.request().postData() ?? '{}') }); await route.fallback(); });
       const outcome = await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.confirm('read-only-upload-identity'));
@@ -191,7 +191,11 @@ test('picker filters and selects locally and attaches the exact versions against
   try {
     await verifyBuiltAdmission({ diagnostic(message) { console.log(message); }, after(fn) { cleanup.push(fn); } }, async ({ origin, accessTokens }) => {
       const token = accessTokens[0]!;
-      materialNetwork.allowPost(origin, '/v1/conversations/conversation-a/uses');
+      materialNetwork.expectOperations(
+        { origin, method: 'GET', path: '/v1/conversations/conversation-a/workspace', count: 2, query: {} },
+        { origin, method: 'GET', path: '/v1/library', count: 2, query: {} },
+        { origin, method: 'POST', path: '/v1/conversations/conversation-a/uses', count: 2, query: {} },
+      );
       requests.length = 0;
       await openPicker(page, origin, token, { conversationId: 'conversation-a' });
       await expect(page.getByRole('heading', { name: 'Library', exact: true })).toBeVisible();
@@ -261,7 +265,8 @@ test('picker filters and selects locally and attaches the exact versions against
   } finally { for (const finish of cleanup.reverse()) await finish(); }
 });
 
-test('picker without facts guesses nothing and attach needs a current conversation', async ({ page }) => {
+test('picker without facts guesses nothing and attach needs a current conversation', async ({ page, materialNetwork }) => {
+  materialNetwork.expectOperations({ origin: 'http://127.0.0.1:4179', method: 'GET', path: '/v1/library', count: 1, query: {} });
   await openPicker(page, 'http://127.0.0.1:4179', 'token', { prerequisites: {} });
   await expect(page.locator('.wp-picker-pill')).toHaveCount(0);
   await expect(page.locator('.wp-picker-tile .wp-picker-label')).toHaveText(['Reference', 'Reference', 'Image', 'Reference']);
@@ -278,7 +283,12 @@ test('picker without facts guesses nothing and attach needs a current conversati
 });
 
 test('controlled partial success attaches one exact version and keeps the rest selected', async ({ page, materialNetwork }) => {
-  materialNetwork.allowPost('http://127.0.0.1:4179', '/v1/conversations/conversation-a/uses');
+  const origin = 'http://127.0.0.1:4179';
+  materialNetwork.expectOperations(
+    { origin, method: 'GET', path: '/v1/conversations/conversation-a/workspace', count: 1, query: {} },
+    { origin, method: 'GET', path: '/v1/library', count: 1, query: {} },
+    { origin, method: 'POST', path: '/v1/conversations/conversation-a/uses', count: 2, query: {} },
+  );
   await openPicker(page, 'http://127.0.0.1:4179', 'token', { conversationId: 'conversation-a' });
   const bodies: Record<string, unknown>[] = [];
   await page.route('**/v1/conversations/conversation-a/uses', async (route) => {
@@ -298,7 +308,12 @@ test('controlled partial success attaches one exact version and keeps the rest s
 });
 
 test('controlled full success clears the selection and claims nothing else locally', async ({ page, materialNetwork }) => {
-  materialNetwork.allowPost('http://127.0.0.1:4179', '/v1/conversations/conversation-a/uses');
+  const origin = 'http://127.0.0.1:4179';
+  materialNetwork.expectOperations(
+    { origin, method: 'GET', path: '/v1/conversations/conversation-a/workspace', count: 1, query: {} },
+    { origin, method: 'GET', path: '/v1/library', count: 1, query: {} },
+    { origin, method: 'POST', path: '/v1/conversations/conversation-a/uses', count: 2, query: {} },
+  );
   await openPicker(page, 'http://127.0.0.1:4179', 'token', { conversationId: 'conversation-a' });
   const bodies: Record<string, unknown>[] = [];
   await page.route('**/v1/conversations/conversation-a/uses', async (route) => {

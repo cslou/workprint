@@ -1,19 +1,30 @@
 import { expect, test as base, type Request } from '@playwright/test';
 
 type Entry = { method: string; url: URL; body: unknown };
-export type MaterialNetwork = { entries: Entry[]; allowPost(origin: string, path: string): void; assertSafe(): void };
+type Operation = Readonly<{ origin: string; method: string; path: string; count: number; query: Readonly<Record<string, string>> }>;
+type Allowance = Omit<Operation, 'count' | 'query'> & { query: string; consumed: boolean };
+export type MaterialNetwork = { entries: Entry[]; expectOperations(...operations: Operation[]): void; assertSafe(): void };
+const queryKey = (entries: Iterable<[string, string]>) => JSON.stringify([...entries].sort(([a, av], [b, bv]) => a.localeCompare(b) || av.localeCompare(bv)));
 
-/** Records every browser HTTP request before navigation and keeps observing through context teardown. */
+/** Records every HTTP request; exact operation allowances are consumed at observation, never retroactively. */
 export const test = base.extend<{ materialNetwork: MaterialNetwork }>({
   materialNetwork: [async ({ context }, use) => {
     const entries: Entry[] = [];
-    const permitted = new Set<string>();
+    const allowances: Allowance[] = [];
+    const unexpected: Entry[] = [];
     const record = (request: Request) => {
       let body: unknown = null;
       if (request.postData()) { try { body = request.postDataJSON(); } catch { body = 'non-JSON transfer'; } }
-      entries.push({ method: request.method(), url: new URL(request.url()), body });
+      const entry = { method: request.method(), url: new URL(request.url()), body };
+      entries.push(entry);
+      if (entry.url.pathname.startsWith('/v1/') || !['GET', 'HEAD', 'OPTIONS'].includes(entry.method)) {
+        const allowance = allowances.find(value => !value.consumed && value.method === entry.method && value.origin === entry.url.origin && value.path === entry.url.pathname && value.query === queryKey(entry.url.searchParams.entries()));
+        if (allowance) allowance.consumed = true;
+        else unexpected.push(entry);
+      }
     };
     const assertSafe = () => {
+      expect(unexpected.map(entry => `${entry.method} ${entry.url.origin}${entry.url.pathname}${entry.url.search}`), 'Unexpected or repeated operation/transfer').toEqual([]);
       for (const entry of entries) {
         expect(['127.0.0.1', 'localhost', '[::1]']).toContain(entry.url.hostname);
         expect(entry.url.pathname).not.toMatch(/generation|provider/);
@@ -21,10 +32,7 @@ export const test = base.extend<{ materialNetwork: MaterialNetwork }>({
           expect(entry.method).toBe('GET');
           expect([...entry.url.searchParams.keys()].filter(key => key !== 'cursor')).toEqual([]);
         }
-        if (!['GET', 'HEAD', 'OPTIONS'].includes(entry.method)) {
-          expect(permitted.has(`${entry.method} ${entry.url.origin}${entry.url.pathname}`), `Unexpected mutation/transfer: ${entry.method} ${entry.url.origin}${entry.url.pathname}`).toBe(true);
-          if (entry.url.pathname.endsWith('/uses')) expect(entry.body).toMatchObject({ purpose: 'reference' });
-        }
+        if (entry.method === 'POST' && entry.url.pathname.endsWith('/uses')) expect(entry.body).toMatchObject({ purpose: 'reference' });
       }
     };
     context.on('request', record);
@@ -32,8 +40,20 @@ export const test = base.extend<{ materialNetwork: MaterialNetwork }>({
       if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(route.request().url()).hostname)) { await route.abort('blockedbyclient'); return; }
       await route.continue();
     });
-    try { await use({ entries, allowPost(origin, path) { permitted.add(`POST ${origin}${path}`); }, assertSafe }); }
-    finally { await context.close(); assertSafe(); context.off('request', record); }
+    try {
+      await use({ entries, expectOperations(...operations) {
+        for (const operation of operations) {
+          expect(Number.isInteger(operation.count) && operation.count > 0).toBe(true);
+          for (let index = 0; index < operation.count; index++) allowances.push({ origin: operation.origin, method: operation.method, path: operation.path, query: queryKey(Object.entries(operation.query)), consumed: false });
+        }
+      }, assertSafe });
+    } finally {
+      await context.close();
+      try {
+        assertSafe();
+        expect(allowances.filter(value => !value.consumed).map(value => `${value.method} ${value.origin}${value.path} query=${value.query}`), 'Expected operations were not consumed').toEqual([]);
+      } finally { context.off('request', record); }
+    }
   }, { auto: true }],
 });
 export { expect };
