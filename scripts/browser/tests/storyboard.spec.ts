@@ -6,6 +6,30 @@ import type { verifyBuiltAdmission as VerifyBuiltAdmission } from '../../../apps
 type Harness = { storyboardTest: { configure(input: unknown): void; unmount(): void } };
 const initial = 'Second Panel description.';
 
+test('aborted planning PATCH retains the exact base, selection and draft and re-enables controls', async ({ page }, info) => {
+  await info.attach('prerequisite', { body: 'Labelled read-only workspace/version projections; actual planning PATCH is aborted, never replaced by a successful backend response.', contentType: 'text/plain' });
+  await page.goto('/storyboard.html'); await page.waitForFunction(() => !!(window as unknown as Harness).storyboardTest);
+  const patches: unknown[] = [];
+  await page.route('**/v1/**', async route => { if (route.request().method() === 'PATCH') patches.push(route.request().postDataJSON()); else expect(route.request().method()).toBe('GET'); await route.abort('failed'); });
+  await page.evaluate(() => (window as unknown as Harness).storyboardTest.configure({ composition: true, videos: true, apiOrigin: 'http://127.0.0.1:4179' }));
+  await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
+  const selection = () => page.locator('.wp-video-row [data-current-version-id]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-current-version-id')));
+  await expect.poll(selection).toEqual(['video-v1', 'video-v1']);
+  await page.getByRole('button', { name: 'View storyboard', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Panel description', exact: true }).last().click();
+  const field = page.getByRole('textbox', { name: 'Panel description', exact: true });
+  const draft = 'Exact planning draft.\nThe second line stays.';
+  await field.fill(draft); await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Changes were not saved. Your unsaved text is retained.');
+  await expect(field).toHaveValue(draft);
+  await expect(field.locator('..')).toHaveAttribute('data-version-id', 'board-v7');
+  await expect(field.locator('..')).toHaveAttribute('data-version-revision', '7');
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeEnabled();
+  expect(await selection()).toEqual(['video-v1', 'video-v1']);
+  expect(patches).toHaveLength(1); expect(patches[0]).toMatchObject({ baseVersionId: 'board-v7', shots: expect.arrayContaining([expect.objectContaining({ shotId: 'shot-a', panels: expect.arrayContaining([expect.objectContaining({ panelId: 'panel-b', description: draft })]) })]) });
+});
+
 test('production Shell composes ordered typed Storyboard and an exact Panel viewer without mutations', async ({ page }, info) => {
   await info.attach('prerequisite', { body: 'Labelled read-only public workspace delivered to the production Shell; no successful mutation or persisted lifecycle fixture.', contentType: 'text/plain' });
   await page.goto('/storyboard.html'); await page.waitForFunction(() => !!(window as unknown as Harness).storyboardTest);
