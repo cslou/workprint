@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
-import { proposalSchema, workspaceSchema } from '../../../packages/contracts/src/index.js';
+import { proposalSchema, workspaceSchema, versionSchema } from '../../../packages/contracts/src/index.js';
 import { proposalCost, proposalLines, deriveProposalDisplayFacts } from '../../../apps/web/src/conversation/proposal.js';
 import type { verifyBuiltAdmission as VerifyBuiltAdmission } from '../../../apps/api/test/auth-built-fixture.js';
 
@@ -56,6 +56,14 @@ test('real question/proposal/version reads and exact option answers distinguish 
         expect(responses).toEqual([status, status, status, status]);
         expect(requests.map((request) => request.path).sort()).toEqual(['/v1/questions/question-example', '/v1/proposals/proposal-example', '/v1/versions/vale-v1', '/v1/versions/gallery-v1'].sort());
         await expect(page.getByText('Shot 2 · Panel 2.1 · 1 image', { exact: true })).toBeVisible();
+        await page.locator('.wp-proposal summary').click();
+        await expect(page.locator('.wp-proposal details')).toHaveAttribute('open', '');
+        await expect(page.locator('.wp-proposal details > div > p')).toHaveText([
+          'Vale recognises Mercer in the gallery.',
+          '16:9 · still camera',
+          'Input references are sent to example-provider.',
+          'The output is a generated candidate, not an approved version.',
+        ]);
         await page.getByRole('textbox', { name: 'Message' }).fill('This is a message, not an answer');
         await page.getByRole('button', { name: 'Send', exact: true }).click();
         await expect(page.getByText('Sending messages is not available yet. Your message is kept.', { exact: true })).toBeVisible();
@@ -142,4 +150,54 @@ test('record-owned options, generic client error and missing display facts canno
   await expect(page.getByRole('textbox', { name: 'Message' })).toHaveValue('Keep this separate message');
   await page.evaluate(() => (window as unknown as { questionTest: { configure(value: unknown): void } }).questionTest.configure({ withProposal: true, missingFacts: true, accountId: 'new-scope' }));
   await expect(page.getByRole('button', { name: 'Request a different framing', exact: true })).toBeDisabled();
+});
+
+for (const status of ['answered', 'superseded'] as const) for (const timing of ['cached', 'concurrent'] as const) test(`${status} prop synchronously blocks a ${timing} pending read`, async ({ page }, info) => {
+  await info.attach('prerequisite', { body: 'Labelled read-only terminal question; controlled pending GET tests cache/response races, not backend success.', contentType: 'text/plain' });
+  await page.goto('/question.html');
+  await page.waitForFunction(() => !!(window as unknown as { questionTest?: unknown }).questionTest);
+  const pending = { id: 'terminal-question', revision: 7, status: 'pending', scope: {}, prompt: 'Cached pending response', options: [{ id: 'choice', label: 'Record terminal choice' }] };
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  let held = false;
+  let posts = 0;
+  await page.route('**/v1/**', async (route) => {
+    if (route.request().method() === 'POST') { posts++; await route.fulfill({ status: 501, json: { error: { code: 'not_implemented', message: 'Controlled terminal race' } } }); return; }
+    held = true; await gate; await route.fulfill({ json: pending });
+  });
+  const response = page.waitForResponse((value) => value.url().endsWith('/v1/questions/terminal-question'));
+  await page.evaluate((question) => (window as unknown as { questionTest: { configure(value: unknown): void } }).questionTest.configure({ apiOrigin: 'http://127.0.0.1:4179', question: { ...question, prompt: 'Pending prop' } }), pending);
+  await expect.poll(() => held).toBe(true);
+  if (timing === 'cached') { release(); await (await response).finished(); await expect(page.getByRole('heading', { name: 'Cached pending response' })).toBeVisible(); }
+  const snapshot = await page.evaluate((question) => {
+    (window as unknown as { questionTest: { configure(value: unknown): void } }).questionTest.configure({ question, sync: true });
+    const region = document.querySelector('[aria-label="Question"]');
+    return { status: region?.getAttribute('data-question-status'), disabled: (region?.querySelector('.wp-question-option') as HTMLButtonElement | null)?.disabled };
+  }, { ...pending, status, prompt: 'Terminal question prop' });
+  expect(snapshot).toEqual({ status, disabled: true });
+  if (timing === 'concurrent') { release(); await (await response).finished(); await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))); }
+  await expect(page.getByRole('region', { name: 'Question' })).toHaveAttribute('data-question-status', status);
+  await expect(page.getByRole('button', { name: 'Record terminal choice', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Record terminal choice', exact: true }).evaluate((element) => (element as HTMLButtonElement).click());
+  expect(posts).toBe(0);
+});
+
+test('inherited display-name entries cannot authorize a proposal input', () => {
+  const proposal = proposalSchema.parse({ id: 'p', revision: 1, questionId: 'q', purpose: 'reference_image', target: { role: 'character' }, provider: 'provider', model: 'model', prompt: 'Prompt', settings: {}, candidateCount: 1, inputs: [{ versionId: 'constructor', role: 'character_reference', order: 0 }], disclosures: [], estimate: { basis: 'unknown' } });
+  const version = versionSchema.parse({ id: 'constructor', artifactId: 'artifact', revision: 1, kind: 'reference', content: {}, createdBy: 'human', createdAt: '2026-10-28T00:00:00Z', dependencies: [] });
+  expect(proposalLines(proposal, { proposalId: 'p', proposalRevision: 1, inputs: {} }, [version])).toBeNull();
+  expect(proposalLines(proposal, { proposalId: 'p', proposalRevision: 1, inputs: { constructor: { name: 'Explicit reference' } } }, [version])?.inputs).toBe('Uses: Explicit reference (version 1)');
+});
+
+for (const docked of [false, true]) test(`standalone ${docked ? 'docked' : 'opening'} composer owns its styles`, async ({ page }) => {
+  await page.goto(`/composer.html${docked ? '?docked' : ''}`);
+  await expect(page.getByRole('textbox', { name: 'Message' })).toBeVisible();
+  const styles = await page.locator('form').evaluate((element) => {
+    const form = getComputedStyle(element);
+    const input = getComputedStyle(element.querySelector('textarea')!);
+    const attach = element.querySelector('.wp-opening-attach > span')!.getBoundingClientRect();
+    return { display: form.display, background: form.backgroundColor, radius: form.borderTopLeftRadius, borderRight: form.borderRightWidth, shadow: form.boxShadow, fontSize: input.fontSize, minHeight: input.minHeight, lineHeight: input.lineHeight, attach: [attach.width, attach.height] };
+  });
+  expect(styles).toMatchObject({ display: 'flex', background: docked ? 'rgba(0, 0, 0, 0)' : 'rgb(255, 254, 250)', radius: docked ? '0px' : '14px', borderRight: docked ? '0px' : '1px', fontSize: '15px', minHeight: '44px', lineHeight: docked ? '21.75px' : '22.5px', attach: [30, 30] });
+  if (docked) expect(styles.shadow).toBe('none'); else expect(styles.shadow).not.toBe('none');
 });

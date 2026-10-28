@@ -48,6 +48,7 @@ export function proposalLines(proposal: Proposal, facts: ProposalDisplayFacts, v
   if (new Set(ordered.map((input) => input.order)).size !== ordered.length) return null;
   const inputs: string[] = [];
   for (const input of ordered) {
+    if (!Object.hasOwn(facts.inputs, input.versionId)) return null;
     const fact = facts.inputs[input.versionId];
     const version = versions.find((value) => value.id === input.versionId);
     const number = version?.revision;

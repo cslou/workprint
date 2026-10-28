@@ -15,5 +15,3 @@
 .wp-proposal details { margin-top: var(--space-8); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-lg); background: var(--color-bg-surface); font-size: var(--font-size-13); }
 .wp-proposal summary { padding: var(--space-6) var(--space-10); color: var(--color-text-secondary); font-size: var(--font-size-12); cursor: pointer; }
 .wp-proposal details > div { padding: 0 var(--space-10) var(--space-10); }
-.wp-opening-composer.wp-chat-docked { margin: var(--space-12) calc(-1 * var(--space-14)) 0; border: 0; border-top: var(--border-width-default) solid var(--color-border-default); border-radius: 0; padding: var(--space-14) var(--space-12) var(--space-10) var(--space-16); box-shadow: none; background: transparent; width: auto; }
-.wp-chat-docked .wp-chat-input { line-height: var(--font-line-height-1-45); }

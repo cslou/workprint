@@ -19,7 +19,10 @@ function ScopedQuestion({ connection, scope, question, proposalPrerequisite, wor
   const client = connection.kind === 'configured' ? connection.client : null;
   const native: ApiClient['native'] = client?.native ?? nativeConversations;
   const observed = useQuestionRead(client, scope, question.id);
-  const current = observed.kind === 'settled' && observed.result.ok && observed.result.value.id === question.id && observed.result.value.revision >= question.revision ? observed.result.value : question;
+  const read = observed.kind === 'settled' && observed.result.ok ? observed.result.value : null;
+  const current = read && read.id === question.id && read.revision >= question.revision
+    && (question.status === 'pending' || (read.status !== 'pending' && read.revision > question.revision))
+    ? read : question;
   const proposalRead = useProposalRead(client, scope, current.scope.proposalId);
   const proposal = proposalRead.kind === 'settled' && proposalRead.result.ok ? proposalRead.result.value : proposalPrerequisite;
   const versionRead = useInputVersions(client, scope, proposal?.inputs.map((input) => input.versionId) ?? []);
