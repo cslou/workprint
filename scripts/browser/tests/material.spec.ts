@@ -37,4 +37,9 @@ test('labelled material prerequisites render every field, retain drafts across t
   await page.evaluate(() => (window as unknown as { materialTest: { configure(value: unknown): void } }).materialTest.configure({ prerequisites: true, accountId: 'different-account' }));
   await expect(page.getByRole('textbox')).toHaveCount(0);
   await expect(page.getByText('Mercer and Vale sit side by side on the gallery bench.', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit What happens', exact: true }).click();
+  await page.getByRole('textbox').fill('Conversation-scoped draft');
+  await page.evaluate(() => (window as unknown as { materialTest: { configure(value: unknown): void } }).materialTest.configure({ prerequisites: true, accountId: 'different-account', conversationId: 'different-conversation' }));
+  await expect(page.getByRole('textbox')).toHaveCount(0);
+  await expect(page.getByText('Conversation-scoped draft', { exact: true })).toHaveCount(0);
 });
