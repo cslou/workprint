@@ -81,6 +81,51 @@ test('opening Send is local, retains the message and never answers a question', 
 });
 
 const emptyWorkspace = (revision: number) => ({ script: null, assets: [], storyboard: { work: null, shots: [] }, videos: [], pendingQuestion: null, activeWork: [], selectionRevision: revision });
+const pendingDraftQuestion = { id: 'draft-question', revision: 1, status: 'pending', scope: {}, prompt: 'Keep the current draft?', options: [{ id: 'keep', label: 'Keep it' }] };
+
+test('composer draft survives delayed opening-to-question and question-to-opening transitions', async ({ page }, info) => {
+  await info.attach('race', { body: 'Labelled read-only workspace/question projections; controlled read completion tests a same-scope surface race, not persisted product work.', contentType: 'text/plain' });
+  await page.goto('/shell.html');
+  let release!: () => void; const gate = new Promise<void>((resolve) => { release = resolve; });
+  let workspaceCalls = 0; const requests: string[] = [];
+  await page.route('**/v1/**', async (route) => {
+    expect(route.request().method()).toBe('GET'); requests.push(new URL(route.request().url()).pathname);
+    if (route.request().url().endsWith('/workspace')) { const first = ++workspaceCalls === 1; if (first) await gate; await route.fulfill({ json: { ...emptyWorkspace(workspaceCalls), pendingQuestion: first ? pendingDraftQuestion : null } }); }
+    else await route.abort('failed');
+  });
+  const scope = { session: { accountId: 'draft-account', name: 'Draft account' }, conversationId: 'draft-conversation', apiOrigin: 'http://127.0.0.1:4179' };
+  await configure(page, scope); await expect.poll(() => workspaceCalls).toBe(1);
+  const message = page.getByRole('textbox', { name: 'Message', exact: true });
+  await expect(message).toHaveAttribute('placeholder', 'Describe your video…');
+  const draft = 'Exact opening draft.\nDo not discard the second line.';
+  await message.fill(draft); expect(requests).toEqual(['/v1/conversations/draft-conversation/workspace']);
+  expect(await page.evaluate(() => (window as unknown as { shellTest: { tokenCalls(): number } }).shellTest.tokenCalls())).toBe(1);
+  release(); await expect(page.getByRole('region', { name: 'Question', exact: true })).toBeVisible();
+  await expect(message).toHaveAttribute('placeholder', 'Pick an option, type your own answer, or ask something else…');
+  await expect(message).toHaveValue(draft);
+  await expect.poll(() => requests.length).toBe(2);
+  const dockedDraft = draft + '\nTyped while docked.'; await message.fill(dockedDraft); expect(requests).toHaveLength(2);
+  // Existing harness client replacement supplies a later settled snapshot; its loading presentation is not changed or asserted here.
+  await configure(page, scope);
+  await expect(message).toHaveAttribute('placeholder', 'Describe your video…');
+  await expect(message).toHaveValue(dockedDraft);
+  expect(requests).toEqual(['/v1/conversations/draft-conversation/workspace', '/v1/questions/draft-question', '/v1/conversations/draft-conversation/workspace']);
+});
+
+for (const axis of ['account', 'conversation']) test(`composer draft clears on ${axis}-only switch`, async ({ page }) => {
+  await page.goto('/shell.html'); const requests: string[] = [];
+  await page.route('**/v1/**', async (route) => { expect(route.request().method()).toBe('GET'); requests.push(route.request().method()); if (route.request().url().endsWith('/workspace')) await route.fulfill({ json: { ...emptyWorkspace(1), pendingQuestion: pendingDraftQuestion } }); else await route.abort('failed'); });
+  const session = { accountId: 'draft-account', name: 'Draft account' };
+  await configure(page, { session, conversationId: 'draft-conversation', apiOrigin: 'http://127.0.0.1:4179' });
+  await expect(page.getByRole('region', { name: 'Question', exact: true })).toBeVisible();
+  const message = page.getByRole('textbox', { name: 'Message', exact: true }); await message.fill('Scope-owned draft');
+  const before = requests.length;
+  await configure(page, { session: axis === 'account' ? { accountId: 'other-account', name: 'Other account' } : session, conversationId: axis === 'conversation' ? 'other-conversation' : 'draft-conversation' });
+  await expect(message).toHaveValue('');
+  await expect(page.getByRole('region', { name: 'Question', exact: true })).toBeVisible();
+  await expect(message).toHaveValue(''); expect(requests.length).toBeGreaterThanOrEqual(before);
+});
+
 const reads = (page: Page) => page.evaluate(() => (window as unknown as { shellTest: { reads(): { call: number; conversationId: string; settled: boolean; code: string | null }[] } }).shellTest.reads());
 
 for (const axis of ['account-only', 'conversation-only'] as const) test(`${axis} switch resets presentation after the old read has settled or cancelled`, async ({ page }) => {

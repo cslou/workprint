@@ -3,9 +3,13 @@ import type { ApiClient } from '@workprint/api-client';
 import { Button } from '../ui/controls.js';
 import './composer.css';
 
+export type ComposerDraft = { value: string; onChange(value: string): void };
+
 /** Only explicit presses call the supported unavailable-native boundary. */
-export function Composer({ native, working = false, docked = false, placeholder = 'Describe your video…' }: { native: ApiClient['native']; working?: boolean; docked?: boolean; placeholder?: string }) {
-  const [text, setText] = useState('');
+export function Composer({ native, working = false, docked = false, placeholder = 'Describe your video…', draft }: { native: ApiClient['native']; working?: boolean; docked?: boolean; placeholder?: string; draft?: ComposerDraft }) {
+  const [localText, setLocalText] = useState('');
+  const text = draft?.value ?? localText;
+  const setText = draft?.onChange ?? setLocalText;
   const [feedback, setFeedback] = useState<'send' | 'stop' | null>(null);
   const [pending, setPending] = useState(false);
   const send = async () => {
