@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import { Shell, type SessionPresentation } from '../src/shell/shell.js';
+import type { LibraryPrerequisites } from '../src/library/picker.js';
 import { createBrowserClient, type BrowserClient } from '../src/api/client.js';
 import '../src/ui/tokens.css';
 import '../src/ui/foundations.css';
@@ -12,7 +13,7 @@ let calls = 0;
 let accessToken: string | null = null;
 const reads: { call: number; conversationId: string; settled: boolean; code: string | null }[] = [];
 (window as unknown as { shellTest: unknown }).shellTest = {
-  configure({ session, conversationId, apiOrigin, timeoutMs, token = null }: { session: SessionPresentation | null; conversationId?: string; apiOrigin?: string; timeoutMs?: number; token?: string | null }) {
+  configure({ session, conversationId, apiOrigin, timeoutMs, token = null, libraryPrerequisites }: { session: SessionPresentation | null; conversationId?: string; apiOrigin?: string; timeoutMs?: number; token?: string | null; libraryPrerequisites?: LibraryPrerequisites }) {
     accessToken = token;
     if (apiOrigin !== undefined) {
       connection = createBrowserClient(apiOrigin, async () => { calls++; return accessToken; }, timeoutMs);
@@ -29,7 +30,7 @@ const reads: { call: number; conversationId: string; settled: boolean; code: str
         } } };
       }
     }
-    root.render(<Shell connection={connection} session={session} {...(conversationId === undefined ? {} : { conversationId })} workspaceContent={(workspace) => ({ script: <p>Workspace revision {workspace.selectionRevision}</p> })} />);
+    root.render(<Shell connection={connection} session={session} {...(conversationId === undefined ? {} : { conversationId })} {...(libraryPrerequisites === undefined ? {} : { libraryPrerequisites })} workspaceContent={(workspace) => ({ script: <p>Workspace revision {workspace.selectionRevision}</p> })} />);
   },
   tokenCalls() { return calls; },
   reads() { return reads; },

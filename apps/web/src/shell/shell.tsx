@@ -7,6 +7,8 @@ import type { BrowserClient } from '../api/client.js';
 import { Button } from '../ui/controls.js';
 import type { WorkspaceTab } from '../ui/panel.js';
 import { Library } from '../library/library.js';
+import { LibraryPicker } from '../library/picker.js';
+import type { LibraryPrerequisites } from '../library/picker.js';
 import { MaterialPanel } from '../materials/panel.js';
 import type { MaterialPrerequisites } from '../materials/presentation.js';
 import { Storyboard } from '../storyboard/storyboard.js';
@@ -19,7 +21,7 @@ import { WorkspaceReadPlaceholder } from './workspace-placeholder.js';
 import './shell.css';
 
 export type SessionPresentation = { accountId: string; name: string };
-export type ShellProps = { connection: BrowserClient; session: SessionPresentation | null; conversationId?: string; workspaceContent?: (workspace: OperationResponse<'workspace'>) => Partial<Record<WorkspaceTab, ReactNode>>; materialPrerequisites?: MaterialPrerequisites; storyboardPrerequisites?: StoryboardPrerequisites; videoPrerequisites?: VideoPrerequisites };
+export type ShellProps = { connection: BrowserClient; session: SessionPresentation | null; conversationId?: string; workspaceContent?: (workspace: OperationResponse<'workspace'>) => Partial<Record<WorkspaceTab, ReactNode>>; materialPrerequisites?: MaterialPrerequisites; storyboardPrerequisites?: StoryboardPrerequisites; videoPrerequisites?: VideoPrerequisites; libraryPrerequisites?: LibraryPrerequisites };
 type Surface = 'account' | 'account-unavailable' | 'navigation' | 'library' | 'new' | 'recents' | 'load' | null;
 const nativeCopy = { new: ['New video is not available yet.', 'No conversation was created.'], recents: ['Recents are not available yet.', 'No conversation list was loaded.'], load: ['Conversation loading is not available yet.', 'The current workspace is unchanged.'] } as const;
 
@@ -27,7 +29,7 @@ const nativeCopy = { new: ['New video is not available yet.', 'No conversation w
 export function Shell(props: ShellProps) {
   return <ScopedShell key={JSON.stringify([props.session?.accountId ?? null, props.conversationId ?? null])} {...props} />;
 }
-function ScopedShell({ connection, session, conversationId, workspaceContent, materialPrerequisites, storyboardPrerequisites, videoPrerequisites }: ShellProps) {
+function ScopedShell({ connection, session, conversationId, workspaceContent, materialPrerequisites, storyboardPrerequisites, videoPrerequisites, libraryPrerequisites }: ShellProps) {
   const [surface, setSurface] = useState<Surface>(null);
   const [tab, setTab] = useState<WorkspaceTab>('script');
   const [composerText, setComposerText] = useState('');
@@ -62,7 +64,7 @@ function ScopedShell({ connection, session, conversationId, workspaceContent, ma
       </nav>
       <main className="wp-main" aria-label="New video" aria-busy={workspace.kind === 'loading'}>
         <div className="wp-thread"><div className="wp-welcome"><h1>What would you like to make?</h1><p className="wp-lead">Describe the moment you want to see. Rough is fine; I'll ask about anything I need.</p><div className="wp-hints" aria-label="Things that help">{["Who's in it", 'Where it happens', 'What happens', 'Anything they say', 'Look or mood'].map((hint) => <span key={hint}>{hint}</span>)}</div><p className="wp-aside-note">Have photos of the people or places? You can attach them now or later.</p></div></div>
-        {workspace.kind === 'settled' && workspace.result.ok && workspace.result.value.pendingQuestion ? <QuestionReview connection={connection} scope={scope} question={workspace.result.value.pendingQuestion} workspace={workspace.result.value} draft={draft} /> : <Composer native={native} draft={draft} />}
+        {workspace.kind === 'settled' && workspace.result.ok && workspace.result.value.pendingQuestion ? <QuestionReview connection={connection} scope={scope} question={workspace.result.value.pendingQuestion} workspace={workspace.result.value} draft={draft} /> : <Composer native={native} draft={draft} connection={connection} scope={scope} />}
       </main>
       <aside className="wp-workspace" aria-label="This video"><MaterialPanel connection={connection} scope={scope} workspace={projection} {...(projection ? { additionalContent: { storyboard: <Storyboard connection={connection} scope={scope} workspace={projection} {...(storyboardPrerequisites ? { prerequisites: storyboardPrerequisites } : {})} />, videos: <Videos connection={connection} scope={scope} workspace={projection} {...(videoPrerequisites ? { prerequisites: videoPrerequisites } : {})} /> } } : {})} {...(materialPrerequisites ? { prerequisites: materialPrerequisites } : {})} placeholder={placeholder} selectedKey={tab} onSelectionChange={(key) => setTab(key as WorkspaceTab)} {...(content === undefined ? {} : { contentOverride: content })} /></aside>
     </div>
@@ -71,7 +73,7 @@ function ScopedShell({ connection, session, conversationId, workspaceContent, ma
       {surface === 'account' && <div className="wp-session-content"><p><b>{session?.name ?? 'Not signed in'}</b></p>{session ? <div className="wp-session-actions"><Button variant="secondary" onPress={() => setSurface('account-unavailable')}>Sign out</Button><Button variant="secondary" onPress={() => setSurface('account-unavailable')}>Switch account</Button></div> : <><p>Sign-in is not available yet.</p><div className="wp-session-actions"><Button isDisabled size="choose">Sign in</Button></div></>}</div>}
       {surface === 'account-unavailable' && <p className="wp-session-message" role="status">Account actions are not available yet. Nothing about your session has changed.</p>}
       {(surface === 'new' || surface === 'recents' || surface === 'load') && <div className="wp-session-content" role="status">{nativeCopy[surface].map((line) => <p key={line}>{line}</p>)}</div>}
-      {surface === 'library' && <Library connection={connection} scope={scope}>{() => null}</Library>}
+      {surface === 'library' && <Library connection={connection} scope={scope}>{(library) => <LibraryPicker connection={connection} scope={scope} library={library} {...(libraryPrerequisites === undefined ? {} : { prerequisites: libraryPrerequisites })} />}</Library>}
     </Dialog></Modal></ModalOverlay>
   </>;
 }
