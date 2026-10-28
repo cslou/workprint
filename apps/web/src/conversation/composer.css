@@ -1,4 +1,4 @@
-.wp-chat-input { display: block; width: 100%; height: calc(2 * var(--space-22)); padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--color-text-primary); font-family: var(--font-family-sans); font-size: var(--font-size-15); line-height: var(--font-line-height-1-5); resize: none; outline: none; }
+.wp-opening-field.wp-chat-input { display: block; width: 100%; height: auto; field-sizing: content; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--color-text-primary); font-family: var(--font-family-sans); font-size: var(--font-size-15); line-height: var(--font-line-height-1-5); resize: none; outline: none; }
 .wp-chat-input::placeholder { color: var(--color-text-subtle); opacity: 1; }
 .wp-chat-input:focus-visible { outline: var(--border-width-focus) solid var(--color-border-focus); outline-offset: var(--border-width-focus-offset); }
 .wp-chat-actions { display: flex; align-items: center; gap: var(--space-8); }

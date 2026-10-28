@@ -60,5 +60,5 @@ export function ProposalCard({ proposal, facts, versions }: { proposal: Proposal
   const lines = proposalLines(proposal, facts, versions);
   if (!lines) return null;
   const settings = Object.entries(proposal.settings).map(([key, value]) => key === 'aspectRatio' ? String(value) : key === 'camera' ? `${String(value)} camera` : `${key.replace(/([a-z])([A-Z])/g, '$1 $2')}: ${typeof value === 'object' ? JSON.stringify(value) : String(value)}`).join(' · ');
-  return <div className="wp-proposal"><p>{lines.target}</p><p>{lines.inputs}</p><p>Model: {proposal.provider} · {proposal.model}</p><p>{proposalCost(proposal)}</p><p>For information only; not a quote.</p><details><summary>Prompt and settings</summary><div><p>{proposal.prompt}</p><p>{settings}</p>{proposal.disclosures.map((line, index) => <p key={index}>{line}</p>)}</div></details></div>;
+  return <div className="wp-proposal"><p>{lines.target}</p><p>{lines.inputs}</p><p>{`Model: ${proposal.provider} · ${proposal.model}`}</p><p>{proposalCost(proposal)}</p><p>For information only; not a quote.</p><details><summary>Prompt and settings</summary><div><p>{proposal.prompt}</p><p>{settings}</p>{proposal.disclosures.map((line, index) => <p key={index}>{line}</p>)}</div></details></div>;
 }
