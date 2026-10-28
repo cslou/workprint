@@ -55,6 +55,51 @@ test('exact Save uses real admission, retains unsaved text and does not change t
   } finally { for (const fn of cleanup.reverse()) await fn(); }
 });
 
+test('history viewing stays read-only, binds the requested older version, and exact Use failures preserve selection', async ({ page }, info) => {
+  test.setTimeout(120000);
+  await info.attach('prerequisite', { body: 'Read-only current/earlier public versions, selected use and explicit field mapping; not saved product records.', contentType: 'text/plain' });
+  const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
+  const cleanup: (() => void | Promise<void>)[] = [];
+  try {
+    await verifyBuiltAdmission({ diagnostic(message) { console.log(message); }, after(fn) { cleanup.push(fn); } }, async ({ origin, accessTokens }) => {
+      for (const [token, status, feedback] of [[accessTokens[0], 501, 'Using this version is not available yet. The current selection is unchanged.'], [null, 401, 'Sign-in required to use this version. The current selection is unchanged.']] as const) {
+        await page.goto('/version.html');
+        await page.waitForFunction(() => !!(window as unknown as { versionTest?: unknown }).versionTest);
+        let allowMutation = false;
+        const requests: { method: string; path: string; body: unknown }[] = [];
+        await page.route('**/*', async (route) => {
+          const url = new URL(route.request().url());
+          if (!['http://127.0.0.1:4179', origin].includes(url.origin)) throw new Error('Unauthorized history egress');
+          if (url.origin === origin) {
+            if (route.request().method() !== 'GET' && !allowMutation) throw new Error('Viewing/history attempted a mutation');
+            requests.push({ method: route.request().method(), path: url.pathname, body: route.request().method() === 'POST' ? route.request().postDataJSON() : null });
+          }
+          await route.continue();
+        });
+        await page.evaluate((input) => (window as unknown as { versionTest: { configure(value: unknown): void } }).versionTest.configure(input), { apiOrigin: origin, token, review: true });
+        await expect.poll(() => requests.length).toBe(1);
+        await page.locator('.wp-version-history summary').click();
+        await expect.poll(() => requests.length).toBe(2);
+        await page.getByRole('button', { name: 'View version 6', exact: true }).click();
+        await expect.poll(() => requests.length).toBe(3);
+        await expect(page.locator('[data-displayed-version-id]')).toHaveAttribute('data-displayed-version-id', 'script-v6');
+        await expect(page.getByText('Earlier Script text.', { exact: true })).toBeVisible();
+        expect(requests.map(({ method, path }) => ({ method, path }))).toEqual([{ method: 'GET', path: '/v1/versions/script-v7' }, { method: 'GET', path: '/v1/artifacts/script-example/versions' }, { method: 'GET', path: '/v1/versions/script-v6' }]);
+        allowMutation = true;
+        const response = page.waitForResponse((value) => value.url() === `${origin}/v1/conversations/read-only-conversation/uses`);
+        await page.getByRole('button', { name: 'Use this version', exact: true }).click();
+        expect((await response).status()).toBe(status);
+        await expect(page.getByRole('status')).toHaveText(feedback);
+        expect(requests[3]).toEqual({ method: 'POST', path: '/v1/conversations/read-only-conversation/uses', body: { purpose: 'script', versionId: 'script-v6', operationId: expect.stringMatching(/^[0-9a-f-]{36}$/) } });
+        await expect(page.locator('[data-current-version-id]')).toHaveAttribute('data-current-version-id', 'script-v7');
+        await expect(page.locator('[data-displayed-version-id]')).toHaveAttribute('data-displayed-version-id', 'script-v6');
+        expect(requests).toHaveLength(4);
+        await page.unrouteAll({ behavior: 'wait' });
+      }
+    }, { browserOrigin: 'http://127.0.0.1:4179' });
+  } finally { for (const fn of cleanup.reverse()) await fn(); }
+});
+
 test('client validation failure retains text; inherited fields are not editable', async ({ page }) => {
   await page.goto('/version.html');
   await page.waitForFunction(() => !!(window as unknown as { versionTest?: unknown }).versionTest);
