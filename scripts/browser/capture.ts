@@ -19,4 +19,11 @@ export async function settleCapture(page: Page) {
       previous = current;
     }
   });
+  // A CDP LayerTree enable forces a full compositor commit so text rasters are deterministic.
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('LayerTree.enable');
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  await page.waitForTimeout(50);
+  await cdp.send('LayerTree.disable');
+  await cdp.detach();
 }

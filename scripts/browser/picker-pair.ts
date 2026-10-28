@@ -13,9 +13,10 @@ const facts = [
   { name: 'Bench', sub: 'Prop', category: 'Props' },
 ];
 const kindFacts = [
-  { name: 'Image', sub: 'Version 3' },
-  { name: 'Video', sub: 'Version 2' },
   { name: 'Reference', sub: 'Version 1' },
+  { name: 'Reference', sub: 'Version 1' },
+  { name: 'Image', sub: 'Version 3' },
+  { name: 'Reference', sub: 'Version 2' },
 ];
 const stateData = (state: PickerState) => {
   if (state === 'no-facts') return { pills: [], tiles: kindFacts, empty: false, query: '', selected: [] as string[] };
@@ -96,7 +97,7 @@ export async function capturePickerPair(page: Page, info: TestInfo, width: numbe
   await page.addStyleTag({ content: fonts });
   await page.evaluate((markup) => { const account = document.querySelector('.account'); if (account) account.innerHTML = '<span class="avatar">C</span>Creator A'; document.querySelectorAll('.lightbox').forEach((node) => node.remove()); document.body.insertAdjacentHTML('beforeend', markup); }, referenceMarkup(state));
   await settleCapture(page);
-  const referenceSelectors = ['.pk-panel', '.pk-head', '.pk-bar', '.pk-search', '.pk-pill', '.pk-body', '.pk-tray', '.pk-count', '.pk-send', ...(state === 'no-match' ? ['.pk-empty'] : ['.pk-grid', '.pk-tile', '.pk-media']), ...(state === 'no-facts' || state === 'no-match' ? [] : ['.pk-pill.on']), ...(state === 'selected' ? ['.pk-chip'] : [])];
+  const referenceSelectors = ['.pk-panel', '.pk-head', '.pk-bar', '.pk-search', '.pk-body', '.pk-tray', '.pk-count', '.pk-send', ...(state === 'no-facts' ? [] : ['.pk-pill', ...(state === 'no-match' ? [] : ['.pk-pill.on'])]), ...(state === 'no-match' ? ['.pk-empty'] : ['.pk-grid', '.pk-tile', '.pk-media']), ...(state === 'selected' ? ['.pk-chip'] : [])];
   const referenceGeometry = await measure(page, referenceSelectors);
   const reference = await page.screenshot({ path: info.outputPath('reference-full.png'), fullPage: true, animations: 'disabled' });
   await page.goto('/shell.html');
@@ -114,7 +115,7 @@ export async function capturePickerPair(page: Page, info: TestInfo, width: numbe
     await page.locator('.wp-picker-tile').filter({ hasText: 'Bench' }).click();
   }
   await settleCapture(page);
-  const actualSelectors = ['.wp-modal', '.wp-dialog-head', '.wp-picker-bar', '.wp-search-field', '.wp-picker-pill', '.wp-picker-body', '.wp-picker-tray', '.wp-picker-count', '.wp-picker-tray .wp-button', ...(state === 'no-match' ? ['.wp-picker-empty'] : ['.wp-picker-grid', '.wp-picker-tile', '.wp-picker-media']), ...(state === 'no-facts' || state === 'no-match' ? [] : ['.wp-picker-pill.on']), ...(state === 'selected' ? ['.wp-picker-chip'] : [])];
+  const actualSelectors = ['.wp-modal', '.wp-dialog-head', '.wp-picker-bar', '.wp-search-field', '.wp-picker-body', '.wp-picker-tray', '.wp-picker-count', '.wp-picker-tray .wp-button', ...(state === 'no-facts' ? [] : ['.wp-picker-pill', ...(state === 'no-match' ? [] : ['.wp-picker-pill.on'])]), ...(state === 'no-match' ? ['.wp-picker-empty'] : ['.wp-picker-grid', '.wp-picker-tile', '.wp-picker-media']), ...(state === 'selected' ? ['.wp-picker-chip'] : [])];
   const actualGeometry = await measure(page, actualSelectors);
   expect(actualGeometry.map((row) => row.boxes)).toEqual(referenceGeometry.map((row) => row.boxes));
   const actual = await page.screenshot({ path: info.outputPath('actual-full.png'), fullPage: true, animations: 'disabled' });
