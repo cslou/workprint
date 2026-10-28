@@ -11,7 +11,7 @@ export function storyboardReference({ source, view }: { source: string; view: 's
   }
   // The approved dialog action uses a native button, not prototype hash navigation.
   const prototypeLink = required('#p-storyboard .viewboard', tracked);
-  const link = document.createElement('button'); link.type = 'button'; link.className = 'viewboard'; link.innerHTML = prototypeLink.innerHTML; link.style.background = 'transparent'; link.setAttribute('aria-haspopup', 'dialog'); link.setAttribute('aria-expanded', String(view === 'board'));
+  const link = document.createElement('button'); link.type = 'button'; link.className = 'viewboard'; link.innerHTML = prototypeLink.innerHTML; link.style.background = 'var(--raised)'; link.setAttribute('aria-haspopup', 'dialog'); link.setAttribute('aria-expanded', String(view === 'board'));
   const shot = required('#p-storyboard .sb-shot', tracked).cloneNode(true) as Element;
   required('.ftitle b',shot).textContent='First Shot'; required('.ftitle small',shot).textContent='1 panel'; required('.status',shot).remove(); required('.sb-camline',shot).remove();
   (required('summary',shot) as HTMLElement).style.gridTemplateColumns='24px 1fr 16px';

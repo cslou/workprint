@@ -10,7 +10,7 @@ const dirty = execFileSync('git', ['status', '--porcelain'], { cwd, encoding: 'u
 export default defineConfig({
   metadata: { revision, workingTreeDirty: dirty, platform: process.platform, architecture: process.arch },
   testDir: './tests',
-  outputDir: resolve(process.env.WORKPRINT_BROWSER_OUTPUT ?? `outputs/verification/sprint-002/${revision}${dirty ? '-working' : ''}`),
+  outputDir: resolve(process.env.WORKPRINT_BROWSER_OUTPUT ?? `outputs/verification/sprint-003/${revision}${dirty ? '-working' : ''}`),
   timeout: 30_000,
   expect: { timeout: 5000 },
   fullyParallel: false,

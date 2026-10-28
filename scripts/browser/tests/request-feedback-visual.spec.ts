@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { writeFile } from 'node:fs/promises';
 import type { verifyBuiltAdmission as VerifyBuiltAdmission } from '../../../apps/api/test/auth-built-fixture.js';
 import { compare } from '../compare.js';
+import { settleCapture } from '../capture.js';
 import { referenceFonts } from '../material-reference.js';
 import { requestReference } from '../storyboard-reference.js';
 
@@ -19,7 +20,7 @@ test('real unavailable cancellation reference at desktop and narrow', async ({ p
         await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
         await page.goto('/references/flow2-step1-r73.html'); await page.addStyleTag({ content: referenceFonts }); await page.evaluate(requestReference, { feedback: true });
         const measure = () => page.evaluate(() => ['.panel','.need,.wp-request-card','.choice,.wp-request-action button','#p-takes .pempty,.wp-panel-body .wp-empty'].map(selector => { const nodes = [...document.querySelectorAll(selector)]; if (!nodes.length) throw new Error(`Missing paired geometry ${selector}`); return { selector, boxes: nodes.map(node => node.getBoundingClientRect().toJSON()) }; }));
-        await page.evaluate(async () => { await document.fonts.ready; scrollTo(0, 0); });
+        await settleCapture(page);
         const reference = await measure(); const expected = await page.screenshot({ path: info.outputPath(`${width}-reference-full.png`), fullPage: true, animations: 'disabled' });
         await page.goto('/storyboard-visual.html'); await page.waitForFunction(() => !!(window as unknown as { storyboardVisual?: unknown }).storyboardVisual);
         await page.evaluate(input => (window as unknown as { storyboardVisual: { configure(input: unknown): void } }).storyboardVisual.configure(input), { origin, token: accessTokens[0] });
@@ -29,7 +30,7 @@ test('real unavailable cancellation reference at desktop and narrow', async ({ p
         await card.getByRole('button', { name: 'Cancel request', exact: true }).click(); expect((await response).status()).toBe(501);
         await expect(card.getByRole('status')).toHaveText('Cancelling this request is not available yet. The last known state is still shown.');
         await expect(card.getByRole('button', { name: 'Cancel request', exact: true })).toBeEnabled();
-        await page.mouse.move(1, 1); await page.evaluate(async () => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); await document.fonts.ready; scrollTo(0, 0); });
+        await settleCapture(page);
         const actual = await measure(); await writeFile(info.outputPath(`${width}-geometry.json`), JSON.stringify({ reference, actual }, null, 2));
         const image = await page.screenshot({ path: info.outputPath(`${width}-actual-full.png`), fullPage: true, animations: 'disabled' });
         const changedPixels = await compare(expected, image, info.outputPath(`${width}-comparison`));

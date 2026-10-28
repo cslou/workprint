@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { compare } from '../compare.js';
+import { settleCapture } from '../capture.js';
 import { referenceFonts } from '../material-reference.js';
 import { requestReference } from '../storyboard-reference.js';
 
@@ -14,14 +15,14 @@ for (const width of [1440, 390, 820, 821]) for (const details of [false, true]) 
   await page.evaluate(requestReference, {});
   if (details) await page.locator('.need').nth(2).locator('summary').click();
   const measure = () => page.evaluate(() => ['.panel','.ptabs,.wp-tabs','#p-takes > section,.wp-panel-section','.need,.wp-request-card','.take-hist,.wp-request-details','.choice,.wp-request-action button'].map(selector => { const nodes = [...document.querySelectorAll(selector)]; if (!nodes.length) throw new Error(`Missing geometry ${selector}`); return { selector, boxes: nodes.map(node => node.getBoundingClientRect().toJSON()) }; }));
-  await page.evaluate(async () => { await document.fonts.ready; scrollTo(0, 0); });
+  await settleCapture(page);
   const reference = await measure();
   const expected = await page.screenshot({ path: info.outputPath('reference-full.png'), fullPage: true, animations: 'disabled' });
   await page.goto('/storyboard-visual.html'); await page.waitForFunction(() => !!(window as unknown as { storyboardVisual?: unknown }).storyboardVisual);
   await page.evaluate(() => (window as unknown as { storyboardVisual: { configure(input: unknown): void } }).storyboardVisual.configure({}));
   await expect(page.locator('.wp-request-card')).toHaveCount(6);
   if (details) await page.locator('.wp-request-card').nth(2).locator('summary').click();
-  await page.mouse.move(1, 1); await page.evaluate(async () => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); await document.fonts.ready; scrollTo(0, 0); });
+  await settleCapture(page);
   const actual = await measure();
   await writeFile(info.outputPath('geometry.json'), JSON.stringify({ reference, actual }, null, 2));
   const image = await page.screenshot({ path: info.outputPath('actual-full.png'), fullPage: true, animations: 'disabled' });

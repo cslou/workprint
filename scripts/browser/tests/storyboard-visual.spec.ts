@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { compare } from '../compare.js';
+import { settleCapture } from '../capture.js';
 import { referenceFonts } from '../material-reference.js';
 import { requestReference, storyboardReference } from '../storyboard-reference.js';
 
@@ -15,14 +16,14 @@ for (const width of [1440,390,820,821]) for (const view of ['storyboard','board'
   await page.evaluate(storyboardReference,{source,view});
   const selectors = ['.panel','.ptabs,.wp-tabs',...(view==='videos'?['.take-item,.wp-video-row','.take-hist,.wp-version-history,.wp-request-details','.need,.wp-request-card']:['.sb-shot,.wp-storyboard-shot','.sb-panel,.wp-storyboard-panel']),...(view==='panel'?['.lb-panel.wide,.wp-modal','.notes,.wp-panel-version p','.choose,.wp-version-use-viewer .wp-button-primary']:view==='board'?['.lb-panel.board,.wp-modal-board','.lb-scroll,.wp-storyboard-board','.bshot,.wp-board-shot','.bgrid,.wp-board-grid','.plabel .edit,.wp-version-pencil .wp-button-icon','.viewboard,.wp-storyboard > .wp-button-secondary','html,body']:[])];
   const measure = () => page.evaluate(selectors=>selectors.map(selector=>{const nodes=[...document.querySelectorAll(selector)];if(!nodes.length)throw new Error(`Missing paired geometry ${selector}`);return {selector,boxes:nodes.map(node=>node.getBoundingClientRect().toJSON()),styles:nodes.map(node=>{const style=getComputedStyle(node);return Object.fromEntries(['font','line-height','color','background','border','border-radius','appearance','position','z-index','padding','margin','transform','opacity','box-shadow','overflow','height'].map(key=>[key,style.getPropertyValue(key)]));})};}),selectors);
-  await page.evaluate(async()=>{await document.fonts.ready;scrollTo(0,0);});
+  await settleCapture(page);
   const reference=await measure();const expected=await page.screenshot({path:info.outputPath('reference-full.png'),fullPage:true,animations:'disabled'});
   await page.goto('/storyboard-visual.html');await page.waitForFunction(()=>!!(window as unknown as {storyboardVisual?:unknown}).storyboardVisual);
   await page.evaluate(view=>(window as unknown as {storyboardVisual:{configure(input:unknown):void}}).storyboardVisual.configure({view}),view);
   if(view==='panel')await page.getByRole('button',{name:'View Panel 1.1 version 2',exact:true}).click();
   else if(view==='board')await page.getByRole('button',{name:'View storyboard',exact:true}).click();
   else await expect(page.locator(view==='videos'?'.wp-video-row':'.wp-storyboard-shot')).toBeVisible();
-  await page.mouse.move(1,1);await page.evaluate(async()=>{if(document.activeElement instanceof HTMLElement)document.activeElement.blur();await document.fonts.ready;scrollTo(0,0);});
+  await settleCapture(page);
   const actual=await measure();await writeFile(info.outputPath('geometry.json'),JSON.stringify({reference,actual},null,2));
   const image=await page.screenshot({path:info.outputPath('actual-full.png'),fullPage:true,animations:'disabled'});
   const changedPixels=await compare(expected,image,info.outputPath('comparison'));
