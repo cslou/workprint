@@ -42,7 +42,8 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
   const publish = (value: PlayerSnapshot) => { snapshot = value; emit(); };
   // Element events always describe its current resource; the attribute is our own supplied URL.
   const currentSource = () => source && !disposed && media.getAttribute('src') === source.url ? source : null;
-  const measuredDuration = (value: PlayerSource) => Number.isFinite(media.duration) && media.duration > 0 ? Math.round(media.duration * 1000) : value.durationMs ?? null;
+  const normalizeDuration = (value: number | undefined) => value !== undefined && Number.isFinite(value) && value >= 0 ? Math.round(value) : undefined;
+  const measuredDuration = (value: PlayerSource) => Number.isFinite(media.duration) && media.duration > 0 ? Math.round(media.duration * 1000) : normalizeDuration(value.durationMs) ?? null;
   const position = () => Math.max(0, Math.round(media.currentTime * 1000));
   const release = () => {
     try { media.pause(); } catch { /* the element may already be detached */ }
@@ -53,7 +54,7 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
 
   const observe = (event: Event) => {
     const value = currentSource();
-    if (!value) return;
+    if (!value || snapshot.status === 'failed') return;
     switch (event.type) {
       case 'error':
         if (media.error) publish({ status: 'failed', sourceId: value.sourceId, positionMs: 0, durationMs: null, failure: 'source' });
@@ -74,8 +75,8 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
       case 'durationchange':
       case 'timeupdate':
       case 'seeked':
-        if (snapshot.status === 'idle' || snapshot.status === 'loading' || snapshot.status === 'failed') return;
-        publish({ status: snapshot.status, sourceId: value.sourceId, positionMs: position(), durationMs: measuredDuration(value), failure: null });
+        if (snapshot.status === 'idle' || snapshot.status === 'loading') return;
+        publish({ status: snapshot.status === 'ended' || snapshot.status === 'ready' || snapshot.status === 'paused' ? (media.ended ? 'ended' : media.paused ? (snapshot.status === 'ready' ? 'ready' : 'paused') : 'playing') : snapshot.status, sourceId: value.sourceId, positionMs: position(), durationMs: measuredDuration(value), failure: null });
         return;
       default:
         return;
@@ -97,15 +98,16 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
       if (next.posterUrl !== undefined) media.setAttribute('poster', next.posterUrl);
       media.setAttribute('src', next.url);
       try { media.load(); } catch { /* a supplied URL that cannot load reports through the error event */ }
-      publish({ status: 'loading', sourceId: next.sourceId, positionMs: 0, durationMs: next.durationMs ?? null, failure: null });
+      publish({ status: 'loading', sourceId: next.sourceId, positionMs: 0, durationMs: normalizeDuration(next.durationMs) ?? null, failure: null });
     },
     play() {
       const value = currentSource();
       if (!value) return;
       const token = generation;
-      void media.play().catch(() => {
-        // A blocked play leaves the truthful paused state; it is not a source failure.
-        if (!disposed && token === generation) observe(new Event('pause'));
+      void media.play().catch((error: unknown) => {
+        if (disposed || token !== generation || !currentSource() || snapshot.status === 'failed') return;
+        if (error instanceof DOMException && error.name === 'NotAllowedError') { observe(new Event('pause')); return; }
+        publish({ status: 'failed', sourceId: value.sourceId, positionMs: 0, durationMs: null, failure: 'source' });
       });
     },
     pause() {
@@ -115,8 +117,9 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
     seek(positionMs) {
       const value = currentSource();
       if (!value || media.readyState < 1 || !Number.isFinite(positionMs)) return;
-      const known = Number.isFinite(media.duration) && media.duration > 0 ? media.duration * 1000 : value.durationMs ?? 0;
+      const known = Number.isFinite(media.duration) && media.duration > 0 ? media.duration * 1000 : normalizeDuration(value.durationMs) ?? 0;
       media.currentTime = Math.max(0, Math.min(positionMs, Math.max(0, known))) / 1000;
+      if (snapshot.status === 'ended') publish({ status: media.paused ? 'paused' : 'playing', sourceId: value.sourceId, positionMs: position(), durationMs: measuredDuration(value), failure: null });
     },
     current() { return snapshot; },
     subscribe(listener) {
