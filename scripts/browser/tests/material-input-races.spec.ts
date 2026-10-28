@@ -86,7 +86,7 @@ const libraryPage = {
   ],
   nextCursor: null,
 };
-const facts = { 'vale-v1': { name: 'Vale', category: 'Characters' }, 'bench-v2': { name: 'Bench', category: 'Props' } };
+const facts = { 'vale-v1': { name: 'Vale', tileLabel: 'Character', category: 'Characters' }, 'bench-v2': { name: 'Bench', tileLabel: 'Prop', category: 'Props' } };
 async function shellScope(page: Page, conversationId: string, session: string) {
   await page.evaluate((input) => (window as unknown as ShellHarness).shellTest.configure(input), { session: { accountId: session, name: 'Creator A' }, apiOrigin: 'http://127.0.0.1:4179', token: 'token', conversationId, libraryPrerequisites: { display: facts } });
 }

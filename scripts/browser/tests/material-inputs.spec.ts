@@ -19,10 +19,10 @@ const libraryItems = (() => {
   ];
 })();
 const display = {
-  'vale-v1': { name: 'Vale', category: 'Characters', image: { src: '/fixtures/library-tile.png', alt: 'Vale' } },
-  'mercer-v1': { name: 'Mercer', category: 'Characters', image: { src: '/fixtures/library-tile.png', alt: 'Mercer' } },
-  'gallery-v3': { name: 'The gallery', category: 'Places', image: { src: '/fixtures/library-tile.png', alt: 'The gallery' } },
-  'bench-v2': { name: 'Bench', category: 'Props', image: { src: '/fixtures/library-tile.png', alt: 'Bench' } },
+  'vale-v1': { name: 'Vale', tileLabel: 'Character', category: 'Characters', image: { src: '/fixtures/library-tile.png', alt: 'Vale' } },
+  'mercer-v1': { name: 'Mercer', tileLabel: 'Character', category: 'Characters', image: { src: '/fixtures/library-tile.png', alt: 'Mercer' } },
+  'gallery-v3': { name: 'The gallery', tileLabel: 'Place', category: 'Places', image: { src: '/fixtures/library-tile.png', alt: 'The gallery' } },
+  'bench-v2': { name: 'Bench', tileLabel: 'Prop', category: 'Props', image: { src: '/fixtures/library-tile.png', alt: 'Bench' } },
 } as const;
 const labels = ['Vale', 'Mercer', 'The gallery', 'Bench'];
 const requests: { method: string; path: string; body: unknown }[] = [];
