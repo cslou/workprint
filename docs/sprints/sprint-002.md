@@ -2,7 +2,7 @@
 
 **Date:** Start authorized 2026-10-28; end follows acceptance gates
 **Goal:** Render the approved core workspace as reusable React components, with real application-client wiring for questions and Script/Assets controls, truthful unavailable outcomes, and page-by-page visual parity evidence.
-**Status:** 🔵 In Progress
+**Status:** 🟢 Complete
 
 **Start gate:** independent planning pass 2 scored **5/5**, no findings, including the revised main-page coverage and phase-2 sequencing. User authorized execution of both sprints. The checked planning gates below confirm readiness, not implemented acceptance; pass-1 notes are retained as history. Functional/design ACs remain unchecked until evidence exists.
 
@@ -46,7 +46,7 @@ Record reference → actual component/page → screenshot pair → result or exp
 | Conversation and question/proposal review — demo 02–04, 09–11, 14, 16–17 | 002/S4 | Shared option/media review presentation; inspect is not choose; representative layout comparisons, not working generation |
 | Script/edit/history — demo 02–03 | 002/S5 | Main view and representative editing/version controls |
 | Assets/reference sheets/viewer — demo 04, 09–11 | 002/S5 | Main Assets and reference review layout; read-only prerequisites where needed |
-| Library picker — demo 05–08 / library-picker-r92 | 002/S2–S3 base; 003/S3 attachment | Main Library/picker layout; categories/selection checked behaviorally, no pretend attachment |
+| Library picker — demo 05–08 / library-picker-r92 | 002/S2–S3 Library read consumer and feedback/empty states; 003/S3 populated picker and attachment (user reassignment 2026-10-28) | Sprint 002: wired Library dialog, approved feedback/empty states and header/search parity. Sprint 003 Story 3: populated picker layout, with categories/selection checked behaviorally; no pretend attachment |
 | Storyboard/Shot/Panel planning — demo 12–13 | 003/S1 | Main board and representative planning edit layout |
 | Videos/candidates/version review — demo 15–18 | 003/S1–S2 | Individual versions only; Play all/comparison excluded |
 | Material input and single-clip access — demo 08–11, 15–17 | 003/S2–S3 | Main input/viewer surfaces; real transfer/private playback remain Phase 3 |
@@ -71,15 +71,15 @@ Record reference → actual component/page → screenshot pair → result or exp
 - **As a** creator, **I want** the approved visual language implemented consistently, **so that** every workspace view uses familiar, accessible controls rather than divergent copies.
 - **Dependencies:** accepted Sprint 001. Existing design approval applies to its in-scope pages; genuinely absent states require scoped visual approval before implementation.
 - **Acceptance criteria:**
-  - [ ] Map the core pages/states to exact brand-book-linked references and record actual gaps in the PR. No broad redesign or reapproval of existing pages. Resolve proposal/estimate, session, basic error/loading/empty/unavailable gaps only where missing; detailed recovery remains assigned to P3/P4. Record new approvals in existing design guide/history.
-  - [ ] Implement canonical semantic tokens and only the shared primitives needed by this sprint: buttons/inputs, tabs, panels, dialog/popover and status/feedback presentation. Consumers share these modules; no copied page CSS, duplicate DTOs or premature general-purpose renderer. Preserve approved keyboard cues and focus treatment rather than imposing a conflicting style.
-  - [ ] Pin the needed React Aria and browser-test dependencies, prove compatibility with the existing cohort, and establish the browser/visual commands and deterministic capture environment described above. Test-only mounts are separate from production and cannot be selected through a production query flag.
-  - [ ] Approve any real token/mockup discrepancy and capture reference/application comparisons for the foundations used by downstream pages. Do not add excluded historical controls merely to match pixels.
+  - [x] Map the core pages/states to exact brand-book-linked references and record actual gaps in the PR. No broad redesign or reapproval of existing pages. Resolve proposal/estimate, session, basic error/loading/empty/unavailable gaps only where missing; detailed recovery remains assigned to P3/P4. Record new approvals in existing design guide/history.
+  - [x] Implement canonical semantic tokens and only the shared primitives needed by this sprint: buttons/inputs, tabs, panels, dialog/popover and status/feedback presentation. Consumers share these modules; no copied page CSS, duplicate DTOs or premature general-purpose renderer. Preserve approved keyboard cues and focus treatment rather than imposing a conflicting style.
+  - [x] Pin the needed React Aria and browser-test dependencies, prove compatibility with the existing cohort, and establish the browser/visual commands and deterministic capture environment described above. Test-only mounts are separate from production and cannot be selected through a production query flag.
+  - [x] Approve any real token/mockup discrepancy and capture reference/application comparisons for the foundations used by downstream pages. Do not add excluded historical controls merely to match pixels.
 - **Functional verification:**
-  - [ ] Browser component tests prove keyboard activation, disabled controls, tab selection, dialog focus entry/return and dismiss behavior; each assertion observes actual rendered controls. Visual captures compare the implemented primitives in their reference context.
-  - [ ] Run the screenshot comparator against a deliberate temporary spacing change; it must fail, then pass after restoration. No persistent defect or source-string test remains.
+  - [x] Browser component tests prove keyboard activation, disabled controls, tab selection, dialog focus entry/return and dismiss behavior; each assertion observes actual rendered controls. Visual captures compare the implemented primitives in their reference context.
+  - [x] Run the screenshot comparator against a deliberate temporary spacing change; it must fail, then pass after restoration. No persistent defect or source-string test remains.
 - **Regression verification:**
-  - [ ] Run existing aggregate/check/build and frozen install/audit after dependency additions; clean smoke still starts without private browser settings and existing Vite private-file denial remains effective.
+  - [ ] Run existing aggregate/check/build and frozen install/audit after dependency additions; clean smoke still starts without private browser settings and existing Vite private-file denial remains effective. *Final verification: aggregate/check/build/frozen install, clean smoke and Vite filesystem denial PASS; `pnpm audit` NON-PASS under user-approved exception B-002, so this item stays unchecked.*
 - **Editorial/design verification:** compare token mappings and reference inventory with the existing guide; obtain scoped approval for new states/deviations. Record per-view evidence, not a new design system document.
 - **Manual-only behavior verification:** side-by-side visual judgment under the shared Visual contract; pass only with no unexplained differences. Keyboard behavior is automated, not manual-only.
 - **Planned commits:**
@@ -105,15 +105,15 @@ Record reference → actual component/page → screenshot pair → result or exp
 - **As a** developer, **I want** one safe browser client composition and reusable request-state handling, **so that** genuine UI actions reach the backend without leaking secrets or replaying commands.
 - **Dependencies:** Story 1; existing api-client and actual authorized development Auth fixtures.
 - **Acceptance criteria:**
-  - [ ] Supply an explicit public API-origin configuration seam without passing backend environment/secrets through Vite or weakening backend rejection of browser config. Missing configuration is explicit and cannot fall back to a production endpoint. Credential-free build/health-only smoke remains supported.
-  - [ ] Connect an actual Library view consumer to api-client and the built backend; valid synthetic Auth receives 501 and missing/invalid Auth receives 401 with distinct user feedback. No arbitrary API-test button is added to production. Qualify browser-origin/preflight behavior for local dev and built serving; any CORS adjustment stays narrowly scoped to intended origins/methods/headers and existing route restrictions.
-  - [ ] Share request settlement, error presentation and scope invalidation only where used. Cancellation/unmount/scope change discards late results and never retries mutations. Support the injected token-provider interface, without implementing or pretending a sign-in/session-refresh product.
-  - [ ] Browser network instrumentation rejects non-authorized egress and proves the guard using a deliberate blocked request. Real test tokens are ephemeral and absent from bundles, captured logs and screenshots. Isolated test mounts/props are absent from the production build.
+  - [x] Supply an explicit public API-origin configuration seam without passing backend environment/secrets through Vite or weakening backend rejection of browser config. Missing configuration is explicit and cannot fall back to a production endpoint. Credential-free build/health-only smoke remains supported.
+  - [x] Connect an actual Library view consumer to api-client and the built backend; valid synthetic Auth receives 501 and missing/invalid Auth receives 401 with distinct user feedback. No arbitrary API-test button is added to production. Qualify browser-origin/preflight behavior for local dev and built serving; any CORS adjustment stays narrowly scoped to intended origins/methods/headers and existing route restrictions.
+  - [x] Share request settlement, error presentation and scope invalidation only where used. Cancellation/unmount/scope change discards late results and never retries mutations. Support the injected token-provider interface, without implementing or pretending a sign-in/session-refresh product.
+  - [x] Browser network instrumentation rejects non-authorized egress and proves the guard using a deliberate blocked request. Real test tokens are ephemeral and absent from bundles, captured logs and screenshots. Isolated test mounts/props are absent from the production build.
 - **Functional verification:**
-  - [ ] Actual browser Library load crosses its intended origin boundary into real admission and renders distinct unavailable/unauthenticated outcomes. Observe request method/path and verify no domain/native writes or inference.
-  - [ ] Controlled delayed/failing response tests show timeout/error settles loading and a late result from old scope is discarded; unmount/reconnect never duplicates a mutation. These are UI-race evidence, not real backend success claims.
+  - [x] Actual browser Library load crosses its intended origin boundary into real admission and renders distinct unavailable/unauthenticated outcomes. Observe request method/path and verify no domain/native writes or inference.
+  - [x] Controlled delayed/failing response tests show timeout/error settles loading and a late result from old scope is discarded; unmount/reconnect never duplicates a mutation. These are UI-race evidence, not real backend success claims.
 - **Regression verification:**
-  - [ ] Retain client deadline/no-native-network and real Auth/route matrices; run check/build, browser secret scan and Vite filesystem-denial tests after public-config/import changes. No wildcard origin or broad workspace filesystem allowlist replaces current restrictions.
+  - [x] Retain client deadline/no-native-network and real Auth/route matrices; run check/build, browser secret scan and Vite filesystem-denial tests after public-config/import changes. No wildcard origin or broad workspace filesystem allowlist replaces current restrictions.
 - **Editorial/design verification:** compare the Library empty/unavailable/error presentation to approved references and scoped new-state approvals; include its paired screenshots.
 - **Manual-only behavior verification:** shared Visual contract; all transport and race assertions automated.
 - **Planned commits:**
@@ -139,14 +139,14 @@ Record reference → actual component/page → screenshot pair → result or exp
 - **As a** creator, **I want** the approved navigation and four workspace tabs, **so that** I can find each area and understand which capabilities are unavailable.
 - **Dependencies:** Stories 1–2.
 - **Acceptance criteria:**
-  - [ ] Implement desktop/narrow shell, New video, Recents, Library, session/sign-in presentation and Script/Assets/Storyboard/Videos tabs. Working navigation does not manufacture a saved conversation or successful login. Native create/list/load actions use the existing no-network unavailable methods; unavailable session actions are labelled honestly pending P3-S1a.
-  - [ ] Workspace/Library reads use the actual application client where scope exists. Absent scope shows a deliberate empty/unavailable state, not a synthetic account or guessed conversation ID. Only isolated component tests supply read-only scope/data prerequisites.
-  - [ ] Switching account/conversation or clearing the session presentation clears scoped view state; late responses cannot repopulate another scope. Focus/navigation work at desktop, narrow and the breakpoint; no inaccessible hidden-only navigation replaces missing narrow controls.
+  - [x] Implement desktop/narrow shell, New video, Recents, Library, session/sign-in presentation and Script/Assets/Storyboard/Videos tabs. Working navigation does not manufacture a saved conversation or successful login. Native create/list/load actions use the existing no-network unavailable methods; unavailable session actions are labelled honestly pending P3-S1a.
+  - [x] Workspace/Library reads use the actual application client where scope exists. Absent scope shows a deliberate empty/unavailable state, not a synthetic account or guessed conversation ID. Only isolated component tests supply read-only scope/data prerequisites.
+  - [x] Switching account/conversation or clearing the session presentation clears scoped view state; late responses cannot repopulate another scope. Focus/navigation work at desktop, narrow and the breakpoint; no inaccessible hidden-only navigation replaces missing narrow controls.
 - **Functional verification:**
-  - [ ] Browser tests navigate every shell destination by pointer and keyboard, preserve intended tab navigation and show unavailable native outcomes without HTTP/token calls. Delayed response tests switch two accounts/conversations and assert old content never appears in the new scope.
-  - [ ] Screenshot each shell/session/Library/empty-tab view at matched desktop/narrow reference states, checking dimensions, paddings, spacing and overflow.
+  - [x] Browser tests navigate every shell destination by pointer and keyboard, preserve intended tab navigation and show unavailable native outcomes without HTTP/token calls. Delayed response tests switch two accounts/conversations and assert old content never appears in the new scope.
+  - [x] Screenshot each shell/session/Library/empty-tab view at matched desktop/narrow reference states, checking dimensions, paddings, spacing and overflow.
 - **Regression verification:**
-  - [ ] Re-run Story 1 component/visual checks and Story 2 real Library/Auth/config tests; existing root smoke still starts from a clean committed export and excludes private files.
+  - [x] Re-run Story 1 component/visual checks and Story 2 real Library/Auth/config tests; existing root smoke still starts from a clean committed export and excludes private files.
 - **Editorial/design verification:** use the brand-book-linked opening/demo/Library references; ask only for genuinely missing session/narrow states. A displayed example must not be presented as account-owned work.
 - **Manual-only behavior verification:** shared Visual contract; navigation, keyboard and scope races are automated.
 - **Planned commits:**
@@ -172,14 +172,14 @@ Record reference → actual component/page → screenshot pair → result or exp
 - **As a** creator, **I want** clear question/proposal review and unavailable chat feedback, **so that** I never mistake a typed message or failed action for approval or completed work.
 - **Dependencies:** Stories 1–3; scoped visual approval only for proposal/disclosure/estimate or other states not in approved flows.
 - **Acceptance criteria:**
-  - [ ] Actual question/proposal readers and option-answer controls use their application methods. Answer requests preserve question ID/revision/option and operation identity. Show exact scope/inputs/provider/model and informational estimate/basis or unknown; no editable proposal, spending gate or model selector.
-  - [ ] On 501/error, keep the question pending and show no approval, generation request or completed assistant reply. Typed text never becomes an answer; preserve unsent text when the native method returns unavailable.
-  - [ ] Send/queue/subscribe/Stop presentation invokes only the existing local unavailable-native boundary, without invented payload/stream protocol. Remount/reconnect never sends/replays commands; disconnect/unmount sends neither Stop nor generation cancellation.
+  - [x] Actual question/proposal readers and option-answer controls use their application methods. Answer requests preserve question ID/revision/option and operation identity. Show exact scope/inputs/provider/model and informational estimate/basis or unknown; no editable proposal, spending gate or model selector.
+  - [x] On 501/error, keep the question pending and show no approval, generation request or completed assistant reply. Typed text never becomes an answer; preserve unsent text when the native method returns unavailable.
+  - [x] Send/queue/subscribe/Stop presentation invokes only the existing local unavailable-native boundary, without invented payload/stream protocol. Remount/reconnect never sends/replays commands; disconnect/unmount sends neither Stop nor generation cancellation.
 - **Functional verification:**
-  - [ ] Mount actual production question/proposal components with labelled read-only prerequisites and real token-provider/API client. Observe exact GET/answer requests against built backend, distinct 401/501 and unchanged pending state; no fabricated saved decision.
-  - [ ] Instrument native calls/network: typing while pending, send/queue/Stop and remount produce local unavailable feedback, zero native requests and no answer/cancel side effect. Compare all delivered question/chat/proposal states with their approved references.
+  - [x] Mount actual production question/proposal components with labelled read-only prerequisites and real token-provider/API client. Observe exact GET/answer requests against built backend, distinct 401/501 and unchanged pending state; no fabricated saved decision.
+  - [x] Instrument native calls/network: typing while pending, send/queue/Stop and remount produce local unavailable feedback, zero native requests and no answer/cancel side effect. Compare all delivered question/chat/proposal states with their approved references.
 - **Regression verification:**
-  - [ ] Re-run shell/account-switch, Library and shared dialog/feedback checks; client/schema/error regression suites retain exact-binding and no-network behavior.
+  - [x] Re-run shell/account-switch, Library and shared dialog/feedback checks; client/schema/error regression suites retain exact-binding and no-network behavior.
 - **Editorial/design verification:** compare approved demo question layouts with current spec authority; old demo typed-answer/cost omissions cannot override exact option approval and disclosure. Record approved differences rather than silently replicating obsolete behavior.
 - **Manual-only behavior verification:** shared Visual contract; requests, pending-state preservation and no-replay checks automated.
 - **Planned commits:**
@@ -206,14 +206,14 @@ Record reference → actual component/page → screenshot pair → result or exp
 - **As a** creator, **I want** approved Script/Assets views and exact-version edit/use controls, **so that** inspecting work never implies a saved or approved change.
 - **Dependencies:** Stories 1–3; shared feedback from Story 4 where applicable.
 - **Acceptance criteria:**
-  - [ ] Render Script, reference sheets, viewers and version history from supplied public projections using shared components. Wire workspace/version/history reads and manual save/use to the intended existing operation keys; do not invent content schemas or a new authoring product.
-  - [ ] Save carries exact base/version/dependencies and operation ID; use carries exact version/purpose. Not-implemented/transport errors preserve unsaved text and prior displayed versions/uses. Viewing/history sends no approval and never falls back to an unrequested latest version.
-  - [ ] Empty ordinary app remains empty. Isolated read-only examples exercise real frontend controls through the backend; they do not become production seeded records, persisted edits or working media playback.
+  - [x] Render Script, reference sheets, viewers and version history from supplied public projections using shared components. Wire workspace/version/history reads and manual save/use to the intended existing operation keys; do not invent content schemas or a new authoring product.
+  - [x] Save carries exact base/version/dependencies and operation ID; use carries exact version/purpose. Not-implemented/transport errors preserve unsaved text and prior displayed versions/uses. Viewing/history sends no approval and never falls back to an unrequested latest version.
+  - [x] Empty ordinary app remains empty. Isolated read-only examples exercise real frontend controls through the backend; they do not become production seeded records, persisted edits or working media playback.
 - **Functional verification:**
-  - [ ] Browser component/wiring tests exercise exact reads/save/use on built backend and assert correct payloads, 501 feedback, unchanged version/approval and retained edits. Test viewing with a mutation-request trap; no mutation may occur.
-  - [ ] Screenshot Script, Assets/reference viewer, version/history, edit and error/unavailable states against matching approved flow/demo references at both required sizes.
+  - [x] Browser component/wiring tests exercise exact reads/save/use on built backend and assert correct payloads, 501 feedback, unchanged version/approval and retained edits. Test viewing with a mutation-request trap; no mutation may occur.
+  - [x] Screenshot Script, Assets/reference viewer, version/history, edit and error/unavailable states against matching approved flow/demo references at both required sizes.
 - **Regression verification:**
-  - [ ] Re-run shared shell, dialog, question and account-switch/browser tests plus contracts/client tests; unchanged input must survive error and navigation paths that retain its editing scope without leaking across accounts.
+  - [x] Re-run shared shell, dialog, question and account-switch/browser tests plus contracts/client tests; unchanged input must survive error and navigation paths that retain its editing scope without leaking across accounts.
 - **Editorial/design verification:** check Script/reference terminology and token consistency; preserve existing approved layout rather than duplicating CSS for each tab. Actual rich content validation and persistence stay with P3-S2/S4/S5.
 - **Manual-only behavior verification:** shared Visual contract; edit preservation and action identities automated.
 - **Planned commits:**
@@ -236,21 +236,21 @@ Record reference → actual component/page → screenshot pair → result or exp
 - **As a** maintainer, **I want** all sprint functional verification and all available regression verification run, **so that** the sprint can be integrated with evidence that new behavior works and existing behavior did not regress.
 - **Dependencies:** All implementation stories.
 - **Acceptance criteria:**
-  - [ ] Every story’s acceptance criteria are evaluated against implementation evidence.
-  - [ ] Every story’s functional verification checkboxes are run, checked, or explicitly marked failed/ambiguous/unrun.
-  - [ ] Every story’s targeted regression verification checkboxes are run, checked, or explicitly marked failed/ambiguous/unrun.
-  - [ ] The full available regression verification suite is run, including existing unit, integration, e2e, smoke, simulator/browser/device, static, and manual-only checks where applicable.
-  - [ ] Failed, ambiguous, manual-only, or unrun verification items are documented. B-001's two failed ingress leaves are reported separately under the unchanged private-only exception, not as passes. B-002's audit advisory is likewise reported as NON-PASS, not as a pass.
-  - [ ] Reusable new functional checks are identified as future regression verification; one-off editorial evidence is not counted as a suite.
-  - [ ] Verification delta reports all 11 canonical types: Unit; Integration / contract; E2E / smoke; Simulator / device; AI / model evals; Static / local checks; Performance / load; Security / dependency; Accessibility / visual; Manual-only; Other verification. Include every row, even zeros, with before sprint, added this sprint, removed, pending/not yet run, and after sprint totals. Explain any Unknown count; classify each method under its most specific type and avoid duplicate counts. Report command groups separately from behavioral cases.
-  - [ ] The sprint doc status is updated to `🟢 Complete` only if completion criteria are met.
-  - [ ] A `## Final Review` section is appended to the sprint doc with the final completion message quoted for auditability.
-  - [ ] Capture all delivered MAIN pages in the Main-page checklist against corresponding approved full-size references at desktop/narrow sizes. Record paired screenshots, overlays/diffs, source/revision and style/spacing inspection; no unexplained difference or missing required main-page pair passes. Obtain Lou's approval for deviations or genuinely new layouts. Re-run earlier main-page comparisons after shared-component changes. Representative state screenshots suffice; functional tests still cover implemented interactions without simulating missing features.
+  - [x] Every story’s acceptance criteria are evaluated against implementation evidence.
+  - [x] Every story’s functional verification checkboxes are run, checked, or explicitly marked failed/ambiguous/unrun.
+  - [x] Every story’s targeted regression verification checkboxes are run, checked, or explicitly marked failed/ambiguous/unrun.
+  - [x] The full available regression verification suite is run, including existing unit, integration, e2e, smoke, simulator/browser/device, static, and manual-only checks where applicable. *Accepted state: every automated suite ran at `b1a3e1e`. The manual-only human side-by-side visual review was not performed here; the user deferred it to Lou's Phase 2 (`phase-2` → `main`) review on 2026-10-28, and it stays open below.*
+  - [x] Failed, ambiguous, manual-only, or unrun verification items are documented. B-001's two failed ingress leaves are reported separately under the unchanged private-only exception, not as passes. B-002's audit advisory is likewise reported as NON-PASS, not as a pass.
+  - [x] Reusable new functional checks are identified as future regression verification; one-off editorial evidence is not counted as a suite.
+  - [x] Verification delta reports all 11 canonical types: Unit; Integration / contract; E2E / smoke; Simulator / device; AI / model evals; Static / local checks; Performance / load; Security / dependency; Accessibility / visual; Manual-only; Other verification. Include every row, even zeros, with before sprint, added this sprint, removed, pending/not yet run, and after sprint totals. Explain any Unknown count; classify each method under its most specific type and avoid duplicate counts. Report command groups separately from behavioral cases.
+  - [x] The sprint doc status is updated to `🟢 Complete` only if completion criteria are met.
+  - [x] A `## Final Review` section is appended to the sprint doc with the final completion message quoted for auditability.
+  - [x] Capture all delivered MAIN pages in the Main-page checklist against corresponding approved full-size references at desktop/narrow sizes. Record paired screenshots, overlays/diffs, source/revision and style/spacing inspection; no unexplained difference or missing required main-page pair passes. Obtain Lou's approval for deviations or genuinely new layouts. Re-run earlier main-page comparisons after shared-component changes. Representative state screenshots suffice; functional tests still cover implemented interactions without simulating missing features. *Accepted state: every Sprint 002-owned main-page pair is captured with zero drift; the populated Library picker was reassigned to Sprint 003 Story 3 (user decision). No deviations needed approval. Human side-by-side review is deferred to Lou's Phase 2 review, not performed here.*
 - **Functional verification:**
-  - [ ] Run all functional verification items from every story and record pass/fail evidence, including real-browser component → client → backend actions, explicit native unavailable outcomes and visual comparison commands.
+  - [x] Run all functional verification items from every story and record pass/fail evidence, including real-browser component → client → backend actions, explicit native unavailable outcomes and visual comparison commands.
 - **Regression verification:**
-  - [ ] Run all targeted regression verification items from every story and record pass/fail evidence.
-  - [ ] Run the full available regression verification suite and record pass/fail evidence: aggregate, browser, visual, check/build, frozen install/audit where applicable, and separate ingress qualification. Preserve earlier security, clean-start, contract and process checks.
+  - [x] Run all targeted regression verification items from every story and record pass/fail evidence.
+  - [x] Run the full available regression verification suite and record pass/fail evidence: aggregate, browser, visual, check/build, frozen install/audit where applicable, and separate ingress qualification. Preserve earlier security, clean-start, contract and process checks.
 - **Editorial/design verification:** reconcile reference/page inventory with all created views and their basic states; inspect DRY component ownership and approved token use. Summarize evidence in this Final Review and PRs; captures/logs remain ignored. No prose-presence tests.
 - **Manual-only behavior verification:** perform the shared Visual contract's side-by-side review for every required main-page pair, including padding/margins/gaps and narrow overflow; pass only when all differences have an explicit accepted disposition. No manual substitute for automatable interaction tests.
 - **Planned commits:**
@@ -276,3 +276,106 @@ Record reference → actual component/page → screenshot pair → result or exp
 - Sprint-integration PR is reviewed, passes the required gates, and is merged only after the explicit user merge command.
 - If the sprint introduces new flows, they are folded into the implementation spec before sprint integration.
 - Every required main page has its matched reference screenshot and accepted visual comparison, including fine spacing and consistent shared styling. B-001 does not waive visual or other current-scope checks.
+
+## Final Review
+
+> **Mergeability:** Pending — resulting-head review required. Story PRs #11–#15 were each accepted at 5/5 on their own heads; that is history, not a verdict on this record.
+>
+> ### Sprint objective + accomplishments
+>
+> **Objective:** render the approved core workspace as reusable React components, with real application-client wiring for questions and Script/Assets controls, truthful unavailable outcomes, and page-by-page visual parity evidence.
+>
+> **What was accomplished:**
+> - **Story 1 — Approved tokens and reusable UI foundations** ([PR #11](https://github.com/cslou/workprint/pull/11)). Canonical semantic tokens and the shared React Aria primitives (controls, tabs/panel, dialog/popover, status), plus pinned Playwright browser and visual commands with a deterministic pixel comparator. The comparator's spacing canary proves it fails on drift.
+> - **Story 2 — Browser-to-backend connectivity** ([PR #12](https://github.com/cslou/workprint/pull/12)). An explicit public API-origin seam and an actual Library consumer through api-client to the built backend, showing distinct 401/501 feedback. Includes CORS and egress guards, secret isolation, and scoped request settlement that never resurrects stale results or replays mutations.
+> - **Story 3 — Responsive shell, session presentation and navigation** ([PR #13](https://github.com/cslou/workprint/pull/13)). Desktop and narrow shell, four-tab workspace, approved session and native-unavailable presentation, and account-only/conversation-only scope isolation. Workspace-read failures show the approved text in the tab's empty box.
+> - **Story 4 — Conversation-unavailable and exact question/proposal controls** ([PR #14](https://github.com/cslou/workprint/pull/14)). Record-owned question options with exact answer payloads, and proposal details that fail closed. Send and Stop stay local and unavailable, keeping typed text. Newer revisions win; terminal state never downgrades.
+> - **Story 5 — Script, Assets and exact-version controls** ([PR #15](https://github.com/cslou/workprint/pull/15)). Script, reference sheets, viewer and version history from typed projections, with the approved inline edit. Exact Save and Use payloads; drafts retained across tabs, history and failures without crossing accounts, conversations or artifacts. Earlier versions are read-only.
+>
+> ### Final-run command results (`b1a3e1e34cbd1670f467e911eeaa4e216d64b4dc`, code identical to merge `50b2a3c`)
+>
+> | Command | Result |
+> | --- | --- |
+> | `pnpm install --frozen-lockfile` | PASS |
+> | `pnpm check` | PASS (strict types, lint, dependency boundaries and negative controls) |
+> | `pnpm build` | PASS |
+> | `pnpm test` (aggregate, private loopback Auth fixtures) | **13/13 PASS** |
+> | `pnpm test:browser` | **72/72 PASS** |
+> | `pnpm test:visual` | **136/136 PASS**, all pairs zero drift |
+> | `pnpm qualify:ingress` | **NON-PASS** (exit 1): two unfinished-upload deadline leaves fail; user-approved private/local exception **B-001** |
+> | `pnpm audit` | **NON-PASS** (exit 1): inherited low `deepmerge` GHSA-gcqx-w48m-w2h4, no patched version; user-approved private/local exception **B-002** |
+>
+> Logs are in `/tmp/workprint-s002-final/s002-final-*.log` and captures in ignored `outputs/verification/sprint-002/b1a3e1e34cbd1670f467e911eeaa4e216d64b4dc/`. Neither is committed.
+>
+> ### Main-page checklist results
+>
+> | Main surface | Reference (tracked) | Result at 1440 / 390 / 820 / 821 |
+> | --- | --- | --- |
+> | Opening/session shell and four-tab navigation | `flow2-step1-r73.html#p-script`, `flow1-step4-r85.html#look-a`, plus approved session/menu/native substitutions | 52 full-page pairs, zero pixel drift. Navigation is narrow-only; feedback states at 1440/390 |
+> | Conversation and question/proposal review | `flow2-step2-r74.html#q1`, `flow2-step6-r78.html#plan` | 12 pairs, zero drift, two-sided geometry recorded |
+> | Script/edit/history | `flow2-step2-r74.html#p-script`, r82 history, approved inline edit | 12 pairs, zero drift, two-sided geometry |
+> | Assets/reference sheets/viewer | `flow2-step10-r82.html#p-assets`/`#sheet-vale` | 8 pairs plus Save/Use lines at 1440/390, zero drift, two-sided geometry |
+> | Library (Sprint 002 part) | `demo-05.html#lib-yours`, `library-picker-r92.html` header | 24 feedback/empty pairs plus header/search region pairs, zero drift |
+> | Library populated picker | `library-picker-r92.html` | **Reassigned to Sprint 003 Story 3** by the user on 2026-10-28; not built in Sprint 002, and a successful read renders nothing yet |
+> | Storyboard; Videos; material input; Export | — | Later owners: Sprint 003 Stories 1–4 |
+> | Editor/Project/scene playback | — | Excluded |
+>
+> Shell pairs have no separate geometry file. Their full-page captures are pixel-identical, which is stronger evidence for dimensions, padding and overflow. The 24 foundation pairs are region comparisons of primitives, not page acceptance.
+>
+> ### Verification delta
+>
+> | Verification type | Before sprint | Added this sprint | Removed | Pending / not yet run | After sprint | Notes |
+> | --- | ---: | ---: | ---: | ---: | ---: | --- |
+> | Unit | 0 | +3 | 0 | 0 | 3 | Workspace/proposal helpers |
+> | Integration / contract | 6 | +39 | 0 | 0 | 45 | Isolated component → client → built backend, races, exact payloads |
+> | E2E / smoke | 1 | +16 | 0 | 0 | 17 | Shell navigation/admission journeys; clean-export smoke retained |
+> | Simulator / device | 0 | 0 | 0 | 0 | 0 | Not applicable; Chromium is browser verification |
+> | AI / model evals | 0 | 0 | 0 | 0 | 0 | No enabled model |
+> | Static / local checks | 0 | 0 | 0 | 0 | 0 | `pnpm check` reported as a command group |
+> | Performance / load | 0 | 0 | 0 | 0 | 0 | Not applicable |
+> | Security / dependency | 8 | +5 | 0 | 0 | 13 | Config/CORS/secret/egress cases; includes two failing B-001 leaves. Audit NON-PASS is a command result, not a case |
+> | Accessibility / visual | 0 | +145 | 0 | 0 | 145 | 136 visual comparisons plus 9 keyboard/focus cases |
+> | Manual-only | 0 | 0 | 0 | 0 | 0 | Human side-by-side review is one open acceptance gate, not a counted case |
+> | Other verification | 0 | 0 | 0 | 0 | 0 | Editorial evidence is not a suite |
+> | **Total** | **15** | **+208** | **0** | **0** | **223** | 221 passing plus 2 B-001 failing leaves |
+>
+> Counting basis: unique Node leaf cases plus expanded Playwright cases, each classified once (inventory `/tmp/workprint-s002-final/verification-cases.tsv`). Command groups are separate: frozen install, check, build, aggregate, browser, visual, ingress and audit. Regression summary: 0 existing regression checks pending; 223 behavioural cases plus 8 command groups referenced.
+>
+> ### Why ready
+> - Every story AC was evaluated against final-run evidence and passes. The populated Library picker was reassigned by the user, not waived.
+> - All functional items pass at the final head, including real-browser component → client → built-backend 401/501, local native-unavailable outcomes and all visual comparisons.
+> - The full regression suite ran. Its only non-passes are the user-approved B-001 and B-002 exceptions, reported separately; Story 1's audit item therefore stays unchecked.
+> - Each story PR passed seven-check review, with `/review-fix` after any fix cycle, and was accepted at 5/5 before merge. This record's head still needs its own review.
+>
+> ### Open for your decision
+> - [ ] Human side-by-side review of the Sprint 002 main-page pairs. Deferred to Lou's Phase 2 (`phase-2` → `main`) review, as agreed. Automated comparisons show zero drift; orchestrator AI inspection is not human approval.
+> - [ ] The "Open conversation" sidebar link. It appears only when a conversation ID is supplied, which only test compositions do in Phase 2, and is not in the approved copy.
+> - [ ] Known Phase 3 gaps: untyped Script/reference content and proposal input display names (B-003). Production fails closed; rich content comes only from labelled read-only test prerequisites.
+> - [ ] B-001 and B-002 must be resolved before Phase 3 native-runtime qualification and any shared or public deployment.
+>
+> ### Delivered
+>
+> | Story | Item | Status | Evidence |
+> | --- | --- | --- | --- |
+> | 1 — Foundations | AC-1–AC-4 | ✅ | PR #11 gap inventory; `design.md`/`history.md`; `interaction.spec.ts`; `config.spec.ts`; `visual.spec.ts` |
+> | 1 — Foundations | F-1 keyboard/focus/dismiss; F-2 comparator canary | ✅ | `interaction.spec.ts:5,28,40,71`; `visual.spec.ts` spacing mutation |
+> | 1 — Foundations | R-1 aggregate/check/build/frozen/audit | ⚠️ NON-PASS (B-002) | Audit only; everything else passes |
+> | 2 — Connectivity | AC-1–AC-4, F-1, F-2, R-1 | ✅ | `connectivity.spec.ts:15,93,117`; `config.spec.ts:4`; client/auth/web-files suites |
+> | 3 — Shell | AC-1–AC-3, F-1, F-2, R-1 | ✅ | `shell.spec.ts:15,33,70,86,169`; `shell-admission.spec.ts:6`; `shell-visual.spec.ts` (52 pairs) |
+> | 4 — Questions/proposals | AC-1–AC-3, F-1, F-2, R-1 | ✅ | `question.spec.ts:8,16,34,138`; `chat.spec.ts:3`; `question-visual.spec.ts` (12 pairs) |
+> | 5 — Script/Assets/versions | AC-1–AC-3, F-1, F-2, R-1 | ✅ | `version.spec.ts:21,41,100,135`; `version-races.spec.ts:3`; `material.spec.ts:3,17`; material visual specs (24 pairs) |
+> | Final — Verification | Automated suites, evidence and records | ✅ | This record; `/tmp/workprint-s002-final/evidence.md` |
+> | Final — Verification | Manual-only human side-by-side visual review | ⏸️ Deferred (user decision) | Lou's Phase 2 review; see Open for your decision |
+>
+> ### Editorial/design observations (no blocking finding)
+> No hard-coded production colours exist outside `ui/tokens.css`. Remaining raw values are layout maxima/viewport deductions (for example 240px, 150px, 78vh and popover maxima), SVG stroke widths and media-query breakpoints, which CSS custom properties cannot express. One sheet kicker repeats the `1.4px` tracking-token value. `VersionUse` styles live in `versions/review.css` and proposal styles in `question.css`, each beside its only consumer. Candidates for tidy-up when those modules are next touched.
+>
+> ### Drift from spec
+> - No new product flow. The populated Library picker moves from Sprint 002 to Sprint 003 Story 3 within Phase 2 (user decision); the implementation spec is unchanged.
+> - Earlier versions viewed from history are read-only, following the spec's `stale_revision` rule for non-latest bases.
+>
+> ### New Dependencies
+> - `react-aria-components` 1.22.1: specified accessible primitives (PR #11).
+> - `@playwright/test` 1.64.1: pinned real-browser and visual runner (PR #11).
+> - `pngjs` 7.0.0 and `@types/pngjs` 6.0.5 (dev): exact pixel diff and overlay output without threshold libraries (PR #11).
+> - Internal workspace packages `@workprint/api-client` and `@workprint/contracts` added as web consumers (PR #12); not external dependencies.
