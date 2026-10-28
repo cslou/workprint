@@ -25,7 +25,7 @@ for (const width of [1440, 390, 820, 821]) for (const [state, title, message] of
     await page.evaluate(async () => { await document.fonts.ready; window.scrollTo(0, 0); });
     const bounds = await page.locator('.lp-empty').boundingBox();
     const reference = await page.locator('.lp-empty').screenshot({ path: info.outputPath('reference-region.png'), animations: 'disabled' });
-    await page.screenshot({ path: info.outputPath('reference-full.png'), fullPage: true, animations: 'disabled' });
+    const referenceFull = await page.screenshot({ path: info.outputPath('reference-full.png'), fullPage: true, animations: 'disabled' });
     await page.goto('/library.html?reference');
     await page.waitForFunction(() => typeof (window as unknown as { libraryTest?: { configure?: unknown } }).libraryTest?.configure === 'function');
     let release: (() => void) | undefined;
@@ -39,11 +39,13 @@ for (const width of [1440, 390, 820, 821]) for (const [state, title, message] of
     await page.evaluate(async () => { await document.fonts.ready; window.scrollTo(0, 0); });
     expect(await page.getByRole('status').boundingBox()).toEqual(bounds);
     const actual = await page.getByRole('status').screenshot({ path: info.outputPath('actual-region.png'), animations: 'disabled' });
-    await page.screenshot({ path: info.outputPath('actual-full.png'), fullPage: true, animations: 'disabled' });
+    const actualFull = await page.screenshot({ path: info.outputPath('actual-full.png'), fullPage: true, animations: 'disabled' });
     const changed = await compare(reference, actual, info.outputPath('comparison'));
-    await writeFile(info.outputPath('result.json'), JSON.stringify({ state, width, reference: 'docs/design/demo-05.html#lib-yours', referenceHash: createHash('sha256').update(await readFile('docs/design/demo-05.html')).digest('hex'), approval: 'docs/design/design.md#library-feedback', revision: info.config.metadata, browser: context.browser()?.version(), changedPixels: changed, tolerance: 0, scope: 'Actual Library consumer, controlled read-only state, approved reference surroundings' }, null, 2));
+    const fullPageChanged = await compare(referenceFull, actualFull, info.outputPath('full-page-comparison'));
+    await writeFile(info.outputPath('result.json'), JSON.stringify({ state, width, reference: 'docs/design/demo-05.html#lib-yours', referenceHash: createHash('sha256').update(await readFile('docs/design/demo-05.html')).digest('hex'), approval: 'docs/design/design.md#library-feedback', revision: info.config.metadata, browser: context.browser()?.version(), changedPixels: changed, fullPageChangedPixels: fullPageChanged, tolerance: 0, scope: 'Actual Library consumer, controlled read-only state, approved reference surroundings' }, null, 2));
     release?.();
     expect(changed).toBe(0);
+    expect(fullPageChanged).toBe(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 }

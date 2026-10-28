@@ -13,6 +13,9 @@ if (new URLSearchParams(location.search).has('reference')) {
   const reference = new DOMParser().parseFromString(await response.text(), 'text/html');
   reference.querySelectorAll('[src]').forEach((element) => element.setAttribute('src', `/references/${element.getAttribute('src')}`));
   document.body.innerHTML = reference.body.innerHTML;
+  document.body.className = reference.body.className;
+  document.documentElement.style.setProperty('--font-sans', 'var(--font-family-sans)');
+  document.documentElement.style.setProperty('--font-display', 'var(--font-family-display)');
   const stylesheet = document.createElement('link');
   stylesheet.rel = 'stylesheet'; stylesheet.href = '/references/app-r11.css'; document.head.prepend(stylesheet);
   const empty = document.querySelector('.lp-empty');
