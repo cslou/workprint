@@ -1,5 +1,5 @@
 // Independent tracked r73 shell plus approved r11 item/disclosure/control substitutions.
-export function storyboardReference({ source, view }: { source: string; view: 'storyboard' | 'panel' | 'board' | 'videos' }) {
+export function storyboardReference({ source, view, edit }: { source: string; view: 'storyboard' | 'panel' | 'board' | 'videos'; edit?: 'shot' | 'panel' }) {
   const required = (selector: string, root: ParentNode = document) => { const node = root.querySelector(selector); if (!node) throw new Error(`Missing tracked reference ${selector}`); return node; };
   const active = view === 'videos' ? 'p-takes' : 'p-storyboard';
   const tracked = new DOMParser().parseFromString(source, 'text/html');
@@ -31,6 +31,13 @@ export function storyboardReference({ source, view }: { source: string; view: 's
     const pencil='<span style="display:contents"><button class="edit" disabled style="opacity:1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button></span>';
     const section=(label:string,text:string)=>`<section style="padding:2px 0 14px;border:0"><div class="plabel"><span>${label}</span>${pencil}</div><p style="white-space:pre-wrap">${text}</p></section>`;
     first.innerHTML='<header><span class="sn">1</span><b>First Shot</b></header>'+section('Shot intent','First Shot')+'<div class="bgrid"><section style="min-width:0"><b>1.1</b>'+section('Panel description','A quiet moment.')+'<div style="display:flex;gap:8px;margin-top:6px"><button style="min-height:24px;height:auto;padding:0;border:0;background:transparent;color:var(--fg-muted);font-size:12px;font-weight:400;line-height:1.45">Version 2</button></div></section></div>';
+    if (edit) {
+      const field = required(edit === 'shot' ? 'section' : '.bgrid > section > section', first);
+      required('.edit', field).remove();
+      const text = required('p', field).textContent ?? '';
+      required('p', field).outerHTML = `<textarea rows="6" aria-label="${edit === 'shot' ? 'Shot intent' : 'Panel description'}" style="display:block;width:100%;padding:8px 12px;border:1px solid var(--input-border);border-radius:10px;background:var(--bg);color:var(--fg);font:inherit;font-size:14px;line-height:1.5;resize:none">${text}</textarea><div class="approved-edit-actions" style="display:flex;align-items:center;gap:8px;margin-top:10px"><button class="choice">Cancel</button><button class="send" disabled>Save</button></div>`;
+      if (edit === 'panel') (field.parentElement as HTMLElement).style.gridColumn = '1/-1';
+    }
     document.body.append(modal);
   }
 }
