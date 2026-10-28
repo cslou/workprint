@@ -28,6 +28,11 @@ test('missing or malformed configuration fails without echoing values', () => {
     { ...valid, PORT: '4111junk' },
     { ...valid, MIGRATION_DATABASE_URL: valid.DATABASE_URL },
     { ...valid, VITE_PRIVATE_KEY: sentinel },
+    { ...valid, WORKPRINT_BROWSER_ORIGIN: '' },
+    { ...valid, WORKPRINT_BROWSER_ORIGIN: 'http://remote.invalid' },
+    { ...valid, WORKPRINT_BROWSER_ORIGIN: 'https://example.invalid/path' },
+    { ...valid, WORKPRINT_BROWSER_ORIGIN: `https://user:${sentinel}@example.invalid` },
+    { ...valid, WORKPRINT_BROWSER_ORIGIN: ' https://example.invalid' },
   ]) {
     assert.throws(() => loadServerConfig(env), (error: unknown) => {
       assert.ok(error instanceof Error);

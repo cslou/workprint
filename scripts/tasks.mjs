@@ -13,8 +13,9 @@ const env = {
 };
 const serving = { ...env };
 delete serving.MIGRATION_DATABASE_URL;
-// The shell has no public configuration yet. Never pass backend environment to Vite.
-const webEnv = Object.fromEntries(['PATH', 'HOME', 'TMPDIR', 'SYSTEMROOT', 'NODE_OPTIONS'].filter((key) => env[key]).map((key) => [key, env[key]]));
+delete serving.WORKPRINT_PUBLIC_API_ORIGIN;
+// Only this explicit public origin may cross into Vite; never backend settings.
+const webEnv = Object.fromEntries(['PATH', 'HOME', 'TMPDIR', 'SYSTEMROOT', 'NODE_OPTIONS', 'WORKPRINT_PUBLIC_API_ORIGIN'].filter((key) => env[key]).map((key) => [key, env[key]]));
 const children = new Set();
 let stopping = false;
 function stop(signal = 'SIGTERM') {

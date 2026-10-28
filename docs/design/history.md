@@ -1,5 +1,33 @@
 # Workprint — Application Design History
 
+## Script inline edit — 2026-10-28
+
+The user approved the Story 5 inline Script edit preview with one correction: the action order is **Cancel, then Save**. Clicking a section's pencil turns that section's text into a typing box in the same panel, with the same fonts and colours. Cancel restores the displayed version unchanged. Save retains typed text and uses the already-approved unavailable, 401 and error feedback as one plain line beneath the controls. Nothing else is newly approved, and the draft label is not product copy.
+
+The exact layout and tracked-reference substitution are recorded in [the existing shell/Phase 2 section](design.md#shell-and-remaining-phase-2-feedback). The local `outputs/verification/sprint-002/design-proposals/story5/` previews are historical display evidence only; implementation and comparisons use the tracked Script reference plus the approved substitution, not those ignored files.
+
+## Chat unavailable feedback — 2026-10-28
+
+The user approved 002/Story 4 Send feedback as one plain action-feedback line beneath the chat box: “Sending messages is not available yet. Your message is kept.” This applies to every Send, including opening and queued typing, and retains the typed text. Stop feedback is “Stopping is not available yet.” in the same style; Stop is visible only while the assistant works, reachable in Phase 2 only from an isolated labelled read-only working prerequisite. No successful native turn/stop, banner, colors or recovery flow is implied. Exact bounds are recorded in [the existing shell/Phase 2 section](design.md#shell-and-remaining-phase-2-feedback).
+
+## Workspace-read feedback addition — 2026-10-28
+
+The user approved 002/Story 3 workspace HTTP-read failures as text substitutions in the current tab's existing dashed empty box: 401 — “Sign-in required to load this video.”; 501 — “Loading this video is not available yet.”; all other failures, including transport and timeout — “This video could not be loaded. Nothing was changed.” Loading keeps the approved skeleton and its static reduced-motion alternative; absent session or conversation keeps the existing empty text. No banner, colors or recovery controls. Native-load copy remains only in its dialog. Exact instructions and tracked reference substitutions are in [the existing shell section](design.md#shell-and-remaining-phase-2-feedback).
+
+The user also clarified that 002/Story 4 question cards use the options and labels in their question record; later-phase question producers own the option set/wording, not this design. All other recorded proposal-card lines remain unchanged; no Story 4 implementation is authorized here.
+
+## Shell and remaining Phase 2 states — 2026-10-28
+
+The user approved the layouts displayed in the local `outputs/verification/sprint-002/design-proposals/` set (source `2e03eba`), with explicit copy corrections. The exact texts and owning stories are recorded in [the guide](design.md#shell-and-remaining-phase-2-feedback). Only 002/Story 3 is authorized for implementation now; question/proposal disclosure, the nine answer/save/use feedback states and 003/Story 4 Export remain later-story approvals, not implemented capabilities.
+
+Removed from the approved design: preview markers, test-fixture wording, the local-clear button and its result, the separate switch-unavailable state, visible proposal/question IDs/revisions, and Export selection-revision/test-prerequisite lines. Sign out and Switch account share the unchanged-session unavailable response. Internal scope invalidation remains required. Existing tokens, desktop navigation, empty/loading states and Library feedback stay approved. Reproducible comparisons use tracked flow/demo references plus approved substitutions; ignored screenshots are historical display evidence, never runtime prerequisites. No actual Auth, model integration, spending gate, credits, model selector, working Export, new banner or recovery design is approved by this record.
+
+## Library feedback — 2026-10-28
+
+The user approved the scoped Library feedback proposal in the Story 2 implementation continuation: reuse `demo-05.html#lib-yours`'s existing two-line empty styling for unauthenticated (401), unavailable (501), loading, transport/error and missing-configuration states. The exact copy and bounds are recorded in [the guide](design.md#library-feedback). Local proposal captures remain under ignored `outputs/verification/sprint-002/story-2-feedback-proposal/`; they are not required runtime assets.
+
+This approval adds no banner, colors, recovery controls or functional sign-in. It does not approve unrelated session, proposal/estimate or export designs, nor does it establish implementation acceptance. Existing approved empty Library copy remains unchanged.
+
 ## Unmigrated prototype evidence
 
 This is historical context from the Generate prototype, not current application scope. Source Git revisions, ignored previews and old verification outputs below were not imported. Original example imagery is not published; image links now show neutral placeholders. Historical output/checkout descriptions refer to that source workspace, not this public repository. Current scope follows the [architecture notice](../architecture.md).

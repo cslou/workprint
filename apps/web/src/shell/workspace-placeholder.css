@@ -1,0 +1,4 @@
+.wp-workspace-skeleton { display: grid; gap: var(--space-12); }
+.wp-workspace-skeleton i { display: block; height: var(--space-12); border-radius: var(--radius-sm); background: linear-gradient(90deg, var(--color-bg-hover) 20%, var(--color-bg-sunken) 50%, var(--color-bg-hover) 80%); background-size: 200% 100%; animation: wp-workspace-shimmer var(--duration-shimmer) linear infinite; }
+@keyframes wp-workspace-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .wp-workspace-skeleton i { animation: none; } }

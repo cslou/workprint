@@ -1,0 +1,9 @@
+.wp-version-pencil { display: contents; }
+.wp-version-pencil .wp-button-icon { display: grid; place-items: center; width: var(--size-control-icon); height: var(--size-control-icon); border-radius: var(--radius-sm); margin: calc(-1 * var(--space-4) - var(--border-width-default)) calc(-1 * var(--space-6)) calc(-1 * var(--space-4) - var(--border-width-default)) 0; }
+.wp-version-pencil svg { width: var(--font-size-15); height: var(--font-size-15); fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.wp-version-editor .wp-version-display { margin: 0; white-space: pre-wrap; }
+.wp-version-field { display: block; width: 100%; padding: var(--space-8) var(--space-12); border: var(--border-width-default) solid var(--color-border-input); border-radius: var(--radius-lg); background: var(--color-bg-canvas); color: var(--color-text-primary); font: inherit; font-size: var(--font-size-14); line-height: var(--font-line-height-1-5); resize: none; }
+.wp-version-field:focus-visible { outline: var(--border-width-focus) solid var(--color-border-focus); outline-offset: var(--border-width-focus-offset); }
+.wp-version-edit-actions { display: flex; align-items: center; gap: var(--space-8); margin-top: var(--space-10); }
+.wp-version-edit-actions .wp-button-secondary { height: var(--size-control-lg); border-color: var(--color-border-strong); background: var(--color-bg-surface); color: var(--color-text-primary); }
+.wp-version-editor .wp-version-feedback { font-size: var(--font-size-13); color: var(--color-text-subtle); margin: var(--space-10) 0 0; }

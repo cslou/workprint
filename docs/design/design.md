@@ -2,7 +2,7 @@
 
 **Migration (2026-10-27):** Workprint replaces the prototype name Generate. Layouts/tokens are retained; original media/screenshots are replaced with labelled placeholders. Historical verification below belongs to the source prototype, not this migrated copy. Editor, Project and comparison-player examples are not MVP scope; current scope follows the [architecture notice](../architecture.md). Typed chat is not approval; exact proposal approval and informational cost presentation follow the approved implementation plan.
 
-**Status:** Editor and component integration for inspection, with an accepted separate Project workspace roadmap reference. The accepted foundations and unaffected flows remain in force. Material-control direction is approved, with focus rings removed as requested. The roadmap flow is future design reference, not an addition to approved flows or the demo. Editing, recovery and export completion remain partial. No existing token value changed. Nothing here is implemented in application code.
+**Status:** Editor and component integration for inspection, with an accepted separate Project workspace roadmap reference. The accepted foundations and unaffected flows remain in force. Material-control direction is approved, with focus rings removed as requested. The roadmap flow is future design reference, not an addition to approved flows or the demo. Editing, recovery and export completion remain partial. No existing token value changed. Earlier entries describe reference artifacts; application delivery is tracked separately. The scoped Library feedback approval below is dated 2026-10-28.
 
 **Version:** 1.3 · **Updated:** 16 October 2026 · **History:** [Decisions](#decisions)
 
@@ -177,6 +177,7 @@ Product code uses semantic tokens. Primitives exist only so semantic tokens can 
 | `--font-line-height-1-4` | `1.4` |  |  |  |
 | `--font-line-height-1-45` | `1.45` |  |  |  |
 | `--font-line-height-1-5` | `1.5` |  |  |  |
+| `--font-line-height-1-55` | `1.55` |  |  | Approved `app-r11.css` `.snotes` leading; used for reference-sheet note paragraphs (`.wp-sheet-section p` in `apps/web/src/materials/sheet.css`). |
 | `--font-tracking-display` | `-0.2px` |  | `--tracking-display` | Opening and index titles. |
 | `--font-tracking-kicker` | `1.4px` |  | `--tracking-kicker` | Uppercase sheet kicker only. |
 
@@ -595,6 +596,71 @@ Keyboard/focus: labelled native checkbox toggles with Space; group summaries tog
 - **Tray:** "1 selected", the chips, and **Attach (n)** as the primary button.
 - **Empty library:** "Nothing saved yet" plus one line of explanation.
 
+### Library feedback
+
+**Scoped approval — 2026-10-28.** The user approved the Story 2 feedback proposal derived from `demo-05.html#lib-yours`. Reuse `.lp-empty`: a centered two-line grid, 4px gap, 240px minimum height, 13px subtle body text and 15px/600 primary title. Retain this geometry at desktop/narrow widths; introduce no banner, new colors, sign-in/retry action or recovery flow.
+
+| Condition | Title | Message |
+| --- | --- | --- |
+| 401 / no valid session | Sign-in required | Your Library cannot be loaded without a valid session. |
+| 501 | Library not available yet | Library loading is not implemented in this build. |
+| Loading | Loading Library… | Looking for saved characters, places and props. |
+| Transport/error | Library could not be loaded | No saved material was changed. |
+| Missing public configuration | Library connection not configured | No API origin is configured for this build. |
+
+Empty success retains “Nothing saved yet” and “Characters, places and props you approve will appear here.” A failed read must never be presented as empty saved work. Use polite status semantics, with no credentials or raw error payloads in the message. This approves Library feedback only—not unrelated session, proposal/estimate or export layouts, actual sign-in, or detailed feature recovery.
+
+### Shell and remaining Phase 2 feedback
+
+**User approval — 2026-10-28.** Layouts were approved from the local proposal set at source revision `2e03eba`, with the exact copy below superseding its draft copy. Preview markers and test-fixture language are never product copy. No colors, banners, recovery flows or redesign are added. Approval is design authority, not implementation acceptance.
+
+**002/Story 3 — implement now.** Reuse the opening shell in `flow2-step1-r73.html`, shared dialog geometry in `flow1-step4-r85.html#look-a`, and existing control/section typography. Reproduce new states by approved substitutions into those tracked references, never by loading ignored previews.
+
+| State | Exact copy and controls |
+| --- | --- |
+| Signed out | Account row: `Account`, empty avatar. Dialog: `Not signed in`; `Sign-in is not available yet.`; disabled `Sign in` |
+| Session present | Account row and dialog show the account name. Buttons: `Sign out`, `Switch account` |
+| Either account action | `Account actions are not available yet. Nothing about your session has changed.` |
+| Narrow navigation | At ≤820px, `Menu` beside `New video` opens `Navigation`: `New video`, `Library`, `Recents`, `No videos yet.` when empty, and `Account` (the supplied account name when present). Desktop sidebar unchanged |
+| New video unavailable | `New video is not available yet.` / `No conversation was created.` |
+| Recents unavailable | `Recents are not available yet.` / `No conversation list was loaded.` |
+| Conversation load unavailable | `Conversation loading is not available yet.` / `The current workspace is unchanged.` |
+
+**Workspace-read addition — 2026-10-28, 002/Story 3.** On a failed workspace HTTP read, replace only the text in the current tab's existing dashed empty box, preserving its style. Native-load copy stays only in its native action dialog; it is never an HTTP-read fallback. No banner, colors or recovery controls are added.
+
+| Workspace read | Exact text |
+| --- | --- |
+| 401 | Sign-in required to load this video. |
+| 501 | Loading this video is not available yet. |
+| Any other failure, including transport and timeout | This video could not be loaded. Nothing was changed. |
+
+Loading retains the approved skeleton (`demo-02.html`, [Panel sections](#panel-sections)); motion has the existing static reduced-motion alternative. With no session or no conversation, retain the approved per-tab empty text and make no workspace request. Comparisons substitute these texts into `flow2-step1-r73.html`'s current `.pempty`, with no layout changes.
+
+Dropped: the local-clear button and cleared-session presentation, and the separate switch-unavailable state. Session/account/conversation changes still clear scoped views internally. No actual Auth, fake recents, guessed identity or hidden sample account is authorized.
+
+**002/Story 4 — approved and implemented in PR #14.** Reuse `flow2-step6-r78.html#plan`'s question/plan/options and existing native disclosure treatment. Exact sample lines: `Shot 2 · Panel 2.1 · 1 image`; `Uses: Vale reference (version 1), Gallery reference (version 1)` (input order preserved); `Model: {provider} · {model}`; `Cost: $0.12 · estimate`. Basis words: provider → `provider price`, calculated → `calculated`, estimated → `estimate`. If basis is unknown, amount missing or currency missing: `Cost: unknown`. Follow with `For information only; not a quote.` The collapsible `Prompt and settings` holds the prompt, settings in words (for example `16:9 · still camera`) and any disclosures. Question cards render the options carried by the question record, using its labels. The option set and wording belong to the later-phase question producer (possibly an agent tool that generates the question UI), not to this design. Remove the visible proposal/question ID/revision line and illustrative-identifiers line; submitted answers still bind exact IDs and revisions. No spending gate, model selector, credits or provider qualification is implied.
+
+**Chat unavailable addition — 2026-10-28, 002/Story 4.** Every Send, including the opening composer and queued typing, shows one plain action-feedback line under the chat box: `Sending messages is not available yet. Your message is kept.` Keep the typed text in the box. Stop uses the same feedback style: `Stopping is not available yet.` Show Stop only while the assistant works; Phase 2 can reach that presentation only through an isolated, labelled read-only working prerequisite. These actions use the supported local native-unavailable boundary, with no banner, colors, recovery controls or successful turn/stop fiction.
+
+**002/Stories 4–5 — approved for later, not implemented here.** One plain line immediately under the owning answer, save or version-use controls. Reuse existing hint/activity typography and the owning question/Script/history layouts (`flow2-step2-r74.html`, `flow2-step10-r82.html#p-takes`), not a banner or recovery control. The Library approval alone did not cover these actions.
+
+| Action | Unavailable | Sign-in required | Error |
+| --- | --- | --- | --- |
+| Answer | Answering is not available yet. The question stays pending. | Sign-in required to answer. The question stays pending. | The answer was not submitted. The question stays pending. |
+| Save | Saving is not available yet. Your unsaved text is retained. | Sign-in required to save. Your unsaved text is retained. | Changes were not saved. Your unsaved text is retained. |
+| Use version | Using this version is not available yet. The current selection is unchanged. | Sign-in required to use this version. The current selection is unchanged. | This version was not selected. The current selection is unchanged. |
+
+**Script inline edit — approved 2026-10-28, 002/Story 5.** Clicking a section's edit pencil replaces that section's text with a typing box in the same panel, using the same fonts and colours. Use the displayed six-line textarea treatment: 14px text at 1.5 line height, 8px 12px padding, input border, canvas fill and 10px radius. Immediately below it, place **Cancel, then Save**, with an 8px gap and the existing secondary/primary pill treatments. Cancel restores the displayed version unchanged. Save uses the approved Save feedback above as one plain line under the owning controls and keeps typed text on 401, 501 or any error. Reproduce this state from tracked `flow2-step2-r74.html#p-script` plus this approved substitution; the ignored Story 5 preview is historical approval evidence, never a runtime or comparison dependency. Its draft label is never product copy. Only this inline edit state is newly approved; other states and boundaries are unchanged.
+
+**003/Story 4 — approved for later, not implemented here.** Reuse `demo-18.html#p-takes`'s direct Videos Export direction and the shared viewer dialog, excluding Editor/scene playback. Card: `Chosen source versions`, then `Export` and `Export history`. Remove displayed selection revision and test prerequisite lines. No settings profile, fake record/progress, generated URL or download is authorized.
+
+| Surface | Exact unavailable text |
+| --- | --- |
+| Export | `Export is not available yet.` / `No export was queued and no file was created.` |
+| History | `Export history is not available yet.` / `No export records were loaded.` |
+| Detail | `Export details are not available yet.` / `No export record was loaded.` |
+| Download | `Download is not available yet.` / `No file was downloaded.` |
+
 ### Reference sheet
 
 `.livesheet`: a character or place sheet drawn from its structured record. The images are separate files; a PNG or PDF is only an export.
@@ -875,6 +941,7 @@ These states have not been designed. They are listed so they are not mistaken fo
 
 | Date | Stage / scope | Revision | Decision and response | Conditions |
 | --- | --- | --- | --- | --- |
+| 2026-10-28 | Library feedback | Story 2 `demo-05.html#lib-yours` two-line proposal | User explicitly approved 401, 501, loading, transport/error and missing-configuration feedback treatment | No banner/colors/recovery controls; no blanket session/proposal/export approval; see [Library feedback](#library-feedback) |
 | Earlier | Flows and screens | Flow 1 r64/r83–r90, Flow 2 r73–r82, demo, picker r92 | Approved (D-77, D-80, D-85) | Reused as is |
 | 2026-09-28 | Visual direction | `app-r11.css` light theme | Chosen (D-18): Venice light colours as reference, no Venice branding | |
 | 2026-10-02 | Name and logo | — | Deferred | Working placeholders only |
