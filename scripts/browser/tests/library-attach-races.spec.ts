@@ -1,9 +1,15 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../material-network.js';
 
 const items = ['alpha', 'beta', 'gamma'].map(id => ({ id, kind: 'reference', builtIn: false, latestVersion: { id: `${id}-v1`, artifactId: id, revision: 1, kind: 'reference', content: {}, createdBy: 'human', createdAt: '2026-10-29T00:00:00Z', dependencies: [] } }));
 const display = Object.fromEntries(items.map(item => [item.latestVersion.id, { name: item.id, category: 'Props', tileLabel: 'Prop' }]));
 
-test('pending Attach locks selection and double press cannot duplicate the sequence', async ({ page }, info) => {
+test('pending Attach locks selection and double press cannot duplicate the sequence', async ({ page, materialNetwork }, info) => {
+  const origin = 'http://127.0.0.1:4179';
+  materialNetwork.expectOperations(
+    { origin, method: 'GET', path: '/v1/conversations/conversation-a/workspace', count: 1, query: {} },
+    { origin, method: 'GET', path: '/v1/library', count: 1, query: {} },
+    { origin, method: 'POST', path: '/v1/conversations/conversation-a/uses', count: 2, query: {} },
+  );
   await info.attach('prerequisite', { body: 'Read-only Library projections and held validated acknowledgements, solely for sequence reconciliation; not persisted product success.', contentType: 'text/plain' });
   const held: { id: string; release(): Promise<void> }[] = [];
   await page.route('**/v1/library*', route => route.fulfill({ json: { items, nextCursor: null } }));

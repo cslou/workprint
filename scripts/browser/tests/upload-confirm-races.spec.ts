@@ -1,10 +1,14 @@
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, test } from '../material-network.js';
 
 type Harness = { uploadsTest: { configure(input: unknown): void; confirm(id: string): Promise<string>; unmount(): void } };
 async function configure(page: Page, conversationId: string) {
   await page.evaluate(conversationId => (window as unknown as Harness).uploadsTest.configure({ apiOrigin: 'http://127.0.0.1:4179', token: null, accountId: 'read-only-account', conversationId }), conversationId);
 }
-for (const order of ['new-first', 'old-first', 'unmount'] as const) test(`pending confirmation cannot overwrite or resurrect its mount (${order})`, async ({ page }, info) => {
+for (const order of ['new-first', 'old-first', 'unmount'] as const) test(`pending confirmation cannot overwrite or resurrect its mount (${order})`, async ({ page, materialNetwork }, info) => {
+  const origin = 'http://127.0.0.1:4179';
+  materialNetwork.expectOperations({ origin, method: 'POST', path: '/v1/uploads/read-only-upload-a/confirm', count: 1, query: {} });
+  if (order !== 'unmount') materialNetwork.expectOperations({ origin, method: 'POST', path: '/v1/uploads/read-only-upload-b/confirm', count: 1, query: {} });
   await info.attach('prerequisite', { body: 'Held confirmation failure responses for supplied read-only upload identities. No upload transfer, success or persisted version is simulated.', contentType: 'text/plain' });
   const held: ((status: number, code: string) => Promise<void>)[] = [];
   await page.route('**/v1/uploads/*/confirm', async route => {
