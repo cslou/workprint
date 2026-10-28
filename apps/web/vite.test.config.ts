@@ -14,6 +14,9 @@ export default defineConfig({
   envDir: false,
   envPrefix: [],
   define: { __WORKPRINT_PUBLIC_API_ORIGIN__: JSON.stringify(publicConfig.kind === 'configured' ? publicConfig.apiOrigin : null) },
+  // Eagerly prepare both fixture entrypoints; late dependency discovery reloads
+  // would otherwise replace an in-flight scoped consumer during verification.
+  optimizeDeps: { force: true, noDiscovery: true, include: ['react', 'react-dom/client', 'react/jsx-runtime', 'react/jsx-dev-runtime', 'react-aria-components', '@workprint/api-client', '@workprint/contracts'] },
   build: { rollupOptions: { input: fileURLToPath(new URL('./test/library.html', import.meta.url)) } },
   server: { host: '127.0.0.1', port: 4179, strictPort: true, fs: { strict: true, allow: [web, fileURLToPath(new URL('../../packages/api-client/dist/', import.meta.url)), fileURLToPath(new URL('../../packages/contracts/dist/', import.meta.url)), fileURLToPath(new URL('../../node_modules/', import.meta.url))] } },
   plugins: [{ name: 'tracked-design-references', configureServer(server) {

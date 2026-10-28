@@ -43,6 +43,10 @@ for (const mode of ['development', 'built'] as const) test(`${mode} Library cons
       }
       const blocked: string[] = [];
       const consoleText: string[] = [];
+      const pageErrors: string[] = [];
+      const navigations: string[] = [];
+      page.on('framenavigated', (frame) => { if (frame === page.mainFrame()) navigations.push(frame.url()); });
+      page.on('pageerror', (error) => pageErrors.push(error.message));
       page.on('console', (message) => consoleText.push(message.text()));
       await page.route('**/*', async (route) => {
         const target = new URL(route.request().url());
@@ -50,6 +54,7 @@ for (const mode of ['development', 'built'] as const) test(`${mode} Library cons
         else await route.continue();
       });
       await page.goto(`${frontend}/library.html`);
+      await page.waitForFunction(() => typeof (window as unknown as { libraryTest?: { configure?: unknown } }).libraryTest?.configure === 'function');
       expect(await page.evaluate(async () => { try { await fetch('https://example.invalid/egress-control'); return true; } catch { return false; } })).toBe(false);
       expect(blocked).toEqual(['https://example.invalid']);
       const requests: string[] = [];
@@ -59,7 +64,12 @@ for (const mode of ['development', 'built'] as const) test(`${mode} Library cons
       const identities = [[accessTokens[0]!, 'Library not available yet'], [accessTokens[1]!, 'Library not available yet'], [null, 'Sign-in required'], ['malformed', 'Sign-in required']] as const;
       for (const [index, [token, title]] of identities.entries()) {
         await configure(page, { ...(mode === 'built' ? {} : { apiOrigin: origin }), token, accountId: `synthetic-scope-${index}` });
-        await expect.poll(() => statuses.length).toBe(index + 1);
+        try { await expect.poll(() => statuses.length).toBe(index + 1); }
+        catch (error) {
+          const redact = (text: string) => accessTokens.reduce((safe, token) => safe.replaceAll(token, '[redacted]'), text);
+          await info.attach('sanitized-browser-diagnostics', { body: JSON.stringify({ errors: pageErrors.map(redact), console: consoleText.map(redact) }), contentType: 'application/json' });
+          throw error;
+        }
         await expect(page.getByRole('status')).toContainText(title);
       }
       expect(requests).toEqual(Array(4).fill('GET /v1/library'));
@@ -72,8 +82,10 @@ for (const mode of ['development', 'built'] as const) test(`${mode} Library cons
         }
       }
       expect(blocked).toEqual(['https://example.invalid']);
+      expect(pageErrors).toEqual([]);
+      expect(navigations).toEqual([`${frontend}/library.html`]);
       await page.screenshot({ path: info.outputPath(`${mode}-library-unauthenticated.png`), fullPage: true });
-      await info.attach('request-methods-paths', { body: JSON.stringify({ requests, statuses }), contentType: 'application/json' });
+      await info.attach('request-methods-paths', { body: JSON.stringify({ requests, statuses, navigations }), contentType: 'application/json' });
     }, { browserOrigin: frontend });
   } finally { for (const fn of cleanup.reverse()) await fn(); }
 });
