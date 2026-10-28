@@ -25,9 +25,10 @@ body { margin: 0; background: var(--color-bg-canvas); color: var(--color-text-pr
 .wp-search-control .wp-input[data-focus-visible] { outline: none; }
 .wp-panel { display: flex; flex-direction: column; min-height: 0; flex: 1; background: var(--color-bg-surface); }
 .wp-tabs { display: flex; gap: var(--space-4); padding: var(--space-12) var(--space-14); border-bottom: var(--border-width-default) solid var(--color-border-default); }
-.wp-tab { position: relative; padding: var(--space-6) var(--space-12); border-radius: var(--radius-pill); font-size: var(--font-size-13); color: var(--color-text-secondary); cursor: pointer; outline: none; }
+.wp-tab { padding: var(--space-6) var(--space-12); border-radius: var(--radius-pill); font-size: var(--font-size-13); color: var(--color-text-secondary); cursor: pointer; outline: none; }
 .wp-tab[data-hovered] { background: var(--color-bg-hover); }
 .wp-tab[data-selected] { background: var(--color-bg-inverse); color: var(--color-text-inverse); }
+.wp-tab:has(.wp-tab-update) { position: relative; }
 .wp-tab-update { position: absolute; top: 0; right: 0; width: calc(var(--space-6) + var(--border-width-default)); height: calc(var(--space-6) + var(--border-width-default)); border-radius: 50%; background: var(--color-action-primary-bg); }
 .wp-panel-body { flex: 1; overflow: auto; padding: var(--space-18) var(--space-20); outline: none; }
 .wp-panel-body[inert] { display: none; }
