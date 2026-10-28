@@ -68,7 +68,7 @@ const referenceMarkup = (state: PickerState) => {
   const chips = data.selected.map((name) => `<span class="pk-chip">${name}<button type="button" aria-label="Remove ${name}">×</button></span>`).join('');
   return `${style}<div class="pk-overlay" role="dialog" aria-label="Library"><div class="pk-panel"><div class="pk-head"><h2>Library</h2><span class="qclose">×</span></div><div class="pk-bar">${pills}<div class="pk-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>${data.query ? `<input value="${data.query}" aria-label="Search Library">` : '<input placeholder="Search" aria-label="Search Library">'}</div></div><div class="pk-body">${body}</div><div class="pk-tray"><span class="pk-count">${data.selected.length === 0 ? 'Nothing selected yet' : `${data.selected.length} selected`}</span>${chips}<button class="pk-send" type="button" aria-disabled="true">${data.selected.length === 0 ? 'Attach' : `Attach (${data.selected.length})`}</button></div></div></div>`;
 };
-const libraryPage = (state: PickerState) => {
+const libraryPage = () => {
   const version = (id: string, revision: number, kind: 'reference' | 'image') => kind === 'reference'
     ? { id, artifactId: `artifact-${id}`, revision, kind, content: {}, createdBy: 'human', createdAt: '2026-10-29T00:00:00Z', dependencies: [] }
     : { id, artifactId: `artifact-${id}`, revision, kind, media: { contentType: 'image/png', byteSize: 1024, width: 640, height: 640 }, createdBy: 'human', createdAt: '2026-10-29T00:00:00Z', dependencies: [] };
@@ -98,11 +98,10 @@ export async function capturePickerPair(page: Page, info: TestInfo, width: numbe
   await settleCapture(page);
   const referenceSelectors = ['.pk-panel', '.pk-head', '.pk-bar', '.pk-search', '.pk-pill', '.pk-body', '.pk-tray', '.pk-count', '.pk-send', ...(state === 'no-match' ? ['.pk-empty'] : ['.pk-grid', '.pk-tile', '.pk-media']), ...(state === 'no-facts' || state === 'no-match' ? [] : ['.pk-pill.on']), ...(state === 'selected' ? ['.pk-chip'] : [])];
   const referenceGeometry = await measure(page, referenceSelectors);
-  const refStyles = await page.evaluate(() => { const node = document.querySelector('.pk-send'); if (!node) throw new Error('Missing reference send'); const cs = getComputedStyle(node); const range = document.createRange(); range.selectNodeContents(node); const text = range.getBoundingClientRect(); return { color: cs.color, background: cs.backgroundColor, fontWeight: cs.fontWeight, fontSize: cs.fontSize, lineHeight: cs.lineHeight, letterSpacing: cs.letterSpacing, fontFamily: cs.fontFamily, opacity: cs.opacity, padding: cs.padding, height: cs.height, box: node.getBoundingClientRect().toJSON(), text: text.toJSON() }; });
   const reference = await page.screenshot({ path: info.outputPath('reference-full.png'), fullPage: true, animations: 'disabled' });
   await page.goto('/shell.html');
   await page.waitForFunction(() => !!(window as unknown as { shellTest?: unknown }).shellTest);
-  await page.route('**/v1/library*', async (route) => { await route.fulfill({ status: 200, json: libraryPage(state) }); });
+  await page.route('**/v1/library*', async (route) => { await route.fulfill({ status: 200, json: libraryPage() }); });
   await page.evaluate((input) => (window as unknown as { shellTest: { configure(value: unknown): void } }).shellTest.configure(input), { session: { accountId: 'visual-account', name: 'Creator A' }, apiOrigin: 'http://127.0.0.1:4179', token: 'token', libraryPrerequisites: { display: state === 'no-facts' ? {} : display } });
   if (width <= 820) await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await (width <= 820 ? page.getByRole('dialog') : page).getByRole('button', { name: 'Library', exact: true }).click();
@@ -115,8 +114,6 @@ export async function capturePickerPair(page: Page, info: TestInfo, width: numbe
     await page.locator('.wp-picker-tile').filter({ hasText: 'Bench' }).click();
   }
   await settleCapture(page);
-  const actStyles = await page.evaluate(() => { const node = document.querySelector('.wp-picker-tray .wp-button'); if (!node) throw new Error('Missing actual send'); const cs = getComputedStyle(node); const range = document.createRange(); range.selectNodeContents(node); const text = range.getBoundingClientRect(); return { color: cs.color, background: cs.backgroundColor, fontWeight: cs.fontWeight, fontSize: cs.fontSize, lineHeight: cs.lineHeight, letterSpacing: cs.letterSpacing, fontFamily: cs.fontFamily, opacity: cs.opacity, padding: cs.padding, height: cs.height, box: node.getBoundingClientRect().toJSON(), text: text.toJSON() }; });
-  console.log('STYLES', JSON.stringify({ refStyles, actStyles }, null, 1));
   const actualSelectors = ['.wp-modal', '.wp-dialog-head', '.wp-picker-bar', '.wp-search-field', '.wp-picker-pill', '.wp-picker-body', '.wp-picker-tray', '.wp-picker-count', '.wp-picker-tray .wp-button', ...(state === 'no-match' ? ['.wp-picker-empty'] : ['.wp-picker-grid', '.wp-picker-tile', '.wp-picker-media']), ...(state === 'no-facts' || state === 'no-match' ? [] : ['.wp-picker-pill.on']), ...(state === 'selected' ? ['.wp-picker-chip'] : [])];
   const actualGeometry = await measure(page, actualSelectors);
   expect(actualGeometry.map((row) => row.boxes)).toEqual(referenceGeometry.map((row) => row.boxes));
