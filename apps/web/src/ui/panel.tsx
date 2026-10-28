@@ -12,10 +12,10 @@ export type WorkspaceTab = typeof workspaceTabs[number]['id'];
 export function EmptyState({ children }: { children: ReactNode }) {
   return <div className="wp-empty">{children}</div>;
 }
-export function WorkspacePanel({ content = {}, updated = [], ...props }: Omit<TabsProps, 'children' | 'className' | 'orientation'> & { content?: Partial<Record<WorkspaceTab, ReactNode>>; updated?: readonly WorkspaceTab[] }) {
+export function WorkspacePanel({ content = {}, placeholder, updated = [], ...props }: Omit<TabsProps, 'children' | 'className' | 'orientation'> & { content?: Partial<Record<WorkspaceTab, ReactNode>>; placeholder?: ReactNode; updated?: readonly WorkspaceTab[] }) {
   return <Tabs {...props} className="wp-panel" defaultSelectedKey={props.defaultSelectedKey ?? 'script'}>
     <TabList aria-label="This video" className="wp-tabs">{workspaceTabs.map(({ id, label }) => <Tab className="wp-tab" id={id} key={id}>{label}{updated.includes(id) && <span className="wp-tab-update"><span className="wp-sr-only">, updated</span></span>}</Tab>)}</TabList>
-    {workspaceTabs.map(({ id, empty }) => <TabPanel className="wp-panel-body" id={id} key={id}>{content[id] ?? <EmptyState>{empty}</EmptyState>}</TabPanel>)}
+    {workspaceTabs.map(({ id, empty }) => <TabPanel className="wp-panel-body" id={id} key={id}>{placeholder ?? content[id] ?? <EmptyState>{empty}</EmptyState>}</TabPanel>)}
   </Tabs>;
 }
 export function PanelSection({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
