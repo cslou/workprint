@@ -18,7 +18,7 @@ export function Composer({ native, working = false, docked = false, placeholder 
   return <>
     <form className={`wp-opening-composer${docked ? ' wp-chat-docked' : ''}`} onSubmit={(event) => { event.preventDefault(); void send(); }}>
       <textarea className="wp-opening-field wp-chat-input" aria-label="Message" placeholder={placeholder} value={text} onChange={(event) => setText(event.target.value)} />
-      <div className="wp-opening-bar"><span className="wp-opening-attach"><span>+</span>Attach photos</span><div className="wp-chat-actions">{working && <Button variant="secondary" onPress={() => void stop()}>Stop</Button>}<Button type="submit" isDisabled={pending || !text.trim()}>Send</Button></div></div>
+      <div className="wp-opening-bar"><span className="wp-opening-attach"><span>+</span>{docked ? 'Attach' : 'Attach photos'}</span><div className="wp-chat-actions">{working && <Button variant="secondary" onPress={() => void stop()}>Stop</Button>}<Button type="submit" isDisabled={pending || !text.trim()}>Send</Button></div></div>
     </form>
     {feedback && <p className="wp-chat-feedback" role="status">{feedback === 'send' ? 'Sending messages is not available yet. Your message is kept.' : 'Stopping is not available yet.'}</p>}
   </>;

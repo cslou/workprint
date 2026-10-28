@@ -1,12 +1,29 @@
-import type { Proposal, Version } from '@workprint/contracts';
+import type { OperationResponse, Proposal, Version } from '@workprint/contracts';
 
 /** Display facts are supplied by existing projections or labelled read-only prerequisites. */
 export type ProposalDisplayFacts = Readonly<{
   proposalId: string; proposalRevision: number;
   shot?: Readonly<{ id: string; number: number }>;
   panel?: Readonly<{ id: string; number: number }>;
-  inputs: Readonly<Record<string, Readonly<{ name: string; versionNumber: number }>>>;
+  inputs: Readonly<Record<string, Readonly<{ name: string }>>>;
 }>;
+export type ProposalInputNames = ProposalDisplayFacts['inputs'];
+
+export function deriveProposalDisplayFacts(proposal: Proposal, workspace: OperationResponse<'workspace'>, inputs: ProposalInputNames): ProposalDisplayFacts | null {
+  const facts: ProposalDisplayFacts = { proposalId: proposal.id, proposalRevision: proposal.revision, inputs };
+  if (proposal.purpose === 'reference_image') return facts;
+  const shots = [...workspace.storyboard.shots].sort((a, b) => a.order - b.order);
+  if (new Set(shots.map((shot) => shot.order)).size !== shots.length || new Set(shots.map((shot) => shot.shotId)).size !== shots.length) return null;
+  const index = shots.findIndex((shot) => shot.shotId === proposal.target.shotId);
+  const shot = shots[index];
+  if (!shot) return null;
+  const numbered = { ...facts, shot: { id: shot.shotId, number: index + 1 } };
+  if (proposal.purpose === 'shot_video') return numbered;
+  const panels = [...shot.panels].sort((a, b) => a.order - b.order);
+  if (new Set(panels.map((panel) => panel.order)).size !== panels.length || new Set(panels.map((panel) => panel.panelId)).size !== panels.length) return null;
+  const panelIndex = panels.findIndex((panel) => panel.panelId === proposal.target.panelId);
+  return panelIndex < 0 ? null : { ...numbered, panel: { id: proposal.target.panelId, number: panelIndex + 1 } };
+}
 export function proposalCost(proposal: Proposal): string {
   const { amount, currency, basis } = proposal.estimate;
   if (basis === 'unknown' || amount === undefined || !currency || !/^[A-Z]{3}$/.test(currency)) return 'Cost: unknown';
@@ -33,7 +50,7 @@ export function proposalLines(proposal: Proposal, facts: ProposalDisplayFacts, v
   for (const input of ordered) {
     const fact = facts.inputs[input.versionId];
     const version = versions.find((value) => value.id === input.versionId);
-    const number = version?.revision ?? fact?.versionNumber;
+    const number = version?.revision;
     if (!fact?.name || number === undefined || !Number.isInteger(number) || number < 0) return null;
     inputs.push(`${fact.name} (version ${number})`);
   }

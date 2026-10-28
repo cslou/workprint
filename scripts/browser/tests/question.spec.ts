@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
-import { proposalSchema } from '../../../packages/contracts/src/index.js';
-import { proposalCost, proposalLines } from '../../../apps/web/src/conversation/proposal.js';
+import { proposalSchema, workspaceSchema } from '../../../packages/contracts/src/index.js';
+import { proposalCost, proposalLines, deriveProposalDisplayFacts } from '../../../apps/web/src/conversation/proposal.js';
 import type { verifyBuiltAdmission as VerifyBuiltAdmission } from '../../../apps/api/test/auth-built-fixture.js';
 
 test('proposal cost keeps missing/unknown amounts unknown and display facts bind exact identities', () => {
@@ -11,6 +11,24 @@ test('proposal cost keeps missing/unknown amounts unknown and display facts bind
   for (const estimate of [{ basis: 'estimated' as const }, { basis: 'provider' as const, amount: 0.12 }]) expect(proposalCost({ ...proposal, estimate })).toBe('Cost: unknown');
   expect(proposalCost({ ...proposal, estimate: { basis: 'estimated', amount: 0.12, currency: 'USD' } })).toBe('Cost: $0.12 · estimate');
   expect(proposalLines(proposal, { proposalId: 'other', proposalRevision: 3, inputs: {} }, [])).toBeNull();
+});
+
+test('workspace order positions supply numbering and ambiguous or mismatched targets fail closed', () => {
+  const proposal = proposalSchema.parse({ id: 'p', revision: 1, questionId: 'q', purpose: 'panel_image', target: { shotId: 'target', panelId: 'panel' }, provider: 'provider', model: 'model', prompt: 'Prompt', settings: {}, candidateCount: 1, inputs: [], disclosures: [], estimate: { basis: 'unknown' } });
+  const panel = { panelId: 'panel', order: 40, description: '', references: [], candidateImageVersions: [], approvedImageVersionId: null };
+  const workspace = workspaceSchema.parse({ script: null, assets: [], storyboard: { work: null, shots: [{ shotId: 'target', order: 80, panels: [panel], chosenVideoVersionId: null }, { shotId: 'first', order: 10, panels: [], chosenVideoVersionId: null }] }, videos: [], pendingQuestion: null, activeWork: [], selectionRevision: 0 });
+  const facts = deriveProposalDisplayFacts(proposal, workspace, {});
+  expect(facts?.shot).toEqual({ id: 'target', number: 2 });
+  expect(facts?.panel).toEqual({ id: 'panel', number: 1 });
+  for (const defect of ['missing-shot', 'missing-panel', 'duplicate-shot-order', 'duplicate-panel-order']) {
+    const invalid = structuredClone(workspace);
+    const target = invalid.storyboard.shots[0]!;
+    if (defect === 'missing-shot') target.shotId = 'not-target';
+    if (defect === 'missing-panel') target.panels = [];
+    if (defect === 'duplicate-shot-order') target.order = 10;
+    if (defect === 'duplicate-panel-order') target.panels.push({ ...panel, panelId: 'other' });
+    expect(deriveProposalDisplayFacts(proposal, invalid, {})).toBeNull();
+  }
 });
 
 test('real question/proposal/version reads and exact option answers distinguish 401/501 without effects', async ({ page }, info) => {
@@ -42,7 +60,7 @@ test('real question/proposal/version reads and exact option answers distinguish 
         await page.getByRole('button', { name: 'Send', exact: true }).click();
         await expect(page.getByText('Sending messages is not available yet. Your message is kept.', { exact: true })).toBeVisible();
         expect(requests).toHaveLength(4);
-        await page.getByRole('button', { name: 'He stays still, then gives a small nod', exact: true }).click();
+        await page.getByRole('button', { name: 'Make this panel', exact: true }).click();
         await expect(page.getByText(feedback, { exact: true })).toBeVisible();
         await expect(page.getByRole('region', { name: 'Question' })).toHaveAttribute('data-question-status', 'pending');
         const answer = requests.find((request) => request.method === 'POST');
@@ -55,11 +73,58 @@ test('real question/proposal/version reads and exact option answers distinguish 
         expect(requests.filter((request) => request.method === 'POST')).toHaveLength(1);
         const calls = await page.evaluate(() => (window as unknown as { questionTest: { observations(): { nativeCalls: string[] } } }).questionTest.observations());
         expect(calls.nativeCalls).toEqual(['subscribe', 'sendText']);
+        await page.evaluate((value) => (window as unknown as { questionTest: { configure(value: unknown): void } }).questionTest.configure(value), { token, withProposal: true });
+        await expect.poll(() => requests.length).toBe(9);
+        expect(requests.filter((request) => request.method === 'POST')).toHaveLength(1);
+        expect(await page.getByRole('textbox', { name: 'Message' }).inputValue()).toBe('');
         page.off('response', listener);
         await page.unrouteAll({ behavior: 'wait' });
       }
     }, { browserOrigin: 'http://127.0.0.1:4179' });
   } finally { for (const fn of cleanup.reverse()) await fn(); }
+});
+
+for (const race of ['read', 'answer'] as const) test(`${race} revision race ignores old completion and never replays commands on remount`, async ({ page }, info) => {
+  await info.attach('prerequisite', { body: 'Labelled read-only question revision race; controlled responses only for this race.', contentType: 'text/plain' });
+  await page.goto('/question.html');
+  await page.waitForFunction(() => !!(window as unknown as { questionTest?: unknown }).questionTest);
+  const record = (revision: number) => ({ id: 'race-question', revision, status: 'pending', scope: {}, prompt: revision === 1 ? 'First question revision' : 'Current question revision', options: [{ id: 'choice-' + revision, label: 'Record choice ' + revision }] });
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  let completed!: () => void;
+  const completion = new Promise<void>((resolve) => { completed = resolve; });
+  let held = false;
+  const posts: unknown[] = [];
+  await page.route('**/v1/**', async (route) => {
+    const post = route.request().method() === 'POST';
+    if (post) posts.push(route.request().postDataJSON());
+    if ((race === 'read' && !post) || (race === 'answer' && post)) {
+      held = true; await gate;
+      try { await route.fulfill(race === 'read' ? { json: record(1) } : { status: 501, json: { error: { code: 'not_implemented', message: 'Controlled revision race' } } }); }
+      finally { completed(); }
+    } else await route.fulfill({ status: 501, json: { error: { code: 'not_implemented', message: 'Controlled revision race' } } });
+  });
+  const configure = (revision: number, initial = false) => page.evaluate((input) => (window as unknown as { questionTest: { configure(value: unknown): void } }).questionTest.configure(input), { ...(initial ? { apiOrigin: 'http://127.0.0.1:4179' } : {}), question: record(revision) });
+  await configure(1, true);
+  await page.getByRole('textbox', { name: 'Message' }).fill('Keep the separate message');
+  if (race === 'answer') await page.getByRole('button', { name: 'Record choice 1', exact: true }).click();
+  await expect.poll(() => held).toBe(true);
+  await configure(2);
+  await expect(page.getByRole('heading', { name: 'Current question revision' })).toBeVisible();
+  release(); await completion;
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  await expect(page.getByRole('heading', { name: 'Current question revision' })).toBeVisible();
+  await expect(page.getByRole('textbox')).toHaveValue('Keep the separate message');
+  await expect(page.getByRole('status')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Record choice 2', exact: true })).toBeEnabled();
+  expect(posts).toHaveLength(race === 'answer' ? 1 : 0);
+  await page.evaluate(() => (window as unknown as { questionTest: { unmount(): void } }).questionTest.unmount());
+  await expect(page.getByRole('region', { name: 'Question' })).toHaveCount(0);
+  await configure(2);
+  await expect(page.getByRole('textbox')).toHaveValue('');
+  expect(posts).toHaveLength(race === 'answer' ? 1 : 0);
+  const calls = await page.evaluate(() => (window as unknown as { questionTest: { observations(): { nativeCalls: string[] } } }).questionTest.observations());
+  expect(calls.nativeCalls.every((name) => name === 'subscribe')).toBe(true);
 });
 
 test('record-owned options, generic client error and missing display facts cannot grant approval', async ({ page }) => {
@@ -70,5 +135,5 @@ test('record-owned options, generic client error and missing display facts canno
   await expect(page.getByRole('status')).toHaveText('The answer was not submitted. The question stays pending.');
   await expect(page.getByRole('region', { name: 'Question' })).toHaveAttribute('data-question-status', 'pending');
   await page.evaluate(() => (window as unknown as { questionTest: { configure(value: unknown): void } }).questionTest.configure({ withProposal: true, missingFacts: true, accountId: 'new-scope' }));
-  await expect(page.getByRole('button', { name: 'He looks up at Vale, surprised', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Request a different framing', exact: true })).toBeDisabled();
 });
