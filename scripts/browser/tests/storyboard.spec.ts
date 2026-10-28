@@ -6,6 +6,40 @@ import type { verifyBuiltAdmission as VerifyBuiltAdmission } from '../../../apps
 type Harness = { storyboardTest: { configure(input: unknown): void; unmount(): void } };
 const initial = 'Second Panel description.';
 
+test('production Shell composes ordered typed Storyboard and an exact Panel viewer without mutations', async ({ page }, info) => {
+  await info.attach('prerequisite', { body: 'Labelled read-only public workspace delivered to the production Shell; no successful mutation or persisted lifecycle fixture.', contentType: 'text/plain' });
+  await page.goto('/storyboard.html'); await page.waitForFunction(() => !!(window as unknown as Harness).storyboardTest);
+  const methods: string[] = [];
+  await page.route('**/v1/**', async route => { methods.push(route.request().method()); await route.abort('failed'); });
+  await page.evaluate(() => (window as unknown as Harness).storyboardTest.configure({ composition: true }));
+  await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
+  await expect(page.locator('.wp-storyboard-shot').first()).toHaveAttribute('data-shot-id', 'shot-a');
+  expect(await page.locator('.wp-storyboard-shot').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-shot-id')))).toEqual(['shot-a', 'shot-b']);
+  expect(await page.locator('.wp-storyboard-panel').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-panel-id')))).toEqual(['panel-a', 'panel-b']);
+  await expect(page.locator('.wp-storyboard').getByText('First Shot', { exact: true })).toBeVisible();
+  await expect(page.getByText(initial, { exact: true })).toBeVisible();
+  await expect(page.getByText('Opaque camera must not render.', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.wp-storyboard img')).toHaveCount(0);
+  await page.getByRole('button', { name: 'View Panel 1.2 version 2', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveAccessibleName('Panel 1.2 · Version 2');
+  await expect(page.getByText('Shot 1 · Panel 1.2 · Version 2', { exact: true })).toBeVisible();
+  await expect(page.locator('[data-current-version-id]')).toHaveAttribute('data-current-version-id', 'panel-image-v1');
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'View storyboard', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveAccessibleName('Storyboard');
+  await expect(page.getByRole('button', { name: 'Edit Shot intent', exact: true })).toHaveCount(2);
+  await page.getByRole('button', { name: 'Edit Panel description', exact: true }).last().click();
+  await page.getByRole('textbox', { name: 'Panel description', exact: true }).fill('Draft across tabs.');
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('tab', { name: 'Assets', exact: true }).click();
+  await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
+  await page.getByRole('button', { name: 'View storyboard', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Panel description', exact: true })).toHaveValue('Draft across tabs.');
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.evaluate(() => (window as unknown as Harness).storyboardTest.unmount());
+  expect(methods.every(method => method === 'GET')).toBe(true);
+});
+
 test('planning uses typed text only and viewing, Cancel and unmount never mutate', async ({ page }, info) => {
   await info.attach('prerequisite', { body: 'Isolated read-only public Storyboard projection; no persisted product work or successful backend fixture.', contentType: 'text/plain' });
   await page.goto('/storyboard.html'); await page.waitForFunction(() => !!(window as unknown as Harness).storyboardTest);
@@ -21,6 +55,36 @@ test('planning uses typed text only and viewing, Cancel and unmount never mutate
   await expect(page.getByText(initial, { exact: true })).toBeVisible();
   await page.evaluate(() => (window as unknown as Harness).storyboardTest.unmount());
   expect(requests).toEqual([]);
+});
+
+test('Panel choice sends exact version and Shot/Panel binding to real 401/501 without changing approval', async ({ page }, info) => {
+  test.setTimeout(120000);
+  await info.attach('prerequisite', { body: 'Labelled read-only Panel candidates and approval projection; actual Use and version reads reach the built loopback backend.', contentType: 'text/plain' });
+  const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
+  const cleanup: (() => void | Promise<void>)[] = [];
+  try {
+    await verifyBuiltAdmission({ diagnostic(message) { console.log(message); }, after(fn) { cleanup.push(fn); } }, async ({ origin, accessTokens }) => {
+      for (const [token, status, copy] of [[accessTokens[0], 501, 'Using this version is not available yet. The current selection is unchanged.'], [null, 401, 'Sign-in required to use this version. The current selection is unchanged.']] as const) {
+        await page.goto('/storyboard.html'); await page.waitForFunction(() => !!(window as unknown as Harness).storyboardTest);
+        const commands: { path: string; body: unknown }[] = [];
+        await page.route('**/v1/**', async route => { expect(new URL(route.request().url()).origin).toBe(origin); if (route.request().method() !== 'GET') commands.push({ path: new URL(route.request().url()).pathname, body: route.request().postDataJSON() }); await route.continue(); });
+        await page.evaluate(input => (window as unknown as Harness).storyboardTest.configure(input), { composition: true, apiOrigin: origin, token });
+        await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
+        await page.getByRole('button', { name: 'View Panel 1.2 version 2', exact: true }).click();
+        expect(commands).toEqual([]);
+        const response = page.waitForResponse(value => value.url() === `${origin}/v1/conversations/read-only-conversation/uses`);
+        await page.getByRole('button', { name: 'Use this version', exact: true }).click();
+        expect((await response).status()).toBe(status);
+        await expect(page.getByRole('status')).toHaveText(copy);
+        await expect(page.locator('[data-current-version-id]')).toHaveAttribute('data-current-version-id', 'panel-image-v1');
+        expect(commands).toEqual([{ path: '/v1/conversations/read-only-conversation/uses', body: { purpose: 'panel_image', shotId: 'shot-a', panelId: 'panel-b', versionId: 'panel-image-v2', operationId: expect.stringMatching(/^[0-9a-f-]{36}$/) } }]);
+        await page.getByRole('button', { name: 'Close', exact: true }).click();
+        await page.evaluate(() => (window as unknown as Harness).storyboardTest.unmount());
+        expect(commands).toHaveLength(1);
+        await page.unroute('**/v1/**');
+      }
+    }, { browserOrigin: 'http://127.0.0.1:4179' });
+  } finally { for (const finish of cleanup.reverse()) await finish(); }
 });
 
 for (const shot of [false, true]) test(`planning ${shot ? 'Shot intent' : 'Panel description'} binds exact base and identities on real 401/501`, async ({ page }, info) => {
