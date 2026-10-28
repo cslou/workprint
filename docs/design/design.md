@@ -177,6 +177,7 @@ Product code uses semantic tokens. Primitives exist only so semantic tokens can 
 | `--font-line-height-1-4` | `1.4` |  |  |  |
 | `--font-line-height-1-45` | `1.45` |  |  |  |
 | `--font-line-height-1-5` | `1.5` |  |  |  |
+| `--font-line-height-1-55` | `1.55` |  |  | Approved `app-r11.css` `.snotes` leading; used for reference-sheet note paragraphs (`.wp-sheet-section p` in `apps/web/src/materials/sheet.css`). |
 | `--font-tracking-display` | `-0.2px` |  | `--tracking-display` | Opening and index titles. |
 | `--font-tracking-kicker` | `1.4px` |  | `--tracking-kicker` | Uppercase sheet kicker only. |
 

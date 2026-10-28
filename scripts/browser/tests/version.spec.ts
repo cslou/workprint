@@ -5,6 +5,50 @@ import type { verifyBuiltAdmission as VerifyBuiltAdmission } from '../../../apps
 
 const initial = 'Mercer and Vale sit side by side on the gallery bench.';
 
+test('aborted Save and Use retain draft, exact view and selection through tab navigation', async ({ page }, info) => {
+  await info.attach('prerequisite', { body: 'Read-only exact-version material projections; actual fetch requests are aborted, never replaced by successful product responses.', contentType: 'text/plain' });
+  await page.goto('/material.html');
+  await page.waitForFunction(() => !!(window as unknown as { materialTest?: unknown }).materialTest);
+  const mutations: string[] = [];
+  await page.route('**/v1/**', async (route) => { if (route.request().method() === 'POST') mutations.push(new URL(route.request().url()).pathname); await route.abort('failed'); });
+  await page.evaluate(() => (window as unknown as { materialTest: { configure(value: unknown): void } }).materialTest.configure({ prerequisites: true, apiOrigin: 'http://127.0.0.1:4179' }));
+  await page.getByRole('button', { name: 'Edit What happens', exact: true }).click();
+  await page.getByRole('textbox').fill('Draft retained after transport failures');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Changes were not saved. Your unsaved text is retained.');
+  await expect(page.locator('[data-displayed-version-id]')).toHaveAttribute('data-displayed-version-id', 'script-v7');
+  await expect(page.locator('[data-current-version-id]')).toHaveAttribute('data-current-version-id', 'script-v7');
+  await page.getByRole('tab', { name: 'Assets', exact: true }).click();
+  await page.getByRole('tab', { name: 'Script', exact: true }).click();
+  await expect(page.getByRole('textbox')).toHaveValue('Draft retained after transport failures');
+  await page.locator('.wp-version-history summary').click();
+  await page.getByRole('button', { name: 'Use this version', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText(['Changes were not saved. Your unsaved text is retained.', 'This version was not selected. The current selection is unchanged.']);
+  await page.getByRole('tab', { name: 'Assets', exact: true }).click();
+  await page.getByRole('tab', { name: 'Script', exact: true }).click();
+  await expect(page.getByRole('textbox')).toHaveValue('Draft retained after transport failures');
+  await expect(page.locator('[data-displayed-version-id]')).toHaveAttribute('data-displayed-version-id', 'script-v7');
+  await expect(page.locator('[data-current-version-id]')).toHaveAttribute('data-current-version-id', 'script-v7');
+  expect(mutations).toEqual(['/v1/conversations/read-only-conversation/versions', '/v1/conversations/read-only-conversation/uses']);
+});
+
+test('collapsing history explicitly returns from an earlier version to the supplied current version without selecting it', async ({ page }) => {
+  await page.goto('/version.html');
+  await page.waitForFunction(() => !!(window as unknown as { versionTest?: unknown }).versionTest);
+  const reads: string[] = [];
+  await page.route('**/v1/**', async (route) => { expect(route.request().method()).toBe('GET'); reads.push(new URL(route.request().url()).pathname); await route.abort('failed'); });
+  await page.evaluate(() => (window as unknown as { versionTest: { configure(value: unknown): void } }).versionTest.configure({ apiOrigin: 'http://127.0.0.1:4179', review: true }));
+  await page.locator('.wp-version-history summary').click();
+  await page.getByRole('button', { name: 'View version 6', exact: true }).click();
+  await expect(page.locator('[data-displayed-version-id]')).toHaveAttribute('data-displayed-version-id', 'script-v6');
+  await expect(page.getByText('Earlier Script text.', { exact: true })).toBeVisible();
+  await page.locator('.wp-version-history summary').click();
+  await expect(page.locator('[data-displayed-version-id]')).toHaveAttribute('data-displayed-version-id', 'script-v7');
+  await expect(page.getByText(initial, { exact: true })).toBeVisible();
+  await expect(page.locator('[data-current-version-id]')).toHaveAttribute('data-current-version-id', 'script-v7');
+  await expect.poll(() => reads).toEqual(['/v1/versions/script-v7', '/v1/artifacts/script-example/versions', '/v1/versions/script-v6', '/v1/versions/script-v7']);
+});
+
 test('section editing is local and Cancel restores the exact displayed version', async ({ page }) => {
   await page.goto('/version.html');
   await page.waitForFunction(() => !!(window as unknown as { versionTest?: unknown }).versionTest);

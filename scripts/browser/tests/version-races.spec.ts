@@ -1,5 +1,20 @@
 import { expect, test } from '@playwright/test';
 
+for (const order of [['script-v5', 'script-v6'], ['script-v6', 'script-v5']]) test(`batched concurrent Use completions retain revision 11: ${order.join(' then ')}`, async ({ page }, info) => {
+  await info.attach('race', { body: 'Two labelled exact-version Use promises resolve in one browser turn before React commits. Controlled results are race evidence, not persisted approval.', contentType: 'text/plain' });
+  await page.goto('/version.html');
+  await page.waitForFunction(() => !!(window as unknown as { versionTest?: unknown }).versionTest);
+  await page.route('**/v1/**', async (route) => { expect(route.request().method()).toBe('GET'); await route.abort('failed'); });
+  await page.evaluate(() => (window as unknown as { versionTest: { configure(value: unknown): void } }).versionTest.configure({ apiOrigin: 'http://127.0.0.1:4179', review: true, useRace: true }));
+  await page.locator('.wp-version-history summary').click();
+  const controls = page.getByRole('button', { name: 'Use this version', exact: true });
+  await controls.nth(0).click(); await controls.nth(1).click();
+  expect(await page.evaluate(() => (window as unknown as { versionTest: { pendingUses(): string[] } }).versionTest.pendingUses())).toEqual(['script-v6', 'script-v5']);
+  await page.evaluate((order) => (window as unknown as { versionTest: { resolveUses(value: string[]): void } }).versionTest.resolveUses(order), order);
+  await expect.poll(() => page.locator('[data-current-version-id]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-current-version-id')))).toEqual(['script-v5', 'script-v5']);
+  await expect(page.locator('[data-displayed-version-id]')).toHaveAttribute('data-displayed-version-id', 'script-v7');
+});
+
 const newerVersion = { id: 'script-v8', artifactId: 'script-example', revision: 8, kind: 'script', content: { synopsis: 'Authoritative revision 8.', retained: 'Unrelated field.' }, createdBy: 'human', createdAt: '2026-10-28T00:00:00Z', dependencies: ['reference-v1'] };
 for (const action of ['save', 'use'] as const) for (const change of ['account', 'conversation', 'version'] as const) test(`late ${action} failure cannot cross a ${change} binding`, async ({ page }, info) => {
   await info.attach('race', { body: 'Labelled read-only versions; controlled responses only for late command completion.', contentType: 'text/plain' });
