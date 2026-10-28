@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import type { verifyBuiltAdmission as VerifyBuiltAdmission } from '../../../apps/api/test/auth-built-fixture.js';
 import { compare } from '../compare.js';
+import { settleCapture } from '../capture.js';
 import { referenceFonts, scriptPrerequisite, assetPrerequisite } from '../material-reference.js';
 
 let origin = ''; let token = ''; let release!: () => void; let backend: Promise<void>;
@@ -39,9 +40,8 @@ for (const width of [1440, 390, 820, 821]) for (const view of ['assets', 'viewer
     if (asset) await page.evaluate(assetPrerequisite, { view, source: await readFile('docs/design/flow2-step10-r82.html', 'utf8') });
     else await page.evaluate(scriptPrerequisite, view);
     const selectors = ['.panel', '.ptabs,.wp-tabs', ...(asset ? ['.need.asset,.wp-asset-row', '.need.asset img,.wp-asset-row img', '.need.asset .status,.wp-asset-row .wp-status'] : ['#p-script > section:first-child,.wp-script > section:first-child']), ...(view === 'viewer' ? ['.lightbox,.wp-modal-overlay', '.lb-panel,.wp-modal', '.lb-head,.wp-dialog-head', '.lb-scroll,.wp-sheet-scroll', '.livesheet header,.wp-reference-sheet header', '.sgrid,.wp-sheet-grid', '.ssec.hero img,.wp-sheet-hero img', '.ssec.hero figcaption,.wp-sheet-hero figcaption', '.lightbox .take-hist summary,.wp-modal .wp-version-history summary'] : []), ...(view === 'save' ? ['textarea', '.approved-edit-actions,.wp-version-edit-actions', '.approved-edit-actions button:first-child,.wp-version-edit-actions button:first-child', '.approved-edit-actions button:last-child,.wp-version-edit-actions button:last-child'] : []), ...(view === 'use' ? ['.take-hist,.wp-version-history', '.th-row,.wp-version-history-row', '.use,.wp-version-use .wp-button-secondary'] : []), ...(asset ? [] : ['.approved-feedback,[role="status"]'])];
-    const settle = () => page.evaluate(async () => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); await document.fonts.ready; await Promise.all([...document.images].map((image) => image.decode())); scrollTo(0, 0); });
     const measure = () => page.evaluate((selectors) => selectors.map((selector) => { const node = document.querySelector(selector); if (!node) throw new Error(`Missing expected ${selector}`); const style = getComputedStyle(node); return { selector, box: node.getBoundingClientRect().toJSON(), styles: Object.fromEntries(['font','color','background-color','border','padding','margin','opacity'].map((key) => [key, style.getPropertyValue(key)])) }; }), selectors);
-    await settle(); const reference = await measure();
+    await settleCapture(page); const reference = await measure();
     const expected = await page.screenshot({ path: info.outputPath('reference-full.png'), fullPage: true, animations: 'disabled' });
     await page.goto('/material.html?reference=material');
     await page.waitForFunction(() => !!(window as unknown as { materialTest?: unknown }).materialTest);
@@ -57,7 +57,7 @@ for (const width of [1440, 390, 820, 821]) for (const view of ['assets', 'viewer
       await expect(page.getByRole('status')).toHaveText(view === 'save' ? 'Saving is not available yet. Your unsaved text is retained.' : 'Using this version is not available yet. The current selection is unchanged.');
       expect(mutations).toEqual([`/v1/conversations/read-only-conversation/${view === 'save' ? 'versions' : 'uses'}`]);
     } else expect(mutations).toEqual([]);
-    await page.mouse.move(1, 1); await settle(); const actual = await measure();
+    await settleCapture(page); const actual = await measure();
     await writeFile(info.outputPath('geometry.json'), JSON.stringify({ reference, actual }, null, 2));
     const screenshot = await page.screenshot({ path: info.outputPath('actual-full.png'), fullPage: true, animations: 'disabled' });
     const changedPixels = await compare(expected, screenshot, info.outputPath('comparison'));
