@@ -27,6 +27,8 @@ const render = () => root.render(<div className="wp-panel-body" style={{ width: 
   start: render,
   terminal() { projection = { ...workspace, videos: requests.map(request => request.id === 'request-running' ? { ...request, status: 'succeeded' } : request) }; render(); },
   switchScope() { accountId = 'other-read-only-account'; projection = { ...workspace, videos: [] }; render(); },
+  addRequest() { projection = { ...projection, videos: [...projection.videos, { ...requests[2]!, id: 'new-workspace-request' }] }; render(); },
+  releaseTerminalDetail() { const resolve = details.shift(), original = requests.find(request => request.id === 'request-running'); if (!resolve || !original) throw new Error('Missing controlled terminal detail'); resolve({ ok: true, value: { ...original, status: 'succeeded' } }); },
   pending() { return { lists: lists.length, details: details.length }; },
   releaseList() { const resolve = lists.shift(); if (!resolve) throw new Error('Missing controlled list'); resolve({ ok: true, value: { items: requests, nextCursor: null } }); },
   releaseDetail() { const resolve = details.shift(), original = requests.find(request => request.id === 'request-running'); if (!resolve || !original) throw new Error('Missing controlled detail'); resolve({ ok: true, value: { ...original, status: 'queued' } }); },

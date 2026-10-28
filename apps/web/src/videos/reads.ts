@@ -23,7 +23,11 @@ export function useGenerationRequests(client: ApiClient | null, scope: ReadScope
   } : null, [client, id]);
   return useScopedRead(scope, read);
 }
-export function useGenerationRequest(client: ApiClient | null, scope: ReadScope | null, id: string, open: boolean) {
-  const read = useMemo(() => client && open ? (signal: AbortSignal) => client.generationRequest({ params: { id }, query: {}, body: {} }, { signal }) : null, [client, id, open]);
+export function useGenerationRequest(client: ApiClient | null, scope: ReadScope | null, id: string, open: boolean, onObserved?: (request: GenerationRequest) => void) {
+  const read = useMemo(() => client && open ? async (signal: AbortSignal) => {
+    const result = await client.generationRequest({ params: { id }, query: {}, body: {} }, { signal });
+    if (result.ok && !signal.aborted) onObserved?.(result.value);
+    return result;
+  } : null, [client, id, open, onObserved]);
   return useScopedRead(scope, read);
 }
