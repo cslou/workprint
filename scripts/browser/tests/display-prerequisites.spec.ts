@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import type { Version } from '../../../packages/contracts/src/models.js';
+import type { Version } from '../../../packages/contracts/src/index.js';
 
 type Harness = { selectionRace: { configure(mode: 'video' | 'panel', options: unknown): void; pending(): number } };
 const src = '/references/assets/media-placeholder.svg';

@@ -2,7 +2,9 @@ import { useState } from 'react';
 import type { OperationResponse, Version } from '@workprint/contracts';
 import type { BrowserClient } from '../api/client.js';
 import type { ReadScope } from '../api/use-scoped-read.js';
+import { Button } from '../ui/controls.js';
 import { EmptyState, WorkspaceEmpty } from '../ui/panel.js';
+import { SingleClipViewer } from '../media/viewer.js';
 import { Feedback, StatusPill } from '../ui/status.js';
 import { VersionReview } from '../versions/review.js';
 import { VersionUse } from '../versions/use.js';
@@ -44,7 +46,7 @@ function VideoCandidate({ connection, scope, workspace, prerequisites, row, choi
   return <div className="wp-video-row" data-shot-id={row.shotId}>
     <VersionReview connection={connection} scope={scope} version={version} currentUse={selected?.use ?? null} selectedVersionId={row.selected} selectionRevision={selected?.selectionRevision ?? workspace.selectionRevision} onUsed={onUsed} binding={{ purpose: 'shot_video', shotId: row.shotId }} {...(prerequisites ? { historyPrerequisite: prerequisites.versions } : {})}>{(visible, _editable, selection) => {
       const image = prerequisites?.images?.find(image => image.versionId === visible.id && image.revision === visible.revision);
-      return <><div className="wp-video-head"><span className="wp-video-number">{row.number}</span><b className="wp-video-title">{row.title}</b>{(selection.currentUse?.versionId ?? row.selected) === visible.id && <StatusPill state="chosen" />}</div>{image && <img className="wp-video-thumbnail" src={image.src} alt={image.alt} />}<p className="wp-video-metadata">Version {visible.revision}{visible.kind === 'video' && visible.media.durationMs !== undefined ? ` · ${(visible.media.durationMs / 1000).toFixed(1)} s` : ''}</p><VersionUse connection={connection} scope={scope} version={visible} binding={{ purpose: 'shot_video', shotId: row.shotId }} currentUse={selection.currentUse} selectedVersionId={row.selected} selectionRevision={selection.selectionRevision} onUsed={selection.onUsed} /></>;
+      return <><div className="wp-video-head"><span className="wp-video-number">{row.number}</span><b className="wp-video-title">{row.title}</b>{(selection.currentUse?.versionId ?? row.selected) === visible.id && <StatusPill state="chosen" />}</div>{image && <img className="wp-video-thumbnail" src={image.src} alt={image.alt} />}<span className="wp-video-metadata"><SingleClipViewer connection={connection} scope={scope} version={visible} caption={`Shot ${row.number} · Version ${visible.revision}`} binding={{ purpose: 'shot_video', shotId: row.shotId }} currentUse={selection.currentUse} selectedVersionId={row.selected} selectionRevision={selection.selectionRevision} onUsed={selection.onUsed} trigger={<Button variant="quiet" aria-label={`View Shot ${row.number} version ${visible.revision}`}>Version {visible.revision}{visible.kind === 'video' && visible.media.durationMs !== undefined ? ` · ${(visible.media.durationMs / 1000).toFixed(1)} s` : ''}</Button>} /></span><VersionUse connection={connection} scope={scope} version={visible} binding={{ purpose: 'shot_video', shotId: row.shotId }} currentUse={selection.currentUse} selectedVersionId={row.selected} selectionRevision={selection.selectionRevision} onUsed={selection.onUsed} /></>;
     }}</VersionReview>
   </div>;
 }

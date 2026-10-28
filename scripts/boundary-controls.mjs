@@ -15,6 +15,7 @@ const pairs = [
   ['browser-no-server', 'apps/web/src', `${api}db`],
   ['packages-no-apps', 'packages/contracts/src', `${api}db`],
   ['production-no-tests', `${api}mastra`, 'apps/api/test'],
+  ['player-only-web-consumer', `${api}db`, 'packages/player/src'],
 ];
 
 function probe(rule, files) {

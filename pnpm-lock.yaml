@@ -75,6 +75,9 @@ importers:
       '@workprint/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@workprint/player':
+        specifier: workspace:*
+        version: link:../../packages/player
       react:
         specifier: 19.3.1
         version: 19.3.1
@@ -106,6 +109,8 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+
+  packages/player: {}
 
 packages:
 
