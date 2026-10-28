@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useBindingSchema } from '@workprint/contracts';
+import { useVersion } from '../api/use-version.js';
 import type { OperationResponse, Version } from '@workprint/contracts';
 import type { BrowserClient } from '../api/client.js';
 import type { ReadScope } from '../api/use-scoped-read.js';
@@ -25,12 +25,10 @@ function BoundUse({ connection, scope, version, binding, currentUse, selectionRe
     if (connection.kind !== 'configured' || !scope?.conversationId || busy.current) return;
     busy.current = true; setPending(true); setFeedback(null);
     try {
-      const result = await connection.client.useVersion({ params: { id: scope.conversationId }, query: {}, body: { ...binding, operationId: crypto.randomUUID(), versionId: version.id } });
+      const result = await useVersion(connection.client, { conversationId: scope.conversationId, versionId: version.id, binding, minimumSelectionRevision: selectionRevision });
       if (!active.current || (latest.current.authority !== authority && (!result.ok || result.value.selectionRevision <= latest.current.revision))) return;
       if (!result.ok) { setFeedback(feedbackFor(result.error.code)); return; }
-      const value = result.value;
-      if (value.use.versionId !== version.id || value.use.state !== 'approved' || value.selectionRevision < selectionRevision || JSON.stringify(useBindingSchema.parse(value.use.binding)) !== JSON.stringify(useBindingSchema.parse(binding))) { setFeedback(feedbackFor('invalid_response')); return; }
-      onUsed?.(value);
+      onUsed?.(result.value);
     } catch { if (active.current && latest.current.authority === authority) setFeedback(feedbackFor('transport_failure')); }
     finally { busy.current = false; if (active.current) setPending(false); }
   };

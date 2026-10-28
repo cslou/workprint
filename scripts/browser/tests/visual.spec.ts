@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { compare } from '../compare.js';
+import { settleCapture } from '../capture.js';
 
 const contexts = [
   { name: 'opening', reference: 'flow2-step1-r73.html', region: '.panel', actual: '.panel' },
@@ -23,19 +24,17 @@ for (const width of [1440, 390, 820, 821]) for (const context of contexts) {
     });
     await page.goto(`/references/${context.reference}`);
     await page.addStyleTag({ content: fontNormalization });
-    await page.evaluate(async () => { await document.fonts.ready; });
     await expect(page.locator(context.region)).toBeVisible();
-    await page.evaluate(() => window.scrollTo(0, 0));
+    await settleCapture(page);
     const referenceBounds = await page.locator(context.region).boundingBox();
     const reference = await page.locator(context.region).screenshot({ path: info.outputPath('reference-region.png'), animations: 'disabled' });
     await page.screenshot({ path: info.outputPath('reference-full.png'), fullPage: true, animations: 'disabled' });
     await page.goto(`/?context=${context.name}`);
+    await page.addStyleTag({ content: fontNormalization });
     await expect(page.locator('body')).toHaveAttribute('data-ready', 'true');
     if (context.name === 'viewer') await page.getByRole('button', { name: 'View look A' }).click();
-    // Focus behavior is tested separately; match the reference's pointer state.
-    await page.mouse.move(1, 1);
-    await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); });
-    await page.evaluate(() => window.scrollTo(0, 0));
+    // Focus behavior is tested separately; settleCapture matches the reference's pointer/settle state.
+    await settleCapture(page);
     expect(await page.locator(context.actual).boundingBox()).toEqual(referenceBounds);
     const actual = await page.locator(context.actual).screenshot({ path: info.outputPath('actual-region.png'), animations: 'disabled' });
     await page.screenshot({ path: info.outputPath('actual-full.png'), fullPage: true, animations: 'disabled' });

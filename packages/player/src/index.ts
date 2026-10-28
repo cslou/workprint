@@ -111,12 +111,7 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
       const token = ++playAttempt;
       const sourceGeneration = generation;
       pauseRequested = false;
-      const attempt = media.play();
-      void attempt.then(() => {
-        if (disposed || token !== playAttempt || sourceGeneration !== generation || !currentSource() || !pauseRequested) return;
-        try { media.pause(); } catch { /* no media resource to pause */ }
-        if (snapshot.status === 'playing' || snapshot.status === 'ready') publish({ status: 'paused', sourceId: value.sourceId, positionMs: position(), durationMs: measuredDuration(value), failure: null });
-      }).catch((error: unknown) => {
+      void media.play().catch((error: unknown) => {
         if (disposed || token !== playAttempt || sourceGeneration !== generation || !currentSource() || snapshot.status === 'failed') return;
         if (error instanceof DOMException && error.name === 'NotAllowedError') { observe(new Event('pause')); return; }
         if (error instanceof DOMException && error.name === 'AbortError') return;

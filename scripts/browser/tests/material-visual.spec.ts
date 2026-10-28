@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { compare } from '../compare.js';
+import { settleCapture } from '../capture.js';
 import { referenceFonts as fonts, scriptPrerequisite } from '../material-reference.js';
 for (const width of [1440, 390, 820, 821]) for (const view of ['script', 'edit', 'history'] as const) test(`${view} material main reference at ${width}`, async ({ page, context }, info) => {
   await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
@@ -20,7 +21,7 @@ for (const width of [1440, 390, 820, 821]) for (const view of ['script', 'edit',
     const style = getComputedStyle(node);
     return { selector, box: node.getBoundingClientRect().toJSON(), styles: Object.fromEntries(['font','color','background-color','border','padding','margin','opacity'].map((key) => [key, style.getPropertyValue(key)])) };
   }), selectors);
-  await page.evaluate(async () => { await document.fonts.ready; scrollTo(0, 0); });
+  await settleCapture(page);
   const reference = await measure();
   const expected = await page.screenshot({ path: info.outputPath('reference-full.png'), fullPage: true, animations: 'disabled' });
   await page.goto('/material.html?reference=script');
@@ -29,8 +30,7 @@ for (const width of [1440, 390, 820, 821]) for (const view of ['script', 'edit',
   await expect(page.getByText('Natural colour', { exact: true })).toBeVisible();
   if (view === 'edit') await page.getByRole('button', { name: 'Edit What happens', exact: true }).click();
   if (view === 'history') await page.locator('.wp-version-history summary').click();
-  await page.mouse.move(1, 1);
-  await page.evaluate(async () => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); await document.fonts.ready; scrollTo(0, 0); });
+  await settleCapture(page);
   const actual = await measure();
   await writeFile(info.outputPath('geometry.json'), JSON.stringify({ reference, actual }, null, 2));
   const screenshot = await page.screenshot({ path: info.outputPath('actual-full.png'), fullPage: true, animations: 'disabled' });

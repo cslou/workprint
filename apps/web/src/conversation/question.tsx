@@ -57,6 +57,6 @@ function ScopedQuestion({ connection, scope, question, proposalPrerequisite, wor
     <div className="wp-question-options">{current.options.map((option, index) => <AriaButton key={option.id} className="wp-question-option" isDisabled={!client || !scope?.conversationId || current.status !== 'pending' || submitting || acknowledged || (!!current.scope.proposalId && !completeProposal)} onPress={() => void answer(option.id)}><span className="wp-question-key" aria-hidden="true">{String.fromCharCode(65 + index)}</span><span>{option.label}</span></AriaButton>)}</div>
     {feedback && <p className="wp-question-feedback" role="status">{feedback}</p>}
     </>}
-    <Composer native={native} {...(draft ? { draft } : {})} docked placeholder="Pick an option, type your own answer, or ask something else…" />
+    <Composer native={native} connection={connection} scope={scope} {...(draft ? { draft } : {})} docked placeholder="Pick an option, type your own answer, or ask something else…" />
   </section>;
 }
