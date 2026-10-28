@@ -2,7 +2,7 @@
 
 **Migration (2026-10-27):** Workprint replaces the prototype name Generate. Layouts/tokens are retained; original media/screenshots are replaced with labelled placeholders. Historical verification below belongs to the source prototype, not this migrated copy. Editor, Project and comparison-player examples are not MVP scope; current scope follows the [architecture notice](../architecture.md). Typed chat is not approval; exact proposal approval and informational cost presentation follow the approved implementation plan.
 
-**Status:** Editor and component integration for inspection, with an accepted separate Project workspace roadmap reference. The accepted foundations and unaffected flows remain in force. Material-control direction is approved, with focus rings removed as requested. The roadmap flow is future design reference, not an addition to approved flows or the demo. Editing, recovery and export completion remain partial. No existing token value changed. Nothing here is implemented in application code.
+**Status:** Editor and component integration for inspection, with an accepted separate Project workspace roadmap reference. The accepted foundations and unaffected flows remain in force. Material-control direction is approved, with focus rings removed as requested. The roadmap flow is future design reference, not an addition to approved flows or the demo. Editing, recovery and export completion remain partial. No existing token value changed. Earlier entries describe reference artifacts; application delivery is tracked separately. The scoped Library feedback approval below is dated 2026-10-28.
 
 **Version:** 1.3 · **Updated:** 16 October 2026 · **History:** [Decisions](#decisions)
 
@@ -595,6 +595,20 @@ Keyboard/focus: labelled native checkbox toggles with Space; group summaries tog
 - **Tray:** "1 selected", the chips, and **Attach (n)** as the primary button.
 - **Empty library:** "Nothing saved yet" plus one line of explanation.
 
+### Library feedback
+
+**Scoped approval — 2026-10-28.** The user approved the Story 2 feedback proposal derived from `demo-05.html#lib-yours`. Reuse `.lp-empty`: a centered two-line grid, 4px gap, 240px minimum height, 13px subtle body text and 15px/600 primary title. Retain this geometry at desktop/narrow widths; introduce no banner, new colors, sign-in/retry action or recovery flow.
+
+| Condition | Title | Message |
+| --- | --- | --- |
+| 401 / no valid session | Sign-in required | Your Library cannot be loaded without a valid session. |
+| 501 | Library not available yet | Library loading is not implemented in this build. |
+| Loading | Loading Library… | Looking for saved characters, places and props. |
+| Transport/error | Library could not be loaded | No saved material was changed. |
+| Missing public configuration | Library connection not configured | No API origin is configured for this build. |
+
+Empty success retains “Nothing saved yet” and “Characters, places and props you approve will appear here.” A failed read must never be presented as empty saved work. Use polite status semantics, with no credentials or raw error payloads in the message. This approves Library feedback only—not unrelated session, proposal/estimate or export layouts, actual sign-in, or detailed feature recovery.
+
 ### Reference sheet
 
 `.livesheet`: a character or place sheet drawn from its structured record. The images are separate files; a PNG or PDF is only an export.
@@ -875,6 +889,7 @@ These states have not been designed. They are listed so they are not mistaken fo
 
 | Date | Stage / scope | Revision | Decision and response | Conditions |
 | --- | --- | --- | --- | --- |
+| 2026-10-28 | Library feedback | Story 2 `demo-05.html#lib-yours` two-line proposal | User explicitly approved 401, 501, loading, transport/error and missing-configuration feedback treatment | No banner/colors/recovery controls; no blanket session/proposal/export approval; see [Library feedback](#library-feedback) |
 | Earlier | Flows and screens | Flow 1 r64/r83–r90, Flow 2 r73–r82, demo, picker r92 | Approved (D-77, D-80, D-85) | Reused as is |
 | 2026-09-28 | Visual direction | `app-r11.css` light theme | Chosen (D-18): Venice light colours as reference, no Venice branding | |
 | 2026-10-02 | Name and logo | — | Deferred | Working placeholders only |

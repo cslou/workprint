@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@workprint/api-client": "workspace:*",
+    "@workprint/contracts": "workspace:*",
     "react": "19.3.1",
     "react-aria-components": "1.22.1",
     "react-dom": "19.3.1"

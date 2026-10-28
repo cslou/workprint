@@ -62,10 +62,10 @@ test('clean tracked export installs frozen, prepares, builds and serves built/de
       assert.equal(browser.status, 200);
       assert.match(await browser.text(), /Workprint/);
       if (mode === 'start') {
-        for (const path of ['/?context=viewer', '/test/index.html', '/test/mount.tsx']) {
+        for (const path of ['/?context=viewer', '/test/index.html', '/test/mount.tsx', '/test/library.html', '/test/library-mount.tsx']) {
           const response = await fetch(`http://127.0.0.1:${webPort}${path}`, { signal: AbortSignal.timeout(2000) });
           const text = await response.text();
-          assert.doesNotMatch(text, /Isolated UI verification|Read-only details|mount\.tsx/, 'Built serving cannot select test mounts');
+          assert.doesNotMatch(text, /Isolated UI verification|Isolated Library|Read-only details|mount\.tsx|libraryTest/, 'Built serving cannot select test mounts');
         }
       }
     } finally { await server.stop(); }
@@ -81,7 +81,7 @@ test('clean tracked export installs frozen, prepares, builds and serves built/de
       // This checks generated assets/logs for escaped credentials, not source snapshots.
       const contents = await readFile(file);
       assert.ok(!contents.includes(sentinel), `Secret escaped into ${file}`);
-      if (file.startsWith(join(checkout, 'apps/web/dist'))) assert.doesNotMatch(contents.toString(), /Isolated UI verification|Read-only details|test\/mount|references\/flow/, 'Test compositions are absent from browser artifacts');
+      if (file.startsWith(join(checkout, 'apps/web/dist'))) assert.doesNotMatch(contents.toString(), /Isolated UI verification|Isolated Library|Read-only details|test\/mount|references\/flow|libraryTest/, 'Test compositions are absent from browser artifacts');
     }
   }
   await fixture.noNetwork();
