@@ -4,13 +4,13 @@ import type { ClientResult } from '@workprint/api-client';
 import type { OperationResponse } from '@workprint/contracts';
 import { createBrowserClient } from '../src/api/client.js';
 import { Videos } from '../src/videos/videos.js';
-import { requests, video, videoWorkspace } from './storyboard-fixtures.js';
+import { video, videoWorkspace } from './storyboard-fixtures.js';
 import '../src/ui/tokens.css';
 import '../src/ui/foundations.css';
 
 // Labelled read-only public projections. Successful media sources are supplied
 // only by the isolated harness; the production consumer still performs the read.
-const first = versionSchema.parse({ ...video, id: 'video-v1', revision: 1, media: { ...video.media, durationMs: 2000 } });
+const first = versionSchema.parse({ ...video, id: 'video-v1', revision: 1, kind: 'video', media: { contentType: 'video/mp4', byteSize: 456, width: 1280, height: 720, durationMs: 2000 } });
 const second = video;
 const projection = (() => {
   const value = videoWorkspace();

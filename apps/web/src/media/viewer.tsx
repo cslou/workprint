@@ -79,6 +79,7 @@ function ClipPlayer({ source }: { source: PlayerSource }) {
       <button type="button" className="wp-clip-toggle" aria-label={playing ? 'Pause' : 'Play'} onClick={() => { if (!player.current) return; if (playing) player.current.pause(); else player.current.play(); }}>
         {playing ? <svg className="wp-clip-pause-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg> : <svg className="wp-clip-play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7Z" /></svg>}
       </button>
+      <span className="wp-clip-bar" aria-hidden="true"><i style={{ width: `${progress}%` }} /></span>
       <input type="range" className="wp-clip-seek" aria-label="Seek" min={0} max={Math.max(duration, 1)} step={50} value={position} disabled={duration <= 0} onChange={(event) => player.current?.seek(Number(event.currentTarget.value))} style={{ '--wp-clip-progress': `${progress}%` } as CSSProperties} />
       <span className="wp-clip-time">{format(position)} / {format(duration)}</span>
     </> : <p className="wp-clip-note" role="status">{snapshot.status === 'failed' ? copy.failed : copy.loading}</p>}
