@@ -2,7 +2,7 @@
 .wp-video-head { display: flex; align-items: center; gap: var(--space-8); }
 .wp-video-number { display: inline-grid; place-items: center; width: var(--space-20); height: var(--space-20); border: var(--border-width-default) solid var(--color-border-strong); border-radius: var(--radius-sm); font-weight: var(--font-weight-semibold); font-size: var(--font-size-11); }
 .wp-video-title { flex: 1; font-size: var(--font-size-14); }
-.wp-video-metadata { display: block; margin: var(--space-4) 0 var(--space-6); font-size: var(--font-size-12); color: var(--color-text-subtle); }
-.wp-video-metadata .wp-button-quiet { display: block; width: 100%; min-height: 0; height: auto; padding: 0; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; font-weight: var(--font-weight-regular); line-height: inherit; text-align: left; }
+.wp-video-metadata { display: block; margin: var(--space-4) 0 var(--space-6); font-size: var(--font-size-12); line-height: var(--font-line-height-1-5); color: var(--color-text-subtle); }
+.wp-video-metadata .wp-button-quiet { display: block; width: 100%; min-height: 0; height: auto; padding: 0; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; font-weight: var(--font-weight-regular); line-height: var(--font-line-height-1-5); text-align: left; }
 .wp-video-metadata .wp-button-quiet[data-hovered] { background: transparent; color: var(--color-text-primary); }
 .wp-video-thumbnail { display: block; width: var(--size-media-thumb-row); aspect-ratio: 16 / 9; object-fit: cover; border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-sm); }
