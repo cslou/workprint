@@ -9,7 +9,7 @@ type UploadsHarness = { uploadsTest: { configure(input: unknown): void; confirm(
 type ShellHarness = { shellTest: { configure(input: unknown): void } };
 const libraryItems = (() => {
   const version = (id: string, revision: number, kind: 'reference' | 'image' | 'video'): Version => kind === 'reference'
-    ? { id, artifactId: `artifact-${id}`, revision, kind, content: {}, createdBy: 'human', createdAt: '2026-10-29T00:00:00Z', dependencies: [] }
+    ? { id, artifactId: `artifact-${id}`, revision, kind, content: { searchTrap: 'secret-content-token' }, createdBy: 'human', createdAt: '2026-10-29T00:00:00Z', dependencies: [] }
     : { id, artifactId: `artifact-${id}`, revision, kind, media: { contentType: kind === 'image' ? 'image/png' : 'video/mp4', byteSize: 1024, width: 640, height: 640 }, createdBy: 'human', createdAt: '2026-10-29T00:00:00Z', dependencies: [] };
   return [
     { id: 'vale', kind: 'reference' as const, builtIn: true, latestVersion: version('vale-v1', 1, 'reference') },
@@ -174,10 +174,17 @@ test('picker filters and selects locally and attaches the exact versions against
       await expect(page.locator('.wp-picker-tile .wp-picker-label')).toHaveText(labels);
       await expect(page.locator('.wp-picker-tile img')).toHaveCount(4);
       expect(requests).toEqual([{ method: 'GET', path: '/v1/library', body: null }]);
-      await page.getByRole('button', { name: 'Characters', exact: true }).click();
-      await expect(page.locator('.wp-picker-label')).toHaveText(['Vale', 'Mercer']);
-      await page.getByRole('button', { name: 'All', exact: true }).click();
-      await expect(page.locator('.wp-picker-label')).toHaveText(labels);
+      await expect(page.locator('.wp-picker-sub')).toHaveText(['Character', 'Character', 'Place', 'Prop']);
+      for (const [category, names] of [['Characters', ['Vale', 'Mercer']], ['Places', ['The gallery']], ['Props', ['Bench']], ['All', labels]] as const) {
+        await page.getByRole('button', { name: category, exact: true }).click();
+        await expect(page.locator('.wp-picker-label')).toHaveText([...names]);
+      }
+      await page.getByRole('textbox', { name: 'Search Library', exact: true }).fill('  THE G  ');
+      await expect(page.locator('.wp-picker-label')).toHaveText(['The gallery']);
+      for (const hidden of ['vale-v1', 'secret-content-token']) {
+        await page.getByRole('textbox', { name: 'Search Library', exact: true }).fill(hidden);
+        await expect(page.locator('.wp-picker-empty b')).toHaveText('No matching items');
+      }
       await page.getByRole('textbox', { name: 'Search Library', exact: true }).fill('val');
       await expect(page.locator('.wp-picker-label')).toHaveText(['Vale']);
       await page.getByRole('textbox', { name: 'Search Library', exact: true }).fill('zzz');
