@@ -90,6 +90,30 @@ for (const mode of ['development', 'built'] as const) test(`${mode} Library cons
   } finally { for (const fn of cleanup.reverse()) await fn(); }
 });
 
+test('Library reactivation starts loading before passive effects, never resurrecting settled feedback', async ({ page }, info) => {
+  await page.goto('/library.html');
+  let requests = 0;
+  await page.route('**/v1/library', async (route) => {
+    expect(route.request().method()).toBe('GET');
+    requests++;
+    await route.fulfill({ status: 501, contentType: 'application/json', body: JSON.stringify({ error: { code: 'not_implemented', message: 'Controlled read response' } }) });
+  });
+  const observations = () => page.evaluate(() => (window as unknown as { libraryTest: { observations(): { active: boolean; feedback: string }[] } }).libraryTest.observations());
+  await configure(page, { apiOrigin: 'http://127.0.0.1:4179', token: null, accountId: 'account-a', conversationId: 'conversation-a' });
+  await expect(page.getByRole('status')).toContainText('Library not available yet');
+  await page.evaluate(() => (window as unknown as { libraryTest: { deactivate(): void } }).libraryTest.deactivate());
+  await expect.poll(async () => (await observations()).length).toBe(2);
+  expect((await observations())[1]).toMatchObject({ active: false });
+  // Omit apiOrigin so the exact client/read collaborator and scope A are reused.
+  await configure(page, { token: null, accountId: 'account-a', conversationId: 'conversation-a' });
+  await expect.poll(async () => (await observations()).length).toBe(3);
+  const rendered = await observations();
+  await info.attach('before-passive-render-observations', { body: JSON.stringify(rendered), contentType: 'application/json' });
+  expect(rendered[2]).toEqual({ active: true, feedback: 'Loading Library…Looking for saved characters, places and props.' });
+  await expect.poll(() => requests).toBe(2);
+  await expect(page.getByRole('status')).toContainText('Library not available yet');
+});
+
 for (const change of ['account', 'conversation'] as const) test(`Library ${change} invalidation, unmount and timeout never replay mutations`, async ({ page }) => {
   await page.goto('/library.html');
   let release: (() => void) | undefined;

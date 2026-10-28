@@ -8,6 +8,11 @@ export type ReadState<T> = { kind: 'idle' } | { kind: 'loading' } | { kind: 'set
 export function useScopedRead<T>(scope: ReadScope | null, read: ((signal: AbortSignal) => Promise<ClientResult<T>>) | null): ReadState<T> {
   const key = scope ? JSON.stringify([scope.accountId, scope.conversationId ?? null]) : null;
   const [snapshot, setSnapshot] = useState<{ key: string | null; read: typeof read; state: ReadState<T> }>({ key: null, read: null, state: { kind: 'idle' } });
+  // Forget inactive identities during render, not a later passive effect: the same
+  // scope/client must not recover an old settled snapshot on reactivation.
+  if ((key === null || read === null) && (snapshot.key !== null || snapshot.read !== null)) {
+    setSnapshot({ key: null, read: null, state: { kind: 'idle' } });
+  }
   useEffect(() => {
     if (key === null || read === null) return;
     let current = true;
