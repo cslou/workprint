@@ -52,6 +52,7 @@ try {
   if (task === 'build' || task === 'db:prepare') {
     await run('tsc', ['-p', 'packages/contracts/tsconfig.json']);
     await run('tsc', ['-p', 'packages/api-client/tsconfig.json']);
+    await run('tsc', ['-p', 'packages/player/tsconfig.json']);
     rmSync('apps/api/dist', { recursive: true, force: true });
     await run('tsc', ['-p', 'apps/api/tsconfig.build.json']);
   }
@@ -64,6 +65,7 @@ try {
     if (task === 'dev') {
       await run('tsc', ['-p', 'packages/contracts/tsconfig.json']);
       await run('tsc', ['-p', 'packages/api-client/tsconfig.json']);
+      await run('tsc', ['-p', 'packages/player/tsconfig.json']);
     }
     await Promise.all([
       task === 'dev'

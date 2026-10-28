@@ -18,6 +18,7 @@ export default defineConfig({
         fileURLToPath(new URL('.', import.meta.url)),
         fileURLToPath(new URL('../../packages/api-client/dist/', import.meta.url)),
         fileURLToPath(new URL('../../packages/contracts/dist/', import.meta.url)),
+        fileURLToPath(new URL('../../packages/player/dist/', import.meta.url)),
         realpathSync(fileURLToPath(new URL('../../node_modules/', import.meta.url))),
       ],
     },

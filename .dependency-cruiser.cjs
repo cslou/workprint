@@ -8,6 +8,8 @@ const rules = [
   { name: 'browser-no-node', from: { path: '^(apps/web/|packages/(contracts|api-client|player)/)' }, to: { dependencyTypes: ['core'] } },
   { name: 'packages-no-apps', from: { path: '^packages/' }, to: { path: '^apps/' } },
   { name: 'contracts-no-transport', from: { path: '^packages/contracts/' }, to: { path: '^packages/(api-client|player)/' } },
+  { name: 'player-no-app-or-transport', from: { path: '^packages/player/' }, to: { path: '^(apps/|packages/(contracts|api-client)/)' } },
+  { name: 'player-no-ui-frameworks', from: { path: '^packages/player/' }, to: { path: '(^|/)node_modules/(react|react-dom|react-aria-components)/' } },
   { name: 'application-no-native', from: { path: '^apps/api/src/application/' }, to: { path: '^apps/api/src/(agent|mastra|bootstrap)/|(^|/)node_modules/@mastra/' } },
   { name: 'mechanics-no-upward', from: { path: '^apps/api/src/(db|storage|model-catalog)/' }, to: { path: '^apps/api/src/(application|agent|mastra|bootstrap|artifacts|generation|exports|usage)/' } },
   { name: 'agent-no-bootstrap', from: { path: '^apps/api/src/agent/' }, to: { path: '^apps/api/src/(mastra|bootstrap)/' } },
