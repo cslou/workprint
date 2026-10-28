@@ -1,4 +1,5 @@
 import { createRoot } from 'react-dom/client';
+import { loadReference } from './reference-loader.js';
 import { flushSync } from 'react-dom';
 import { questionSchema, proposalSchema, versionSchema, workspaceSchema } from '@workprint/contracts';
 import type { Question } from '@workprint/contracts';
@@ -18,14 +19,10 @@ const versions = ['vale-v1', 'gallery-v1'].map((id) => versionSchema.parse({ id,
 let node = document.getElementById('root');
 const reference = new URLSearchParams(location.search).get('reference');
 if (reference) {
-  const response = await fetch(`/references/${reference === 'proposal' ? 'flow2-step6-r78.html' : 'flow2-step2-r74.html'}`);
-  if (!response.ok) throw new Error('Question reference unavailable');
-  const source = new DOMParser().parseFromString(await response.text(), 'text/html');
-  source.querySelectorAll('[src]').forEach((element) => element.setAttribute('src', `/references/${element.getAttribute('src')}`));
-  document.body.innerHTML = source.body.innerHTML; document.body.className = source.body.className;
+  const source = await loadReference(reference === 'proposal' ? 'flow2-step6-r78.html' : 'flow2-step2-r74.html');
+  document.body.className = source.body.className;
   document.documentElement.style.setProperty('--font-sans', 'var(--font-family-sans)');
   document.documentElement.style.setProperty('--font-display', 'var(--font-family-display)');
-  const style = document.createElement('link'); style.rel = 'stylesheet'; style.href = '/references/app-r11.css'; document.head.prepend(style);
   const normalization = document.createElement('style'); normalization.textContent = 'b,strong{font-weight:var(--font-weight-semibold)}'; document.head.append(normalization);
   const dock = document.querySelector('.dockwrap');
   if (!dock) throw new Error('Missing reference question dock');

@@ -1,4 +1,5 @@
 import { createRoot } from 'react-dom/client';
+import { loadReference } from './reference-loader.js';
 import { useLayoutEffect } from 'react';
 import type { ReadScope } from '../src/api/use-scoped-read.js';
 import { createBrowserClient } from '../src/api/client.js';
@@ -10,16 +11,10 @@ import '../src/ui/foundations.css';
 
 let node = document.getElementById('root');
 if (new URLSearchParams(location.search).has('reference')) {
-  const response = await fetch('/references/demo-05.html');
-  if (!response.ok) throw new Error('Library reference unavailable');
-  const reference = new DOMParser().parseFromString(await response.text(), 'text/html');
-  reference.querySelectorAll('[src]').forEach((element) => element.setAttribute('src', `/references/${element.getAttribute('src')}`));
-  document.body.innerHTML = reference.body.innerHTML;
+  const reference = await loadReference('demo-05.html');
   document.body.className = reference.body.className;
   document.documentElement.style.setProperty('--font-sans', 'var(--font-family-sans)');
   document.documentElement.style.setProperty('--font-display', 'var(--font-family-display)');
-  const stylesheet = document.createElement('link');
-  stylesheet.rel = 'stylesheet'; stylesheet.href = '/references/app-r11.css'; document.head.prepend(stylesheet);
   const empty = document.querySelector('.lp-empty');
   if (!empty) throw new Error('Missing Library reference');
   node = document.createElement('div'); node.style.display = 'contents'; empty.replaceWith(node);

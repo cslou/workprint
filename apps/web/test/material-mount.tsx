@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { loadReference } from './reference-loader.js';
 import { versionSchema, workspaceSchema } from '@workprint/contracts';
 import type { OperationResponse } from '@workprint/contracts';
 import { MaterialPanel } from '../src/materials/panel.js';
@@ -19,16 +20,7 @@ const prerequisites: MaterialPrerequisites = { presentations: [
   { versionId: reference.id, revision: 2, name: 'Vale reference', description: 'Character sheet', thumbnail: { src: '/references/assets/media-placeholder.svg', alt: 'Vale thumbnail' }, sheet: { kicker: 'Character reference', name: 'Vale', summary: 'Dark navy overcoat · charcoal suit', sections: [{ title: 'Identity', layout: 'hero', text: 'Late forties, light stubble.', figures: [{ src: '/references/assets/media-placeholder.svg', alt: 'Vale front view', caption: 'Front · neutral expression' }] }, { title: 'Wardrobe', text: 'Navy overcoat over a charcoal suit.' }, { title: 'Missing views', text: 'Side and back views are not supplied.' }] } },
 ], history: [versionSchema.parse({ ...script, id: 'script-v6', revision: 6, content: { synopsis: 'Earlier Script text.' } })] };
 const context = new URLSearchParams(location.search).has('reference');
-if (context) {
-  const response = await fetch('/references/flow2-step2-r74.html');
-  if (!response.ok) throw new Error('Missing tracked material reference');
-  const source = new DOMParser().parseFromString(await response.text(), 'text/html');
-  source.querySelectorAll('[src]').forEach((element) => element.setAttribute('src', `/references/${element.getAttribute('src')}`));
-  document.body.innerHTML = source.body.innerHTML;
-  const style = document.createElement('link'); style.rel = 'stylesheet'; style.href = '/references/app-r11.css';
-  const loaded = new Promise<void>((resolve, reject) => { style.onload = () => resolve(); style.onerror = () => reject(new Error('Missing reference stylesheet')); });
-  document.head.prepend(style); await loaded;
-}
+if (context) await loadReference('flow2-step2-r74.html');
 const node = document.querySelector(context ? '.panel' : '#root');
 if (!node) throw new Error('Missing material test root');
 const root = createRoot(node);

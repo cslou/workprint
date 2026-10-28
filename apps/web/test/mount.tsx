@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ReactElement } from 'react';
 import { Button as AriaButton } from 'react-aria-components';
 import { createRoot } from 'react-dom/client';
+import { loadReference } from './reference-loader.js';
 import { Button, TextField } from '../src/ui/controls.js';
 import { WorkspacePanel } from '../src/ui/panel.js';
 import { ViewerDialog, DetailsPopover } from '../src/ui/overlays.js';
@@ -25,13 +26,7 @@ else {
   const paths: Record<string, string> = { opening: 'flow2-step1-r73.html', assets: 'flow1-step4-r85.html', viewer: 'flow1-step4-r85.html', search: 'library-picker-r92.html', 'assets-ready': 'flow2-step9-r81.html', versions: 'flow2-step9-r81.html' };
   const path = paths[context];
   if (!path) throw new Error('Unknown reference context');
-  const response = await fetch(`/references/${path}`);
-  if (!response.ok) throw new Error('Reference unavailable');
-  const documentReference = new DOMParser().parseFromString(await response.text(), 'text/html');
-  documentReference.querySelectorAll('[src]').forEach((element) => { element.setAttribute('src', `/references/${element.getAttribute('src')}`); });
-  document.body.innerHTML = documentReference.body.innerHTML;
-  const stylesheet = document.createElement('link');
-  stylesheet.rel = 'stylesheet'; stylesheet.href = '/references/app-r11.css'; document.head.prepend(stylesheet);
+  await loadReference(path);
   // Reference-only surroundings are not product shell/page implementation.
   if (context === 'opening') {
     const panel = document.querySelector('.panel');
