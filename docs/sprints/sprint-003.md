@@ -2,7 +2,7 @@
 
 **Date:** Authorized 2026-10-28; begins after Sprint 002 integrates into phase-2
 **Goal:** Complete the approved Storyboard/Videos, playback, material-input and export consumers, and demonstrate every intended Phase 2 application surface through actual frontend wiring with complete visual comparison evidence.
-**Status:** 🟢 Complete
+**Status:** 🔵 In Progress. All stories are delivered and verified, and the Final Review is recorded. Completion waits only on Lou's decision on candidate B-004: its audit failure is not user-accepted, so the canonical completion rule withholds 🟢 Complete. See Final Review.
 
 **Planning result:** independent pass 2 scored **5/5**, no findings in this plan; the earlier delta-reporting clarification is resolved. Execution is authorized but waits for Sprint 002 acceptance/integration into phase-2 and a fresh baseline check. Confirm the start checklists then; prior review notes below remain historical. **Start (2026-10-28):** Sprint 002 integrated into `phase-2` at `1b5aa39`; `sprint-003` branched from it. Baseline refreshed in Current state. A sprint-doc-reviewer start re-check scored 4/5 ("Ready to start") with one Story 3 P2, resolved below. Start checklists confirmed.
 
@@ -370,7 +370,7 @@ Current-head results: aggregate 13/13, browser 162/162 (one new case), visual 21
   - [x] Failed, ambiguous, manual-only, or unrun verification items are documented. B-001's two failed ingress leaves remain separately reported under the unchanged private-only exception, not passed or silently removed. B-002's audit advisory likewise remains reported as NON-PASS.
   - [x] Reusable new functional checks are identified as future regression verification; one-off editorial evidence is not counted as a suite.
   - [x] Verification delta reports all 11 canonical types: Unit; Integration / contract; E2E / smoke; Simulator / device; AI / model evals; Static / local checks; Performance / load; Security / dependency; Accessibility / visual; Manual-only; Other verification. Include every row, even zeros, with before sprint, added this sprint, removed, pending/not yet run, and after sprint totals. Explain any Unknown count; classify each method under its most specific type and avoid duplicate counts. Report command groups separately from behavioral cases. Use Sprint 002's actual accepted baseline, not invented future counts.
-  - [x] The sprint doc status is updated to `🟢 Complete` only if completion criteria are met.
+  - [ ] The sprint doc status is updated to `🟢 Complete` only if completion criteria are met. *Open: not set to Complete. `pnpm audit` fails on candidate B-004, which is not user-accepted. Set Complete once Lou approves B-004 as an exception or it is resolved and verified.*
   - [x] A `## Final Review` section is appended to the sprint doc with the final completion message quoted for auditability.
   - [x] Screenshot all required Phase 2 MAIN pages from the shared Main-page checklist against approved full-size flow/demo references at desktop/narrow sizes, including earlier Sprint 002 pages after shared styling changes. Inspect pairs/overlays for typography, colours, geometry, padding, margins and spacing; no missing required comparison or unexplained difference passes. Record Lou's approval of deviations or genuinely missing basic layouts. Representative state captures suffice; do not implement fake functionality to advance through all demo steps. *Accepted state: all 216 comparison records (215 cases) pass with zero drift and two-sided geometry, including every Sprint 002 page re-captured. Dialog and inline-feedback states use region pixel comparisons, now with full-context captures and two-sided page-overflow and containment checks (PR #24). The missing basic layouts in Stories 2–4 were previewed first and provisionally approved by the orchestrator under Lou's delegation (2026-10-29). Lou's ratification of those, and his human side-by-side review, stay open below.*
   - [x] Hand off the genuine-consumer inventory and later feature owners without claiming functional sign-in, native turns, private media, saved decisions, generation or export. B-001 remains a prerequisite before Phase 3 native qualification/public exposure, not silently carried into an enabled feature.
@@ -503,7 +503,7 @@ Current-head results: aggregate 13/13, browser 162/162 (one new case), visual 21
 > ### Why ready
 > - Every story's acceptance criteria, functional and regression items were evaluated against implementation evidence at the final head (`/tmp/workprint-s003-final/story-evaluation.md`). All pass except Story 2's regression item, which is held by the audit NON-PASS. Story 5's dev-exposure criterion passes as an accepted state.
 > - All functional verification passes at the final head: real-browser consumers → client → built-backend 401/501, exact payloads, no-effect and no-replay proofs, scope races, and every visual comparison at zero drift.
-> - The full regression suite ran. Its only non-passes are B-001, B-002 and candidate B-004, each reported separately and never counted as passes.
+> - The full regression suite ran. Its only non-passes are B-001, B-002 and candidate B-004, each reported separately and never counted as passes. B-001 and B-002 are user-accepted. **B-004 is not, so the sprint status stays In Progress until Lou decides.** No sprint work remains.
 > - Each story PR passed the seven-check review, with `/review-fix` after any fix cycle, and was accepted at ≥4/5 with no open P0/P1 before merge. This record's head still needs its own review.
 >
 > ### Open for your decision
@@ -513,7 +513,7 @@ Current-head results: aggregate 13/13, browser 162/162 (one new case), visual 21
 >   - Story 3: picker facts, local search, attach-specific copy and no-match.
 >   - Story 4: populated Export history/detail copy rules.
 >   - All are recorded in `docs/design/design.md` and `history.md`.
-> - [ ] **Candidate B-004** (`@hono/node-server` advisory): approve it as a private/local exception like B-002, or direct another disposition.
+> - [ ] **Candidate B-004** (`@hono/node-server` advisory): approve it as a private/local exception like B-002, or direct another disposition. **This is the only gate holding the sprint status at In Progress.**
 > - [ ] **B-005**: default-dev serving of `apps/web/test/` mounts, accepted by the orchestrator for private loopback development.
 > - [ ] **Carried Phase 2 handoff items:**
 >   - the test-only "Open conversation" link;
