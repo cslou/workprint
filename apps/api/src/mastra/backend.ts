@@ -4,6 +4,7 @@ import { PostgresStore } from '@mastra/pg';
 import { Pool } from 'pg';
 import { createOwnedConversationCheck } from '../agent/index.js';
 import { createApplication } from '../application/index.js';
+import { assertRestrictedApplicationRole } from '../db/index.js';
 import { loadServerConfig } from './config.js';
 import { verifyAccount } from './auth.js';
 import { applicationRoutes } from './application-routes.js';
@@ -21,6 +22,7 @@ export async function createBackend(routes: ApiRoute[] = []) {
     console.error('Native storage idle connection lost', { code });
   });
   try {
+    await assertRestrictedApplicationRole(pool);
     const result = await pool.query<{ privileged: boolean }>(`WITH native_schema AS (
       SELECT oid, nspowner FROM pg_namespace WHERE nspname = 'mastra'
     ), native_owners AS (

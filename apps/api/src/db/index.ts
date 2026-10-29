@@ -10,3 +10,5 @@ export function databaseUrl(value: string | undefined, name: string): string {
     return fail();
   }
 }
+
+export { transaction, assertRestrictedApplicationRole } from './transaction.js';

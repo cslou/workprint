@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { environment, root, sentinel } from './environment.js';
 import { isolatedPostgres, query } from './postgres.js';
 import { command, start, unusedPort } from './process.js';
+import { applyArtifactMigrations } from './artifact-database.js';
 
 // Reuse the same built production runtime. No fixture provider/control is registered.
 test('built backend rejects unsafe config, separates setup privileges and excludes controls/secrets', { timeout: 240000 }, async (t) => {
@@ -16,6 +17,8 @@ test('built backend rejects unsafe config, separates setup privileges and exclud
   await command('pnpm', ['exec', 'tsc', '-p', 'apps/api/tsconfig.build.json', '--listFilesOnly'], { cwd: root, env: fixture.env, log: inputs });
   const helper = await realpath(join(root, 'apps/api/test/native-conversations.ts'));
   assert.ok(!(await readFile(inputs, 'utf8')).split(/\r?\n/).includes(helper), 'Native fixture helper is not a production compiler input');
+  const artifactHelper = await realpath(join(root, 'apps/api/test/artifact-database.ts'));
+  assert.ok(!(await readFile(inputs, 'utf8')).split(/\r?\n/).includes(artifactHelper), 'Application migration fixture is not a production compiler input');
   const source = await readFile(helper);
   for (const path of [...globSync('apps/api/dist/**/*'), ...globSync('apps/api/.mastra/output/**/*', { exclude: ['apps/api/.mastra/output/node_modules/**'] })]) {
     if (!(await stat(path)).isFile()) continue;
@@ -23,6 +26,7 @@ test('built backend rejects unsafe config, separates setup privileges and exclud
     assert.ok(!bytes.includes(source) && !bytes.includes(source.toString('base64')), 'Native fixture source was bundled or inlined');
     assert.ok(!bytes.includes('createNativeConversation') && !bytes.includes('Synthetic test conversation'), 'Executable native fixture entered a production artifact');
     assert.ok(!path.endsWith('/test/native-conversations.js'), 'Native fixture was emitted by the production build');
+    assert.ok(!bytes.includes('applyArtifactMigrations') && !path.endsWith('/test/artifact-database.js'), 'Application migration fixture entered a production artifact');
   }
   const db = await isolatedPostgres();
   t.after(db.close);
@@ -100,6 +104,22 @@ test('built backend rejects unsafe config, separates setup privileges and exclud
   } finally {
     await query(db.adminUrl, 'REVOKE wp_setup FROM wp_serving; REVOKE wp_owner_bridge FROM wp_serving; REVOKE wp_setup FROM wp_owner_bridge; DROP ROLE wp_owner_bridge; GRANT CREATE ON DATABASE workprint TO wp_setup; GRANT CREATE ON SCHEMA mastra TO wp_setup; GRANT CREATE ON SCHEMA public TO pg_database_owner');
   }
+
+  await applyArtifactMigrations(db.setupUrl);
+  // Native-role checks alone cannot detect ownership of application objects.
+  await query(db.adminUrl, 'ALTER TABLE artifacts.versions OWNER TO wp_serving');
+  try {
+    const applicationOwnerPort = await unusedPort();
+    const applicationOwnerLog = join(fixture.logs, 'application-owner.log');
+    const applicationOwner = await start(process.execPath, ['apps/api/.mastra/output/index.mjs'], {
+      cwd: root, env: { ...fixture.env, DATABASE_URL: db.servingUrl, PORT: String(applicationOwnerPort) }, log: applicationOwnerLog,
+    });
+    try {
+      const code = await Promise.race([applicationOwner.exited, applicationOwner.response(`http://127.0.0.1:${applicationOwnerPort}/health`).then(async response => { await response.body?.cancel(); return 0; })]);
+      assert.notEqual(code, 0, 'Application-object ownership must be rejected even without native ownership');
+      assert.match(await readFile(applicationOwnerLog, 'utf8'), /Serving storage unavailable or privileged/);
+    } finally { await applicationOwner.stop(); }
+  } finally { await query(db.adminUrl, 'ALTER TABLE artifacts.versions OWNER TO wp_setup'); }
 
   const port = await unusedPort();
   const server = await start(process.execPath, ['apps/api/.mastra/output/index.mjs'], {
