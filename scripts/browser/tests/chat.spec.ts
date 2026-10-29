@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../material-network.js';
 
 test('labelled working prerequisite: queue/Stop stay local and remount never replays', async ({ page }, info) => {
   await info.attach('prerequisite', { body: 'Read-only working presentation; no assistant or generation is executing.', contentType: 'text/plain' });
@@ -16,11 +16,13 @@ test('labelled working prerequisite: queue/Stop stay local and remount never rep
   await expect(page.getByRole('textbox')).toHaveValue('Keep this queued message');
   await page.getByRole('button', { name: 'Stop', exact: true }).click();
   await expect(page.getByRole('status')).toHaveText('Stopping is not available yet.');
-  expect(await page.evaluate(() => (window as unknown as { chatTest: { calls(): string[] } }).chatTest.calls())).toEqual(['sendText', 'stop']);
+  await page.getByRole('button', { name: 'Stop', exact: true }).press('Space');
+  await expect(page.getByRole('status')).toHaveText('Stopping is not available yet.');
+  expect(await page.evaluate(() => (window as unknown as { chatTest: { calls(): string[] } }).chatTest.calls())).toEqual(['sendText', 'stop', 'stop']);
   await page.evaluate(() => (window as unknown as { chatTest: { unmount(): void } }).chatTest.unmount());
   await expect(page.getByRole('textbox')).toHaveCount(0);
   await configure(false);
   await expect(page.getByRole('textbox')).toHaveValue('');
-  expect(await page.evaluate(() => (window as unknown as { chatTest: { calls(): string[] } }).chatTest.calls())).toEqual(['sendText', 'stop']);
+  expect(await page.evaluate(() => (window as unknown as { chatTest: { calls(): string[] } }).chatTest.calls())).toEqual(['sendText', 'stop', 'stop']);
   expect(requests).toBe(0);
 });

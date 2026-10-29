@@ -84,7 +84,7 @@ test('the actual file input initiates the exact metadata and never transfers or 
       const image = await readFile('apps/web/test/fixtures/library-tile.png');
       const response = page.waitForResponse((value) => new URL(value.url()).pathname === '/v1/conversations/conversation-a/uploads');
       const chooser = page.waitForEvent('filechooser');
-      await page.getByRole('button', { name: 'Attach a file', exact: true }).click();
+      await page.getByRole('button', { name: 'Attach a file', exact: true }).press('Enter');
       await (await chooser).setFiles({ name: 'vale portrait.png', mimeType: 'image/png', buffer: image });
       expect((await response).status()).toBe(501);
       await expect(page.locator('.wp-chat-feedback')).toHaveText('Uploading files is not available yet. The file was not sent.');
@@ -107,7 +107,9 @@ test('the actual file input initiates the exact metadata and never transfers or 
       await page.evaluate((input) => (window as unknown as UploadsHarness).uploadsTest.configure(input), { apiOrigin: origin, token: null, accountId: 'account-a', conversationId: 'conversation-a' });
       await text.fill('A quiet moment in the gallery.');
       const unauthorized = page.waitForResponse((value) => new URL(value.url()).pathname === '/v1/conversations/conversation-a/uploads');
-      await input.setInputFiles({ name: 'vale portrait.png', mimeType: 'image/png', buffer: image });
+      const pointerChooser = page.waitForEvent('filechooser');
+      await page.getByRole('button', { name: 'Attach a file', exact: true }).click();
+      await (await pointerChooser).setFiles({ name: 'vale portrait.png', mimeType: 'image/png', buffer: image });
       expect((await unauthorized).status()).toBe(401);
       await expect(page.locator('.wp-chat-feedback')).toHaveText('Sign-in required to upload a file. The file was not sent.');
       expect(seen[2]!.body).toMatchObject({ kind: 'image', filename: 'vale portrait.png', contentType: 'image/png', byteSize: image.byteLength });
@@ -205,9 +207,13 @@ test('picker filters and selects locally and attaches the exact versions against
       expect(requests).toEqual([{ method: 'GET', path: '/v1/library', body: null }]);
       await expect(page.locator('.wp-picker-sub')).toHaveText(['Character', 'Character', 'Place', 'Prop']);
       for (const [category, names] of [['Characters', ['Vale', 'Mercer']], ['Places', ['The gallery']], ['Props', ['Bench']], ['All', labels]] as const) {
-        await page.getByRole('button', { name: category, exact: true }).click();
+        await page.getByRole('button', { name: category, exact: true }).press('Space');
         await expect(page.locator('.wp-picker-label')).toHaveText([...names]);
       }
+      await page.getByRole('button', { name: 'Characters', exact: true }).click();
+      await expect(page.locator('.wp-picker-label')).toHaveText(['Vale', 'Mercer']);
+      await page.getByRole('button', { name: 'All', exact: true }).press('Space');
+      await expect(page.locator('.wp-picker-label')).toHaveText(labels);
       await page.getByRole('textbox', { name: 'Search Library', exact: true }).fill('  THE G  ');
       await expect(page.locator('.wp-picker-label')).toHaveText(['The gallery']);
       for (const hidden of ['vale-v1', 'secret-content-token']) {
@@ -231,17 +237,17 @@ test('picker filters and selects locally and attaches the exact versions against
       await page.locator('.wp-picker-tile').filter({ hasText: 'Bench' }).click();
       await page.locator('.wp-picker-tile').filter({ hasText: 'Bench' }).click();
       await expect(page.locator('.wp-picker-tile').filter({ hasText: 'Bench' })).toHaveAttribute('aria-pressed', 'false');
-      await page.locator('.wp-picker-tile').filter({ hasText: 'Bench' }).click();
+      await page.locator('.wp-picker-tile').filter({ hasText: 'Bench' }).press('Space');
       await expect(page.locator('.wp-picker-tile[aria-pressed="true"]')).toHaveCount(2);
       await expect(page.locator('.wp-picker-count')).toHaveText('2 selected');
       await expect(page.locator('.wp-picker-chip')).toHaveText(['Vale×', 'Bench×']);
       expect(seen).toEqual([]);
-      await page.getByRole('button', { name: 'Remove Vale', exact: true }).click();
+      await page.getByRole('button', { name: 'Remove Vale', exact: true }).press('Enter');
       await expect(page.locator('.wp-picker-count')).toHaveText('1 selected');
       await page.locator('.wp-picker-tile').filter({ hasText: 'Vale' }).click();
       expect(seen).toEqual([]);
       const attached = page.waitForResponse((value) => new URL(value.url()).pathname === '/v1/conversations/conversation-a/uses');
-      await page.getByRole('button', { name: 'Attach (2)', exact: true }).click();
+      await page.getByRole('button', { name: 'Attach (2)', exact: true }).press('Enter');
       expect((await attached).status()).toBe(501);
       await expect(page.locator('.wp-picker-feedback')).toHaveText('Attaching from your Library is not available yet. Nothing was attached.');
       expect(seen).toHaveLength(1);

@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { test as observedTest } from '../material-network.js';
+import { activate } from '../activation.js';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import type { verifyBuiltAdmission as VerifyBuiltAdmission } from '../../../apps/api/test/auth-built-fixture.js';
@@ -81,8 +83,8 @@ test('planning uses typed text only and viewing, Cancel and unmount never mutate
   expect(requests).toEqual([]);
 });
 
-test('Panel choice sends exact version and Shot/Panel binding to real 401/501 without changing approval', async ({ page }, info) => {
-  test.setTimeout(120000);
+observedTest('Panel choice sends exact version and Shot/Panel binding to real 401/501 without changing approval', async ({ page, materialNetwork }, info) => {
+  observedTest.setTimeout(120000);
   await info.attach('prerequisite', { body: 'Labelled read-only Panel candidates and approval projection; actual Use and version reads reach the built loopback backend.', contentType: 'text/plain' });
   const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
   const cleanup: (() => void | Promise<void>)[] = [];
@@ -90,19 +92,31 @@ test('Panel choice sends exact version and Shot/Panel binding to real 401/501 wi
     await verifyBuiltAdmission({ diagnostic(message) { console.log(message); }, after(fn) { cleanup.push(fn); } }, async ({ origin, accessTokens }) => {
       for (const [token, status, copy] of [[accessTokens[0], 501, 'Using this version is not available yet. The current selection is unchanged.'], [null, 401, 'Sign-in required to use this version. The current selection is unchanged.']] as const) {
         await page.goto('/storyboard.html'); await page.waitForFunction(() => !!(window as unknown as Harness).storyboardTest);
+        materialNetwork.expectOperations(
+          { origin, method: 'GET', path: '/v1/versions/panel-image-v2', count: 1, query: {} },
+          { origin, method: 'GET', path: '/v1/conversations/read-only-conversation/generation-requests', count: 1, query: {} },
+          { origin, method: 'POST', path: '/v1/conversations/read-only-conversation/uses', count: 1, query: {}, purpose: 'panel_image' },
+        );
         const commands: { path: string; body: unknown }[] = [];
         await page.route('**/v1/**', async route => { expect(new URL(route.request().url()).origin).toBe(origin); if (route.request().method() !== 'GET') commands.push({ path: new URL(route.request().url()).pathname, body: route.request().postDataJSON() }); await route.continue(); });
         await page.evaluate(input => (window as unknown as Harness).storyboardTest.configure(input), { composition: true, apiOrigin: origin, token });
-        await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
-        await page.getByRole('button', { name: 'View Panel 1.2 version 2', exact: true }).click();
+        await activate(page.getByRole('tab', { name: 'Storyboard', exact: true }), status === 501);
+        await activate(page.getByRole('button', { name: 'View storyboard', exact: true }), status === 501);
+        await expect(page.getByRole('dialog')).toHaveAccessibleName('Storyboard');
+        await activate(page.getByRole('button', { name: 'Edit Shot intent', exact: true }).first(), status === 501);
+        await page.getByRole('textbox', { name: 'Shot intent', exact: true }).fill('Local cancelled planning edit');
+        await activate(page.getByRole('button', { name: 'Cancel', exact: true }), status === 501);
+        await expect(page.getByRole('textbox', { name: 'Shot intent', exact: true })).toHaveCount(0);
+        await activate(page.getByRole('button', { name: 'Close', exact: true }), status === 501);
+        await activate(page.getByRole('button', { name: 'View Panel 1.2 version 2', exact: true }), status === 501);
         expect(commands).toEqual([]);
         const response = page.waitForResponse(value => value.url() === `${origin}/v1/conversations/read-only-conversation/uses`);
-        await page.getByRole('button', { name: 'Use this version', exact: true }).click();
+        await activate(page.getByRole('button', { name: 'Use this version', exact: true }), status === 501);
         expect((await response).status()).toBe(status);
         await expect(page.getByRole('status')).toHaveText(copy);
         await expect(page.locator('[data-current-version-id]')).toHaveAttribute('data-current-version-id', 'panel-image-v1');
         expect(commands).toEqual([{ path: '/v1/conversations/read-only-conversation/uses', body: { purpose: 'panel_image', shotId: 'shot-a', panelId: 'panel-b', versionId: 'panel-image-v2', operationId: expect.stringMatching(/^[0-9a-f-]{36}$/) } }]);
-        await page.getByRole('button', { name: 'Close', exact: true }).click();
+        await activate(page.getByRole('button', { name: 'Close', exact: true }), status === 501);
         await page.evaluate(() => (window as unknown as Harness).storyboardTest.unmount());
         expect(commands).toHaveLength(1);
         await page.unroute('**/v1/**');
@@ -111,8 +125,8 @@ test('Panel choice sends exact version and Shot/Panel binding to real 401/501 wi
   } finally { for (const finish of cleanup.reverse()) await finish(); }
 });
 
-for (const shot of [false, true]) test(`planning ${shot ? 'Shot intent' : 'Panel description'} binds exact base and identities on real 401/501`, async ({ page }, info) => {
-  test.setTimeout(120000);
+for (const shot of [false, true]) observedTest(`planning ${shot ? 'Shot intent' : 'Panel description'} binds exact base and identities on real 401/501`, async ({ page, materialNetwork }, info) => {
+  observedTest.setTimeout(120000);
   await info.attach('prerequisite', { body: 'Read-only public planning projection; PATCH reaches the built loopback backend and receives real admission/unavailable responses.', contentType: 'text/plain' });
   const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
   const cleanup: (() => void | Promise<void>)[] = [];
@@ -120,14 +134,15 @@ for (const shot of [false, true]) test(`planning ${shot ? 'Shot intent' : 'Panel
     await verifyBuiltAdmission({ diagnostic(message) { console.log(message); }, after(fn) { cleanup.push(fn); } }, async ({ origin, accessTokens }) => {
       for (const [token, status, feedback] of [[accessTokens[0], 501, 'Saving is not available yet. Your unsaved text is retained.'], [null, 401, 'Sign-in required to save. Your unsaved text is retained.']] as const) {
         await page.goto('/storyboard.html'); await page.waitForFunction(() => !!(window as unknown as Harness).storyboardTest);
+        materialNetwork.expectOperations({ origin, method: 'PATCH', path: '/v1/conversations/read-only-conversation/storyboard', count: 1, query: {} });
         const sent: unknown[] = [];
         await page.route('**/v1/**', async route => { expect(new URL(route.request().url()).origin).toBe(origin); expect(route.request().method()).toBe('PATCH'); sent.push(route.request().postDataJSON()); await route.continue(); });
         await page.evaluate(input => (window as unknown as Harness).storyboardTest.configure(input), { apiOrigin: origin, token, shot });
         const label = shot ? 'Shot intent' : 'Panel description';
-        await page.getByRole('button', { name: `Edit ${label}`, exact: true }).click();
+        await activate(page.getByRole('button', { name: `Edit ${label}`, exact: true }), status === 501);
         await page.getByRole('textbox', { name: label, exact: true }).fill('Exact draft\nwith a second line.');
         const response = page.waitForResponse(value => value.url() === `${origin}/v1/conversations/read-only-conversation/storyboard`);
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
+        await activate(page.getByRole('button', { name: 'Save', exact: true }), status === 501);
         expect((await response).status()).toBe(status);
         await expect(page.getByRole('status')).toHaveText(feedback);
         await expect(page.getByRole('textbox')).toHaveValue('Exact draft\nwith a second line.');
@@ -138,7 +153,7 @@ for (const shot of [false, true]) test(`planning ${shot ? 'Shot intent' : 'Panel
         expect(body.shots[0]).toEqual({ shotId: 'shot-b', order: 20, intent: 'Second Shot', panels: [] });
         expect(body.shots[1]?.intent).toBe(shot ? 'Exact draft\nwith a second line.' : 'First Shot');
         expect(body.shots[1]?.panels).toEqual([{ panelId: 'panel-b', order: 8, description: shot ? initial : 'Exact draft\nwith a second line.', references: ['reference-v2'] }, { panelId: 'panel-a', order: 3, description: 'First Panel description.', references: [] }]);
-        await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+        await activate(page.getByRole('button', { name: 'Cancel', exact: true }), status === 501);
         await expect(page.getByText(shot ? 'First Shot' : initial, { exact: true })).toBeVisible();
         await page.unroute('**/v1/**');
       }
