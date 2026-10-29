@@ -2,7 +2,7 @@
 
 **Date:** Authorized 2026-10-28; begins after Sprint 002 integrates into phase-2
 **Goal:** Complete the approved Storyboard/Videos, playback, material-input and export consumers, and demonstrate every intended Phase 2 application surface through actual frontend wiring with complete visual comparison evidence.
-**Status:** 🔵 In Progress. All stories are delivered and verified, and the Final Review is recorded. Completion waits only on Lou's decision on candidate B-004: its audit failure is not user-accepted, so the canonical completion rule withholds 🟢 Complete. See Final Review.
+**Status:** 🟢 Complete
 
 **Planning result:** independent pass 2 scored **5/5**, no findings in this plan; the earlier delta-reporting clarification is resolved. Execution is authorized but waits for Sprint 002 acceptance/integration into phase-2 and a fresh baseline check. Confirm the start checklists then; prior review notes below remain historical. **Start (2026-10-28):** Sprint 002 integrated into `phase-2` at `1b5aa39`; `sprint-003` branched from it. Baseline refreshed in Current state. A sprint-doc-reviewer start re-check scored 4/5 ("Ready to start") with one Story 3 P2, resolved below. Start checklists confirmed.
 
@@ -21,7 +21,7 @@
 - **Delivery authorization:** the user authorized both Phase 2 sprints. After sprint-002 is accepted and merged into phase-2, branch sprint-003 from updated phase-2; story PRs target sprint-003. Reviewed/verified sprint-003 integration into phase-2 is explicitly authorized. Hand the completed phase-2 → main PR back to the user for final review; do not merge main without fresh approval. No routine pause between authorized sprints; genuine blockers and unseen-design approvals remain gates. This phase-specific assigned base replaces the normal main-based sprint sequence.
 - **Shared context:** implement existing approved pages from `docs/design/brand-book.html`, its linked demo/flows, storyboard examples and Library picker. Reuse Sprint 002 tokens, primitives, shell, version viewers, request-state handling and browser harness. DRY means one implementation of genuinely shared behavior, not a configurable god component or speculative framework. Keep feature-specific state in its owner; packages do not depend on app features. This sprint finishes wiring, not filmmaking functionality.
 - **Non-goals:** real uploads/private R2 access, business persistence/approvals, actual generation/cancellation, export processing, native chat/queue/Stop, real sign-in/reset/session refresh, paid AI or deployment. No Editor/Project, timeline, Play all/comparison, standalone audio, PDF/Word, deletion, credits/spending controls or model selector. No fake provider, seeded product lifecycle, production demo mode or custom stream/store/scheduler.
-- **Safety:** B-001 remains known-failing and accepted ONLY for private/local Phase 1–2. Report both ingress failures separately. Resolve early admission/body limits before Phase 3 native-runtime qualification AND public deployment; no implicit listener migration or permission to weaken other checks. B-002, the inherited low-severity `deepmerge` audit advisory (GHSA-gcqx-w48m-w2h4), is also accepted only for private/local use. Report `pnpm audit` as NON-PASS separately, with no suppression, override or vendor patch. Revisit it before shared/public deployment or when an upstream fix ships.
+- **Safety:** B-001 remains known-failing and accepted ONLY for private/local Phase 1–2. Report both ingress failures separately. Resolve early admission/body limits before Phase 3 native-runtime qualification AND public deployment; no implicit listener migration or permission to weaken other checks. B-002, the inherited low-severity `deepmerge` audit advisory (GHSA-gcqx-w48m-w2h4), is also accepted only for private/local use. Report `pnpm audit` as NON-PASS separately, with no suppression, override or vendor patch. Revisit it before shared/public deployment or when an upstream fix ships. B-004, the inherited moderate `@hono/node-server` audit advisory (GHSA-rmxm-3fg6-px4f), was added on 2026-10-29 under the same private/local terms after Lou approved it at the Phase 2 review.
 - **Evidence placement:** maintain surface-to-consumer/status evidence in the Story 5 PR and this sprint's Final Review, not another permanent catalog. Code/contracts and the tracked spec remain authoritative. Optional historical copies in ignored `docs/research/sprint-001/` are not build/test prerequisites. Capture new visual approvals in existing design guide/history only where genuinely needed; existing pages do not require redesign.
 
 ### Affected Flows
@@ -110,7 +110,7 @@ Current-head aggregate 13/13, browser 101/101, visual 165/165 (166 comparison re
   - [x] Actual frontend viewer → media client → built backend requests exact version and renders unavailable, with zero use/selection/export commands. Controlled delayed-source switching proves old media cannot populate a new scope.
   - [x] If supplied-source playback is implemented, browser tests use a generated/licensed local clip to prove play/pause/seek/events and teardown. Record format and fixture origin; no universal codec claim. Compare player/unavailable visuals with matching references at both sizes.
 - **Regression verification:**
-  - [ ] Re-run Story 1 exact choices/cancellation and Sprint 002 viewer/account-switch tests; verify package/browser dependency boundaries, cleanup and no external egress. Run audit/frozen install if dependencies change. *Open: every behavioural, boundary, cleanup and egress check passes and frozen install passes, but `pnpm audit` is NON-PASS (B-002, plus candidate B-004 pending Lou's decision). It stays unchecked, as Sprint 002's audit item did.*
+  - [ ] Re-run Story 1 exact choices/cancellation and Sprint 002 viewer/account-switch tests; verify package/browser dependency boundaries, cleanup and no external egress. Run audit/frozen install if dependencies change. *Open: every behavioural, boundary, cleanup and egress check passes and frozen install passes, but `pnpm audit` is NON-PASS (B-002 and B-004, both user-approved private/local exceptions). It stays unchecked, as Sprint 002's audit item did.*
 - **Editorial/design verification:** record single-clip versus private-transport evidence distinctly. Existing approved playback appearance is reused; absent unavailable/control states require only scoped approval.
 - **Manual-only behavior verification:** shared visual comparison; playback commands/event behavior automated. Human motion/audio inspection is not used to claim private transport or generated quality here.
 - **Planned commits:**
@@ -306,7 +306,7 @@ Current-head results: aggregate 13/13, browser 161/161, visual 215/215. The 20 n
 - **Acceptance criteria:**
   - [x] In the PR and Final Review record surface → owner → genuine consumer → §8 flow → observed evidence → functional/unimplemented/test-only → disposition. Reconcile all 19 application operation keys from code: workspace, artifactVersions, version, library, saveVersion, useVersion, editStoryboard, question, answerQuestion, proposal, requestUpload, confirmUpload, media, generationRequest, generationRequests, cancelGeneration, createExport, exports and export. Reuse prior consumer evidence; fill gaps with actual consumer checks, not arbitrary API callers or extra UI buttons.
   - [x] Distinguish ordinary browser navigation, isolated actual-consumer tests with absent prerequisites and completed-flow evidence. Record native unavailable/no-network methods, operational health and intended non-browser agent/internal owners; no tool gets an HTTP/browser surface just to satisfy coverage. Explicitly assign panel-change notice → api-client/workspace refetch to P3-S9, not implemented chat behavior.
-  - [x] Verify both dev and built production-configured serving: only intended routes are exposed; test mounts, props, providers, identity bypasses and qualification controls cannot enter production. Real Auth remains enforced. No deployed infrastructure is required or authorized. *Accepted state: runtime checks prove that the production build and preview exclude every test entry, module and fixture (binary-safe), and that real Auth rejects missing, malformed and expired tokens on all 19 operations. The dev/built comparison found that the default dev server also serves `apps/web/test/` mounts on loopback. The orchestrator accepted this for private Phase 2 development under Lou's delegation (2026-10-29, pending ratification) and recorded the hardening as backlog B-005.*
+  - [x] Verify both dev and built production-configured serving: only intended routes are exposed; test mounts, props, providers, identity bypasses and qualification controls cannot enter production. Real Auth remains enforced. No deployed infrastructure is required or authorized. *Accepted state: runtime checks prove that the production build and preview exclude every test entry, module and fixture (binary-safe), and that real Auth rejects missing, malformed and expired tokens on all 19 operations. The dev/built comparison found that the default dev server also serves `apps/web/test/` mounts on loopback. Lou decided on 2026-10-29 to keep the test pages until the real pages replace them; dev-only loopback exposure is accepted until then (backlog B-005).*
   - [x] Walk all in-scope pages/actions with pointer/keyboard, honest empty/error/unavailable feedback and account/conversation transitions. Reuse existing tests and fix required small wiring gaps; substantial corrections return to their owning story or a bounded approved follow-up, never an unreviewed rewrite.
 - **Functional verification:**
   - [x] Run actual browser navigation/action coverage through the backend, plus isolated consumers where recorded prerequisites prevent a full journey. Every retained product operation has observed intended-consumer evidence and no fake mutation/provider effect.
@@ -366,13 +366,13 @@ Current-head results: aggregate 13/13, browser 162/162 (one new case), visual 21
   - [x] Every story’s acceptance criteria are evaluated against implementation evidence.
   - [x] Every story’s functional verification checkboxes are run, checked, or explicitly marked failed/ambiguous/unrun.
   - [x] Every story’s targeted regression verification checkboxes are run, checked, or explicitly marked failed/ambiguous/unrun.
-  - [x] The full available regression verification suite is run, including existing unit, integration, e2e, smoke, simulator/browser/device, static, and manual-only checks where applicable. *Accepted state: every automated suite ran at `cad28fa`, which is code-identical to `sprint-003` at `351c7f0`. The manual-only human side-by-side visual review was not performed here; as in Sprint 002, it belongs to Lou's Phase 2 (`phase-2` → `main`) review and stays open below.*
+  - [x] The full available regression verification suite is run, including existing unit, integration, e2e, smoke, simulator/browser/device, static, and manual-only checks where applicable. *Accepted state: every automated suite ran at `cad28fa`, which is code-identical to `sprint-003` at `351c7f0`. Lou performed the manual-only human side-by-side visual review on 2026-10-29 at the Phase 2 review, over all 216 pairs.*
   - [x] Failed, ambiguous, manual-only, or unrun verification items are documented. B-001's two failed ingress leaves remain separately reported under the unchanged private-only exception, not passed or silently removed. B-002's audit advisory likewise remains reported as NON-PASS.
   - [x] Reusable new functional checks are identified as future regression verification; one-off editorial evidence is not counted as a suite.
   - [x] Verification delta reports all 11 canonical types: Unit; Integration / contract; E2E / smoke; Simulator / device; AI / model evals; Static / local checks; Performance / load; Security / dependency; Accessibility / visual; Manual-only; Other verification. Include every row, even zeros, with before sprint, added this sprint, removed, pending/not yet run, and after sprint totals. Explain any Unknown count; classify each method under its most specific type and avoid duplicate counts. Report command groups separately from behavioral cases. Use Sprint 002's actual accepted baseline, not invented future counts.
-  - [ ] The sprint doc status is updated to `🟢 Complete` only if completion criteria are met. *Open: not set to Complete. `pnpm audit` fails on candidate B-004, which is not user-accepted. Set Complete once Lou approves B-004 as an exception or it is resolved and verified.*
+  - [x] The sprint doc status is updated to `🟢 Complete` only if completion criteria are met. *Accepted state: set Complete on 2026-10-29, once Lou approved B-004 as a private/local exception. It had been held at In Progress until then.*
   - [x] A `## Final Review` section is appended to the sprint doc with the final completion message quoted for auditability.
-  - [x] Screenshot all required Phase 2 MAIN pages from the shared Main-page checklist against approved full-size flow/demo references at desktop/narrow sizes, including earlier Sprint 002 pages after shared styling changes. Inspect pairs/overlays for typography, colours, geometry, padding, margins and spacing; no missing required comparison or unexplained difference passes. Record Lou's approval of deviations or genuinely missing basic layouts. Representative state captures suffice; do not implement fake functionality to advance through all demo steps. *Accepted state: all 216 comparison records (215 cases) pass with zero drift and two-sided geometry, including every Sprint 002 page re-captured. Dialog and inline-feedback states use region pixel comparisons, now with full-context captures and two-sided page-overflow and containment checks (PR #24). The missing basic layouts in Stories 2–4 were previewed first and provisionally approved by the orchestrator under Lou's delegation (2026-10-29). Lou's ratification of those, and his human side-by-side review, stay open below.*
+  - [x] Screenshot all required Phase 2 MAIN pages from the shared Main-page checklist against approved full-size flow/demo references at desktop/narrow sizes, including earlier Sprint 002 pages after shared styling changes. Inspect pairs/overlays for typography, colours, geometry, padding, margins and spacing; no missing required comparison or unexplained difference passes. Record Lou's approval of deviations or genuinely missing basic layouts. Representative state captures suffice; do not implement fake functionality to advance through all demo steps. *Accepted state: all 216 comparison records (215 cases) pass with zero drift and two-sided geometry, including every Sprint 002 page re-captured. Dialog and inline-feedback states use region pixel comparisons, now with full-context captures and two-sided page-overflow and containment checks (PR #24). The missing basic layouts in Stories 2–4 were previewed first and provisionally approved by the orchestrator under Lou's delegation. Lou completed the side-by-side review and ratified them on 2026-10-29.*
   - [x] Hand off the genuine-consumer inventory and later feature owners without claiming functional sign-in, native turns, private media, saved decisions, generation or export. B-001 remains a prerequisite before Phase 3 native qualification/public exposure, not silently carried into an enabled feature.
 - **Functional verification:**
   - [x] Run all functional verification items from every story and record pass/fail evidence, including real-browser wiring, native unavailable/no-network outcomes, isolated source checks and screenshot comparisons.
@@ -432,11 +432,11 @@ Current-head results: aggregate 13/13, browser 162/162 (one new case), visual 21
 > | `pnpm test:browser` | **162/162 PASS** |
 > | `pnpm test:visual` | **215/215 PASS**: 216 comparison records, all zero drift |
 > | `pnpm qualify:ingress` | **NON-PASS** (exit 1): the two unfinished-upload deadline leaves fail; user-approved private/local exception **B-001** |
-> | `pnpm audit` | **NON-PASS** (exit 1): low `deepmerge` GHSA-gcqx-w48m-w2h4 (user-approved **B-002**), plus moderate `@hono/node-server` GHSA-rmxm-3fg6-px4f (**candidate B-004, not approved, pending Lou**) |
+> | `pnpm audit` | **NON-PASS** (exit 1): low `deepmerge` GHSA-gcqx-w48m-w2h4 (user-approved **B-002**), plus moderate `@hono/node-server` GHSA-rmxm-3fg6-px4f (**B-004**, approved by Lou on 2026-10-29 as a private/local exception) |
 >
 > The evidence-only final run at `9b86d70`, before PR #24, produced the same counts and NON-PASS items. Logs are in `/tmp/workprint-s003-final/` and `/tmp/workprint-s003-visual-context/`; captures are in ignored `outputs/verification/sprint-003/<revision>/`. None are committed.
 >
-> **Candidate B-004** is a newly published advisory on the existing `mastra` CLI → `@mastra/deployer` → `@hono/node-ws` → `@hono/node-server@1.19.17` chain. No Phase 2 change introduced it. Both `serveStatic` uses in the built API are gated by `options.studio`, and the generated entry passes `studio: false`. No compatible patched release exists. It is recorded in the local backlog for Lou's decision.
+> **B-004** is a newly published advisory on the existing `mastra` CLI → `@mastra/deployer` → `@hono/node-ws` → `@hono/node-server@1.19.17` chain. No Phase 2 change introduced it. Both `serveStatic` uses in the built API are gated by `options.studio`, and the generated entry passes `studio: false`. No compatible patched release exists. Lou approved it on 2026-10-29 as a private/local exception alongside B-001 and B-002, recorded in the local backlog.
 >
 > ### Main-page checklist results
 >
@@ -490,7 +490,7 @@ Current-head results: aggregate 13/13, browser 162/162 (one new case), visual 21
 > | Performance / load | 0 | 0 | 0 | 0 | 0 | Not applicable |
 > | Security / dependency | 13 | +1 | 0 | 0 | 14 | Runtime dev/production exposure case; includes the 2 failing B-001 leaves. Audit NON-PASS is a command result |
 > | Accessibility / visual | 145 | +80 | 0 | 0 | 225 | 79 visual cases plus the media 16:9 geometry case |
-> | Manual-only | 0 | 0 | 0 | 0 | 0 | Human side-by-side review is an open gate, not a counted case |
+> | Manual-only | 0 | 0 | 0 | 0 | 0 | Human side-by-side review is a gate, not a counted case; Lou performed it on 2026-10-29 |
 > | Other verification | 0 | 0 | 0 | 0 | 0 | Editorial evidence is not a suite |
 > | **Total** | **226** | **+166** | **0** | **0** | **392** | 390 passing plus 2 B-001 failing leaves |
 >
@@ -503,24 +503,24 @@ Current-head results: aggregate 13/13, browser 162/162 (one new case), visual 21
 > ### Why ready
 > - Every story's acceptance criteria, functional and regression items were evaluated against implementation evidence at the final head (`/tmp/workprint-s003-final/story-evaluation.md`). All pass except Story 2's regression item, which is held by the audit NON-PASS. Story 5's dev-exposure criterion passes as an accepted state.
 > - All functional verification passes at the final head: real-browser consumers → client → built-backend 401/501, exact payloads, no-effect and no-replay proofs, scope races, and every visual comparison at zero drift.
-> - The full regression suite ran. Its only non-passes are B-001, B-002 and candidate B-004, each reported separately and never counted as passes. B-001 and B-002 are user-accepted. **B-004 is not, so the sprint status stays In Progress until Lou decides.** No sprint work remains.
+> - The full regression suite ran. Its only non-passes are B-001, B-002 and B-004, each reported separately and never counted as passes. All three are user-approved private/local exceptions; Lou approved B-004 on 2026-10-29.
 > - Each story PR passed the seven-check review, with `/review-fix` after any fix cycle, and was accepted at ≥4/5 with no open P0/P1 before merge. This record's head still needs its own review.
 >
-> ### Open for your decision
-> - [ ] **Human side-by-side review** of all Phase 2 main-page pairs (Sprints 002 and 003), at Lou's Phase 2 (`phase-2` → `main`) review. Automated comparisons show zero drift; orchestrator AI inspection is not human approval.
-> - [ ] **Ratify the provisional design approvals** made by the orchestrator under Lou's delegation on 2026-10-29:
->   - Story 2: the Videos metadata trigger, viewer, loading surface and media lines.
->   - Story 3: picker facts, local search, attach-specific copy and no-match.
->   - Story 4: populated Export history/detail copy rules.
->   - All are recorded in `docs/design/design.md` and `history.md`.
-> - [ ] **Candidate B-004** (`@hono/node-server` advisory): approve it as a private/local exception like B-002, or direct another disposition. **This is the only gate holding the sprint status at In Progress.**
-> - [ ] **B-005**: default-dev serving of `apps/web/test/` mounts, accepted by the orchestrator for private loopback development.
-> - [ ] **Carried Phase 2 handoff items:**
->   - the test-only "Open conversation" link;
->   - untyped content, picker categories and proposal input names (B-003);
->   - same-scope workspace re-read presentation;
->   - duplicate exact-version reads in Videos, deferred to P3-S2/S5.
-> - [ ] **B-001 and B-002** (and B-004 if approved) must be resolved before Phase 3 native-runtime qualification and any shared or public deployment.
+> ### Lou's decisions (Phase 2 review, 2026-10-29)
+> - [x] **Human side-by-side review** of all Phase 2 main-page pairs (Sprints 002 and 003): performed by Lou over the full 216-pair gallery; "They look good."
+> - [x] **Provisional Stories 2–4 designs ratified:** single-clip viewer and media lines; picker facts, local search, attach copy and no-match; Export history/detail copy rules. `design.md` and `history.md` now read as approved by Lou.
+> - [x] **B-004 approved** as a private/local exception like B-002, and recorded in the backlog.
+> - [x] **B-005:** keep the test pages until the real pages replace them, then remove them. Dev-only loopback exposure is accepted until then.
+> - [x] **Text inputs have no focus ring:** Lou's QA correction, delivered in [PR #29](https://github.com/cslou/workprint/pull/29) (5/5).
+>
+> **Still open, carried to Phase 3:**
+> - the test-only "Open conversation" link;
+> - untyped content, picker categories and proposal input names (B-003);
+> - same-scope workspace re-read presentation;
+> - duplicate exact-version reads in Videos (P3-S2/S5);
+> - minor tidy-ups (B-006).
+>
+> **B-001, B-002 and B-004** must be resolved before Phase 3 native-runtime qualification and any shared or public deployment.
 >
 > ### Delivered
 >
@@ -528,13 +528,13 @@ Current-head results: aggregate 13/13, browser 162/162 (one new case), visual 21
 > | --- | --- | --- | --- |
 > | 1 — Storyboard/Videos/requests | AC-1–AC-3, F-1, F-2, R-1 | ✅ | `storyboard.spec.ts`, `videos.spec.ts`, `request-races.spec.ts`, `selection-races.spec.ts`, `display-prerequisites.spec.ts`; storyboard, request and request-feedback visual specs (30 pairs) |
 > | 2 — Single-clip player | AC-1–AC-3, F-1, F-2 | ✅ | `media.spec.ts`, `player.spec.ts`; `media-visual.spec.ts` (12 pairs, with full context and bounds after PR #24); `apps/web/test/fixtures/README.md` |
-> | 2 — Single-clip player | R-1 | ⚠️ NON-PASS (audit) | Everything else passes; audit holds B-002 plus candidate B-004 |
+> | 2 — Single-clip player | R-1 | ⚠️ NON-PASS (audit) | Everything else passes; audit holds B-002 and B-004, both user-approved exceptions |
 > | 3 — Material inputs/picker | AC-1–AC-3, F-1, F-2, R-1 | ✅ | `material-inputs.spec.ts`, `material-input-races.spec.ts`, `library-attach-races.spec.ts`, `upload-confirm-races.spec.ts`, `attachment-state.spec.ts`; picker and upload visual specs (18 pairs) |
 > | 4 — Direct Export | AC-1–AC-3, F-1, F-2, R-1 | ✅ | `exports.spec.ts`, `export-races.spec.ts`, `paged-read.spec.ts`; `export-visual.spec.ts` (20 pairs) |
 > | 5 — Walkthrough/stocktake | AC-1, AC-2, AC-4, F-1, F-2, R-1 | ✅ | PR #23 inventory and this record; `config.spec.ts`; `auth-built-fixture.ts`; extended pointer and keyboard consumer cases |
-> | 5 — Walkthrough/stocktake | AC-3 | ✅ Accepted state | Production exclusion and Auth proven; dev-only exposure accepted (B-005, pending ratification) |
+> | 5 — Walkthrough/stocktake | AC-3 | ✅ Accepted state | Production exclusion and Auth proven; Lou keeps the test pages until real pages replace them (B-005) |
 > | Final — Verification | Automated suites, evidence, follow-up and records | ✅ | This record; PR #24; `/tmp/workprint-s003-final/evidence.md` |
-> | Final — Verification | Manual-only human side-by-side review and design ratification | ⏸️ Deferred to Lou | See Open for your decision |
+> | Final — Verification | Manual-only human side-by-side review and design ratification | ✅ | Performed by Lou on 2026-10-29; see Lou's decisions |
 >
 > ### Drift from spec
 > - **No new product flow, operation, route or contract change.** Contracts, the api-client and API production source are unchanged across the sprint.
