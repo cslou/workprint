@@ -1,7 +1,8 @@
-import { applicationError, errorEnvelopeSchema, errorStatus, operations, type ErrorEnvelope, type OperationName, type OperationRequest, type OperationResponse } from '@workprint/contracts';
+import { applicationError, errorEnvelopeSchema, errorStatus, operations, type OperationName, type OperationRequest, type OperationResponse } from '@workprint/contracts';
 
-export type ClientError = ErrorEnvelope['error'] | { code: 'transport_failure' | 'timed_out' | 'cancelled' | 'invalid_response'; message: string };
-export type ClientResult<T> = { ok: true; value: T } | { ok: false; error: ClientError };
+import type { ClientError, ClientResult } from './result.js';
+export type { ClientError, ClientResult } from './result.js';
+export { createPageRead, type PageRead, type PageReadState, type ReadPage } from './paged-read.js';
 export type CallOptions = { signal?: AbortSignal };
 type ApplicationMethods = { [N in OperationName]: (input: OperationRequest<N>, options?: CallOptions) => Promise<ClientResult<OperationResponse<N>>> };
 const nativeNames = ['createConversation', 'listConversations', 'loadConversation', 'sendText', 'subscribe', 'stop'] as const;
