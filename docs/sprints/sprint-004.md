@@ -1,10 +1,12 @@
 # Sprint 004 — Native runtime and conversations
 
 **Date:** Planned and started 2026-10-29
-**Goal:** Pass bounded-ingress qualification, deliver standard Auth and owned conversation navigation, and qualify native turn transport and independent workflow recovery through the built backend without enabling application inference.
+**Goal:** Serve the backend through an app-owned entry on the official Mastra Hono adapter and pass bounded-ingress qualification, deliver standard Auth and owned conversation navigation, and qualify native turn transport and independent workflow recovery through the built backend without enabling application inference.
 **Status:** 🔵 In Progress
 
 **Planning result:** sprint-doc-reviewer **4/5**, "Ready to start" (2026-10-29), with one P2 resolved below. The independent dependency review of the Phase 3 packaging returned "sound with fixes"; all its fixes are applied. Lou authorized Phase 3 Wave 1 on 2026-10-29. [Story 001](../stories/story-001.md) merged into `phase-3` at `a7444a2` ([PR #33](https://github.com/cslou/workprint/pull/33)), the start checklists are confirmed, and `sprint-004` branches from that head.
+
+**Revision (2026-10-29):** the Story 1 investigation showed no supported setting can bound ingress on the generated server (details under Story 1a). Lou approved the application-owned adapter bootstrap the same day. Story 1 is split into **1a** (adapter swap, no behaviour change) and **1b** (the B-001 guards). Stories 4, 6 and 7 gain the lifecycle duties the generated entry used to perform. **Revision review:** sprint-doc-reviewer 2/5 → 2/5 → **5/5**, "Ready to start". A separate fact check of the adapter against the installed 1.79.0 sources fed its corrections into Story 1a.
 
 ---
 
@@ -12,7 +14,7 @@
 
 ### Project Context
 - **Repo:** `/Users/lou/projects/workprint`
-- **Tech stack:** React/Vite/TypeScript and React Aria; framework-free contracts/api-client; one Mastra backend, supported native client/Memory/workflows, real Supabase Auth and Postgres. Runs on the pinned Mastra 1.79.0 set (CLI 1.35.0, `@mastra/pg` 1.32.0). Lou moved the 1.80.x upgrade to after Wave 1 on 2026-10-29 (backlog B-007).
+- **Tech stack:** React/Vite/TypeScript and React Aria; framework-free contracts/api-client; one Mastra backend, supported native client/Memory/workflows, real Supabase Auth and Postgres. Runs on the pinned Mastra 1.79.0 set (`@mastra/pg` 1.32.0; CLI 1.35.0 until Story 1a removes it if unused), served from Story 1a onward through an app-owned entry on `@mastra/hono` 1.7.21 instead of the generated `mastra build` server. Lou moved the 1.80.x upgrade to after Wave 1 on 2026-10-29 (backlog B-007).
 - **Current state:** `main` = `c1397c3`, Phase 2 merged 2026-10-29. All 19 closed application operations have browser consumers but return authenticated structured 501; native methods and account controls are unavailable. Phase 2 recorded aggregate 13/13, browser 162/162 and visual 215/215; these are historical counts, not the post-foundation baseline. B-001 ingress has two failing leaves; audit has B-002/B-004. No application tables, Agent or workflow is currently enabled. Foundation baseline at `9afa670` (tree equal to `a7444a2`): frozen install, check and build PASS; test 15/15; browser 163/163; visual 215/215 with zero drift; concurrent two-clone runs pass. `qualify:ingress` NON-PASS on the two B-001 leaves; audit NON-PASS on B-002/B-004 only. The trusted owned-conversation collaborator, the test-only native-conversation helper and the README account-to-resource rule are on `phase-3`.
 - **Implementation spec:** `docs/specs/implementation-spec-001.md`, Phase 3 P3-S1a, P3-S1b, P3-S18/S19; §§4, 6, 8.1/8.7. Packaging: [Phase 3 sprint packaging](../specs/implementation-spec-001.md#phase-3-sprint-packaging). B-001 source: local `docs/backlog.md` (DATA) and `apps/api/test/ingress.qualification.ts`.
 
@@ -20,9 +22,9 @@
 - **Sprint type:** Feature
 - **Delivery authorization:** authorized by Lou on 2026-10-29 (Phase 3 Wave 1). Standalone `docs/stories/story-001.md` merged into `phase-3` at `a7444a2`. It delivered the configurable browser-test port, the trusted owned-conversation collaborator and the test-only native-conversation fixture helper; the Mastra upgrade is deferred to after Wave 1. Then branch `sprint-004` from updated `phase-3` in the clone `~/projects/workprint` (Lou chose two plain clones over worktrees), with one implementer; story PRs target `sprint-004`. Sprint integration into `phase-3` requires Lou's explicit merge command; `phase-3` → `main` is Lou's.
 - **Shared context:** owns `apps/api/src/mastra/` serving/auth/native/workflow adapters, `apps/api/src/agent/mastra/` native Agent bindings, web `shell/` account/New video/Recents and native-history parts of `conversation/`, plus corresponding native/Auth api-client and contract files. Reuse the foundation's collaborator; bootstrap supplies it to `application`, never imports upward from application. Existing closed operations are implemented, not reinvented; change contracts only for a demonstrated need and reuse supported native types. Creates no application tables and never modifies Mastra-owned schemas.
-- **Parallel wave:** Sprints 004/005 run concurrently and must not depend on each other. Edit only owned modules; shared contracts/api-client indexes, `apps/api/src/mastra/application-routes.ts`, backend registration/bootstrap, shell composition and `storage/` index take additive edits only, with logic in owned files. Resolve `pnpm-lock.yaml` conflicts by rerunning `pnpm install`, never hand-merging. Whichever integrates second first merges `phase-3` into its sprint branch (no rebase), then reruns the full suite on the combined head, requalifying the shared conversation collaborator and native cohort. A discovered wave-mate dependency stops work for escalation, not a substitute implementation. Both clones share one local Supabase stack and its two fixture accounts: no test may change their passwords, sessions or sign-in state; tests that need to (sign-out, reset, expiry) create and delete their own throwaway accounts.
+- **Parallel wave:** Sprints 004/005 run concurrently and must not depend on each other. Edit only owned modules; shared contracts/api-client indexes, `apps/api/src/mastra/application-routes.ts`, backend registration/bootstrap, shell composition and `storage/` index take additive edits only, with logic in owned files. Resolve `pnpm-lock.yaml` conflicts by rerunning `pnpm install`, never hand-merging. Whichever integrates second first merges `phase-3` into its sprint branch (no rebase), then reruns the full suite on the combined head, requalifying the shared conversation collaborator and native cohort. A discovered wave-mate dependency stops work for escalation, not a substitute implementation. From Story 1a, this sprint owns the app-owned server entry and the `build`/`dev`/`start` tasks in `scripts/tasks.mjs`; Sprint 005 starts the built backend only through the shared test fixtures and adds any migration command as a separate task. **Recorded exception:** Story 1b may move `readBody` out of the shared `apps/api/src/mastra/application-routes.ts` into an owned Sprint 004 module, keeping its contract. That is the only non-additive edit to that file. Sprint 005 does not edit `readBody` or the request-body bounds, and adds routes only through the operations catalog. Both clones share one local Supabase stack and its two fixture accounts: no test may change their passwords, sessions or sign-in state; tests that need to (sign-out, reset, expiry) create and delete their own throwaway accounts.
 - **Non-goals:** P3-S1c browser chat consumer, live-model qualification and usage recording belong to wave 2. Normal application inference remains disabled throughout. No signup/invitation administration, creative tools/skills, production seed endpoint, generation/export business schema or execution, saved-work operations owned by Sprint 005, deployment, deletion, model selector or spending controls. Chat text is not a production Artifact; native persistence/technical completion confers no human approval or selection.
-- **Safety:** one Mastra instance, listener and execution owner; no vendor patch, parallel server, scheduler, conversation store, stream protocol or agent loop. B-001 must pass Story 1 before native qualification; its Phase 1–2 exception cannot carry this feature. B-002 (`deepmerge`) and B-004 (`@hono/node-server`) remain Lou-approved private/local audit NON-PASS, separately reported and never counted as passes; no upstream fix as of 2026-10-29. They gate shared/public deployment, not this wave. Key presence is not live-call authorization.
+- **Safety:** one Mastra instance, listener and execution owner; no vendor patch, parallel server, scheduler, conversation store, stream protocol or agent loop. The backend keeps one listener through the app-owned entry approved by Lou on 2026-10-29; that entry owns startup, background workers, recovery and shutdown. From Story 1b, every route that reaches Mastra passes through the pre-Mastra route catalog, Auth and bounded intake. Stories 3–5 add their qualified native routes to that catalog, never around it. B-001 must pass Story 1b before native qualification; its Phase 1–2 exception cannot carry this feature. B-002 (`deepmerge`) and B-004 (`@hono/node-server`) remain Lou-approved private/local audit NON-PASS, separately reported and never counted as passes; no upstream fix as of 2026-10-29. They gate shared/public deployment, not this wave. Key presence is not live-call authorization.
 - **Architecture:** components own styles; web features import only `ui/` and `api/`, with shell composition. Packages never import apps; only web imports `player`; dependency-cruiser enforces boundaries. Domains own SQL and never call peer domains; `application` coordinates narrow interfaces/supplied collaborators and imports neither agent, Mastra subtree nor bootstrap. No sprint/story IDs in code names.
 - **Design and evidence placement:** reuse approved designs. New/unseen states require inert previews at 1440/390 before implementation, recorded in `docs/design/design.md` and `history.md` with the exact label: "Provisionally approved by the orchestrator on <date> under Lou's delegation; pending Lou's ratification at the Phase 3 handoff." AI inspection is not human approval. PRs and Final Review carry revision, commands/results, red→green logs, surface/reference mappings and native observations; logs/captures stay ignored under `outputs/verification/sprint-004/<sha>/`, not uploaded. B-005: when a real flow replaces an isolated `apps/web/test/*.html` mount, retire that mount and migrate its coverage at equal or greater strength; retain mounts not yet replaced.
 
@@ -49,9 +51,9 @@ The Final Verification Story runs all applicable sprint functional verification 
 - **Environment and suite order:** use `WORKPRINT_AUTH_FIXTURE="$PWD/outputs/local-supabase.setup.json"`, `WORKPRINT_AUTH_SIGNING_FIXTURE="$PWD/outputs/local-supabase.status.json"`, `WORKPRINT_BROWSER_OUTPUT="$PWD/outputs/verification/sprint-004/<sha>"` and the foundation's per-checkout browser port (this clone uses the defaults, 4179/4180; Sprint 005's clone uses 4279/4280). Run `pnpm install --frozen-lockfile`, `pnpm check`, `pnpm build`, `pnpm test`, `pnpm test:browser`, `pnpm test:visual`, `pnpm qualify:ingress`, `pnpm audit`, in that order. Redirect full noisy stdout/stderr to local log files; report exit/result and paths. Register new tests in existing command discovery/explicit browser lists so the full suite actually executes them. Final evidence distinguishes controlled-native qualification from live-provider evidence (none here).
 
 ### Stories
-**Constraints:** Seven implementation stories plus Final, strictly in this order; each independently verified/reviewed. The target is ≤5 logical commits including verification; Lou allowed exceeding it where that makes history clearer (2026-10-29). Commit subjects use `Type(scope): Capitalized description`, ≤50 characters. 
+**Constraints:** Eight implementation stories (1a, 1b, 2–7) plus Final, strictly in this order; each independently verified/reviewed. The target is ≤5 logical commits including verification; Lou allowed exceeding it where that makes history clearer (2026-10-29). Commit subjects use `Type(scope): Capitalized description`, ≤50 characters. 
 
-#### Story 1: Bounded ingress before native body parsing (B-001)
+#### Story 1a: App-owned server entry on the official Hono adapter
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
   - [x] Follows sprint template
   - [x] Acceptance criteria are specific and testable
@@ -60,25 +62,175 @@ The Final Verification Story runs all applicable sprint functional verification 
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
   - [x] Ready for Lou
-- **Planning review:**
-  - Findings: None
-  - Resolution: N/A
-- **As a** maintainer, **I want** bounded ingress before native JSON parsing, **so that** unfinished requests cannot bypass admission/resource deadlines.
-- **Dependencies:** accepted foundation on `phase-3`; Lou's execution authorization. All later stories depend on this gate passing.
+- **Planning review:** revision of 2026-10-29.
+  - Findings:
+    - P1: red→green was required for preserved behaviour;
+    - P2: the intermediate merge gate was ambiguous while B-001 still fails;
+    - fact-check corrections: no adapter `/health`, plain-text error/404 defaults, `openapiPath` rather than `server.build`, `RequestContext` replaced during `init()`, browser-stream endpoints, and the shutdown bounds.
+  - Resolution: equivalence checks for preserved behaviour, red→green only for new behaviour, an explicit merge gate, and every corrected responsibility listed in the ACs. Final pass 5/5.
+- **Why this story exists:**
+  - **Cause.** The original Story 1 investigation (2026-10-29; evidence in `outputs/verification/sprint-004/1101eb309046dad575f649a89d879cf6ca9a14d6/bounded-ingress-investigation.md`) found it. The generated server's context middleware runs `await c.req.raw.clone().json()` on every JSON POST/PUT, before anything we can configure: `server.middleware`, `server.auth`, `server.timeout`, `server.bodySizeLimit`.
+  - **No setting fixes it.** None skips or bounds that read, in 1.79.0 or 1.80.0. A `timeout`/`bodySizeLimit` trial still stalled, and it turned the Auth-outage 503 into 504.
+  - **No upstream fix yet.** Issue mastra-ai/mastra#28214, which would move the read after body parsing, is open and labelled vNext.
+  - **Supported route.** Mastra documents the official Hono adapter, with middleware registered before `init()`, as the way to control ordering. **Lou approved the application-owned adapter bootstrap on 2026-10-29.**
+  - **Why split.** The swap and the new guards are separate stories, so a lifecycle regression can't hide inside the ingress fix.
+- **As a** maintainer, **I want** the backend served through an application-owned entry on the official adapter, with the same behaviour, **so that** checks can run before Mastra reads a request body and later stories control the worker and shutdown lifecycle explicitly.
+- **Dependencies:** accepted foundation on `phase-3`; Lou's adapter approval (2026-10-29).
 - **Acceptance criteria:**
-  - [ ] Reproduce both existing `ingress.qualification.ts` leaves on the current pinned Mastra serving path (core/deployer 1.79.0; the 1.80.x upgrade is deferred to after Wave 1, B-007); prefer an evidenced supported configuration, not another speculative upgrade. Establish early authentication plus bounded body size/time on the actual serving path, retaining the 1 MiB body limit and two-second body-read deadline.
-  - [ ] `pnpm qualify:ingress` passes both leaves unchanged: unfinished unauthenticated POST returns exact 401 `unauthenticated`, authenticated POST exact 400 `invalid_input`, each before 3.5 s and the independent five-second watchdog while the upload is still unfinished. Server-side body/request resources settle, not just the client watchdog.
-  - [ ] Public `GET /health`, normal authenticated application requests and closed unintended native routes remain intact. No vendor patch, parallel listener or weakened test. If only an application-owned official-adapter bootstrap works, stop for Lou's approval of the lifecycle change before implementing it; a candidate adapter result is not approval or story completion.
+  - [ ] **Dependencies:**
+    - Pin `@mastra/hono` **1.7.21**, which depends on `@mastra/server` 1.79.0. Its successor 1.7.22 requires core ≥1.80 (npm registry, 2026-10-29), so it moves with B-007.
+    - Add direct `hono` 4.13.14 and `@hono/node-server` 1.19.17, the versions already locked.
+    - `@hono/node-ws` 1.3.1 and `ws` 8.22.0 already satisfy the adapter's ranges.
+    - The only new package expected is `fetch-to-node`; its range `^2.1.0` resolves to 2.1.0, the newest published version (MIT, no dependencies, npm registry 2026-10-29).
+    - No release-age exclusions, overrides or resolutions.
+    - If nothing still uses the `mastra` CLI after the switch, remove it. That drops `@mastra/deployer` and, per the current lockfile, the only `deepmerge` path (B-002).
+    - Record the observed lockfile delta and audit. Nothing beyond B-002/B-004 may appear. `@hono/node-server` (B-004) then becomes a direct dependency as well as reachable via `@mastra/hono` → `@hono/node-ws`.
+  - [ ] **One app-owned entry in `apps/api/src/mastra/`.** Production and every test composition start through this same module; there is no second listener or parallel server. It:
+    1. creates the Hono app;
+    2. registers `GET /health` (same 200 `{ success: true }` body), an ordered hook for guards that run before Mastra (empty in this story), a JSON error handler and a JSON not-found fallback matching today's shapes;
+    3. **awaits** `new MastraServer({ app, mastra, prefix }).init()` on the existing single Mastra instance from `createBackend`. `prefix` comes from `server.apiPrefix`; the adapter's `openapiPath` stays unset, so OpenAPI stays off, and there is no Studio or Swagger UI;
+    4. binds one listener with `@hono/node-server` on the configured `127.0.0.1` host and port.
+    - The current CORS/default-deny `server.middleware` and the terminal `/*` route are still applied, by the adapter after its context middleware.
+  - [ ] **Lifecycle, reproducing the generated entry:**
+    - `startWorkers()`, falling back to `startEventEngine()`. It initialises storage, and the Postgres store respects `disableInit`.
+    - Startup recovery: `restartAllActiveWorkflowRuns()` unless workflow recovery is `off`, plus durable-agent recovery only when configured as `auto`. They run concurrently; failures are logged, not fatal.
+    - **SIGINT/SIGTERM shutdown:**
+      - stop accepting connections;
+      - sweep idle connections every 100 ms;
+      - HTTP drain up to 5 s, then close the remaining connections;
+      - then `mastra.shutdown({ drainTimeout })`, bounded at drain + 5 s, then exit;
+      - a duplicate signal within 250 ms is ignored; a later one exits 1.
+    - These are today's bounds, recorded as observed. Story 6 replaces them with one total deadline.
+  - [ ] **Deliberate differences**, each recorded in the PR and README:
+    - The generated browser-stream endpoints and WebSocket injection are not registered, so its session endpoint (which returned 200 despite the deny middleware) becomes 404.
+    - Studio-only refresh streams are omitted.
+    - Usage telemetry is omitted (it is already disabled by `MASTRA_TELEMETRY_DISABLED`).
+    - The internal scorer-trace workflow registration is omitted. It is a private API and no scorers are configured; revisit if trace scoring is enabled.
+  - [ ] **Commands:**
+    - `pnpm build` compiles through the existing `tsc` steps and no longer runs `mastra build`.
+    - `pnpm start` runs the compiled app-owned entry.
+    - `pnpm dev` runs the same entry, reloading through Node/TypeScript built-ins; no new watcher dependency.
+    - The serving environment still drops `MIGRATION_DATABASE_URL`.
+    - The test compositions (`auth-built-fixture.ts` probe and production, `foundation.security.test.ts`) build and start through the app-owned entry, not `mastra build`, and stay excluded from production.
+    - The clean committed-export smoke still builds and starts.
+    - README commands, lifecycle notes and the module map are updated.
+  - [ ] **Merge gate for this intermediate head:**
+    - Every previously passing check still passes with unchanged counts and outcomes, apart from the recorded browser-stream closure and the new tests.
+    - All 19 operations keep their Auth-first 401/400/501 outcomes, and unintended native routes stay 404.
+    - `qualify:ingress` may fail only on the same two B-001 leaves.
+    - 1a may merge into `sprint-004` on its own. Native qualification (Stories 4–7) stays blocked until 1b passes.
 - **Functional verification:**
-  - [ ] Run `pnpm qualify:ingress` red→green through the built production entry; supplement with oversized/chunked/slow-body and concurrent follow-up requests proving bounded rejection, released resources and continued health/API service, not a client-only abort.
+  - [ ] **New behaviour, red→green.** Each runs first against the generated entry (red), then the app-owned entry (green):
+    - **Hook ordering:** a test composition sends an unfinished JSON upload. On the generated entry, a guard reachable only through `server.middleware` does not run within 1 s, because the body read blocks first. On the app-owned entry, the pre-Mastra hook guard runs immediately and sees the body unread.
+    - **Browser-stream closure:** the session endpoint returns 200 on the generated entry and 404 on the app-owned entry.
+  - [ ] **Preserved behaviour, as before/after equivalence.** The same built-entry checks run on the generated entry (baseline) and the app-owned entry, with matching results:
+    - the health body;
+    - startup reaching health with the background engine started;
+    - JSON error and 404 shapes;
+    - SIGTERM during a slow in-flight request: it completes within the drain bound, then exit 0;
+    - new connections are refused once shutdown starts;
+    - a stalled connection is force-closed at the bound;
+    - repeated-signal behaviour;
+    - startup recovery called once, with a failure logged and the server still up.
+
+    Any check that cannot run on the generated entry is recorded with the reason.
 - **Regression verification:**
-  - [ ] Run built admission, client/surface contracts, foundation smoke/security and CORS/exposure tests; health succeeds, valid calls retain documented outcomes, invalid Auth still rejects first and all unintended native routes remain 404.
-- **Editorial/design verification:** N/A — no UI; review serving-path evidence and lifecycle ownership against B-001 without treating prose as runtime proof.
-- **Manual-only behavior verification:** N/A — built HTTP/resource checks are automated.
+  - [ ] The full ordered suite at the committed head:
+    - test, browser 163 and visual 215 with zero drift, unchanged;
+    - built admission, client/surface contracts, foundation smoke/security, CORS/exposure, native preparation and serving-role checks;
+    - dependency-cruiser;
+    - production-exclusion checks covering the test compositions.
+- **Editorial/design verification:** N/A, since there is no UI. Review the README command and lifecycle notes, and the recorded differences, for accuracy.
+- **Manual-only behavior verification:** N/A; lifecycle and serving checks are automated.
 - **Planned commits:**
-  1. `Fix(api): Bound ingress before native parsing` — supported serving configuration and focused red→green proof.
-  2. `Test(api): Preserve serving boundary checks` — resource cleanup and normal/closed-route regression evidence.
-- **Technical notes:** baseline reproduction is evidence, not a pass. Preserve one runtime and generated-server lifecycle unless Lou explicitly approves the official-adapter alternative; inability to meet the gate blocks native consumers.
+  1. `Build(api): Add official Hono adapter` — exact pins, lockfile and audit record.
+  2. `Refactor(api): Serve through app-owned entry` — entry module, build/dev/start, test compositions, README.
+  3. `Test(api): Qualify app-owned server lifecycle` — red→green and equivalence proof.
+  4. `Build: Remove unused Mastra CLI` — only if nothing else uses it.
+- **Technical notes:**
+  - **Registration order inside `init()`:** context middleware (the body read), route-level auth (this adapter registers no global auth middleware), `server.middleware`, custom routes, native routes. Anything registered on the Hono app before `init()` runs before the body read (Mastra docs, Hono adapter § Adding middleware).
+  - **The adapter creates a fresh per-request `RequestContext`.** Anything a pre-Mastra guard puts on Mastra's context is lost; carry it under a separate trusted Hono context key instead.
+  - **One owned module** holds all startup and lifecycle logic. Later stories extend it for workers, recovery and drain.
+  - **Revisit when upstream changes.** If #28214 or a later release removes the early read, reassess whether the generated server can return. Until then, this entry owns the lifecycle.
+
+#### Story 1b: Bounded ingress before native body parsing (B-001)
+- **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
+  - [x] Follows sprint template
+  - [x] Acceptance criteria are specific and testable
+  - [x] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
+  - [x] Story is small enough to review and merge independently
+  - [x] Reviewed by sub-agent
+  - [x] Review findings addressed or explicitly recorded
+  - [x] Ready for Lou
+- **Planning review:** revision of 2026-10-29.
+  - Findings:
+    - P1: guards covered only protected routes, while Mastra reads bodies even for unknown paths;
+    - P1: proof of the hand-off (single verification, identity, body, no late execution) was missing;
+    - P1: red→green was required for cases that already pass;
+    - P1: moving `readBody` conflicted with the shared-file rule;
+    - P2: no exact overflow status and no 1 MiB boundary test.
+  - Resolution: pre-Mastra default-deny for every path; hand-off integrity cases; an evidence rule (red→green for changed outcomes, equivalence otherwise); a recorded `readBody` exception; 400 `invalid_input` with tests at 1 MiB and 1 MiB + 1. Final pass 5/5.
+- **As a** maintainer, **I want** routing, authentication and bounded body intake before Mastra reads a request, **so that** unfinished or oversized requests to any path cannot hold resources past their deadlines.
+- **Dependencies:** Story 1a. All later stories depend on this gate passing.
+- **Acceptance criteria:**
+  - [ ] **The pre-Mastra hook handles, in order, everything that must happen before any body read:**
+    1. **CORS.** The same narrow policy for catalog routes, including the 204 preflight. Early 401/400/503 responses keep the same CORS headers.
+    2. **`GET /health`.**
+    3. **Default-deny.** Any path or method not in the pre-Mastra route catalog gets JSON 404 before any body read, including unfinished JSON POSTs to unknown paths.
+       - The catalog holds the application operations now. Any native route a later story qualifies (Stories 3–5) is added to this same catalog; no route reaches Mastra without these guards.
+    4. **Authentication from the `Authorization` header.** Missing or invalid credentials give 401 `unauthenticated`; an Auth-service outage keeps 503 `integration_failure`, never 504.
+       - Verify once. Keep the identity under a separate trusted Hono context key, because Mastra replaces `RequestContext` during `init()`.
+       - After `init()`, the existing middleware copies it into Mastra's request context without verifying again.
+    5. **Bounded intake.** The existing `readBody` bounds (JSON content type, 1 MiB, 2 s) move from `application-routes.ts` into an owned module under `apps/api/src/mastra/`, so there is one implementation. The intake uses it, and route handlers read the buffered body through it with the same contract: parsed JSON, or 400 `invalid_input`. This is a recorded exception to the shared-file rule (see Parallel wave).
+       - A declared `Content-Length` over 1 MiB is rejected before reading; chunked or undeclared bodies are counted and stopped at 1 MiB.
+       - **Outcomes match today's contract:** oversized, over-deadline, wrong-type and malformed bodies all give 400 `invalid_input`. Exactly 1 MiB is accepted; 1 MiB + 1 byte is rejected.
+       - On expiry or overflow, reading stops and the request stream is released.
+       - The timer wraps intake only and is cleared before continuing. A timed-out intake never calls `next()`, even if the body completes later.
+    6. **Continue** with `c.req.raw` replaced by `new Request(c.req.raw, { body: bufferedBytes })`, keeping the URL, method, headers and signal (Hono's own `bodyLimit` pattern). Mastra's context read, the pristine custom-route clone and our route handler then all see the same bytes.
+  - [ ] **The 2 s bound covers body intake only.** No timeout middleware wraps downstream work, so route or agent execution longer than 2 s is not cut off.
+  - [ ] **`pnpm qualify:ingress` passes both leaves unchanged:**
+    - the unfinished unauthenticated POST gets exact 401 `unauthenticated`;
+    - the authenticated one gets exact 400 `invalid_input`;
+    - each arrives before 3.5 s and the independent five-second watchdog, while the upload is still unfinished;
+    - server-side body and request resources settle.
+  - [ ] **Unchanged:** health, normal authenticated requests, CORS, and closed native routes. No vendor patch, no parallel listener, no weakened test.
+- **Functional verification:**
+  - [ ] `pnpm qualify:ingress` red→green through the built app-owned entry.
+  - [ ] **Built-server cases.** Each asserts the exact status and code and released server-side resources (socket and listener counts), not just a client abort:
+    - an unfinished JSON POST to an unknown path gets 404 within 3.5 s;
+    - declared 1 MiB accepted and 1 MiB + 1 rejected;
+    - chunked 1 MiB accepted and 1 MiB + 1 rejected, with no length header;
+    - slow but complete within 2 s, accepted;
+    - stalled;
+    - wrong content type;
+    - malformed JSON;
+    - an Auth-upstream stall returns 503;
+    - CORS headers present on early 401 and 400 responses for the browser origin;
+    - concurrent follow-up health and API calls succeed.
+  - [ ] **Hand-off integrity, in a test composition:**
+    - exactly one Auth verification per request, counted at the Auth upstream;
+    - the handler sees the verified account ID and a body hash equal to what was sent;
+    - an expired upload that later completes produces zero downstream handler calls or effects;
+    - a downstream handler running 3 s after a completed body returns its full response, proving the intake timer is cleared. Story 4 repeats this with a real controlled turn.
+  - [ ] **Evidence rule.** Every case whose outcome changes from the Story 1a head has a red→green log, with the red run on the 1a head. Every case that already passes on the 1a head is proved by before/after equivalence against it. Examples: exactly 1 MiB, slow-but-complete, the 3 s handler, concurrent follow-ups. The PR lists which rule each case uses.
+- **Regression verification:**
+  - [ ] The Story 1a lifecycle and equivalence tests, plus built admission, client/surface contracts, foundation smoke/security and CORS/exposure. They must show:
+    - health succeeds;
+    - valid calls keep their documented outcomes;
+    - invalid Auth still rejects first;
+    - unintended native routes stay 404.
+
+    Then the full ordered suite.
+- **Editorial/design verification:** N/A, since there is no UI. Review the guard order and evidence against B-001 without treating prose as runtime proof.
+- **Manual-only behavior verification:** N/A; built HTTP and resource checks are automated.
+- **Planned commits:**
+  1. `Fix(api): Route and authenticate before Mastra` — catalog default-deny, CORS and header-only admission on the hook.
+  2. `Fix(api): Bound request body intake` — move the existing bounds into intake, plus the readable hand-off.
+  3. `Test(api): Qualify bounded ingress` — qualification red→green, resource and hand-off cases.
+- **Technical notes:**
+  - Hono's `bodyLimit()` uses `Content-Length` when present and does not enforce completion. Hono's `timeout()` races downstream work and defaults to 504. Use neither as the deadline.
+  - Relying on Hono's parsed-body cache breaks Mastra's `c.req.raw.clone().json()`; replace the raw request instead.
+  - If no supported hand-off gives Mastra a readable body, stop and escalate rather than patch the vendor.
 
 #### Story 2: Standard Supabase account and session flows (P3-S1a-1)
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
@@ -93,7 +245,7 @@ The Final Verification Story runs all applicable sprint functional verification 
   - Findings: None
   - Resolution: N/A
 - **As a** creator, **I want** standard sign-in/out, password reset and session recovery, **so that** account access settles truthfully without losing saved work.
-- **Dependencies:** Story 1; scoped inert-preview approval for unseen Auth/reset/expiry states before implementation.
+- **Dependencies:** Story 1b; scoped inert-preview approval for unseen Auth/reset/expiry states before implementation.
 - **Acceptance criteria:**
   - [ ] Implement email/password sign-in/out, reset request/link consumption/password update and session refresh/expiry using standard Supabase Auth interfaces only. No signup/invitation administration, custom verifier/session store or account provisioning UI; browser configuration exposes only validated public Auth settings, never privileged credentials.
   - [ ] Successful/incorrect sign-in, reset-request failure, invalid/expired/reused reset links, refresh failure and expiry settle loading with actionable approved feedback. Sign-out/expiry clear account-scoped presentation and drafts; late responses cannot restore old-account data. Refresh/reconnect never replays commands or starts provider work.
@@ -123,7 +275,7 @@ The Final Verification Story runs all applicable sprint functional verification 
   - Findings: None
   - Resolution: N/A
 - **As a** creator, **I want** New video, accessible Recents and restored owned history, **so that** I can return to the right conversation without sending a message.
-- **Dependencies:** Stories 1–2; foundation's trusted owned-conversation collaborator and supported native-conversation fixture helper, not Sprint 005.
+- **Dependencies:** Stories 1a, 1b and 2; foundation's trusted owned-conversation collaborator and supported native-conversation fixture helper, not Sprint 005.
 - **Acceptance criteria:**
   - [ ] New video creates native conversation identity; Recents lists/paginates owned conversations and open/load renders persisted native history through supported native interfaces/api-client. Accessible pagination works by keyboard with labelled controls, focus and announced loading/end/error states; no second conversation table/store or inferred ownership.
   - [ ] Use the foundation collaborator for verified-account ownership; two accounts cannot list/read/mutate each other's records, including forged owner/resource/cursor inputs. Foreign and absent references have indistinguishable safe outcomes. Open/load is read-only; qualified native resource routes alone become available, not generic native mutation/admin routes.
@@ -166,6 +318,7 @@ The Final Verification Story runs all applicable sprint functional verification 
     - an oversized send is rejected before provider work.
 
     Each case asserts the configured bound, the honest persisted outcome, and released connections, listeners and provider handles, with red→green logs.
+  - [ ] A controlled turn whose execution lasts longer than 2 s after its request body completes streams and persists in full, proving Story 1b's intake deadline does not cap execution.
 - **Regression verification:**
   - [ ] Re-run owned create/list/load, body limits/ingress, admission/CORS/security/client deadlines and build/runtime fixture-exclusion checks; real browser send remains unavailable with no provider effect and all 19 application contracts retain their existing outcomes.
 - **Editorial/design verification:** N/A — transport qualification only, no browser chat or new visual surface. Review native observation versus durable completion terminology.
@@ -231,7 +384,7 @@ The Final Verification Story runs all applicable sprint functional verification 
 - **Planned commits:**
   1. `Test(workflow): Add native isolation harness` — minimal native workflow and separate test registration.
   2. `Test(workflow): Qualify execution bounds` — native cancellation/failure, capacity/drain and regression proof.
-- **Technical notes:** limits are explicit qualification targets, not assumed Mastra guarantees; unsupported essential controls are blockers. Use narrow owned adapters and supported registration, with additive bootstrap composition only; no production generation/export state machine.
+- **Technical notes:** the app-owned entry from Story 1a, not a generated server, starts the background engine (`startWorkers()`) and runs `mastra.shutdown()` on SIGTERM; `init()` alone starts no workers. Story 1a reproduces the generated bounds: HTTP drain up to 5 s, then native shutdown up to drain + 5 s, about 15 s in total. This story replaces them with one total shutdown deadline, the seven-second target, split between HTTP drain and native shutdown. It proves that a stalled native shutdown is force-exited within it under an independent watchdog, and extends the entry for workflow start and drain. Limits are explicit qualification targets, not assumed Mastra guarantees; unsupported essential controls are blockers. Use narrow owned adapters and supported registration, with additive bootstrap composition only; no production generation/export state machine.
 
 #### Story 7: Durable start and actual process recovery (P3-S19)
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
@@ -260,7 +413,7 @@ The Final Verification Story runs all applicable sprint functional verification 
 - **Planned commits:**
   1. `Test(workflow): Qualify durable start recovery` — test-only persisted-intent/barrier and real restart checks.
   2. `Test(workflow): Prove guarded step reentry` — lost acknowledgment/repeated-effect and regression evidence.
-- **Technical notes:** the fixture ledger proves the save/start seam, not a production business state machine. Reconciliation is a narrow bounded hand-off using stable identity and supported native state; no polling scheduler or application-owned native schema repair. An essential recovery gap blocks P3-S8/S11–S13 consumers and returns for approval.
+- **Technical notes:** startup recovery (`restartAllActiveWorkflowRuns()`) now runs in the app-owned entry from Story 1a. This story qualifies it through real kill/restart and extends that entry if more is needed. the fixture ledger proves the save/start seam, not a production business state machine. Reconciliation is a narrow bounded hand-off using stable identity and supported native state; no polling scheduler or application-owned native schema repair. An essential recovery gap blocks P3-S8/S11–S13 consumers and returns for approval.
 
 #### Final Story: Sprint Verification & Completion
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
