@@ -1,5 +1,9 @@
 # Workprint — Application Design History
 
+## Text-input focus treatment — 2026-10-29
+
+**Text inputs have no focus ring.** Approved by Lou on 2026-10-29. The chat message box, the inline Script/Shot/Panel editors and Library search show no blue focus outline on focus, matching the brand-book CSS, which rings only links and buttons. Keyboard-only focus rings on buttons, tabs and other controls are unchanged.
+
 ## Direct Export, history/status and download — 2026-10-29
 
 **Provisionally approved by the orchestrator on 2026-10-29 under Lou's delegation; pending Lou's ratification at the Phase 2 handoff.** Reuse `demo-18.html#p-takes`, the existing r11 item cards/neutral pills and shared 560px viewer (342px at a 390px viewport). The orchestrator approved the entry, four unavailable states, shared loading pattern and populated history/detail layout structure, sectioning, wrapping and scrolling, with binding content substitutions. No Editor, settings, progress, deletion or retry.
