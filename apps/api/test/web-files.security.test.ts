@@ -20,7 +20,7 @@ test('Vite serves browser modules but denies private research and fixture creden
   await symlink(join(root, 'apps/web/node_modules'), join(web, 'node_modules'), 'dir');
   const paths = ['docs/research/synthetic-private.md', 'outputs/local-database.env'];
   for (const file of paths) await writeFile(join(checkout, file), sentinel);
-  for (const name of ['native-conversations.ts', 'built-server.ts', 'server-entry.test.ts', 'auth-built-fixture.ts']) {
+  for (const name of ['native-conversations.ts', 'built-server.ts', 'server-entry.test.ts', 'auth-built-fixture.ts', 'auth-server.ts']) {
     const helper = `apps/api/test/${name}`;
     await copyFile(join(root, helper), join(checkout, helper));
     paths.push(helper);

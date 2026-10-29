@@ -5,8 +5,8 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import { buildServerComposition } from './built-server.js';
-import { environment, root } from './environment.js';
-import { start, unusedPort } from './process.js';
+import { environment } from './environment.js';
+import { loadAuthFixture, signInFixtureAccount, startAuthServer } from './auth-server.js';
 
 test('pre-Mastra hook rejects an unfinished upload before any body read', { timeout: 60000 }, async (t) => {
   const fixture = await environment();
@@ -114,26 +114,9 @@ for (const prefix of ['/api', '/native']) {
 
 type Fixture = Awaited<ReturnType<typeof environment>>;
 async function launch(entry: string, fixture: Fixture, name: string, extra: NodeJS.ProcessEnv = {}) {
-  const file = process.env.WORKPRINT_AUTH_FIXTURE;
-  assert.ok(file, 'Real loopback Auth fixture is required');
-  const config = JSON.parse(await readFile(file, 'utf8')) as {
-    url: string; anonKey: string; servingUrl: string; accounts: { email: string; password: string }[];
-  };
-  for (const url of [config.url, config.servingUrl]) assert.equal(new URL(url).hostname, '127.0.0.1');
-  assert.ok(config.accounts.every((account) => /@[^@]+\.invalid$/.test(account.email)));
-  const token = await fetch(`${config.url}/auth/v1/token?grant_type=password`, {
-    method: 'POST', headers: { apikey: config.anonKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify(config.accounts[0]), signal: AbortSignal.timeout(3000),
-  });
-  assert.equal(token.status, 200);
-  const identity = await token.json() as { access_token: string };
-  const port = await unusedPort();
-  const origin = `http://127.0.0.1:${port}`;
-  const server = await start(process.execPath, [entry], {
-    cwd: root, env: { ...fixture.env, DATABASE_URL: config.servingUrl, SUPABASE_URL: config.url,
-      SUPABASE_PUBLISHABLE_KEY: config.anonKey, PORT: String(port), ...extra }, log: join(fixture.logs, `${name}.log`),
-  });
-  await server.response(`${origin}/health`);
+  const config = await loadAuthFixture();
+  const identity = await signInFixtureAccount(config, config.accounts[0]!);
+  const { server, origin } = await startAuthServer(entry, fixture.env, config, join(fixture.logs, `${name}.log`), { env: extra });
   return { server, origin, headers: { Authorization: `Bearer ${identity.access_token}` } };
 }
 
@@ -183,7 +166,7 @@ test('built entry preserves HTTP, worker, recovery and signal lifecycle', { time
     return target;
   };
   const signal = async (name: string, value: NodeJS.Signals) => process.kill((await waitFor(name)).pid, value);
-  const exitWithin = async (server: Awaited<ReturnType<typeof start>>, ms: number) => {
+  const exitWithin = async (server: Awaited<ReturnType<typeof launch>>['server'], ms: number) => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try { return await Promise.race([server.exited, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Server exit deadline')), ms); })]); }
     finally { clearTimeout(timer); }

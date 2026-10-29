@@ -52,7 +52,7 @@ test('default dev and production build expose no interchangeable test compositio
     }] });
   `], { cwd: web, env, log: join(fixture.logs, 'web-build.log') });
   const testRoot = await realpath(join(web, 'test'));
-  const serverHelpers = await Promise.all(['native-conversations.ts', 'built-server.ts', 'server-entry.test.ts', 'auth-built-fixture.ts'].map(file => realpath(resolve('apps/api/test', file))));
+  const serverHelpers = await Promise.all(['native-conversations.ts', 'built-server.ts', 'server-entry.test.ts', 'auth-built-fixture.ts', 'auth-server.ts'].map(file => realpath(resolve('apps/api/test', file))));
   const graph = JSON.parse(await readFile(inputsFile, 'utf8')) as { inputs: string[]; inlineLimit: number | null };
   expect(graph.inputs.length).toBeGreaterThan(0);
   for (const input of new Set(graph.inputs)) {
@@ -116,7 +116,7 @@ test('default dev and production build expose no interchangeable test compositio
         const body = await response.text();
         exposure.push({ mode, path, status: response.status, disposition: 'Native fixture helper denied or ordinary application fallback' });
         expect(response.status === 403 || response.status === 404 || (response.status === 200 && body === html), path).toBe(true);
-        expect(body).not.toMatch(/createNativeConversation|buildServerComposition|Synthetic startup recovery failure/);
+        expect(body).not.toMatch(/createNativeConversation|buildServerComposition|startAuthServer|Synthetic startup recovery failure/);
       }
       for (const suffix of ['', '?context=viewer&reference=proposal&fixture=1&__qualification=1']) {
         await page.goto(origin + suffix);
