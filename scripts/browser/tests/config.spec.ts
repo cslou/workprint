@@ -60,10 +60,16 @@ test('default dev and production build expose no interchangeable test compositio
     const source = await readFile(join(testRoot, file));
     expect.soft(hashes.has(digest(source)), `Test file SHA256 emitted: ${file}`).toBe(false);
     expect.soft(bytes.some(asset => asset.includes(source)), `Raw test bytes bundled: ${file}`).toBe(false);
-    if (graph.inlineLimit === null || source.length <= graph.inlineLimit) {
-      const forms = [source.toString('base64')];
-      if (/\.(html|tsx?|js|css|json|svg|txt|md)$/.test(file)) forms.push(encodeURIComponent(source.toString('utf8')), JSON.stringify(source.toString('utf8')).slice(1, -1));
-      for (const form of forms) expect.soft(textAssets.some(asset => asset.bytes.includes(form)), `Inlined test fixture: ${file}`).toBe(false);
+    // A base64 payload also detects data URLs of any MIME type, including forced ?inline assets.
+    // Scan one fixture at a time at every size; shorter artifacts cannot contain its encoded bytes.
+    const forms = [{ encoding: 'base64/data URL', value: source.toString('base64') }];
+    if (/\.(html|tsx?|js|css|json|svg|txt|md)$/.test(file)) forms.push(
+      { encoding: 'URI data URL', value: encodeURIComponent(source.toString('utf8')) },
+      { encoding: 'JSON string', value: JSON.stringify(source.toString('utf8')).slice(1, -1) },
+    );
+    for (const form of forms) {
+      const encoded = Buffer.from(form.value);
+      expect.soft(textAssets.some(asset => asset.bytes.length >= encoded.length && asset.bytes.includes(encoded)), `Inlined test fixture (${form.encoding}): ${file}`).toBe(false);
     }
     expect(artifacts.some(asset => asset.endsWith(`/test/${file}`)), `Test artifact emitted: ${file}`).toBe(false);
   }
