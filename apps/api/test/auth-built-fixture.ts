@@ -171,9 +171,10 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
   };
   for (const token of ['', 'malformed', expired]) {
     const client = createApiClient({ baseUrl: origin, getAccessToken: async () => token || null });
-    const result = await client.library(applicationRequests.library);
-    assert.equal(result.ok, false);
-    if (!result.ok) assert.equal(result.error.code, 'unauthenticated');
+    const invoke = <N extends OperationName>(name: N) => (client[name] as (input: OperationRequest<N>) => Promise<unknown>)(applicationRequests[name]);
+    for (const name of Object.keys(operations) as OperationName[]) {
+      assert.deepEqual(await invoke(name), { ok: false, error: { code: 'unauthenticated', message: 'Authentication required' } }, `${name} must require real Auth`);
+    }
     const response = await raw('/v1/conversations/c/versions', 'POST', '{', token);
     assert.equal(response.status, 401, 'Identity rejects before application validation of completed malformed JSON');
     assert.equal(response.payload.error.code, 'unauthenticated');
@@ -207,7 +208,7 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
   // No product resources exist; these arbitrary IDs prove no ownership semantics.
   assert.deepEqual(await snapshot(), beforeRequests, 'Unavailable matrix creates/changes no native records');
   const exposure: { path: string; bearer: boolean; status: number }[] = [];
-  for (const path of ['/api/auth/capabilities', '/api/auth/me', '/__auth_probe', '/api/agents', '/api/memory/threads', '/api/workflows', '/api/tools', '/api/telemetry', '/swagger-ui', '/openapi.json', '/health/']) {
+  for (const path of ['/api/auth/capabilities', '/api/auth/me', '/__auth_probe', '/api/agents', '/api/memory/threads', '/api/workflows', '/api/tools', '/api/telemetry', '/swagger-ui', '/openapi.json', '/health/', '/__qualification', '/__qualification/release', '/test/shell.html', '/fixtures/clip.webm', '/studio', '/assets/index.js', '/api/tools/test/execute']) {
     for (const bearer of [false, true]) {
       const response = await fetch(`${origin}${path}`, {
         headers: bearer ? { Authorization: `Bearer ${identities[0]!.access_token}` } : {}, signal: AbortSignal.timeout(3000),
