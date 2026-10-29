@@ -2,6 +2,7 @@ import { expect, type Page, type TestInfo } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { compare } from './compare.js';
 import { settleCapture } from './capture.js';
+import { capturePairSide } from './capture-pair.js';
 
 const fonts = ':root{--font-sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-display:Georgia,"Times New Roman",serif}';
 const image = '/fixtures/library-tile.png';
@@ -102,8 +103,8 @@ export async function capturePickerPair(page: Page, info: TestInfo, width: numbe
   await settleCapture(page);
   const referenceSelectors = ['.pk-panel', '.pk-head', '.pk-bar', '.pk-search', '.pk-body', '.pk-tray', '.pk-count', '.pk-send', ...(state === 'attach-unavailable' ? ['.pk-line'] : []), ...(state === 'no-facts' ? [] : ['.pk-pill', ...(state === 'no-match' ? [] : ['.pk-pill.on'])]), ...(state === 'no-match' ? ['.pk-empty'] : ['.pk-grid', '.pk-tile', '.pk-media']), ...(state === 'selected' || state === 'attach-unavailable' ? ['.pk-chip'] : [])];
   const referenceGeometry = await measure(page, referenceSelectors);
-  const referenceClip = state === 'attach-unavailable' ? await page.locator('.pk-panel').boundingBox() : null;
-  const reference = await page.screenshot({ path: info.outputPath('reference-full.png'), ...(referenceClip ? { clip: referenceClip } : { fullPage: true }), animations: 'disabled' });
+  const referencePair = state === 'attach-unavailable' ? await capturePairSide(page, info, [], 'reference', '.pk-panel', '.pk-panel') : null;
+  const reference = referencePair?.image ?? await page.screenshot({ path: info.outputPath('reference-full.png'), fullPage: true, animations: 'disabled' });
   await page.goto('/shell.html');
   await page.waitForFunction(() => !!(window as unknown as { shellTest?: unknown }).shellTest);
   await page.route('**/v1/library*', async (route) => { await route.fulfill({ status: 200, json: libraryPage() }); });
@@ -128,11 +129,10 @@ export async function capturePickerPair(page: Page, info: TestInfo, width: numbe
   const actualSelectors = ['.wp-modal', '.wp-dialog-head', '.wp-picker-bar', '.wp-search-field', '.wp-picker-body', '.wp-picker-tray', '.wp-picker-count', '.wp-picker-tray .wp-button', ...(state === 'attach-unavailable' ? ['.wp-picker-feedback'] : []), ...(state === 'no-facts' ? [] : ['.wp-picker-pill', ...(state === 'no-match' ? [] : ['.wp-picker-pill.on'])]), ...(state === 'no-match' ? ['.wp-picker-empty'] : ['.wp-picker-grid', '.wp-picker-tile', '.wp-picker-media']), ...(state === 'selected' || state === 'attach-unavailable' ? ['.wp-picker-chip'] : [])];
   const actualGeometry = await measure(page, actualSelectors);
   expect(actualGeometry.map((row) => row.boxes)).toEqual(referenceGeometry.map((row) => row.boxes));
-  const actualClip = state === 'attach-unavailable' ? await page.locator('.wp-modal').boundingBox() : null;
-  if (referenceClip && actualClip) expect(actualClip).toEqual(referenceClip);
-  const actual = await page.screenshot({ path: info.outputPath('actual-full.png'), ...(actualClip ? { clip: actualClip } : { fullPage: true }), animations: 'disabled' });
+  const actualPair = state === 'attach-unavailable' ? await capturePairSide(page, info, [], 'actual', '.wp-modal', '.wp-modal') : null;
+  const actual = actualPair?.image ?? await page.screenshot({ path: info.outputPath('actual-full.png'), fullPage: true, animations: 'disabled' });
   const changed = await compare(reference, actual, info.outputPath('comparison'));
-  await writeFile(info.outputPath('result.json'), JSON.stringify({ state, width, changedPixels: changed, tolerance: 0, reference: 'docs/design/flow2-step1-r73.html shell + library-picker-r92.html#lib-yours picker panel', substitutions: 'Library heading at 15px, Examples source removed, search at the pill row, wordless /fixtures/library-tile.png on both sides, no current conversation so Attach is disabled', revision: info.config.metadata, geometry: { reference: referenceGeometry, actual: actualGeometry } }, null, 2));
+  await writeFile(info.outputPath('result.json'), JSON.stringify({ state, width, changedPixels: changed, tolerance: 0, reference: 'docs/design/flow2-step1-r73.html shell + library-picker-r92.html#lib-yours picker panel', substitutions: 'Library heading at 15px, Examples source removed, search at the pill row, wordless /fixtures/library-tile.png on both sides, no current conversation so Attach is disabled', revision: info.config.metadata, ...(referencePair && actualPair ? { context: { reference: referencePair.context, actual: actualPair.context } } : {}), geometry: { reference: referenceGeometry, actual: actualGeometry } }, null, 2));
   expect(changed).toBe(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 }

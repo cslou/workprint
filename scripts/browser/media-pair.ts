@@ -1,8 +1,7 @@
 import { expect, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { compare } from './compare.js';
-import { settleCapture } from './capture.js';
+import { capturePairSide, verifyCapturePair } from './capture-pair.js';
 
 const source = 'flow1-step9-r90.html';
 const fonts = ':root{--font-sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-display:Georgia,"Times New Roman",serif}';
@@ -34,10 +33,8 @@ export async function captureMediaPair(page: Page, context: BrowserContext, info
       player.outerHTML = `<div class="pempty" style="aspect-ratio:16/9;display:grid;place-items:center;padding:0">${text}</div>`;
     }, copy);
   }
-  await settleCapture(page);
   const referenceSelectors = ['#take-1 .lb-panel.wide', '#take-1 .lb-head', '#take-1 .player, #take-1 .pempty', '#take-1 .notes', '#take-1 .choose'];
-  const referenceGeometry = await measure(page, referenceSelectors);
-  const reference = await page.locator('#take-1 .lb-panel').screenshot({ path: info.outputPath('reference.png'), animations: 'disabled' });
+  const reference = await capturePairSide(page, info, referenceSelectors, 'reference', '#take-1 .lb-panel', '#take-1 .lb-panel');
   await page.goto('/media.html');
   await page.addStyleTag({ content: '.wp-modal-overlay{background:#1b1913!important}' });
   await page.waitForFunction(() => !!(window as unknown as { mediaTest?: unknown }).mediaTest);
@@ -55,15 +52,7 @@ export async function captureMediaPair(page: Page, context: BrowserContext, info
   }, state);
   if (state === 'player') await expect(page.locator('.wp-clip-surface[data-ready="true"]')).toHaveCount(1);
   else await expect(page.locator('.wp-clip-note')).toHaveText(state === 'loading' ? 'Loading this video…' : state === 'unavailable' ? 'Loading this video is not available yet.' : state === 'unauthenticated' ? 'Sign-in required to load this video.' : 'This video could not be loaded. Nothing was changed.');
-  const actualGeometry = await measure(page, ['.wp-modal', '.wp-dialog-head', '.wp-clip-surface', '.wp-clip-version > p', '.wp-version-use-viewer .wp-button']);
-  await writeFile(info.outputPath('geometry.json'), JSON.stringify({ reference: referenceGeometry, actual: actualGeometry }, null, 2));
-  expect(actualGeometry.map((row) => row.boxes)).toEqual(referenceGeometry.map((row) => row.boxes));
-  await settleCapture(page);
-  const actual = await page.locator('.wp-modal').screenshot({ path: info.outputPath('actual.png'), animations: 'disabled' });
-  const changedPixels = await compare(reference, actual, info.outputPath('comparison'));
+  const actual = await capturePairSide(page, info, ['.wp-modal', '.wp-dialog-head', '.wp-clip-surface', '.wp-clip-version > p', '.wp-version-use-viewer .wp-button'], 'actual', '.wp-modal', '.wp-modal');
   const file = await readFile(`docs/design/${source}`, 'utf8');
-  await writeFile(info.outputPath('result.json'), JSON.stringify({ state, width, changedPixels, tolerance: 0, revision: info.config.metadata, browser: context.browser()?.version(), source, sourceSha256: createHash('sha256').update(file).digest('hex'), approval: 'docs/design/design.md#shell-and-remaining-phase-2-feedback', note: 'Paused supplied poster; decoded playback frames are not pixel-claimed.' }, null, 2));
-  expect(changedPixels).toBe(0);
+  await verifyCapturePair(info, reference, actual, { state, width, browser: context.browser()?.version(), source, sourceSha256: createHash('sha256').update(file).digest('hex'), approval: 'docs/design/design.md#shell-and-remaining-phase-2-feedback', note: 'Paused supplied poster; decoded playback frames are not pixel-claimed. Full-context evidence accompanies the unchanged dialog-region comparison.' });
 }
-
-const measure = (page: Page, selectors: string[]) => page.evaluate((values) => values.map((selector) => { const nodes = [...document.querySelectorAll(selector)]; if (!nodes.length) throw new Error(`Missing paired geometry ${selector}`); return { selector, boxes: nodes.map((node) => node.getBoundingClientRect().toJSON()) }; }), selectors);
