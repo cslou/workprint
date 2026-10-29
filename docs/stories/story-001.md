@@ -4,7 +4,7 @@
 
 **Date:** 2026-10-29
 **Type:** Feature
-**Status:** 🔵 In Progress
+**Status:** 🟢 Complete
 **Planning review:** an independent review (2026-10-29) found one P1 (the port scope missed about 100 hardcoded references and the fixed 4180 preview server) and two P2s (exception pass conditions, and the target-branch exception). All three are resolved; re-check **5/5**.
 **Start (2026-10-29):** Lou authorized starting Phase 3 Wave 1, beginning with this story ("lets stick to the plan … Are we ready to commence?"). Working branch `feat/parallel-sprint-foundation` from `phase-3` at `20a9fab`. This authorizes this story's implementation and its PR into `phase-3`, not the sprint branches.
 **Scope change (2026-10-29):** Lou moved the Mastra 1.80.x upgrade out of this story ("proceed without the upgrade first … when the sprints are done proceed with the upgrade"). pnpm 11's default 24-hour minimum release age blocked the new versions until about 14:00Z, and nothing in Wave 1 needs them. Both Wave 1 sprints run on the current 1.79.0 set; the upgrade becomes its own standalone story into `phase-3` after Wave 1 and before Wave 2 (backlog B-007). The approved transitive `zod-from-json-schema` 0.5.6→0.5.2 pin goes with it.
@@ -73,7 +73,7 @@
 ## Acceptance Criteria
 
 - **Mastra version set — moved out of this story** (Lou, 2026-10-29; see Scope change). Manifests, lockfile and release-age settings stay unchanged. The full ordered suite still runs at the final head, under the exceptions in Regression verification.
-- [ ] **Browser-test ports.**
+- [x] **Browser-test ports.**
   - One environment setting (default `4179`) defines the browser origin. It drives:
     - the Playwright `baseURL` and web-server URL;
     - the test Vite server, which uses a strict port;
@@ -84,12 +84,12 @@
   - `reuseExistingServer` stays `false`, and an occupied port fails loudly without attaching to another checkout's server.
   - The default command behaviour, test counts and visual results are unchanged.
   - **Concurrent proof:** two separate checkouts of the PR head run the complete `pnpm test:browser` and then `pnpm test:visual` at the same time. They use distinct port pairs and `WORKPRINT_BROWSER_OUTPUT` directories, and both pass in full with zero visual drift, with no retries, threshold changes or masks. If CPU contention causes any timing or pixel failure, the story stops for escalation; nothing is loosened.
-- [ ] **Owned-conversation check.**
+- [x] **Owned-conversation check.**
   - `application` declares a narrow collaborator. Given a verified account ID and a conversation ID, it returns `owned` or `not_found`, plus a typed unavailable outcome when native storage cannot answer.
   - Backend composition implements it over the supported Mastra native storage API: thread lookup, with ownership equal to the thread's resource identity matching the verified account. It is supplied through bootstrap, so `application` still imports no agent, Mastra subtree or bootstrap, and dependency-cruiser passes.
   - The check is read-only and leaks no existence: foreign and absent conversations give the same `not_found`. A malformed ID returns an invalid or not-found outcome, never a raw query error.
   - Before mapping, the observed native thread shape is recorded in redacted form. The account-to-resource mapping becomes the documented rule that Sprint 004 must use when creating conversations.
-- [ ] **Test-only fixture helper.**
+- [x] **Test-only fixture helper.**
   - Under `apps/api/test/`, a helper creates native conversations, and optionally messages, for a given account in isolated real Postgres through the supported native API.
   - It is excluded from production build inputs, assets and runtime, and the existing exposure checks are extended to cover it.
   - Neither a production route nor a seed endpoint is added.
@@ -119,21 +119,21 @@
 ## Verification Plan
 
 - **Functional verification:**
-  - [ ] **Ownership tests (red→green):** in isolated real Postgres with two Supabase-verified synthetic accounts, created through the helper:
+  - [x] **Ownership tests (red→green):** in isolated real Postgres with two Supabase-verified synthetic accounts, created through the helper:
     - owned gives `owned`;
     - foreign and absent give identical `not_found`;
     - malformed gives invalid or not-found without a query error;
     - storage unavailable gives the typed unavailable outcome, never `owned`.
 
     The red log comes from before the collaborator exists.
-  - [ ] **Concurrent ports:**
+  - [x] **Concurrent ports:**
     - two checkouts at the PR head run the complete `test:browser` and then `test:visual` at the same time, with distinct port pairs and output directories, and both pass in full;
     - a run against an occupied port exits non-zero with a port error;
     - a repository search shows `4179`/`4180` only as the defaults;
     - logs are saved under `outputs/verification/foundation/<sha>/`.
   - **Upgrade:** moved out of this story (see Scope change). The redacted observed native thread shape and the `qualify:ingress`/`audit` results are still recorded in the PR.
 - **Regression verification:**
-  - [ ] The full ordered suite runs with the standard environment: `pnpm install --frozen-lockfile`, `check`, `build`, `test`, `test:browser`, `test:visual`, `qualify:ingress`, `audit`.
+  - [x] The full ordered suite runs with the standard environment: `pnpm install --frozen-lockfile`, `check`, `build`, `test`, `test:browser`, `test:visual`, `qualify:ingress`, `audit`.
     - `WORKPRINT_AUTH_FIXTURE="$PWD/outputs/local-supabase.setup.json"`
     - `WORKPRINT_AUTH_SIGNING_FIXTURE="$PWD/outputs/local-supabase.status.json"`
     - `WORKPRINT_BROWSER_OUTPUT="$PWD/outputs/verification/foundation/<sha>"`
@@ -146,16 +146,48 @@
 
 (Fill this in before marking the story `🟢 Complete`.)
 
-- **PR:**
+- **PR:** [#33](https://github.com/cslou/workprint/pull/33), `feat/parallel-sprint-foundation` → `phase-3`. The records head is the commit that adds this evidence; code and tests are unchanged from `9afa670c0de4e2915d2a48ea682d5e6538808f20`.
 - **Commits:**
+  - `01bd801` story start (orchestrator);
+  - `78d47c2` `Test(browser): Make test ports configurable`;
+  - `fcf795c` `Feat(api): Add owned-conversation check` (collaborator, helper, tests and docs);
+  - `0e6d765` `Fix(browser): Canonicalize test origins` (review P2);
+  - `9afa670` `Docs(story): Defer Mastra upgrade past Wave 1` (orchestrator, Lou's scope change);
+  - plus this completion record.
 - **Acceptance criteria evidence:**
+  - **Mastra:** moved out by Lou on 2026-10-29 (backlog B-007). Manifests, lockfile and release-age settings are unchanged.
+  - **Browser-test ports:** `WORKPRINT_BROWSER_PORT`/`WORKPRINT_PREVIEW_PORT` are owned by `scripts/browser/origin.ts` (canonical `URL.origin`). Strict ports and `reuseExistingServer: false` are kept. The literal search finds runtime `4179`/`4180` only in the two defaults.
+  - **Owned-conversation check:** declared in `application/`, implemented in `agent/mastra/`, composed in `mastra/`.
+    - Foreign and absent both give `not_found`; malformed IDs are rejected before storage; storage failure gives typed `unavailable`.
+    - Observed native thread shape: `{ id, resourceId, title, metadata, createdAt, updatedAt }`.
+    - Documented Sprint 004 rule: the verified Supabase `accountId` is used unchanged as the native `resourceId`.
+  - **Fixture helper:** under `apps/api/test/`; the production input, asset, filesystem and runtime exposure checks are extended.
 - **Functional verification evidence:**
-- **Regression verification evidence:**
-- **Editorial/design verification evidence:**
-- **Manual-only behavior verification evidence:**
+  - **Ownership red→green:** the type check failed before the collaborator existed; the focused tests then passed 2/2. Both cases are included in the final aggregate.
+  - **Concurrent proof at `9afa670`** (`workprint` on 4179/4180, `workprint-2` on 4279/4280):
+    - browser 163/163 in each, overlapping 10:03:23–10:09:49Z;
+    - visual 215/215 in each, overlapping 10:09:50–10:13:45Z;
+    - zero drift (216 parity records each), no retries, no masks.
+  - **Occupied port:** Playwright and Vite each exit 1 without attaching.
+  - **P2 origin fix:** red→green.
+  - Evidence: `outputs/verification/foundation/9afa670c0de4e2915d2a48ea682d5e6538808f20/` (local).
+- **Regression verification evidence:** at `9afa670`, all of these PASS:
+  - frozen install, check and build;
+  - test 15/15 (13 baseline cases plus 2 ownership cases);
+  - browser 163/163;
+  - visual 215/215 with zero drift.
+  - All 19 operations keep their Auth-first outcomes; closed native routes, health, native preparation and serving-role restrictions are retained.
+- **Editorial/design verification evidence:** N/A, since there is no UI change. README port, environment and ownership notes were reviewed for accuracy.
+- **Manual-only behavior verification evidence:** N/A.
 - **Failed, ambiguous, or unrun verification:**
+  - `qualify:ingress` is NON-PASS on exactly the two existing B-001 leaves (five-second watchdog; failure mode unchanged).
+  - `audit` is NON-PASS on B-002 and B-004 only, with B-004 unchanged.
+  - These are the approved exceptions and are not counted as passes. Nothing else failed or went unrun.
 - **Review evidence:**
-- **New dependencies:**
+  - Early `/review` at `fcf795c`: 7/7 checks, 4/5, one logic P2 (port-80 origin), fixed in `0e6d765`.
+  - `/review-fix` cycle 1 at `9afa670`: the security, logic and modularity regression scans plus the verification and semantic checks found nothing; 5/5.
+  - This completion record is reviewed at its own head before merge.
+- **New dependencies:** None.
 
 ## Rules
 
