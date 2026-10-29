@@ -25,10 +25,10 @@ export async function startServer(mastra: Mastra, beforeMastra: readonly Middlew
     mastra.getLogger().error('HTTP request failed', { error });
     return context.json({ error: 'Internal Server Error' }, 500);
   });
-  // Retain the generated request timeout after native context parsing, not on the hook.
+  // Match generated ordering: context, existing programmatic middleware, global timeout.
   mastra.setServerMiddleware([
-    timeout(options?.timeout ?? 180000),
     ...mastra.getServerMiddleware(),
+    { path: '*', handler: timeout(options?.timeout ?? 180000) },
   ]);
   await new MastraServer({ app, mastra, prefix: options?.apiPrefix ?? '/api' }).init();
   const listener = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: options?.port ?? 4111 }, () => {

@@ -62,6 +62,56 @@ test('app-owned entry does not register generated browser-stream endpoints', { t
   await fixture.noNetwork();
 });
 
+for (const prefix of ['/api', '/native']) {
+  test(`completed /v1 bodies retain global timeout after programmatic middleware (${prefix})`, { timeout: 60000 }, async (t) => {
+    const fixture = await environment();
+    t.diagnostic(`Evidence: ${fixture.logs}`);
+    const journal = join(fixture.logs, 'completed-bodies.jsonl');
+    await writeFile(journal, '');
+    const entry = await buildServerComposition(fixture.logs, 'timeout', (directory) => `
+      import { appendFileSync } from 'node:fs';
+      import { setTimeout as delay } from 'node:timers/promises';
+      import { registerApiRoute } from '@mastra/core/server';
+      import { createBackend } from ${JSON.stringify(join(directory, 'mastra/backend.js'))};
+      export const mastra = await createBackend(['fast', 'slow'].map(kind => registerApiRoute('/v1/__entry-timeout/' + kind, {
+        method: 'POST', handler: async c => {
+          const body = await c.req.json();
+          appendFileSync(${JSON.stringify(journal)}, JSON.stringify({ kind, body }) + '\\n');
+          if (kind === 'slow') await delay(750);
+          return c.json({ completed: true, body });
+        }
+      })));
+      mastra.getServer().apiPrefix = ${JSON.stringify(prefix)};
+      mastra.getServer().timeout = 300;
+      mastra.setServerMiddleware([{ path: '*', handler: async (c, next) => {
+        if (c.req.path.startsWith('/v1/__entry-timeout/')) await delay(450);
+        await next();
+        c.header('X-Programmatic-Middleware', 'retained');
+        return c.res;
+      } }]);
+    `, fixture.env);
+    const target = await launch(entry, fixture, 'timeout');
+    t.after(target.server.stop);
+    const body = { payload: 'complete' };
+    for (const kind of ['fast', 'slow']) {
+      const started = Date.now();
+      const response = await fetch(`${target.origin}/v1/__entry-timeout/${kind}`, {
+        method: 'POST', headers: { ...target.headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body), signal: AbortSignal.timeout(2500),
+      });
+      assert.equal(response.status, kind === 'slow' ? 504 : 200, `${kind} completed-body request`);
+      assert.deepEqual(await response.json(), kind === 'slow' ? { error: 'Gateway Timeout' } : { completed: true, body });
+      assert.equal(response.headers.get('X-Programmatic-Middleware'), 'retained');
+      assert.ok(Date.now() - started >= 400, 'Existing programmatic middleware runs before the timeout');
+      assert.ok(Date.now() - started < 2000, 'Server response precedes the independent client watchdog');
+    }
+    const observed = (await readFile(journal, 'utf8')).trim().split('\n').map(line => JSON.parse(line) as unknown);
+    assert.deepEqual(observed, [{ kind: 'fast', body }, { kind: 'slow', body }], 'Completed bodies reach authenticated handlers before the downstream timeout');
+    await target.server.stop();
+    await fixture.noNetwork();
+  });
+}
+
 type Fixture = Awaited<ReturnType<typeof environment>>;
 async function launch(entry: string, fixture: Fixture, name: string, extra: NodeJS.ProcessEnv = {}) {
   const file = process.env.WORKPRINT_AUTH_FIXTURE;
