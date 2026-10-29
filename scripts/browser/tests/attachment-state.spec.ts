@@ -1,9 +1,10 @@
+import { browserOrigin } from '../origin.js';
 import { test, expect } from '../material-network.js';
 import { existingWorkspace, chosenVideo, approvedImage, reference, materialFacts } from '../attachment-prerequisites.js';
 
 for (const outcome of ['abort', 'acknowledged'] as const) test(`reference attachment preserves existing exact choices and approvals (${outcome})`, async ({ page, materialNetwork }, info) => {
   await info.attach('prerequisite', { body: 'Labelled read-only existing workspace, exact versions and reference presentation. Local workspace/request-list collaborators are observation prerequisites. Controlled approved acknowledgement exercises unreachable attachment reconciliation, not persistence or generation.', contentType: 'text/plain' });
-  const origin = 'http://127.0.0.1:4179';
+  const origin = browserOrigin;
   materialNetwork.expectOperations(
     { origin, method: 'GET', path: `/v1/versions/${chosenVideo.id}`, count: 2, query: {} },
     { origin, method: 'GET', path: `/v1/versions/${approvedImage.id}`, count: 2, query: {} },
@@ -20,7 +21,7 @@ for (const outcome of ['abort', 'acknowledged'] as const) test(`reference attach
     else await route.fulfill({ json: { use: { id: 'isolated-attachment-ack', versionId: body.versionId, binding: { purpose: 'reference' }, state: 'approved' }, selectionRevision: 10 } });
   });
   await page.goto('/shell.html'); await page.waitForFunction(() => !!(window as unknown as { shellTest?: unknown }).shellTest);
-  const input: unknown = { session: { accountId: 'read-only-account', name: 'Read-only existing state' }, conversationId: 'conversation-a', apiOrigin: 'http://127.0.0.1:4179', token: null, readOnlyWorkspace: existingWorkspace, materialPrerequisites: materialFacts, videoPrerequisites: { versions: [chosenVideo] } };
+  const input: unknown = { session: { accountId: 'read-only-account', name: 'Read-only existing state' }, conversationId: 'conversation-a', apiOrigin: browserOrigin, token: null, readOnlyWorkspace: existingWorkspace, materialPrerequisites: materialFacts, videoPrerequisites: { versions: [chosenVideo] } };
   await page.evaluate(input => (window as unknown as { shellTest: { configure(input: unknown): void } }).shellTest.configure(input), input);
   const assertExisting = async () => {
     await page.getByRole('tab', { name: 'Videos', exact: true }).click();

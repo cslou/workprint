@@ -1,3 +1,4 @@
+import { browserTestSettings } from '../origin.js';
 import { expect, test } from '../material-network.js';
 import { createHash } from 'node:crypto';
 import { readFile, readdir, realpath } from 'node:fs/promises';
@@ -7,7 +8,13 @@ import type * as Processes from '../../../apps/api/test/process.js';
 import type * as Environment from '../../../apps/api/test/environment.js';
 import { parsePublicApiOrigin } from '../../../apps/web/src/api/public-config.js';
 
-test('public API configuration is explicit, origin-only and never reflects invalid secrets', () => {
+test('browser ports and public API configuration are explicit and reject malformed settings', () => {
+  expect(browserTestSettings({ WORKPRINT_BROWSER_PORT: '4279', WORKPRINT_PREVIEW_PORT: '4280' })).toEqual({ browserPort: 4279, browserOrigin: 'http://127.0.0.1:4279', previewPort: 4280, previewOrigin: 'http://127.0.0.1:4280' });
+  for (const setting of ['WORKPRINT_BROWSER_PORT', 'WORKPRINT_PREVIEW_PORT']) {
+    for (const value of ['', '0', '-1', '65536', '1.5', ' 4279', '4279/path', 'secret']) {
+      expect(() => browserTestSettings({ [setting]: value })).toThrow(`Invalid ${setting}: expected a TCP port`);
+    }
+  }
   for (const value of [undefined, null, '']) expect(parsePublicApiOrigin(value)).toEqual({ kind: 'missing' });
   for (const value of ['https://api.example.invalid', 'http://127.0.0.1:4111', 'http://localhost:4111', 'http://[::1]:4111']) expect(parsePublicApiOrigin(value)).toEqual({ kind: 'configured', apiOrigin: value });
   for (const value of ['http://remote.invalid', '/v1', 'https://user:secret@example.invalid', 'https://example.invalid/path', 'https://example.invalid/?secret=value', 'https://example.invalid/#token', ' https://example.invalid', 42, {}]) expect(parsePublicApiOrigin(value)).toEqual({ kind: 'invalid' });

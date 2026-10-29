@@ -1,3 +1,4 @@
+import { browserOrigin } from '../origin.js';
 import { expect, test, type Page } from '@playwright/test';
 import type { Version } from '../../../packages/contracts/src/index.js';
 
@@ -7,7 +8,7 @@ const boardFacts = () => ({ versionId: 'board-v7', revision: 7, title: 'Bound st
 const video = (revision: number): Extract<Version, { media: unknown }> => ({ id: `video-v${revision}`, artifactId: 'video-artifact', revision, kind: 'video', media: { contentType: 'video/mp4', byteSize: 456, width: 1280, height: 720, durationMs: 5100 }, createdBy: 'assistant', createdAt: '2026-10-28T00:00:00Z', dependencies: [] });
 const videoFacts = () => ({ versions: [video(1), video(2)], images: [1, 2].map(revision => ({ versionId: `video-v${revision}`, revision, src: `${src}?version=${revision}`, alt: `Bound Video version ${revision}` })) });
 async function configure(page: Page, mode: 'video' | 'panel', options: unknown) {
-  await page.route('**/*', async route => { if (new URL(route.request().url()).origin !== 'http://127.0.0.1:4179') throw new Error('Unauthorized display prerequisite egress'); await route.continue(); });
+  await page.route('**/*', async route => { if (new URL(route.request().url()).origin !== browserOrigin) throw new Error('Unauthorized display prerequisite egress'); await route.continue(); });
   await page.goto('/selection-races.html'); await page.waitForFunction(() => !!(window as unknown as Harness).selectionRace);
   await page.evaluate(({ mode, options }) => (window as unknown as Harness).selectionRace.configure(mode, options), { mode, options });
 }

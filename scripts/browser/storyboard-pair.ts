@@ -1,3 +1,4 @@
+import { browserOrigin } from './origin.js';
 import { expect, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -10,7 +11,7 @@ import { requestReference, storyboardReference } from './storyboard-reference.js
 /** Shared paired capture contract; expected markup remains independent tracked-reference substitutions. */
 export async function captureStoryboardPair(page: Page, context: BrowserContext, info: TestInfo, width: number, view: 'storyboard' | 'board' | 'panel' | 'videos', edit?: 'shot' | 'panel') {
   await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
-  await context.route('**/*', async route => { if (new URL(route.request().url()).origin !== 'http://127.0.0.1:4179' || route.request().method() !== 'GET') throw new Error('Unauthorized visual request'); await route.continue(); });
+  await context.route('**/*', async route => { if (new URL(route.request().url()).origin !== browserOrigin || route.request().method() !== 'GET') throw new Error('Unauthorized visual request'); await route.continue(); });
   await context.route('**/references/app-r11.css', async route => { const response = await route.fetch(); await route.fulfill({ response, body: `${await response.text()}\n${referenceFonts}` }); });
   const source = await readFile('docs/design/flow2-step7-r79.html', 'utf8');
   await page.goto('/references/flow2-step1-r73.html'); await page.addStyleTag({ content: referenceFonts });

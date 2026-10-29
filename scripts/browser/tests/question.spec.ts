@@ -1,3 +1,4 @@
+import { browserOrigin } from '../origin.js';
 import { expect, test } from '@playwright/test';
 import { test as observedTest } from '../material-network.js';
 import { activate } from '../activation.js';
@@ -50,7 +51,7 @@ observedTest('real question/proposal/version reads and exact option answers dist
         await page.waitForFunction(() => !!(window as unknown as { questionTest?: unknown }).questionTest);
         await page.route('**/*', async (route) => {
           const url = new URL(route.request().url());
-          if (!['http://127.0.0.1:4179', origin].includes(url.origin)) throw new Error('Unauthorized question egress');
+          if (![browserOrigin, origin].includes(url.origin)) throw new Error('Unauthorized question egress');
           if (url.origin === origin) requests.push({ method: route.request().method(), path: url.pathname, body: route.request().method() === 'POST' ? route.request().postDataJSON() : null });
           await route.continue();
         });
@@ -98,7 +99,7 @@ observedTest('real question/proposal/version reads and exact option answers dist
         page.off('response', listener);
         await page.unrouteAll({ behavior: 'wait' });
       }
-    }, { browserOrigin: 'http://127.0.0.1:4179' });
+    }, { browserOrigin });
   } finally { for (const fn of cleanup.reverse()) await fn(); }
 });
 
@@ -122,7 +123,7 @@ for (const race of ['read', 'answer'] as const) test(`${race} revision race igno
       finally { completed(); }
     } else await route.fulfill({ status: 501, json: { error: { code: 'not_implemented', message: 'Controlled revision race' } } });
   });
-  const configure = (revision: number, initial = false) => page.evaluate((input) => (window as unknown as { questionTest: { configure(value: unknown): void } }).questionTest.configure(input), { ...(initial ? { apiOrigin: 'http://127.0.0.1:4179' } : {}), question: record(revision) });
+  const configure = (revision: number, initial = false) => page.evaluate((input) => (window as unknown as { questionTest: { configure(value: unknown): void } }).questionTest.configure(input), { ...(initial ? { apiOrigin: browserOrigin } : {}), question: record(revision) });
   await configure(1, true);
   await page.getByRole('textbox', { name: 'Message' }).fill('Keep the separate message');
   if (race === 'answer') await page.getByRole('button', { name: 'Record choice 1', exact: true }).click();
@@ -148,7 +149,7 @@ for (const race of ['read', 'answer'] as const) test(`${race} revision race igno
 test('record-owned options, generic client error and missing display facts cannot grant approval', async ({ page }) => {
   await page.goto('/question.html');
   await page.waitForFunction(() => !!(window as unknown as { questionTest?: unknown }).questionTest);
-  await page.evaluate(() => (window as unknown as { questionTest: { configure(value: unknown): void } }).questionTest.configure({ apiOrigin: 'http://127.0.0.1:4179', question: { id: '.', revision: 9, status: 'pending', scope: {}, prompt: 'Record-owned question', options: [{ id: 'custom-option', label: 'A label supplied by this record' }] } }));
+  await page.evaluate(() => (window as unknown as { questionTest: { configure(value: unknown): void } }).questionTest.configure({ apiOrigin: window.location.origin, question: { id: '.', revision: 9, status: 'pending', scope: {}, prompt: 'Record-owned question', options: [{ id: 'custom-option', label: 'A label supplied by this record' }] } }));
   await page.getByRole('button', { name: 'A label supplied by this record', exact: true }).click();
   await expect(page.getByRole('status')).toHaveText('The answer was not submitted. The question stays pending.');
   await expect(page.getByRole('region', { name: 'Question' })).toHaveAttribute('data-question-status', 'pending');
@@ -176,7 +177,7 @@ for (const status of ['answered', 'superseded'] as const) for (const timing of [
     held = true; await gate; await route.fulfill({ json: pending });
   });
   const response = page.waitForResponse((value) => value.url().endsWith('/v1/questions/terminal-question'));
-  await page.evaluate((question) => (window as unknown as { questionTest: { configure(value: unknown): void } }).questionTest.configure({ apiOrigin: 'http://127.0.0.1:4179', question: { ...question, prompt: 'Pending prop' } }), pending);
+  await page.evaluate((question) => (window as unknown as { questionTest: { configure(value: unknown): void } }).questionTest.configure({ apiOrigin: window.location.origin, question: { ...question, prompt: 'Pending prop' } }), pending);
   await expect.poll(() => held).toBe(true);
   if (timing === 'cached') { release(); await (await response).finished(); await expect(page.getByRole('heading', { name: 'Cached pending response' })).toBeVisible(); }
   const snapshot = await page.evaluate((question) => {
@@ -206,7 +207,7 @@ for (const status of ['answered', 'superseded'] as const) for (const kind of ['n
     } else await route.fulfill({ json: server });
   });
   const response = page.waitForResponse((value) => value.url().endsWith('/v1/questions/revision-question'));
-  await page.evaluate((question) => (window as unknown as { questionTest: { configure(value: unknown): void } }).questionTest.configure({ apiOrigin: 'http://127.0.0.1:4179', question, sync: true }), question);
+  await page.evaluate((question) => (window as unknown as { questionTest: { configure(value: unknown): void } }).questionTest.configure({ apiOrigin: window.location.origin, question, sync: true }), question);
   await (await response).finished();
   await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   if (kind === 'newer') {

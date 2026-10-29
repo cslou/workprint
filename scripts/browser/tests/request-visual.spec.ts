@@ -1,3 +1,4 @@
+import { browserOrigin } from '../origin.js';
 import { expect, test } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -8,7 +9,7 @@ import { requestReference } from '../storyboard-reference.js';
 
 for (const width of [1440, 390, 820, 821]) for (const details of [false, true]) test(`requests ${details ? 'details' : 'list'} main reference at ${width}`, async ({ page, context }, info) => {
   await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
-  await context.route('**/*', async route => { if (new URL(route.request().url()).origin !== 'http://127.0.0.1:4179' || route.request().method() !== 'GET') throw new Error('Unauthorized Story 1 visual request'); await route.continue(); });
+  await context.route('**/*', async route => { if (new URL(route.request().url()).origin !== browserOrigin || route.request().method() !== 'GET') throw new Error('Unauthorized Story 1 visual request'); await route.continue(); });
   await context.route('**/references/app-r11.css', async route => { const response = await route.fetch(); await route.fulfill({ response, body: `${await response.text()}\n${referenceFonts}` }); });
   await page.goto('/references/flow2-step1-r73.html');
   await page.addStyleTag({ content: referenceFonts });

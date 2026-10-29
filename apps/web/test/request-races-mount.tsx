@@ -8,7 +8,7 @@ import '../src/ui/tokens.css';
 import '../src/ui/foundations.css';
 
 // Controlled read-only observation completions, not a persisted product lifecycle/backend.
-const base = createBrowserClient('http://127.0.0.1:4179', async () => null);
+const base = createBrowserClient(window.location.origin, async () => null);
 if (base.kind !== 'configured') throw new Error('Missing loopback client');
 const lists: ((result: ClientResult<OperationResponse<'generationRequests'>>) => void)[] = [];
 const details: ((result: ClientResult<OperationResponse<'generationRequest'>>) => void)[] = [];

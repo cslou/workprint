@@ -1,3 +1,4 @@
+import { browserOrigin } from '../origin.js';
 import { expect, test } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -7,7 +8,7 @@ import { referenceFonts as fonts, scriptPrerequisite } from '../material-referen
 for (const width of [1440, 390, 820, 821]) for (const view of ['script', 'edit', 'history'] as const) test(`${view} material main reference at ${width}`, async ({ page, context }, info) => {
   await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
   await context.route('**/*', async (route) => {
-    if (new URL(route.request().url()).origin !== 'http://127.0.0.1:4179') throw new Error('Unauthorized material visual egress');
+    if (new URL(route.request().url()).origin !== browserOrigin) throw new Error('Unauthorized material visual egress');
     if (route.request().method() !== 'GET') throw new Error('Viewing/local editing must not mutate');
     await route.continue();
   });

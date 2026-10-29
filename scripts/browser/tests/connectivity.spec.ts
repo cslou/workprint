@@ -1,3 +1,4 @@
+import { browserOrigin, previewOrigin, previewPort } from '../origin.js';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { pathToFileURL } from 'node:url';
@@ -17,7 +18,7 @@ for (const mode of ['development', 'built'] as const) test(`${mode} Library cons
   const fixture = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
   const processes = await import(pathToFileURL(resolve('apps/api/.test-build/test/process.js')).href) as typeof Processes;
   const cleanup: (() => void | Promise<void>)[] = [];
-  const frontend = mode === 'built' ? 'http://127.0.0.1:4180' : 'http://127.0.0.1:4179';
+  const frontend = mode === 'built' ? previewOrigin : browserOrigin;
   try {
     await fixture.verifyBuiltAdmission({ diagnostic(message) { console.log(message); }, after(fn) { cleanup.push(fn); } }, async ({ origin, accessTokens, logs }) => {
       let webOutput: string | undefined;
@@ -25,7 +26,7 @@ for (const mode of ['development', 'built'] as const) test(`${mode} Library cons
         webOutput = join(logs, 'browser-dist');
         const env = { PATH: process.env.PATH, HOME: process.env.HOME, WORKPRINT_PUBLIC_API_ORIGIN: origin };
         await processes.command('pnpm', ['--filter', '@workprint/web', 'exec', 'vite', 'build', '--config', 'vite.test.config.ts', '--outDir', webOutput], { cwd: process.cwd(), env, log: join(logs, 'browser-build.log') });
-        const preview = await processes.start('pnpm', ['--filter', '@workprint/web', 'exec', 'vite', 'preview', '--config', 'vite.test.config.ts', '--outDir', webOutput, '--host', '127.0.0.1', '--port', '4180', '--strictPort'], { cwd: process.cwd(), env, log: join(logs, 'browser-preview.log') });
+        const preview = await processes.start('pnpm', ['--filter', '@workprint/web', 'exec', 'vite', 'preview', '--config', 'vite.test.config.ts', '--outDir', webOutput, '--host', '127.0.0.1', '--port', String(previewPort), '--strictPort'], { cwd: process.cwd(), env, log: join(logs, 'browser-preview.log') });
         cleanup.push(preview.stop);
         await preview.response(`${frontend}/library.html`);
       }
@@ -99,7 +100,7 @@ test('Library reactivation starts loading before passive effects, never resurrec
     await route.fulfill({ status: 501, contentType: 'application/json', body: JSON.stringify({ error: { code: 'not_implemented', message: 'Controlled read response' } }) });
   });
   const observations = () => page.evaluate(() => (window as unknown as { libraryTest: { observations(): { active: boolean; feedback: string }[] } }).libraryTest.observations());
-  await configure(page, { apiOrigin: 'http://127.0.0.1:4179', token: null, accountId: 'account-a', conversationId: 'conversation-a' });
+  await configure(page, { apiOrigin: browserOrigin, token: null, accountId: 'account-a', conversationId: 'conversation-a' });
   await expect(page.getByRole('status')).toContainText('Library not available yet');
   await page.evaluate(() => (window as unknown as { libraryTest: { deactivate(): void } }).libraryTest.deactivate());
   await expect.poll(async () => (await observations()).length).toBe(2);
@@ -126,7 +127,7 @@ for (const change of ['account', 'conversation'] as const) test(`Library ${chang
     await route.fulfill({ status: index === 1 ? 401 : 501, contentType: 'application/json', body: JSON.stringify({ error: { code: index === 1 ? 'unauthenticated' : 'not_implemented', message: 'Synthetic controlled response' } }) });
     if (index === 1) completed = true;
   });
-  await configure(page, { apiOrigin: 'http://127.0.0.1:4179', token: null, accountId: 'account-a', conversationId: 'conversation-a', timeoutMs: 1000 });
+  await configure(page, { apiOrigin: browserOrigin, token: null, accountId: 'account-a', conversationId: 'conversation-a', timeoutMs: 1000 });
   await expect.poll(() => requests).toBe(1);
   await configure(page, { token: null, accountId: change === 'account' ? 'account-b' : 'account-a', conversationId: change === 'conversation' ? 'conversation-b' : 'conversation-a' });
   await expect(page.getByRole('status')).toContainText('Library not available yet');
@@ -134,7 +135,7 @@ for (const change of ['account', 'conversation'] as const) test(`Library ${chang
   await expect.poll(() => completed).toBe(true);
   await expect(page.getByRole('status')).not.toContainText('Sign-in required');
   await page.evaluate(() => (window as unknown as { libraryTest: { unmount(): void } }).libraryTest.unmount());
-  await configure(page, { apiOrigin: 'http://127.0.0.1:4179', token: null, accountId: 'account-b', timeoutMs: 1000 });
+  await configure(page, { apiOrigin: browserOrigin, token: null, accountId: 'account-b', timeoutMs: 1000 });
   await expect(page.getByRole('status')).toContainText('Library not available yet');
   expect(requests).toBe(3);
   await page.unroute('**/v1/library');
@@ -144,7 +145,7 @@ for (const change of ['account', 'conversation'] as const) test(`Library ${chang
     await new Promise<void>((resolve) => { settle = resolve; });
     await route.abort();
   });
-  await configure(page, { apiOrigin: 'http://127.0.0.1:4179', token: null, accountId: 'account-b', timeoutMs: 100 });
+  await configure(page, { apiOrigin: browserOrigin, token: null, accountId: 'account-b', timeoutMs: 100 });
   await expect.poll(() => typeof settle).toBe('function');
   await expect(page.getByRole('status')).toContainText('Library could not be loaded');
   settle?.();

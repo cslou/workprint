@@ -1,3 +1,4 @@
+import { browserOrigin } from './origin.js';
 import { expect, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -20,7 +21,7 @@ export const mediaReference = () => {
 };
 export async function captureMediaPair(page: Page, context: BrowserContext, info: TestInfo, width: number, state: 'player' | 'loading' | 'unavailable' | 'unauthenticated' | 'error') {
   await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
-  await context.route('**/*', async (route) => { const url = new URL(route.request().url()); if (url.origin !== 'http://127.0.0.1:4179' || route.request().method() !== 'GET') throw new Error('Unauthorized visual request'); await route.continue(); });
+  await context.route('**/*', async (route) => { const url = new URL(route.request().url()); if (url.origin !== browserOrigin || route.request().method() !== 'GET') throw new Error('Unauthorized visual request'); await route.continue(); });
   await page.goto(`/references/${source}`);
   await page.addStyleTag({ content: fonts });
   await page.evaluate(mediaReference);

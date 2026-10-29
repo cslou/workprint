@@ -5,7 +5,7 @@ for (const order of [['script-v5', 'script-v6'], ['script-v6', 'script-v5']]) te
   await page.goto('/version.html');
   await page.waitForFunction(() => !!(window as unknown as { versionTest?: unknown }).versionTest);
   await page.route('**/v1/**', async (route) => { expect(route.request().method()).toBe('GET'); await route.abort('failed'); });
-  await page.evaluate(() => (window as unknown as { versionTest: { configure(value: unknown): void } }).versionTest.configure({ apiOrigin: 'http://127.0.0.1:4179', review: true, useRace: true }));
+  await page.evaluate(() => (window as unknown as { versionTest: { configure(value: unknown): void } }).versionTest.configure({ apiOrigin: window.location.origin, review: true, useRace: true }));
   await page.locator('.wp-version-history summary').click();
   const controls = page.getByRole('button', { name: 'Use this version', exact: true });
   await controls.nth(0).click(); await controls.nth(1).click();
@@ -30,7 +30,7 @@ for (const action of ['save', 'use'] as const) for (const change of ['account', 
       try { await route.fulfill({ status: 501, json: { error: { code: 'not_implemented', message: 'Controlled late response' } } }); } finally { done(); }
     } else await route.fulfill({ status: 501, json: { error: { code: 'not_implemented', message: 'Controlled race prerequisite read' } } });
   });
-  await page.evaluate((review) => (window as unknown as { versionTest: { configure(value: unknown): void } }).versionTest.configure({ apiOrigin: 'http://127.0.0.1:4179', review }), action === 'use');
+  await page.evaluate((review) => (window as unknown as { versionTest: { configure(value: unknown): void } }).versionTest.configure({ apiOrigin: window.location.origin, review }), action === 'use');
   if (action === 'save') { await page.getByRole('button', { name: 'Edit What happens', exact: true }).click(); await page.getByRole('textbox').fill('Old scope draft'); await page.getByRole('button', { name: 'Save', exact: true }).click(); }
   else { await page.locator('.wp-version-history summary').click(); await page.getByRole('button', { name: 'Use this version', exact: true }).click(); }
   await expect.poll(() => held).toBe(true);
@@ -54,7 +54,7 @@ for (const resultRevision of [8, 10]) test(`raced Use revision ${resultRevision}
     if (route.request().method() === 'POST') { held = true; await gate; await route.fulfill({ json: { use: { id: 'raced-use', versionId: 'script-v6', binding: { purpose: 'script' }, state: 'approved' }, selectionRevision: resultRevision } }); }
     else await route.fulfill({ status: 501, json: { error: { code: 'not_implemented', message: 'Controlled race read' } } });
   });
-  await page.evaluate(() => (window as unknown as { versionTest: { configure(value: unknown): void } }).versionTest.configure({ apiOrigin: 'http://127.0.0.1:4179', review: true }));
+  await page.evaluate(() => (window as unknown as { versionTest: { configure(value: unknown): void } }).versionTest.configure({ apiOrigin: window.location.origin, review: true }));
   await page.locator('.wp-version-history summary').click();
   await page.getByRole('button', { name: 'Use this version', exact: true }).click();
   await expect.poll(() => held).toBe(true);

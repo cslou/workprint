@@ -1,3 +1,4 @@
+import { browserPort } from '../../scripts/browser/origin.js';
 import { readFile, realpath } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { extname, resolve, sep } from 'node:path';
@@ -18,7 +19,7 @@ export default defineConfig({
   // would otherwise replace an in-flight scoped consumer during verification.
   optimizeDeps: { force: true, noDiscovery: true, include: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime', 'react/jsx-dev-runtime', 'react-aria-components', '@workprint/api-client', '@workprint/contracts', '@workprint/player'] },
   build: { rollupOptions: { input: fileURLToPath(new URL('./test/library.html', import.meta.url)) } },
-  server: { host: '127.0.0.1', port: 4179, strictPort: true, fs: { strict: true, allow: [web, fileURLToPath(new URL('../../packages/api-client/dist/', import.meta.url)), fileURLToPath(new URL('../../packages/contracts/dist/', import.meta.url)), fileURLToPath(new URL('../../packages/player/dist/', import.meta.url)), fileURLToPath(new URL('../../node_modules/', import.meta.url))] } },
+  server: { host: '127.0.0.1', port: browserPort, strictPort: true, fs: { strict: true, allow: [web, fileURLToPath(new URL('../../packages/api-client/dist/', import.meta.url)), fileURLToPath(new URL('../../packages/contracts/dist/', import.meta.url)), fileURLToPath(new URL('../../packages/player/dist/', import.meta.url)), fileURLToPath(new URL('../../node_modules/', import.meta.url))] } },
   plugins: [{ name: 'tracked-design-references', configureServer(server) {
     server.middlewares.use('/references', async (req, res, next) => {
       try {

@@ -1,3 +1,4 @@
+import { browserOrigin } from './origin.js';
 import { expect, type Page, type TestInfo } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { compare } from './compare.js';
@@ -96,7 +97,7 @@ const display = {
 const measure = (page: Page, selectors: string[]) => page.evaluate((values) => values.map((selector) => { const nodes = [...document.querySelectorAll(selector)]; if (!nodes.length) throw new Error(`Missing paired geometry ${selector}`); return { selector, boxes: nodes.map((node) => node.getBoundingClientRect().toJSON()) }; }), selectors);
 export async function capturePickerPair(page: Page, info: TestInfo, width: number, state: PickerState) {
   await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
-  await page.route('**/*', async (route) => { if (new URL(route.request().url()).origin !== 'http://127.0.0.1:4179') throw new Error('Unauthorized visual egress'); await route.continue(); });
+  await page.route('**/*', async (route) => { if (new URL(route.request().url()).origin !== browserOrigin) throw new Error('Unauthorized visual egress'); await route.continue(); });
   await page.goto('/references/flow2-step1-r73.html');
   await page.addStyleTag({ content: fonts });
   await page.evaluate((markup) => { const account = document.querySelector('.account'); if (account) account.innerHTML = '<span class="avatar">C</span>Creator A'; document.querySelectorAll('.lightbox').forEach((node) => node.remove()); document.body.insertAdjacentHTML('beforeend', markup); }, referenceMarkup(state));
@@ -109,7 +110,7 @@ export async function capturePickerPair(page: Page, info: TestInfo, width: numbe
   await page.waitForFunction(() => !!(window as unknown as { shellTest?: unknown }).shellTest);
   await page.route('**/v1/library*', async (route) => { await route.fulfill({ status: 200, json: libraryPage() }); });
   if (state === 'attach-unavailable') await page.route('**/v1/conversations/visual-conversation/uses', async (route) => { await route.fulfill({ status: 501, json: { error: { code: 'not_implemented', message: 'Controlled visual prerequisite matched to the built backend 501' } } }); });
-  await page.evaluate((input) => (window as unknown as { shellTest: { configure(value: unknown): void } }).shellTest.configure(input), { session: { accountId: 'visual-account', name: 'Creator A' }, ...(state === 'attach-unavailable' ? { conversationId: 'visual-conversation' } : {}), apiOrigin: 'http://127.0.0.1:4179', token: 'token', libraryPrerequisites: { display: state === 'no-facts' ? {} : display } });
+  await page.evaluate((input) => (window as unknown as { shellTest: { configure(value: unknown): void } }).shellTest.configure(input), { session: { accountId: 'visual-account', name: 'Creator A' }, ...(state === 'attach-unavailable' ? { conversationId: 'visual-conversation' } : {}), apiOrigin: browserOrigin, token: 'token', libraryPrerequisites: { display: state === 'no-facts' ? {} : display } });
   if (width <= 820) await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await (width <= 820 ? page.getByRole('dialog') : page).getByRole('button', { name: 'Library', exact: true }).click();
   await page.locator('.wp-picker').waitFor();

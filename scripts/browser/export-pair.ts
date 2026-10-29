@@ -1,3 +1,4 @@
+import { browserOrigin } from './origin.js';
 import { expect, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -12,7 +13,7 @@ export async function captureExportPair(page: Page, context: BrowserContext, inf
   await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
   await context.route('**/*', async route => {
     const request = route.request(), url = new URL(request.url());
-    if (url.origin !== 'http://127.0.0.1:4179' || (request.method() !== 'GET' && !(request.method() === 'POST' && url.pathname === '/v1/conversations/conversation-a/exports'))) throw new Error('Unauthorized Export visual request');
+    if (url.origin !== browserOrigin || (request.method() !== 'GET' && !(request.method() === 'POST' && url.pathname === '/v1/conversations/conversation-a/exports'))) throw new Error('Unauthorized Export visual request');
     await route.continue();
   });
   await context.route('**/references/app-r11.css', async route => { const response = await route.fetch(); await route.fulfill({ response, body: `${await response.text()}\n${referenceFonts}` }); });
@@ -32,7 +33,7 @@ export async function captureExportPair(page: Page, context: BrowserContext, inf
   await page.goto('/exports.html'); await page.waitForFunction(() => !!(window as unknown as Harness).exportsTest);
   const mode = view === 'entry' ? 'videos' : view === 'export' ? 'entry' : view === 'history' || view === 'history-unavailable' || view === 'loading' ? 'history' : view === 'download' ? 'download' : 'detail';
   const title = mode === 'history' ? 'Export history' : mode === 'download' ? 'Download' : 'Export details';
-  await page.evaluate(input => (window as unknown as Harness).exportsTest.configure(input), { apiOrigin: 'http://127.0.0.1:4179', mode, ...(view === 'entry' || view === 'export' ? {} : { dialogTitle: title }), ...(view === 'failed' ? { recordId: 'export-failed' } : {}) });
+  await page.evaluate(input => (window as unknown as Harness).exportsTest.configure(input), { apiOrigin: browserOrigin, mode, ...(view === 'entry' || view === 'export' ? {} : { dialogTitle: title }), ...(view === 'failed' ? { recordId: 'export-failed' } : {}) });
   if (view === 'export') await page.getByRole('button', { name: 'Export', exact: true }).click();
   else if (view !== 'entry') await page.getByRole('button', { name: 'Open dialog', exact: true }).click();
   if (view === 'entry') await expect(page.locator('.wp-request-card')).toHaveCount(1);

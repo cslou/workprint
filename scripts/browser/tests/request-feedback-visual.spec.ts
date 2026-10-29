@@ -1,3 +1,4 @@
+import { browserOrigin } from '../origin.js';
 import { expect, test } from '@playwright/test';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
@@ -14,7 +15,7 @@ test('real unavailable cancellation reference at desktop and narrow', async ({ p
   const cleanup: (() => void | Promise<void>)[] = [];
   try {
     await verifyBuiltAdmission({ diagnostic(message) { console.log(message); }, after(fn) { cleanup.push(fn); } }, async ({ origin, accessTokens }) => {
-      await context.route('**/*', async route => { if (!['http://127.0.0.1:4179', origin].includes(new URL(route.request().url()).origin)) throw new Error('Unauthorized cancellation visual egress'); await route.continue(); });
+      await context.route('**/*', async route => { if (![browserOrigin, origin].includes(new URL(route.request().url()).origin)) throw new Error('Unauthorized cancellation visual egress'); await route.continue(); });
       await context.route('**/references/app-r11.css', async route => { const response = await route.fetch(); await route.fulfill({ response, body: `${await response.text()}\n${referenceFonts}` }); });
       for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
@@ -37,6 +38,6 @@ test('real unavailable cancellation reference at desktop and narrow', async ({ p
         await writeFile(info.outputPath(`${width}-result.json`), JSON.stringify({ width, changedPixels, tolerance: 0, revision: info.config.metadata, browser: context.browser()?.version(), source: 'docs/design/flow2-step1-r73.html#p-takes + app-r11.css item/disclosure/control treatments', approval: 'docs/design/design.md#shell-and-remaining-phase-2-feedback', response: 501, prerequisite: 'Labelled read-only public request examples, actual loopback admission for list/cancel; not persisted product work' }, null, 2));
         expect(actual.map(row => row.boxes)).toEqual(reference.map(row => row.boxes)); expect(changedPixels).toBe(0);
       }
-    }, { browserOrigin: 'http://127.0.0.1:4179' });
+    }, { browserOrigin });
   } finally { for (const finish of cleanup.reverse()) await finish(); }
 });

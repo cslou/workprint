@@ -1,3 +1,4 @@
+import { browserOrigin } from '../origin.js';
 import { expect, test } from '@playwright/test';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
@@ -12,7 +13,7 @@ test('shell workspace and Library use real admission; native navigation never ca
       const requests: string[] = [];
       await page.route('**/*', async (route) => {
         const url = new URL(route.request().url());
-        if (!['http://127.0.0.1:4179', origin].includes(url.origin)) throw new Error('Unauthorized shell egress');
+        if (![browserOrigin, origin].includes(url.origin)) throw new Error('Unauthorized shell egress');
         if (url.origin === origin) requests.push(`${route.request().method()} ${url.pathname}`);
         await route.continue();
       });
@@ -47,6 +48,6 @@ test('shell workspace and Library use real admission; native navigation never ca
       await expect(page.getByRole('tabpanel')).toHaveText('Sign-in required to load this video.');
       expect(requests).toEqual(['GET /v1/conversations/read-only-conversation/workspace', 'GET /v1/library', 'GET /v1/conversations/read-only-conversation/workspace']);
       for (const token of accessTokens) expect((await page.content()).includes(token)).toBe(false);
-    }, { browserOrigin: 'http://127.0.0.1:4179' });
+    }, { browserOrigin });
   } finally { for (const fn of cleanup.reverse()) await fn(); }
 });

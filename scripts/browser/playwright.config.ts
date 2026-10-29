@@ -1,3 +1,4 @@
+import { browserOrigin } from './origin.js';
 import { defineConfig } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
@@ -17,6 +18,6 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   reporter: 'list',
-  use: { baseURL: 'http://127.0.0.1:4179', browserName: 'chromium', viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, locale: 'en-US', timezoneId: 'UTC', colorScheme: 'light', reducedMotion: 'reduce', serviceWorkers: 'block', headless: true },
-  webServer: { cwd: fileURLToPath(new URL('../../', import.meta.url)), command: 'pnpm --filter @workprint/web exec vite --config vite.test.config.ts', url: 'http://127.0.0.1:4179', reuseExistingServer: false, timeout: 30_000, gracefulShutdown: { signal: 'SIGTERM', timeout: 5000 } },
+  use: { baseURL: browserOrigin, browserName: 'chromium', viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, locale: 'en-US', timezoneId: 'UTC', colorScheme: 'light', reducedMotion: 'reduce', serviceWorkers: 'block', headless: true },
+  webServer: { cwd: fileURLToPath(new URL('../../', import.meta.url)), command: 'pnpm --filter @workprint/web exec vite --config vite.test.config.ts', url: browserOrigin, reuseExistingServer: false, timeout: 30_000, gracefulShutdown: { signal: 'SIGTERM', timeout: 5000 } },
 });

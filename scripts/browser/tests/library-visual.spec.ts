@@ -1,3 +1,4 @@
+import { browserOrigin } from '../origin.js';
 import { expect, test } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -17,7 +18,7 @@ for (const width of [1440, 390, 820, 821]) for (const [state, title, message] of
   test(`Library ${state} approved reference at ${width}`, async ({ page, context }, info) => {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
     await context.route('**/*', async (route) => {
-      if (new URL(route.request().url()).origin !== 'http://127.0.0.1:4179') throw new Error('Unauthorized visual egress');
+      if (new URL(route.request().url()).origin !== browserOrigin) throw new Error('Unauthorized visual egress');
       await route.continue();
     });
     await page.goto('/references/demo-05.html#lib-yours');
@@ -35,7 +36,7 @@ for (const width of [1440, 390, 820, 821]) for (const [state, title, message] of
       if (state === 'error') await route.abort();
       else await route.fulfill({ status: state === 'empty' ? 200 : state === 'unauthenticated' ? 401 : 501, contentType: 'application/json', body: JSON.stringify(state === 'empty' ? { items: [], nextCursor: null } : { error: { code: state === 'unauthenticated' ? 'unauthenticated' : 'not_implemented', message: 'Controlled visual prerequisite' } }) });
     });
-    await page.evaluate((apiOrigin) => (window as unknown as { libraryTest: { configure(value: unknown): void } }).libraryTest.configure({ apiOrigin, token: null, accountId: 'read-only-visual-scope' }), state === 'unconfigured' ? '' : 'http://127.0.0.1:4179');
+    await page.evaluate((apiOrigin) => (window as unknown as { libraryTest: { configure(value: unknown): void } }).libraryTest.configure({ apiOrigin, token: null, accountId: 'read-only-visual-scope' }), state === 'unconfigured' ? '' : browserOrigin);
     await expect(page.getByRole('status')).toHaveText(title + message);
     await settleCapture(page);
     expect(await page.getByRole('status').boundingBox()).toEqual(bounds);

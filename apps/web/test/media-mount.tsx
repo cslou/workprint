@@ -28,7 +28,7 @@ let conversationId = 'read-only-conversation';
 const nativeLoad = HTMLMediaElement.prototype.load;
 let loadCount = 0;
 HTMLMediaElement.prototype.load = function load(this: HTMLMediaElement) { loadCount += 1; return nativeLoad.call(this); };
-let connection = createBrowserClient('http://127.0.0.1:4179', async () => null);
+let connection = createBrowserClient(window.location.origin, async () => null);
 const node = document.getElementById('root');
 if (!node) throw new Error('Missing media test root');
 const root = createRoot(node);
@@ -40,7 +40,7 @@ const render = () => {
 (window as unknown as { mediaTest: unknown }).mediaTest = {
   configure(input: { apiOrigin?: string; token?: string | null; controlled?: boolean; accountId?: string }) {
     accountId = input.accountId ?? 'read-only-account';
-    const base = createBrowserClient(input.apiOrigin ?? 'http://127.0.0.1:4179', async () => input.token ?? null);
+    const base = createBrowserClient(input.apiOrigin ?? window.location.origin, async () => input.token ?? null);
     if (base.kind !== 'configured') throw new Error('Media composition needs a loopback client');
     connection = input.controlled ? { kind: 'configured', client: { ...base.client,
       version: async (value) => ({ ok: true, value: value.params.id === first.id ? first : second }),

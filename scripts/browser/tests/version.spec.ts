@@ -1,3 +1,4 @@
+import { browserOrigin } from '../origin.js';
 import { expect, test } from '@playwright/test';
 import { test as observedTest } from '../material-network.js';
 import { activate } from '../activation.js';
@@ -46,7 +47,7 @@ test('aborted Save and Use retain draft, exact view and selection through tab na
   await page.waitForFunction(() => !!(window as unknown as { materialTest?: unknown }).materialTest);
   const mutations: string[] = [];
   await page.route('**/v1/**', async (route) => { if (route.request().method() === 'POST') mutations.push(new URL(route.request().url()).pathname); await route.abort('failed'); });
-  await page.evaluate(() => (window as unknown as { materialTest: { configure(value: unknown): void } }).materialTest.configure({ prerequisites: true, apiOrigin: 'http://127.0.0.1:4179' }));
+  await page.evaluate(() => (window as unknown as { materialTest: { configure(value: unknown): void } }).materialTest.configure({ prerequisites: true, apiOrigin: window.location.origin }));
   await page.getByRole('button', { name: 'Edit What happens', exact: true }).click();
   await page.getByRole('textbox').fill('Draft retained after transport failures');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -72,7 +73,7 @@ test('collapsing history explicitly returns from an earlier version to the suppl
   await page.waitForFunction(() => !!(window as unknown as { versionTest?: unknown }).versionTest);
   const reads: string[] = [];
   await page.route('**/v1/**', async (route) => { expect(route.request().method()).toBe('GET'); reads.push(new URL(route.request().url()).pathname); await route.abort('failed'); });
-  await page.evaluate(() => (window as unknown as { versionTest: { configure(value: unknown): void } }).versionTest.configure({ apiOrigin: 'http://127.0.0.1:4179', review: true }));
+  await page.evaluate(() => (window as unknown as { versionTest: { configure(value: unknown): void } }).versionTest.configure({ apiOrigin: window.location.origin, review: true }));
   await page.locator('.wp-version-history summary').click();
   await page.getByRole('button', { name: 'View version 6', exact: true }).click();
   await expect(page.locator('[data-displayed-version-id]')).toHaveAttribute('data-displayed-version-id', 'script-v6');
@@ -112,7 +113,7 @@ observedTest('exact Save uses real admission, retains unsaved text and does not 
         const requests: { path: string; body: unknown }[] = [];
         await page.route('**/*', async (route) => {
           const url = new URL(route.request().url());
-          if (!['http://127.0.0.1:4179', origin].includes(url.origin)) throw new Error('Unauthorized version egress');
+          if (![browserOrigin, origin].includes(url.origin)) throw new Error('Unauthorized version egress');
           if (url.origin === origin) requests.push({ path: url.pathname, body: route.request().method() === 'POST' ? route.request().postDataJSON() : null });
           await route.continue();
         });
@@ -131,7 +132,7 @@ observedTest('exact Save uses real admission, retains unsaved text and does not 
         await expect(page.getByText(initial, { exact: true })).toBeVisible();
         await page.unrouteAll({ behavior: 'wait' });
       }
-    }, { browserOrigin: 'http://127.0.0.1:4179' });
+    }, { browserOrigin });
   } finally { for (const fn of cleanup.reverse()) await fn(); }
 });
 
@@ -155,7 +156,7 @@ observedTest('history viewing stays read-only, binds the requested older version
         const requests: { method: string; path: string; body: unknown }[] = [];
         await page.route('**/*', async (route) => {
           const url = new URL(route.request().url());
-          if (!['http://127.0.0.1:4179', origin].includes(url.origin)) throw new Error('Unauthorized history egress');
+          if (![browserOrigin, origin].includes(url.origin)) throw new Error('Unauthorized history egress');
           if (url.origin === origin) {
             if (route.request().method() !== 'GET' && !allowMutation) throw new Error('Viewing/history attempted a mutation');
             requests.push({ method: route.request().method(), path: url.pathname, body: route.request().method() === 'POST' ? route.request().postDataJSON() : null });
@@ -182,14 +183,14 @@ observedTest('history viewing stays read-only, binds the requested older version
         expect(requests).toHaveLength(4);
         await page.unrouteAll({ behavior: 'wait' });
       }
-    }, { browserOrigin: 'http://127.0.0.1:4179' });
+    }, { browserOrigin });
   } finally { for (const fn of cleanup.reverse()) await fn(); }
 });
 
 test('client validation failure retains text; inherited fields are not editable', async ({ page }) => {
   await page.goto('/version.html');
   await page.waitForFunction(() => !!(window as unknown as { versionTest?: unknown }).versionTest);
-  await page.evaluate(() => (window as unknown as { versionTest: { configure(value: unknown): void } }).versionTest.configure({ apiOrigin: 'http://127.0.0.1:4179', conversationId: '.' }));
+  await page.evaluate(() => (window as unknown as { versionTest: { configure(value: unknown): void } }).versionTest.configure({ apiOrigin: window.location.origin, conversationId: '.' }));
   await page.getByRole('button', { name: 'Edit What happens', exact: true }).click();
   await page.getByRole('textbox').fill('Retained invalid-input edit');
   await page.getByRole('button', { name: 'Save', exact: true }).click();

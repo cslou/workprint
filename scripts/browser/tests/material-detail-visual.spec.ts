@@ -1,3 +1,4 @@
+import { browserOrigin } from '../origin.js';
 import { expect, test } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -16,7 +17,7 @@ test.beforeAll(async () => {
   const gate = new Promise<void>((resolve) => { release = resolve; });
   let ready!: () => void; let fail!: (reason: unknown) => void;
   const available = new Promise<void>((resolve, reject) => { ready = resolve; fail = reject; });
-  backend = verifyBuiltAdmission({ diagnostic() {}, after(fn) { cleanup.push(fn); } }, async (fixture) => { origin = fixture.origin; token = fixture.accessTokens[0]!; ready(); await gate; }, { browserOrigin: 'http://127.0.0.1:4179' });
+  backend = verifyBuiltAdmission({ diagnostic() {}, after(fn) { cleanup.push(fn); } }, async (fixture) => { origin = fixture.origin; token = fixture.accessTokens[0]!; ready(); await gate; }, { browserOrigin });
   void backend.catch(fail); await available;
 });
 test.afterAll(async () => { try { release?.(); await backend; } finally { for (const fn of cleanup.reverse()) await fn(); } });
@@ -29,7 +30,7 @@ for (const width of [1440, 390, 820, 821]) for (const view of ['assets', 'viewer
     let allowMutation = false; const mutations: string[] = [];
     await context.route('**/*', async (route) => {
       const url = new URL(route.request().url());
-      if (!['http://127.0.0.1:4179', origin].includes(url.origin)) throw new Error('Unauthorized material egress');
+      if (![browserOrigin, origin].includes(url.origin)) throw new Error('Unauthorized material egress');
       if (route.request().method() === 'POST') { if (!allowMutation || url.origin !== origin) throw new Error('Inspection attempted mutation'); mutations.push(url.pathname); }
       await route.continue();
     });
