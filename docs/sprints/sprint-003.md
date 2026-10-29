@@ -262,6 +262,33 @@ Check, build and frozen install passed. `pnpm audit` was NON-PASS under B-002, a
   3. Add browser no-effect/no-replay and reference screenshot evidence.
 - **Technical notes:** exports reuse media access; no special download transport or fake export URL. Backend processing and private media remain unavailable.
 
+**Story 4 delivery:** [PR #22](https://github.com/cslou/workprint/pull/22), accepted head `a8873e5a5e24e02555ec48ee830612a6e01e9c18`, merged into sprint-003 at `698a7f7938fbf0a49a9dfa664e424a2bea3773df`.
+
+Implementer: a fresh `openai-codex/gpt-6.1-sol` worker at `xhigh` thinking. It was fresh because the Story 3 fix worker's context was at 73%. It used 5 prompts.
+
+Design:
+- The direct Export entry and its four unavailable pairs were already user-approved in Sprint 002.
+- The design gate found the populated history and detail layouts missing, and previewed them first. The user was away and had delegated decisions, so the orchestrator provisionally approved the structure with copy rules on 2026-10-29, pending Lou's ratification at the Phase 2 handoff. Recorded in `docs/design/design.md` and `history.md` (`bf89e57`).
+  - **History card:** titled "Export", with a capitalized status pill and one currentness line from the typed `current` field: "Uses your current chosen versions." or "Uses earlier chosen versions."
+  - **Detail:** "Shots in this export", with each source resolved by exact ID to `Shot {n} · Version {revision}` or "Not in the current Videos list". "Can't be combined" appears only when the export is incompatible, and "Why it failed" shows the literal reason.
+  - Creators see no IDs, order numbers or selection revisions.
+
+Behavior:
+- Export sends one `createExport` per press, with the exact conversation, a fresh operation ID and the displayed selection revision. Double presses, remounts and same-mount reconnects (after pending and after failed attempts) never resend.
+- History and detail reads are scoped; stale responses are discarded in both completion orders.
+- **Download stays unavailable in Phase 2 even when media access succeeds** (orchestrator decision in fix cycle 1). The media operation is called for the exact `outputVersionId`, but no anchor or navigation is rendered on any outcome; the approved Download lines are shown. Trusted origin and attachment delivery belong to P3-S10.
+- The shell composes Videos and Exports through a generic slot; neither feature imports the other.
+- The paged read policy (duplicate ID, repeated cursor, cancellation) is shared in `apps/web/src/api/paged-read.ts` by exports and generation requests.
+- Populated records appear only through labelled read-only prerequisites in isolated mounts.
+
+Review:
+- **Initial review** at `7055358` scored 2/5, with three P1s: history requests didn't assert their 401/501 status, same-mount reconnect replay was untested, and Videos imported Exports. It also had three P2s: an arbitrary-URL download anchor, duplicated pagination and duplicated pair mechanics.
+- **Fix cycle 1** resolved all six with genuine red controls. Regression scans were clean, and `/review-fix` coverage was complete, scoring **5/5**.
+
+The PR has three commits, all append-only.
+
+Current-head results: aggregate 13/13, browser 161/161, visual 215/215. The 20 new Export pairs are the entry at 1440/390/820/821 and the states at 1440/390. Prior pairs are unchanged, and the 72 affected PNGs are byte-identical across the fix. Check, build and frozen install passed. The two B-001 ingress leaves still failed. `pnpm audit` was NON-PASS under B-002, plus a newly published moderate `@hono/node-server` advisory that the PR did not introduce, recorded as candidate B-004 in `docs/backlog.md` for Lou's decision. Post-merge check passed. No planning file was changed by the worker, and no main merge occurred.
+
 #### Story 5: Phase 2 browser walkthrough and surface stocktake (P2-S9)
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
   - [x] Follows sprint template
