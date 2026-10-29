@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import { z } from 'zod';
-import { idSchema, operations, savedStoryboardContentSchema, useBindingSchema, useSchema, versionSchema, type OperationResponse, type Version } from '@workprint/contracts';
+import { idSchema, operations, savedStoryboardContentSchema, useBindingSchema, useSchema, versionSchema, type OperationRequest, type OperationResponse, type Version } from '@workprint/contracts';
 import { transaction } from '../db/index.js';
 import { parseContent } from './content.js';
 import { createCursors } from './cursor.js';
@@ -45,7 +45,7 @@ export function createArtifactStore(pool: Pool, checkOwnedConversation: Ownershi
     return row;
   };
   const version = async (account: string, id: string) => project(await rowFor(account, id));
-  const history = async (account: string, artifact: string, query: { cursor?: string; limit?: number } = {}): Promise<OperationResponse<'artifactVersions'>> => {
+  const history = async (account: string, artifact: string, query: OperationRequest<'artifactVersions'>['query'] = {}): Promise<OperationResponse<'artifactVersions'>> => {
     const parsed = operations.artifactVersions.request.safeParse({ params: { id: artifact }, query, body: {} });
     if (!parsed.success) throw new ArtifactError('invalid_input');
     const limit = query.limit ?? 20;
@@ -62,7 +62,7 @@ export function createArtifactStore(pool: Pool, checkOwnedConversation: Ownershi
     const visible = rows.slice(0, limit);
     return { items: visible.map(project), nextCursor: rows.length > limit ? cursors.encode(scope, { max, after: visible.at(-1)!.revision }) : null };
   };
-  const library = async (account: string, query: { cursor?: string; limit?: number; kind?: string } = {}): Promise<OperationResponse<'library'>> => {
+  const library = async (account: string, query: OperationRequest<'library'>['query'] = {}): Promise<OperationResponse<'library'>> => {
     const parsed = operations.library.request.safeParse({ params: {}, query, body: {} });
     if (!parsed.success) throw new ArtifactError('invalid_input');
     const limit = query.limit ?? 20;

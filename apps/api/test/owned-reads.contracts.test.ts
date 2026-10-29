@@ -1,0 +1,44 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { createApiClient } from '@workprint/api-client';
+import { verifyBuiltAdmission } from './auth-built-fixture.js';
+import { prepareOwnedSavedWork, type OwnedSavedWork } from './saved-work.js';
+
+test('built owned reads return real saved work, exact history and owner-scoped pages through online Auth', { timeout: 180000 }, async t => {
+  let saved: OwnedSavedWork | undefined;
+  await verifyBuiltAdmission(t, async target => {
+    assert.ok(saved);
+    const client = createApiClient({ baseUrl: target.origin, getAccessToken: async () => target.accessTokens[0]! });
+    const foreign = createApiClient({ baseUrl: target.origin, getAccessToken: async () => target.accessTokens[1]! });
+    const read = await client.workspace({ params: { id: saved.conversationA }, query: {}, body: {} });
+    assert.equal(read.ok, true, 'The real owned workspace must replace 501');
+    if (!read.ok) throw new Error('Owned workspace did not settle successfully');
+    assert.equal(read.value.script?.version.id, saved.scriptVersions[0]!.id);
+    assert.equal(read.value.script?.state, 'Ready');
+    assert.equal(read.value.assets[0]?.state, 'Draft');
+    assert.deepEqual(read.value.videos, []); assert.deepEqual(read.value.activeWork, []); assert.equal(read.value.pendingQuestion, null);
+    assert.equal(read.value.selectionRevision, 0);
+    const empty = await client.workspace({ params: { id: saved.emptyConversationA }, query: {}, body: {} });
+    assert.ok(empty.ok); assert.equal(empty.value.script, null); assert.deepEqual(empty.value.assets, []);
+    const artifact = saved.scriptVersions[0]!.artifactId;
+    const firstPage = await client.artifactVersions({ params: { id: artifact }, query: { limit: 1 }, body: {} });
+    assert.ok(firstPage.ok); assert.equal(firstPage.value.items[0]?.id, saved.scriptVersions[2]!.id); assert.ok(firstPage.value.nextCursor);
+    const secondPage = await client.artifactVersions({ params: { id: artifact }, query: { limit: 1, cursor: firstPage.value.nextCursor }, body: {} });
+    assert.ok(secondPage.ok); assert.equal(secondPage.value.items[0]?.id, saved.scriptVersions[1]!.id);
+    const exact = await client.version({ params: { id: saved.scriptVersions[1]!.id }, query: {}, body: {} });
+    assert.ok(exact.ok); assert.deepEqual(exact.value, saved.scriptVersions[1]);
+    const library = await client.library({ params: {}, query: { kind: 'script', limit: 1 }, body: {} });
+    assert.ok(library.ok); assert.deepEqual(library.value.items.map(item => item.latestVersion.id), [saved.scriptVersions[2]!.id]);
+    assert.ok(library.value.items.every(item => !('state' in item)));
+    const missing = { ok: false, error: { code: 'not_found', message: 'Saved work not found' } };
+    assert.deepEqual(await foreign.workspace({ params: { id: saved.conversationA }, query: {}, body: {} }), missing);
+    assert.deepEqual(await foreign.version({ params: { id: saved.scriptVersions[0]!.id }, query: {}, body: {} }), missing);
+    assert.deepEqual(await foreign.artifactVersions({ params: { id: artifact }, query: {}, body: {} }), missing);
+    assert.deepEqual(await client.version({ params: { id: saved.foreign.id }, query: {}, body: {} }), missing);
+    assert.deepEqual(await client.version({ params: { id: 'unknown' }, query: {}, body: {} }), missing);
+    const otherLibrary = await foreign.library({ params: {}, query: {}, body: {} });
+    assert.ok(otherLibrary.ok); assert.deepEqual(otherLibrary.value.items.map(item => item.latestVersion.id), [saved.foreign.id]);
+    const wrongScope = await foreign.artifactVersions({ params: { id: artifact }, query: { cursor: firstPage.value.nextCursor, limit: 1 }, body: {} });
+    assert.deepEqual(wrongScope, missing);
+  }, { prepareSavedWork: async setup => { saved = await prepareOwnedSavedWork(setup); } });
+});

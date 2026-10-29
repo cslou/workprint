@@ -23,6 +23,10 @@ test('Vite serves browser modules but denies private research and fixture creden
   const helper = 'apps/api/test/native-conversations.ts';
   await copyFile(join(root, helper), join(checkout, helper));
   paths.push(helper);
+  for (const file of ['apps/api/test/artifact-database.ts', 'apps/api/test/saved-work.ts']) {
+    await copyFile(join(root, file), join(checkout, file));
+    paths.push(file);
+  }
   const port = await unusedPort();
   const server = await start(process.execPath, [join(root, 'apps/web/node_modules/vite/bin/vite.js'), '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
     cwd: web, env: fixture.env, log: join(fixture.logs, 'vite.log'),
