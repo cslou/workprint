@@ -721,7 +721,7 @@ The four unavailable pairs retain the same shared two-line empty treatment. Down
 - **Output:** when `outputVersionId` is present, show `Download` without its ID. It calls the existing `media` operation for exactly that version. No URL construction or independent download transport.
 - **Read-only contract projection:** status, currentness and compatibility come only from their typed fields. No local stale-submission rules, export state machine, stream validation, inferred currentness or processing is approved. Populated records remain labelled read-only prerequisites in isolated mounts until their real producer exists.
 
-The ignored `outputs/verification/sprint-003/design-proposals/story4/` previews preserve the initial candidates as `*-v1` and regenerate populated history/detail with these final substitutions. They are inspection evidence only; runtime and reference comparisons use tracked references plus this record, never ignored assets. This is provisional design approval, not implementation acceptance.
+The ignored `outputs/verification/sprint-003/design-proposals/story4/` previews preserve the initial candidates as `*-v1` and regenerate populated history/detail with these final substitutions. They are inspection evidence only; runtime and reference comparisons use tracked references plus this record, never ignored assets. This is design approval (by Lou, 2026-10-29), not implementation acceptance.
 
 ### Reference sheet
 

@@ -335,7 +335,7 @@ Record reference → actual component/page → screenshot pair → result or exp
 > | Performance / load | 0 | 0 | 0 | 0 | 0 | Not applicable |
 > | Security / dependency | 8 | +5 | 0 | 0 | 13 | Config/CORS/secret/egress cases; includes two failing B-001 leaves. Audit NON-PASS is a command result, not a case |
 > | Accessibility / visual | 0 | +145 | 0 | 0 | 145 | 136 visual comparisons plus 9 keyboard/focus cases |
-> | Manual-only | 0 | 0 | 0 | 0 | 0 | Human side-by-side review is one open acceptance gate, not a counted case |
+> | Manual-only | 0 | 0 | 0 | 0 | 0 | Human side-by-side review is an acceptance gate, not a counted case; Lou completed it on 2026-10-29 |
 > | Other verification | 0 | 0 | 0 | 0 | 0 | Editorial evidence is not a suite |
 > | **Total** | **15** | **+208** | **0** | **0** | **223** | 221 passing plus 2 B-001 failing leaves |
 >
