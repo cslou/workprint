@@ -30,6 +30,8 @@ These are implemented module responsibilities, not claims of working business op
 | `apps/api` | One Mastra/Postgres backend with Supabase admission, closed routes and authenticated unavailable application boundaries; native storage setup is separate. No Agent, provider or workflow is enabled. |
 | `scripts/browser` | Playwright verification harness: `capture.ts` settles captures, `material-network.ts` observes exact consumable request allowances, and pair helpers record geometry/context and compare reference/application images with `compare.ts`. |
 
+Backend ownership reads are declared by `application/`, implemented by `agent/mastra/` through native storage, and supplied by backend `mastra/` composition. Application code imports neither native integration subtree. No ownership route or implemented application operation is added.
+
 Dependency direction: the shell composes features; features use shared `api/` and `ui/`, which do not import features. `api-client` depends on `contracts`; packages never import apps. Browser code/packages cannot import backend or Node modules, and only web may consume `player`. These package/server boundaries, including the framework-free player boundary, are enforced by [dependency-cruiser](.dependency-cruiser.cjs).
 
 ## Development
@@ -69,6 +71,14 @@ SUPABASE_URL=http://127.0.0.1:1 SUPABASE_PUBLISHABLE_KEY=health-only WORKPRINT_E
 The isolated fixture is sufficient for this foundation. For separately authorized, dedicated development storage, copy `.env.example` to ignored `.env` and privately supply the exact target and **different restricted serving / setup credentials**. Then run `pnpm db:prepare` before `pnpm dev`. The setup role must own native objects and have database CREATE privilege; serving must not have database/schema CREATE, native schema/object ownership (direct, inherited or reachable through SET ROLE), superuser, role-creation or database-creation privileges. The process rejects privileged serving connections. Reapply narrowly scoped serving grants after supported native upgrades; the local fixture does this automatically.
 
 `db:prepare` calls **`PostgresStore.init()`**, never application-authored native DDL. There are no application-owned tables or migrations yet. When an owning feature introduces them, use the Supabase CLI migration workflow under `supabase/`, excluding native schemas; do not add a custom SQL migration runner. Shared/production targets still require separate authorization.
+
+### Native conversation ownership foundation
+
+`application` receives a read-only `checkOwnedConversation(verifiedAccountId, conversationId)` collaborator. Its native adapter calls `PostgresStore.getStore('memory').getThreadById({ threadId, resourceId })`, then compares `thread.resourceId` exactly with the verified account ID. Foreign and absent threads both return `not_found`; malformed IDs never reach a query, and storage failures return typed `unavailable`. All 19 application operations remain Auth-first and unavailable.
+
+**Conversation creation rule for Sprint 004:** use the verified Supabase `accountId` unchanged as the native thread's `resourceId` (and the resource identity of its messages). Never use a caller's owner field, conversation ID, email, display name, prefix or normalized substitute. This is native storage identity, not a second conversation table. Before writing the adapter, isolated Postgres on core 1.79.0 / pg 1.32.0 returned the redacted native shape `{ id: string, resourceId: string, title: string, metadata: {}, createdAt: Date, updatedAt: Date }`; the supplied resource identity round-tripped exactly.
+
+`apps/api/test/native-conversations.ts` creates native threads and optional messages only for isolated tests through supported storage APIs. Tests own their Postgres and teardown. The helper is not a production compiler input, bundle, asset or route; no seed endpoint is enabled.
 
 Auth qualification requires privately supplied dedicated Supabase Auth configuration, two existing authorized synthetic identities, and restricted serving credentials identifying the approved target. Provisioning/accounts remain outside the product and serving process. Do not substitute a trusted-identity bypass or use an arbitrary shared project. R2, media tooling and real model keys are not prerequisites here.
 

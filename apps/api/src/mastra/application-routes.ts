@@ -1,6 +1,6 @@
 import { registerApiRoute } from '@mastra/core/server';
 import { applicationError, errorStatus, operations, type OperationName } from '@workprint/contracts';
-import { unavailableApplication } from '../application/index.js';
+import type { Application } from '../application/index.js';
 
 async function readBody(request: Request): Promise<unknown> {
   if (!request.body) return {};
@@ -28,7 +28,7 @@ async function readBody(request: Request): Promise<unknown> {
   }
 }
 
-export const applicationRoutes = (Object.keys(operations) as OperationName[]).map((name) => {
+export const applicationRoutes = (application: Application) => (Object.keys(operations) as OperationName[]).map((name) => {
   const operation = operations[name];
   return registerApiRoute(operation.path, { method: operation.method, handler: async (context) => {
     const accountId: unknown = context.get('requestContext').get('accountId');
@@ -44,7 +44,7 @@ export const applicationRoutes = (Object.keys(operations) as OperationName[]).ma
     } catch {
       return context.json(applicationError('invalid_input', 'Invalid application request'), 400);
     }
-    const result = await unavailableApplication[name]({ params: context.req.param(), query, body }, async () => ({ kind: 'verified', accountId }));
+    const result = await application.operations[name]({ params: context.req.param(), query, body }, async () => ({ kind: 'verified', accountId }));
     return Response.json(result, { status: errorStatus[result.error.code] });
   } });
 });

@@ -2,20 +2,15 @@ import { Mastra } from '@mastra/core';
 import { registerApiRoute, type ApiRoute } from '@mastra/core/server';
 import { PostgresStore } from '@mastra/pg';
 import { Pool } from 'pg';
+import { createOwnedConversationCheck } from '../agent/index.js';
+import { createApplication } from '../application/index.js';
 import { loadServerConfig } from './config.js';
 import { verifyAccount } from './auth.js';
 import { applicationRoutes } from './application-routes.js';
 
 /** One backend: cataloged application routes plus explicit test-composition additions. */
 export async function createBackend(routes: ApiRoute[] = []) {
-  const protectedRoutes = [...applicationRoutes, ...routes];
   const config = loadServerConfig(process.env);
-  const matchesRoute = (path: string, method: string) => protectedRoutes.some((route) => {
-    const template = route.path.split('/');
-    const segments = path.split('/');
-    return route.method === method && template.length === segments.length &&
-      template.every((part, index) => /^:[A-Za-z][A-Za-z0-9_]*$/.test(part) ? Boolean(segments[index]) : part === segments[index]);
-  });
   const pool = new Pool({
     connectionString: config.connectionString, max: 4, connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 5000, statement_timeout: 10000,
@@ -50,6 +45,14 @@ export async function createBackend(routes: ApiRoute[] = []) {
     throw new Error('Serving storage unavailable or privileged; prepare storage separately and use restricted DATABASE_URL');
   }
   const storage = new PostgresStore({ id: 'workprint-native', schemaName: 'mastra', disableInit: true, pool });
+  const application = createApplication({ checkOwnedConversation: createOwnedConversationCheck(storage) });
+  const protectedRoutes = [...applicationRoutes(application), ...routes];
+  const matchesRoute = (path: string, method: string) => protectedRoutes.some((route) => {
+    const template = route.path.split('/');
+    const segments = path.split('/');
+    return route.method === method && template.length === segments.length &&
+      template.every((part, index) => /^:[A-Za-z][A-Za-z0-9_]*$/.test(part) ? Boolean(segments[index]) : part === segments[index]);
+  });
   return new Mastra({
     storage,
     server: {
