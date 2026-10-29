@@ -9,7 +9,7 @@ body { margin: 0; background: var(--color-bg-canvas); color: var(--color-text-pr
 .wp-button-icon { width: var(--size-control-sm); height: var(--size-control-sm); padding: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text-subtle); font-size: var(--size-icon-lg); font-weight: var(--font-weight-regular); line-height: 1; }
 .wp-button-round { width: var(--size-control-md); height: var(--size-control-md); padding: 0; border: var(--border-width-default) solid var(--color-border-strong); background: transparent; color: var(--color-text-primary); font-weight: var(--font-weight-regular); }
 .wp-button-secondary[data-hovered], .wp-button-quiet[data-hovered], .wp-button-icon[data-hovered], .wp-button-round[data-hovered], .wp-button-quiet[data-pressed] { background: var(--color-bg-hover); color: var(--color-text-primary); }
-.wp-button[data-focus-visible], .wp-tab[data-focus-visible], .wp-input[data-focus-visible] { outline: var(--border-width-focus) solid var(--color-border-focus); outline-offset: var(--border-width-focus-offset); }
+.wp-button[data-focus-visible], .wp-tab[data-focus-visible] { outline: var(--border-width-focus) solid var(--color-border-focus); outline-offset: var(--border-width-focus-offset); }
 .wp-button-quiet[data-focus-visible] { outline: none; text-decoration: underline; text-decoration-thickness: var(--border-width-focus); text-underline-offset: var(--border-width-focus-offset); }
 .wp-button[data-disabled], .wp-text-field[data-disabled] { opacity: var(--opacity-disabled); cursor: not-allowed; }
 .wp-button-choose[data-disabled] { opacity: var(--opacity-disabled-choose); }
@@ -21,8 +21,7 @@ body { margin: 0; background: var(--color-bg-canvas); color: var(--color-text-pr
 .wp-search-control { display: flex; align-items: center; gap: var(--space-8); height: var(--size-control-lg); padding: 0 var(--space-12); border: var(--border-width-default) solid var(--color-border-input); border-radius: var(--radius-pill); background: var(--color-bg-canvas); color: var(--color-text-subtle); }
 .wp-search-control svg { width: var(--size-icon-md); height: var(--size-icon-md); flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
 .wp-search-control .wp-input { flex: 1; height: auto; padding: 0; border: 0; border-radius: 0; background: transparent; line-height: var(--font-line-height-1-5); }
-.wp-search-control:has([data-focus-visible]) { outline: var(--border-width-focus) solid var(--color-border-focus); outline-offset: var(--border-width-focus-offset); }
-.wp-search-control .wp-input[data-focus-visible] { outline: none; }
+.wp-input:focus, .wp-search-control:focus-within { outline: none; box-shadow: none; }
 .wp-panel { display: flex; flex-direction: column; min-height: 0; flex: 1; background: var(--color-bg-surface); }
 .wp-tabs { display: flex; gap: var(--space-4); padding: var(--space-12) var(--space-14); border-bottom: var(--border-width-default) solid var(--color-border-default); }
 .wp-tab { padding: var(--space-6) var(--space-12); border-radius: var(--radius-pill); font-size: var(--font-size-13); color: var(--color-text-secondary); cursor: pointer; outline: none; }

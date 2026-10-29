@@ -272,7 +272,7 @@ Responsive sizes: `display-xl` is 34px and `display-md` 28px at or below `--brea
 | `--opacity-dimmed` | `0.45` |  |  | Images of a shot changed but not regenerated. |
 | `--opacity-making` | `0.35` |  |  | Placeholder while an item is being made. |
 
-Circles (avatar, number badges, tab dot) use `border-radius: 50%`; it is a rule, not a token. The user message uses `--radius-bubble` on three corners and `--radius-bubble-tail` bottom-right. Focus: `--border-width-focus` solid `--color-border-focus`, offset `--border-width-focus-offset`, on every interactive element.
+Circles (avatar, number badges, tab dot) use `border-radius: 50%`; it is a rule, not a token. The user message uses `--radius-bubble` on three corners and `--radius-bubble-tail` bottom-right. Focus: `--border-width-focus` solid `--color-border-focus`, offset `--border-width-focus-offset`, except for [text inputs](#shell-and-remaining-phase-2-feedback) and the material controls' underline treatment below.
 
 ## Iconography and imagery
 
@@ -308,7 +308,7 @@ Every animation has a still alternative under `prefers-reduced-motion: reduce`: 
 
 Each component has the same anchor here and on the [Components page](brand-book/components.html). Mockup class names are given so implementers can find the reference markup; they are not a required naming scheme.
 
-**Rules that apply everywhere:** interactive elements retain a visible keyboard-focus cue. Existing controls keep their focus ring; the new material controls below use a label underline instead, without a ring. Disabled controls use 45–60% opacity and stay visible (open: pick one `--opacity-disabled` value); status is never colour only.
+**Rules that apply everywhere:** interactive elements other than [text inputs](#shell-and-remaining-phase-2-feedback) retain a visible keyboard-focus cue. Existing non-text controls keep their focus ring; the new material controls below use a label underline instead, without a ring. Disabled controls use 45–60% opacity and stay visible (open: pick one `--opacity-disabled` value); status is never colour only.
 
 ### App shell
 
@@ -614,6 +614,8 @@ Empty success retains “Nothing saved yet” and “Characters, places and prop
 
 **User approval — 2026-10-28.** Layouts were approved from the local proposal set at source revision `2e03eba`, with the exact copy below superseding its draft copy. Preview markers and test-fixture language are never product copy. No colors, banners, recovery flows or redesign are added. Approval is design authority, not implementation acceptance.
 
+**Text inputs have no focus ring.** Approved by Lou on 2026-10-29. The chat message box, the inline Script/Shot/Panel editors and Library search show no blue focus outline on focus, matching the brand-book CSS, which rings only links and buttons. Keyboard-only focus rings on buttons, tabs and other controls are unchanged.
+
 **002/Story 3 — implement now.** Reuse the opening shell in `flow2-step1-r73.html`, shared dialog geometry in `flow1-step4-r85.html#look-a`, and existing control/section typography. Reproduce new states by approved substitutions into those tracked references, never by loading ignored previews.
 
 | State | Exact copy and controls |
@@ -772,7 +774,7 @@ The ignored `outputs/verification/sprint-003/design-proposals/story4/` previews 
 | **`--color-border-input` on `--color-bg-surface` (chat box)** | **1.26** | **Below 3:1. Accepted gap**, your decision 2026-10-02 after a [side-by-side](brand-book/patterns.html#outline-compare) |
 | `--color-border-strong` on canvas (chip outline) | 1.38 | Acceptable: chips are identified by text; × has a 24px hit area |
 
-- **Focus:** every interactive control needs a visible keyboard cue. Existing controls retain the focus ring. The new single select, quiet action and Scene disclosure use a keyboard-only label underline (2px thick, 2px offset), not a ring; their text colors retain the existing contrast. This is a scoped material-component refinement, not a global removal of keyboard indication. Viewers and the picker trap focus, close on Escape and return focus to the opener.
+- **Focus:** every interactive control other than [text inputs](#shell-and-remaining-phase-2-feedback) needs a visible keyboard cue. Existing non-text controls retain the focus ring. The new single select, quiet action and Scene disclosure use a keyboard-only label underline (2px thick, 2px offset), not a ring; their text colors retain the existing contrast. This is a scoped material-component refinement, not a global removal of keyboard indication. Viewers and the picker trap focus, close on Escape and return focus to the opener.
 - **Targets:** at least `--size-target-min` (24px).
 - **Keyboard:** option rows, tiles, tabs and "Show" are reachable in reading order; lettered options can be chosen by typing the letter.
 - **Announcements:** activity lines and the agent's message use a polite live region; questions are labelled groups; a changed-tab dot needs a text alternative ("Assets, updated").
