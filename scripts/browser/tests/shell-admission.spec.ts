@@ -21,8 +21,8 @@ test('shell workspace and Library use real admission; native navigation never ca
       await page.waitForFunction(() => !!(window as unknown as { shellTest?: unknown }).shellTest);
       const workspaceResponse = page.waitForResponse((response) => response.url() === `${origin}/v1/conversations/read-only-conversation/workspace`);
       await page.evaluate((value) => (window as unknown as { shellTest: { configure(value: unknown): void } }).shellTest.configure(value), { apiOrigin: origin, token: accessTokens[0], session: { accountId: 'admission-account-a', name: 'Creator A' }, conversationId: 'read-only-conversation' });
-      expect((await workspaceResponse).status()).toBe(501);
-      await expect(page.getByRole('tabpanel')).toHaveText('Loading this video is not available yet.');
+      expect((await workspaceResponse).status()).toBe(404);
+      await expect(page.getByRole('tabpanel')).toHaveText('This video could not be loaded. Nothing was changed.');
       await expect(page.getByRole('main')).toHaveAttribute('aria-busy', 'false');
       await expect(page.getByRole('main')).not.toContainText('Conversation loading is not available yet.');
       expect(requests).toEqual(['GET /v1/conversations/read-only-conversation/workspace']);
@@ -39,7 +39,7 @@ test('shell workspace and Library use real admission; native navigation never ca
       expect(await page.evaluate(() => (window as unknown as { shellTest: { tokenCalls(): number } }).shellTest.tokenCalls())).toBe(1);
       await page.getByRole('button', { name: 'Library', exact: true }).focus();
       await page.keyboard.press('Enter');
-      await expect(page.getByRole('dialog')).toContainText('Library not available yet');
+      await expect(page.getByRole('dialog')).toContainText('Nothing saved yet');
       expect(requests).toEqual(['GET /v1/conversations/read-only-conversation/workspace', 'GET /v1/library']);
       await page.keyboard.press('Escape');
       const deniedResponse = page.waitForResponse((response) => response.url() === `${origin}/v1/conversations/read-only-conversation/workspace`);

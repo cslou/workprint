@@ -23,7 +23,7 @@ test('Vite serves browser modules but denies private research and fixture creden
   const helper = 'apps/api/test/native-conversations.ts';
   await copyFile(join(root, helper), join(checkout, helper));
   paths.push(helper);
-  for (const file of ['apps/api/test/artifact-database.ts', 'apps/api/test/saved-work.ts']) {
+  for (const file of ['apps/api/test/artifact-database.ts', 'apps/api/test/saved-work.ts', 'apps/api/test/paged-saved-work.ts']) {
     await copyFile(join(root, file), join(checkout, file));
     paths.push(file);
   }

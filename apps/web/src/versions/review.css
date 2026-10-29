@@ -8,3 +8,9 @@
 .wp-version-history-row > .wp-button-quiet { justify-self: start; padding: 0; min-height: 0; border-radius: 0; font: inherit; font-weight: var(--font-weight-semibold); color: var(--color-text-primary); }
 .wp-version-use .wp-button-secondary { font-size: var(--font-size-12); padding: var(--space-4) var(--space-10); border-radius: var(--radius-pill); border: var(--border-width-default) solid var(--color-border-default); background: var(--color-bg-surface); color: var(--color-text-secondary); height: auto; font-weight: var(--font-weight-regular); line-height: var(--font-line-height-1-5); }
 .wp-version-use .wp-version-use-feedback { font-size: var(--font-size-13); color: var(--color-text-subtle); margin: var(--space-10) 0 0; }
+.wp-version-review[data-paged-history] .wp-version-history summary, .wp-version-review[data-paged-history] .wp-version-history-row > .wp-button-quiet { min-height: var(--size-control-sm); }
+.wp-version-pagination { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-6); padding-top: var(--space-10); }
+.wp-version-pagination p, .wp-version-history-feedback { margin: 0; font-size: var(--font-size-13); color: var(--color-text-subtle); }
+.wp-version-history-feedback { padding-top: var(--space-10); }
+.wp-version-reading { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4) var(--space-12); margin-bottom: var(--space-12); font-size: var(--font-size-12); color: var(--color-text-subtle); }
+.wp-version-reading .wp-button { padding: 0; }

@@ -18,7 +18,7 @@
     "test:security": "node scripts/test.mjs security",
     "test:contracts": "node scripts/test.mjs contracts",
     "qualify:ingress": "node scripts/test.mjs ingress-qualification",
-    "test:browser": "node scripts/test.mjs compile && playwright test --config scripts/browser/playwright.config.ts interaction.spec.ts config.spec.ts connectivity.spec.ts shell.spec.ts shell-admission.spec.ts chat.spec.ts question.spec.ts version.spec.ts version-races.spec.ts material.spec.ts storyboard.spec.ts videos.spec.ts media.spec.ts player.spec.ts request-races.spec.ts selection-races.spec.ts display-prerequisites.spec.ts material-inputs.spec.ts material-input-races.spec.ts library-attach-races.spec.ts upload-confirm-races.spec.ts attachment-state.spec.ts exports.spec.ts export-races.spec.ts paged-read.spec.ts",
+    "test:browser": "node scripts/test.mjs compile && playwright test --config scripts/browser/playwright.config.ts interaction.spec.ts config.spec.ts connectivity.spec.ts shell.spec.ts shell-admission.spec.ts chat.spec.ts question.spec.ts version.spec.ts version-races.spec.ts material.spec.ts storyboard.spec.ts videos.spec.ts media.spec.ts player.spec.ts request-races.spec.ts selection-races.spec.ts display-prerequisites.spec.ts material-inputs.spec.ts material-input-races.spec.ts library-attach-races.spec.ts upload-confirm-races.spec.ts attachment-state.spec.ts exports.spec.ts export-races.spec.ts paged-read.spec.ts owned-reads.spec.ts owned-pages.spec.ts",
     "test:visual": "playwright test --config scripts/browser/playwright.config.ts visual.spec.ts media-visual.spec.ts picker-visual.spec.ts upload-visual.spec.ts"
   },
   "devDependencies": {

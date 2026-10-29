@@ -12,7 +12,7 @@ const states = [
   ['error', 'Library could not be loaded', 'No saved material was changed.'],
   ['loading', 'Loading Library…', 'Looking for saved characters, places and props.'],
   ['unconfigured', 'Library connection not configured', 'No API origin is configured for this build.'],
-  ['empty', 'Nothing saved yet', 'Characters, places and props you approve will appear here.'],
+  ['empty', 'Nothing saved yet', 'Your saved work will appear here.'],
 ] as const;
 for (const width of [1440, 390, 820, 821]) for (const [state, title, message] of states) {
   test(`Library ${state} approved reference at ${width}`, async ({ page, context }, info) => {

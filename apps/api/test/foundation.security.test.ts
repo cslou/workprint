@@ -21,6 +21,8 @@ test('built backend rejects unsafe config, separates setup privileges and exclud
   assert.ok(!(await readFile(inputs, 'utf8')).split(/\r?\n/).includes(artifactHelper), 'Application migration fixture is not a production compiler input');
   const savedWorkHelper = await realpath(join(root, 'apps/api/test/saved-work.ts'));
   assert.ok(!(await readFile(inputs, 'utf8')).split(/\r?\n/).includes(savedWorkHelper), 'Saved-work setup is not a production compiler input');
+  const pagedHelper = await realpath(join(root, 'apps/api/test/paged-saved-work.ts'));
+  assert.ok(!(await readFile(inputs, 'utf8')).split(/\r?\n/).includes(pagedHelper), 'Paged saved-work setup is not a production compiler input');
   const source = await readFile(helper);
   for (const path of [...globSync('apps/api/dist/**/*'), ...globSync('apps/api/.mastra/output/**/*', { exclude: ['apps/api/.mastra/output/node_modules/**'] })]) {
     if (!(await stat(path)).isFile()) continue;
@@ -30,6 +32,7 @@ test('built backend rejects unsafe config, separates setup privileges and exclud
     assert.ok(!path.endsWith('/test/native-conversations.js'), 'Native fixture was emitted by the production build');
     assert.ok(!bytes.includes('applyArtifactMigrations') && !path.endsWith('/test/artifact-database.js'), 'Application migration fixture entered a production artifact');
     assert.ok(!bytes.includes('prepareOwnedSavedWork') && !path.endsWith('/test/saved-work.js'), 'Saved-work setup entered a production artifact');
+    assert.ok(!bytes.includes('preparePagedSavedWork') && !path.endsWith('/test/paged-saved-work.js'), 'Paged saved-work setup entered a production artifact');
   }
   const db = await isolatedPostgres();
   t.after(db.close);

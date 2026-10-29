@@ -6,6 +6,7 @@ import type { ReadScope } from '../api/use-scoped-read.js';
 import { Button } from '../ui/controls.js';
 import { VersionUse, type VersionUseProps } from './use.js';
 import { useExactVersion, useVersionHistory } from './reads.js';
+import { HistoryControls } from './history-controls.js';
 import './review.css';
 
 type Use = OperationResponse<'useVersion'>['use'];
@@ -28,20 +29,23 @@ function ScopedReview({ connection, scope, version, binding, currentUse, selecti
   const supplied = history.kind === 'settled' && history.result.ok ? history.result.value.items : historyPrerequisite;
   const ids = new Set<string>();
   const revisions = new Set<number>();
-  const earlier = supplied.filter((item) => item.artifactId === version.artifactId && item.kind === version.kind && item.revision < version.revision && item.id !== version.id);
-  const valid = earlier.every((item) => { if (ids.has(item.id) || revisions.has(item.revision)) return false; ids.add(item.id); revisions.add(item.revision); return true; });
-  const rows = valid ? [...earlier].sort((a, b) => b.revision - a.revision) : [];
+  const relevant = supplied.filter((item) => item.artifactId === version.artifactId && item.kind === version.kind && item.id !== version.id);
+  const valid = supplied.every(item => item.artifactId === version.artifactId && item.kind === version.kind) && relevant.every((item) => { if (ids.has(item.id) || revisions.has(item.revision)) return false; ids.add(item.id); revisions.add(item.revision); return true; });
+  const rows = valid ? [...relevant].sort((a, b) => b.revision - a.revision) : [];
+  const complete = history.kind === 'settled' && history.result.ok ? history.result.value.nextCursor === null : historyPrerequisite.length > 0;
   const selection = used && (used.value.selectionRevision > selectionRevision || (used.value.selectionRevision === selectionRevision && used.basis === basis)) ? used.value : { use: currentUse, selectionRevision };
   const onUsed = (value: OperationResponse<'useVersion'>) => {
     setUsed(previous => previous && previous.value.selectionRevision > value.selectionRevision ? previous : { basis, value });
     notifyUsed?.(value);
   };
   const context: ReviewSelection = { currentUse: selection.use, selectionRevision: selection.selectionRevision, onUsed };
-  return <div className="wp-version-review" data-displayed-version-id={visible.id}>
+  return <div className="wp-version-review" data-displayed-version-id={visible.id} data-paged-history={historyPrerequisite.length === 0 || undefined}>
+    {selected && <div className="wp-version-reading"><span>Viewing version {visible.revision}</span><Button variant="quiet" onPress={() => setSelected(null)}>Back to current version</Button></div>}
     <div className="wp-version-body" hidden={!!selected} inert={!!selected}>{children(selected ? version : visible, true, context)}</div>
     {selected && <div className="wp-version-body">{children(visible, false, context)}</div>}
-    <details className="wp-version-history" onToggle={(event) => { const expanded = event.currentTarget.open; setOpen(expanded); if (!expanded) setSelected(null); }}><summary>Version history{rows.length > 0 && (history.kind !== 'settled' || !history.result.ok || history.result.value.nextCursor === null) ? ` · ${rows.length} earlier` : ''}</summary>
-      {rows.map((item) => <div className="wp-version-history-row" key={item.id}><Button variant="quiet" aria-label={`View version ${item.revision}`} onPress={() => setSelected(item)}>Version {item.revision}</Button><VersionUse connection={connection} scope={scope} version={item} binding={binding} currentUse={selection.use} selectionRevision={selection.selectionRevision} selectedVersionId={selection.use?.versionId ?? selectedVersionId ?? null} onUsed={onUsed} /></div>)}
+    <details className="wp-version-history" onToggle={(event) => { const expanded = event.currentTarget.open; setOpen(expanded); if (!expanded) setSelected(null); }}><summary>Version history{rows.length > 0 && complete && rows.every(item => item.revision < version.revision) ? ` · ${rows.length} earlier` : ''}</summary>
+      {rows.map((item) => <div className="wp-version-history-row" key={item.id}><Button variant="quiet" data-history-id={item.id} aria-label={`View version ${item.revision}`} onPress={() => setSelected(item)}>Version {item.revision}</Button><VersionUse connection={connection} scope={scope} version={item} binding={binding} currentUse={selection.use} selectionRevision={selection.selectionRevision} selectedVersionId={selection.use?.versionId ?? selectedVersionId ?? null} onUsed={onUsed} /></div>)}
+      {open && historyPrerequisite.length === 0 && <HistoryControls read={history} invalid={!valid} />}
     </details>
   </div>;
 }

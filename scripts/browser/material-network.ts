@@ -33,7 +33,11 @@ export const test = base.extend<{ materialNetwork: MaterialNetwork }>({
         if (!((entry.method === 'GET' && /^\/v1\/(conversations\/[^/]+\/)?generation-requests(\/[^/]+)?$/.test(entry.url.pathname)) || (entry.method === 'POST' && /^\/v1\/generation-requests\/[^/]+\/cancel$/.test(entry.url.pathname)))) expect(entry.url.pathname).not.toMatch(/generation|provider/);
         if (entry.url.pathname === '/v1/library') {
           expect(entry.method).toBe('GET');
-          expect([...entry.url.searchParams.keys()].filter(key => key !== 'cursor')).toEqual([]);
+          expect([...entry.url.searchParams.keys()].filter(key => !['cursor', 'kind', 'limit'].includes(key))).toEqual([]);
+          const limit = entry.url.searchParams.get('limit');
+          if (limit !== null) expect(/^[1-9]\d*$/.test(limit) && Number(limit) <= 100).toBe(true);
+          const kind = entry.url.searchParams.get('kind');
+          if (kind !== null) expect(['script', 'reference', 'storyboard', 'image', 'video']).toContain(kind);
         }
       }
     };

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { OperationResponse } from '@workprint/contracts';
 import type { BrowserClient } from '../api/client.js';
 import type { ReadScope } from '../api/use-scoped-read.js';
@@ -28,11 +28,11 @@ const displayFor = (item: Item, facts: Readonly<Record<string, LibraryDisplayFac
 };
 
 /** Local-only picker: categories, search and pressed state never carry a request. */
-type PickerProps = { connection: BrowserClient; scope: ReadScope | null; library: OperationResponse<'library'>; prerequisites?: LibraryPrerequisites };
+type PickerProps = { connection: BrowserClient; scope: ReadScope | null; library: OperationResponse<'library'>; prerequisites?: LibraryPrerequisites; pagination?: ReactNode };
 export function LibraryPicker(props: PickerProps) {
   return <ScopedPicker key={JSON.stringify([props.scope?.accountId, props.scope?.conversationId])} {...props} />;
 }
-function ScopedPicker({ connection, scope, library, prerequisites }: PickerProps) {
+function ScopedPicker({ connection, scope, library, prerequisites, pagination }: PickerProps) {
   const facts = prerequisites?.display;
   const items = library.items.map((item) => ({ item, display: displayFor(item, facts) }));
   const categories = [...new Set(items.flatMap(({ display }) => display.category === undefined ? [] : [display.category]))];
@@ -88,11 +88,12 @@ function ScopedPicker({ connection, scope, library, prerequisites }: PickerProps
       {visible.length === 0 ? <div className="wp-picker-empty" role="status"><b>No matching items</b><span>Search only looks at the names shown here.</span></div> : <div className="wp-picker-grid">{visible.map(({ item, display }) => {
         const id = item.latestVersion.id;
         const pressed = selected.includes(id);
-        return <button key={item.id} type="button" disabled={busy} className={`wp-picker-tile${pressed ? ' on' : ''}`} aria-pressed={pressed} onClick={() => toggle(id)}>
+        return <button key={item.id} type="button" data-page-id={item.id} disabled={busy} className={`wp-picker-tile${pressed ? ' on' : ''}`} aria-pressed={pressed} onClick={() => toggle(id)}>
           <span className={`wp-picker-media${display.image === undefined ? ' empty' : ''}`}>{display.image !== undefined && <img src={display.image.src} alt={display.image.alt} />}<span className="wp-picker-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10" /></svg></span></span>
           <span className="wp-picker-label">{display.name}</span><span className="wp-picker-sub">{display.sub}</span>
         </button>;
       })}</div>}
+      {pagination}
     </div>
     <div className="wp-picker-tray"><span className="wp-picker-count">{selectedItems.length === 0 ? 'Nothing selected yet' : `${selectedItems.length} selected`}</span>{selectedItems.map(({ item, display }) => <span key={item.id} className="wp-picker-chip">{display.name}<button type="button" disabled={busy} aria-label={`Remove ${display.name}`} onClick={() => toggle(item.latestVersion.id)}>×</button></span>)}<Button isDisabled={busy || selectedItems.length === 0 || connection.kind !== 'configured' || !scope?.conversationId} onPress={() => void attach()}>{selectedItems.length === 0 ? 'Attach' : `Attach (${selectedItems.length})`}</Button></div>
     {feedback && <p className="wp-picker-feedback" role="status">{feedback}</p>}
