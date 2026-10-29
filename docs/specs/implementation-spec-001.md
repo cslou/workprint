@@ -1051,7 +1051,7 @@ The approved spec scope supersedes older architecture/design language about spen
 
 #### Phase 3 sprint packaging
 
-Approved by Lou on 2026-10-29. Phase 3 runs as parallel waves. Sprints in one wave run concurrently in separate worktrees and do not depend on each other. Stories inside a sprint run strictly in order. Only Wave 1's documents are written; later sprint documents are created when their wave starts, from this allocation and the earlier waves' actual results.
+Approved by Lou on 2026-10-29. Phase 3 runs as parallel waves. Sprints in one wave run concurrently in separate clones of the repository (`~/projects/workprint` and `~/projects/workprint-2`; Lou chose plain clones over worktrees) and do not depend on each other. Stories inside a sprint run strictly in order. Only Wave 1's documents are written; later sprint documents are created when their wave starts, from this allocation and the earlier waves' actual results.
 
 | Wave | Sprint | Stories, in order | Owns |
 | --- | --- | --- | --- |
@@ -1071,10 +1071,14 @@ Wave 2 starts after both Wave 1 sprints integrate, because 006 and 007 need 004'
 - **Lockfile:** `pnpm-lock.yaml` conflicts are regenerated with `pnpm install`, never hand-merged.
 - **Integration order:** each sprint integrates into `phase-3` on Lou's explicit merge command. Whichever wave-mate integrates second first merges `phase-3` into its branch, without a rebase, then reruns the full suite on the combined head. That rerun requalifies shared collaborators and the native version set.
 - **Escalation:** if a story finds it needs a wave-mate's unintegrated work, it stops and escalates; it never builds a substitute.
+- **Shared local services:** each clone keeps its own ignored `outputs/` fixtures, but both share one local Supabase stack and its fixture accounts. No test changes those accounts' passwords, sessions or sign-in state; tests that must (sign-out, reset, expiry) create and delete their own throwaway accounts. API tests already start their own throwaway Postgres containers.
 
 **Decisions recorded with this packaging**
 
-- **R2, local first:** P3-S3/S10 are developed and tested against a pinned local S3-compatible emulator (SeaweedFS 4.51, by digest). Their real development-R2 criteria move to a dedicated final qualification story in Sprint 005. Sprint 005 cannot complete without it, and Lou provides the bucket before that story starts.
+- **R2, local first:** P3-S3/S10 are developed and tested against a pinned local S3-compatible emulator (SeaweedFS 4.51, by digest). Their real development-R2 criteria move to a dedicated final qualification story in Sprint 005. Sprint 005 cannot complete without it, and Lou provides the bucket before that story starts. Lou confirmed this on 2026-10-29, including keeping the real-R2 check in Sprint 005.
+  - Cloudflare's experimental local R2 S3 endpoint (Wrangler 4.115 / Miniflare, July 2026) was considered and not chosen: its CORS is always permissive, so our rules cannot be tested locally, and it adds about 140 MB of native packages.
+  - For the real check, the token is limited to object read/write in the dev bucket. Lou sets the bucket's CORS rule once, and the tests verify it.
+- **Built-in Library examples:** ignored for now (Lou, 2026-10-29). Only the read-only `builtIn` semantics are implemented, proven with test-only records.
 - **P3-S1c moves to Wave 2:** it needs 005's migration workflow for usage records, plus Lou's live-model choice and call authorization.
 - **New designs:** unseen states get inert previews first. The orchestrator provisionally approves them under Lou's delegation, pending ratification at the Phase 3 handoff.
 - **Audit exceptions:** B-002 and B-004 have no upstream fix as of 2026-10-29. They gate shared or public deployment, not Phase 3 native-runtime qualification. B-001 does gate that qualification, and Sprint 004 resolves it first.
