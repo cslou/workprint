@@ -1,10 +1,10 @@
 # Sprint 004 — Native runtime and conversations
 
-**Date:** Planning suggestion 2026-10-29; execution dates pending authorization and foundation integration
+**Date:** Planned and started 2026-10-29
 **Goal:** Pass bounded-ingress qualification, deliver standard Auth and owned conversation navigation, and qualify native turn transport and independent workflow recovery through the built backend without enabling application inference.
-**Status:** 🟡 Planning
+**Status:** 🔵 In Progress
 
-**Planning result:** sprint-doc-reviewer **4/5**, "Ready to start" (2026-10-29), with one P2 resolved below. The independent dependency review of the Phase 3 packaging returned "sound with fixes"; all its fixes are applied. Execution awaits Lou's authorization and the merge of [Story 001](../stories/story-001.md) into `phase-3`. Confirm the start checklists then.
+**Planning result:** sprint-doc-reviewer **4/5**, "Ready to start" (2026-10-29), with one P2 resolved below. The independent dependency review of the Phase 3 packaging returned "sound with fixes"; all its fixes are applied. Lou authorized Phase 3 Wave 1 on 2026-10-29. [Story 001](../stories/story-001.md) merged into `phase-3` at `a7444a2` ([PR #33](https://github.com/cslou/workprint/pull/33)), the start checklists are confirmed, and `sprint-004` branches from that head.
 
 ---
 
@@ -12,13 +12,13 @@
 
 ### Project Context
 - **Repo:** `/Users/lou/projects/workprint`
-- **Tech stack:** React/Vite/TypeScript and React Aria; framework-free contracts/api-client; one Mastra backend, supported native client/Memory/workflows, real Supabase Auth and Postgres. Foundation supplies the pinned Mastra 1.80.x / CLI 1.36.x cohort before this sprint branches.
-- **Current state:** `main` = `c1397c3`, Phase 2 merged 2026-10-29. All 19 closed application operations have browser consumers but return authenticated structured 501; native methods and account controls are unavailable. Phase 2 recorded aggregate 13/13, browser 162/162 and visual 215/215; these are historical counts, not the post-foundation baseline. B-001 ingress has two failing leaves; audit has B-002/B-004. No application tables, Agent or workflow is currently enabled. Refresh facts/checks against the accepted foundation head before starting.
+- **Tech stack:** React/Vite/TypeScript and React Aria; framework-free contracts/api-client; one Mastra backend, supported native client/Memory/workflows, real Supabase Auth and Postgres. Runs on the pinned Mastra 1.79.0 set (CLI 1.35.0, `@mastra/pg` 1.32.0). Lou moved the 1.80.x upgrade to after Wave 1 on 2026-10-29 (backlog B-007).
+- **Current state:** `main` = `c1397c3`, Phase 2 merged 2026-10-29. All 19 closed application operations have browser consumers but return authenticated structured 501; native methods and account controls are unavailable. Phase 2 recorded aggregate 13/13, browser 162/162 and visual 215/215; these are historical counts, not the post-foundation baseline. B-001 ingress has two failing leaves; audit has B-002/B-004. No application tables, Agent or workflow is currently enabled. Foundation baseline at `9afa670` (tree equal to `a7444a2`): frozen install, check and build PASS; test 15/15; browser 163/163; visual 215/215 with zero drift; concurrent two-clone runs pass. `qualify:ingress` NON-PASS on the two B-001 leaves; audit NON-PASS on B-002/B-004 only. The trusted owned-conversation collaborator, the test-only native-conversation helper and the README account-to-resource rule are on `phase-3`.
 - **Implementation spec:** `docs/specs/implementation-spec-001.md`, Phase 3 P3-S1a, P3-S1b, P3-S18/S19; §§4, 6, 8.1/8.7. Packaging: [Phase 3 sprint packaging](../specs/implementation-spec-001.md#phase-3-sprint-packaging). B-001 source: local `docs/backlog.md` (DATA) and `apps/api/test/ingress.qualification.ts`.
 
 ### Sprint-Wide Context
 - **Sprint type:** Feature
-- **Delivery authorization:** planning only; Lou has not authorized implementation. Execution starts only after Lou authorizes it and standalone `docs/stories/story-001.md` merges into `phase-3` (created from `main`). Foundation delivers the configurable browser-test port, Mastra upgrade, trusted owned-conversation collaborator and test-only native-conversation fixture helper. Then branch `sprint-004` from updated `phase-3` in the clone `~/projects/workprint` (Lou chose two plain clones over worktrees), with one implementer; story PRs target `sprint-004`. Sprint integration into `phase-3` requires Lou's explicit merge command; `phase-3` → `main` is Lou's.
+- **Delivery authorization:** authorized by Lou on 2026-10-29 (Phase 3 Wave 1). Standalone `docs/stories/story-001.md` merged into `phase-3` at `a7444a2`. It delivered the configurable browser-test port, the trusted owned-conversation collaborator and the test-only native-conversation fixture helper; the Mastra upgrade is deferred to after Wave 1. Then branch `sprint-004` from updated `phase-3` in the clone `~/projects/workprint` (Lou chose two plain clones over worktrees), with one implementer; story PRs target `sprint-004`. Sprint integration into `phase-3` requires Lou's explicit merge command; `phase-3` → `main` is Lou's.
 - **Shared context:** owns `apps/api/src/mastra/` serving/auth/native/workflow adapters, `apps/api/src/agent/mastra/` native Agent bindings, web `shell/` account/New video/Recents and native-history parts of `conversation/`, plus corresponding native/Auth api-client and contract files. Reuse the foundation's collaborator; bootstrap supplies it to `application`, never imports upward from application. Existing closed operations are implemented, not reinvented; change contracts only for a demonstrated need and reuse supported native types. Creates no application tables and never modifies Mastra-owned schemas.
 - **Parallel wave:** Sprints 004/005 run concurrently and must not depend on each other. Edit only owned modules; shared contracts/api-client indexes, `apps/api/src/mastra/application-routes.ts`, backend registration/bootstrap, shell composition and `storage/` index take additive edits only, with logic in owned files. Resolve `pnpm-lock.yaml` conflicts by rerunning `pnpm install`, never hand-merging. Whichever integrates second first merges `phase-3` into its sprint branch (no rebase), then reruns the full suite on the combined head, requalifying the shared conversation collaborator and native cohort. A discovered wave-mate dependency stops work for escalation, not a substitute implementation. Both clones share one local Supabase stack and its two fixture accounts: no test may change their passwords, sessions or sign-in state; tests that need to (sign-out, reset, expiry) create and delete their own throwaway accounts.
 - **Non-goals:** P3-S1c browser chat consumer, live-model qualification and usage recording belong to wave 2. Normal application inference remains disabled throughout. No signup/invitation administration, creative tools/skills, production seed endpoint, generation/export business schema or execution, saved-work operations owned by Sprint 005, deployment, deletion, model selector or spending controls. Chat text is not a production Artifact; native persistence/technical completion confers no human approval or selection.
@@ -46,10 +46,10 @@ The Final Verification Story runs all applicable sprint functional verification 
 - **Functional execution:** extend existing `apps/api/test/` built-server/Auth/process/Postgres fixtures and `scripts/browser/` suites. Use the real built backend, real Supabase Auth with two synthetic accounts and isolated real Postgres; never bypass identity. Observe native response/status/persistence shapes before writing integration-specific handling and save redacted fixtures/evidence. Every new behavior test requires a genuine red→green log. Missing prerequisites fail, not skip. Browser tests use the consumable `scripts/browser/material-network.ts` observer with exact predeclared allowances, including Auth and newly qualified native reads; no broad exemptions or alternative harness.
 - **Regression and exposure:** retain clean-export/build/dev/start, all 19-operation Auth/closed-schema checks, route/CORS denial, storage-role/idle-pool safety, secret/egress controls, deadlines, no replay and existing browser/visual coverage. Test providers, workflow fixtures, barriers, helper routes and credentials must be absent from production build inputs/assets and unavailable at runtime even with test-looking environment flags; extend `scripts/browser/tests/config.spec.ts` and `apps/api/test/web-files.security.test.ts` patterns. Update unavailable-method expectations only for genuinely qualified capabilities, preserving no-effect coverage for the rest.
 - **Visual contract:** main Auth/account and conversation-navigation/history surfaces at 1440×900, 390×844 and 820/821px; representative loading/error/reset/expiry/pagination states at 1440/390. Reference HTML comes from tracked brand-book files and recorded approved preview substitutions. All captures use `settleCapture` (`scripts/browser/capture.ts`); zero tolerance, no masks, retries or automatic baseline acceptance. Compare paired full-context images/diffs/overlays and two-sided geometry/overflow/containment; unexplained typography, colour, spacing or geometry differences fail. Pointer/keyboard/focus/accessibility assertions accompany the visuals; human side-by-side review remains explicit.
-- **Environment and suite order:** use `WORKPRINT_AUTH_FIXTURE="$PWD/outputs/local-supabase.setup.json"`, `WORKPRINT_AUTH_SIGNING_FIXTURE="$PWD/outputs/local-supabase.status.json"`, `WORKPRINT_BROWSER_OUTPUT="$PWD/outputs/verification/sprint-004/<sha>"` and the foundation's per-checkout browser port. Run `pnpm install --frozen-lockfile`, `pnpm check`, `pnpm build`, `pnpm test`, `pnpm test:browser`, `pnpm test:visual`, `pnpm qualify:ingress`, `pnpm audit`, in that order. Redirect full noisy stdout/stderr to local log files; report exit/result and paths. Register new tests in existing command discovery/explicit browser lists so the full suite actually executes them. Final evidence distinguishes controlled-native qualification from live-provider evidence (none here).
+- **Environment and suite order:** use `WORKPRINT_AUTH_FIXTURE="$PWD/outputs/local-supabase.setup.json"`, `WORKPRINT_AUTH_SIGNING_FIXTURE="$PWD/outputs/local-supabase.status.json"`, `WORKPRINT_BROWSER_OUTPUT="$PWD/outputs/verification/sprint-004/<sha>"` and the foundation's per-checkout browser port (this clone uses the defaults, 4179/4180; Sprint 005's clone uses 4279/4280). Run `pnpm install --frozen-lockfile`, `pnpm check`, `pnpm build`, `pnpm test`, `pnpm test:browser`, `pnpm test:visual`, `pnpm qualify:ingress`, `pnpm audit`, in that order. Redirect full noisy stdout/stderr to local log files; report exit/result and paths. Register new tests in existing command discovery/explicit browser lists so the full suite actually executes them. Final evidence distinguishes controlled-native qualification from live-provider evidence (none here).
 
 ### Stories
-**Constraints:** Seven implementation stories plus Final, strictly in this order; each independently verified/reviewed with ≤5 logical commits including verification. Commit subjects use `Type(scope): Capitalized description`, ≤50 characters. No implementation or checklist completion is implied by this suggestion.
+**Constraints:** Seven implementation stories plus Final, strictly in this order; each independently verified/reviewed. The target is ≤5 logical commits including verification; Lou allowed exceeding it where that makes history clearer (2026-10-29). Commit subjects use `Type(scope): Capitalized description`, ≤50 characters. 
 
 #### Story 1: Bounded ingress before native body parsing (B-001)
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
@@ -59,14 +59,14 @@ The Final Verification Story runs all applicable sprint functional verification 
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: None
   - Resolution: N/A
 - **As a** maintainer, **I want** bounded ingress before native JSON parsing, **so that** unfinished requests cannot bypass admission/resource deadlines.
 - **Dependencies:** accepted foundation on `phase-3`; Lou's execution authorization. All later stories depend on this gate passing.
 - **Acceptance criteria:**
-  - [ ] Reproduce both existing `ingress.qualification.ts` leaves on the foundation's already-upgraded 1.80.x serving path; prefer an evidenced supported configuration, not another speculative upgrade. Establish early authentication plus bounded body size/time on the actual serving path, retaining the 1 MiB body limit and two-second body-read deadline.
+  - [ ] Reproduce both existing `ingress.qualification.ts` leaves on the current pinned Mastra serving path (core/deployer 1.79.0; the 1.80.x upgrade is deferred to after Wave 1, B-007); prefer an evidenced supported configuration, not another speculative upgrade. Establish early authentication plus bounded body size/time on the actual serving path, retaining the 1 MiB body limit and two-second body-read deadline.
   - [ ] `pnpm qualify:ingress` passes both leaves unchanged: unfinished unauthenticated POST returns exact 401 `unauthenticated`, authenticated POST exact 400 `invalid_input`, each before 3.5 s and the independent five-second watchdog while the upload is still unfinished. Server-side body/request resources settle, not just the client watchdog.
   - [ ] Public `GET /health`, normal authenticated application requests and closed unintended native routes remain intact. No vendor patch, parallel listener or weakened test. If only an application-owned official-adapter bootstrap works, stop for Lou's approval of the lifecycle change before implementing it; a candidate adapter result is not approval or story completion.
 - **Functional verification:**
@@ -88,7 +88,7 @@ The Final Verification Story runs all applicable sprint functional verification 
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: None
   - Resolution: N/A
@@ -118,7 +118,7 @@ The Final Verification Story runs all applicable sprint functional verification 
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: None
   - Resolution: N/A
@@ -148,7 +148,7 @@ The Final Verification Story runs all applicable sprint functional verification 
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: P2 [check-4] — limit qualification lacked boundary scenarios and pass conditions.
   - Resolution: Added a limit-boundary functional item: stalled send/stream deadlines, output-cap and oversized-send cases, with persisted outcomes and resource release.
@@ -183,7 +183,7 @@ The Final Verification Story runs all applicable sprint functional verification 
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: None
   - Resolution: N/A
@@ -212,7 +212,7 @@ The Final Verification Story runs all applicable sprint functional verification 
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: None
   - Resolution: N/A
@@ -241,7 +241,7 @@ The Final Verification Story runs all applicable sprint functional verification 
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: None
   - Resolution: N/A
@@ -264,10 +264,10 @@ The Final Verification Story runs all applicable sprint functional verification 
 
 #### Final Story: Sprint Verification & Completion
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
-  - [ ] Uses the story sections above and the existing regression suite as the verification source of truth
-  - [ ] Defines where final verification evidence will be recorded
-  - [ ] Includes full regression verification, not only areas believed to be touched
-  - [ ] Ready for Lou
+  - [x] Uses the story sections above and the existing regression suite as the verification source of truth
+  - [x] Defines where final verification evidence will be recorded
+  - [x] Includes full regression verification, not only areas believed to be touched
+  - [x] Ready for Lou
 - **As a** maintainer, **I want** all sprint functional verification and all available regression verification run, **so that** the sprint can be integrated with evidence that new behavior works and existing behavior did not regress.
 - **Dependencies:** All implementation stories
 - **Acceptance criteria:**
