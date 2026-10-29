@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { test as observedTest } from '../material-network.js';
 
 test('production material composition uses typed intents and never guesses opaque Script/reference content', async ({ page }) => {
   await page.goto('/material.html');
@@ -14,7 +15,7 @@ test('production material composition uses typed intents and never guesses opaqu
   await expect(page.locator('.wp-asset-row')).toHaveCount(0);
 });
 
-test('labelled material prerequisites render every field, retain drafts across tabs, and clear them across accounts', async ({ page }, info) => {
+observedTest('labelled material prerequisites render every field, retain drafts across tabs, and clear them across accounts', async ({ page }, info) => {
   await info.attach('prerequisite', { body: 'Read-only public workspace, explicit version-bound display/edit facts and neutral placeholders; no persisted records or domain schema.', contentType: 'text/plain' });
   await page.goto('/material.html');
   await page.waitForFunction(() => !!(window as unknown as { materialTest?: unknown }).materialTest);
@@ -32,7 +33,11 @@ test('labelled material prerequisites render every field, retain drafts across t
   for (const text of ['Character reference', 'Vale', 'Dark navy overcoat · charcoal suit', 'Identity', 'Late forties, light stubble.', 'Front · neutral expression', 'Wardrobe', 'Navy overcoat over a charcoal suit.', 'Missing views', 'Side and back views are not supplied.', 'Ready']) await expect(dialog.getByText(text, { exact: true })).toBeVisible();
   await expect(dialog.getByAltText('Vale front view')).toBeVisible();
   await page.getByRole('button', { name: 'Close', exact: true }).click();
-  await page.getByRole('tab', { name: 'Script', exact: true }).click();
+  await page.locator('.wp-asset-row').press('Enter');
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.wp-asset-row')).toBeFocused();
+  await page.getByRole('tab', { name: 'Script', exact: true }).press('Enter');
   await expect(page.getByRole('textbox', { name: 'What happens', exact: true })).toHaveValue('Keep this draft while inspecting Assets');
   await page.evaluate(() => (window as unknown as { materialTest: { configure(value: unknown): void } }).materialTest.configure({ prerequisites: true, accountId: 'different-account' }));
   await expect(page.getByRole('textbox')).toHaveCount(0);

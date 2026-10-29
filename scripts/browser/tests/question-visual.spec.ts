@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { compare } from '../compare.js';
+import { settleCapture } from '../capture.js';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 
@@ -11,7 +12,7 @@ for (const width of [1440, 390, 820, 821]) for (const view of ['question', 'prop
     // Apply the approved font mapping in the first stylesheet response, before layout.
     await context.route('http://127.0.0.1:4179/references/app-r11.css', async (route) => {
       const response = await route.fetch();
-      await route.fulfill({ response, body: `${await response.text()}\n:root{--font-sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-display:Georgia,"Times New Roman",serif}b,strong{font-weight:600}` });
+      await route.fulfill({ response, body: `${await response.text()}\n:root{--font-sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-display:Georgia,"Times New Roman",serif}b,strong{font-weight:600}.viewboard{background:var(--raised)}` });
     });
     const reference = view === 'send' ? 'flow2-step1-r73.html' : view === 'proposal' ? 'flow2-step6-r78.html' : 'flow2-step2-r74.html';
     await page.goto(`/references/${reference}`);
@@ -38,7 +39,7 @@ for (const width of [1440, 390, 820, 821]) for (const view of ['question', 'prop
       }
       if (view === 'answer') document.querySelector('.qopts')!.insertAdjacentHTML('afterend', '<p class="approved-feedback">The answer was not submitted. The question stays pending.</p>');
     }, view);
-    await page.evaluate(async () => { await document.fonts.ready; window.scrollTo(0, 0); });
+    await settleCapture(page);
     const measure = () => page.evaluate((view) => {
       const selectors = [
         ...(view === 'send' ? [] : ['.qcard,.wp-question-card']),
@@ -71,8 +72,7 @@ for (const width of [1440, 390, 820, 821]) for (const view of ['question', 'prop
       if (view === 'answer') { await page.getByRole('button', { name: 'He stays still, then gives a small nod', exact: true }).click(); await expect(page.getByRole('status')).toHaveText('The answer was not submitted. The question stays pending.'); }
       if (view === 'proposal') await expect(page.getByText('Cost: $0.12 · estimate', { exact: true })).toBeVisible();
     }
-    await page.mouse.move(1, 1);
-    await page.evaluate(async () => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); await document.fonts.ready; window.scrollTo(0, 0); });
+    await settleCapture(page);
     const actualGeometry = await measure();
     await writeFile(info.outputPath('geometry.json'), JSON.stringify({ reference: referenceGeometry, actual: actualGeometry }, null, 2));
     expect(actualGeometry.map((element) => element.box)).toEqual(referenceGeometry.map((element) => element.box));
@@ -80,7 +80,7 @@ for (const width of [1440, 390, 820, 821]) for (const view of ['question', 'prop
     const changed = await compare(expected, actual, info.outputPath('comparison'));
     const source = await readFile(`docs/design/${reference}`);
     const referenceCss = await readFile('docs/design/app-r11.css');
-    await writeFile(info.outputPath('result.json'), JSON.stringify({ view, width, reference, sourceSha256: createHash('sha256').update(source).digest('hex'), referenceCssSha256: createHash('sha256').update(referenceCss).digest('hex'), approval: 'docs/design/design.md#shell-and-remaining-phase-2-feedback', changedPixels: changed, tolerance: 0, revision: info.config.metadata, browser: context.browser()?.version(), scope: 'Actual review component in inert tracked reference surroundings; read-only prerequisites are not saved work.' }, null, 2));
+    await writeFile(info.outputPath('result.json'), JSON.stringify({ view, width, reference, sourceSha256: createHash('sha256').update(source).digest('hex'), referenceCssSha256: createHash('sha256').update(referenceCss).digest('hex'), approval: 'docs/design/design.md#shell-and-remaining-phase-2-feedback', changedPixels: changed, tolerance: 0, revision: info.config.metadata, browser: context.browser()?.version(), scope: 'Actual review component in inert tracked reference surroundings; the inert rounded Storyboard trigger paints its existing raised surround to avoid translucent-border rounding, identically on both sides. Read-only prerequisites are not saved work.' }, null, 2));
     expect(changed).toBe(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });

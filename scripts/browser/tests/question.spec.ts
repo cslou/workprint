@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { test as observedTest } from '../material-network.js';
+import { activate } from '../activation.js';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import { proposalSchema, workspaceSchema, versionSchema } from '../../../packages/contracts/src/index.js';
@@ -31,14 +33,18 @@ test('workspace order positions supply numbering and ambiguous or mismatched tar
   }
 });
 
-test('real question/proposal/version reads and exact option answers distinguish 401/501 without effects', async ({ page }, info) => {
-  test.setTimeout(120000);
+observedTest('real question/proposal/version reads and exact option answers distinguish 401/501 without effects', async ({ page, materialNetwork }, info) => {
+  observedTest.setTimeout(120000);
   await info.attach('prerequisites', { body: 'Labelled read-only question, proposal, exact versions and identity-bound display facts; not saved product records.', contentType: 'text/plain' });
   const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
   const cleanup: (() => void | Promise<void>)[] = [];
   try {
     await verifyBuiltAdmission({ diagnostic(message) { console.log(message); }, after(fn) { cleanup.push(fn); } }, async ({ origin, accessTokens }) => {
       for (const [token, status, feedback] of [[accessTokens[0], 501, 'Answering is not available yet. The question stays pending.'], [null, 401, 'Sign-in required to answer. The question stays pending.']] as const) {
+        materialNetwork.expectOperations(
+          ...['/v1/questions/question-example', '/v1/proposals/proposal-example', '/v1/versions/vale-v1', '/v1/versions/gallery-v1'].map(path => ({ origin, method: 'GET', path, count: 2, query: {} })),
+          { origin, method: 'POST', path: '/v1/questions/question-example/answers', count: 1, query: {} },
+        );
         const requests: { method: string; path: string; body: unknown }[] = [];
         await page.goto('/question.html');
         await page.waitForFunction(() => !!(window as unknown as { questionTest?: unknown }).questionTest);
@@ -56,7 +62,7 @@ test('real question/proposal/version reads and exact option answers distinguish 
         expect(responses).toEqual([status, status, status, status]);
         expect(requests.map((request) => request.path).sort()).toEqual(['/v1/questions/question-example', '/v1/proposals/proposal-example', '/v1/versions/vale-v1', '/v1/versions/gallery-v1'].sort());
         await expect(page.getByText('Shot 2 · Panel 2.1 · 1 image', { exact: true })).toBeVisible();
-        await page.locator('.wp-proposal summary').click();
+        await activate(page.locator('.wp-proposal summary'), status === 501);
         await expect(page.locator('.wp-proposal details')).toHaveAttribute('open', '');
         await expect(page.locator('.wp-proposal details > div > p')).toHaveText([
           'Vale recognises Mercer in the gallery.',
@@ -65,10 +71,14 @@ test('real question/proposal/version reads and exact option answers distinguish 
           'The output is a generated candidate, not an approved version.',
         ]);
         await page.getByRole('textbox', { name: 'Message' }).fill('This is a message, not an answer');
-        await page.getByRole('button', { name: 'Send', exact: true }).click();
+        await activate(page.getByRole('button', { name: 'Send', exact: true }), status === 501);
         await expect(page.getByText('Sending messages is not available yet. Your message is kept.', { exact: true })).toBeVisible();
         expect(requests).toHaveLength(4);
-        await page.getByRole('button', { name: 'Make this panel', exact: true }).click();
+        await activate(page.getByRole('button', { name: 'Fold the question', exact: true }), status === 501);
+        await expect(page.getByRole('button', { name: 'Make this panel', exact: true })).toHaveCount(0);
+        await activate(page.getByRole('button', { name: 'Show', exact: true }), status === 501);
+        await expect(page.getByRole('textbox', { name: 'Message' })).toHaveValue('This is a message, not an answer');
+        await activate(page.getByRole('button', { name: 'Make this panel', exact: true }), status === 501);
         await expect(page.getByText(feedback, { exact: true })).toBeVisible();
         await expect(page.getByRole('region', { name: 'Question' })).toHaveAttribute('data-question-status', 'pending');
         const answer = requests.find((request) => request.method === 'POST');

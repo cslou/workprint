@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { compare } from '../compare.js';
+import { settleCapture } from '../capture.js';
 
 // Approved in the Story 2 continuation; independent expected copy, not imported from the component.
 const states = [
@@ -22,7 +23,7 @@ for (const width of [1440, 390, 820, 821]) for (const [state, title, message] of
     await page.goto('/references/demo-05.html#lib-yours');
     await page.addStyleTag({ content: ':root{--font-sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-display:Georgia,"Times New Roman",serif}.lp-empty b{font-weight:600}' });
     await page.locator('.lp-empty').evaluate((element, copy) => { element.querySelector('b')!.textContent = copy[0] ?? ''; element.querySelector('span')!.textContent = copy[1] ?? ''; }, [title, message]);
-    await page.evaluate(async () => { await document.fonts.ready; window.scrollTo(0, 0); });
+    await settleCapture(page);
     const bounds = await page.locator('.lp-empty').boundingBox();
     const reference = await page.locator('.lp-empty').screenshot({ path: info.outputPath('reference-region.png'), animations: 'disabled' });
     const referenceFull = await page.screenshot({ path: info.outputPath('reference-full.png'), fullPage: true, animations: 'disabled' });
@@ -36,7 +37,7 @@ for (const width of [1440, 390, 820, 821]) for (const [state, title, message] of
     });
     await page.evaluate((apiOrigin) => (window as unknown as { libraryTest: { configure(value: unknown): void } }).libraryTest.configure({ apiOrigin, token: null, accountId: 'read-only-visual-scope' }), state === 'unconfigured' ? '' : 'http://127.0.0.1:4179');
     await expect(page.getByRole('status')).toHaveText(title + message);
-    await page.evaluate(async () => { await document.fonts.ready; window.scrollTo(0, 0); });
+    await settleCapture(page);
     expect(await page.getByRole('status').boundingBox()).toEqual(bounds);
     const actual = await page.getByRole('status').screenshot({ path: info.outputPath('actual-region.png'), animations: 'disabled' });
     const actualFull = await page.screenshot({ path: info.outputPath('actual-full.png'), fullPage: true, animations: 'disabled' });

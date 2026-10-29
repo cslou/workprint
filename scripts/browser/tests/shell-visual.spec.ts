@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { compare } from '../compare.js';
+import { settleCapture } from '../capture.js';
 import { writeFile } from 'node:fs/promises';
 
 // Independent approved substitutions into the tracked opening/dialog references.
@@ -35,7 +36,7 @@ for (const width of [1440, 390, 820, 821]) for (const state of states) {
       if (state === 'new' || state === 'recents' || state === 'load') { const value = copy[state]; title = value[0]!; body = `<div class="approved-rows"><p>${value[1]}</p><p>${value[2]}</p></div>`; }
       document.body.insertAdjacentHTML('beforeend', `<div class="lightbox" style="display:flex"><div class="lb-panel"><div class="lb-head"><h2>${title}</h2><span class="qclose">×</span></div>${body}</div></div>`);
     }, { state });
-    await page.evaluate(async () => { await document.fonts.ready; window.scrollTo(0, 0); });
+    await settleCapture(page);
     const reference = await page.screenshot({ path: info.outputPath('reference-full.png'), fullPage: true, animations: 'disabled' });
     await page.goto('/shell.html');
     await page.waitForFunction(() => !!(window as unknown as { shellTest?: unknown }).shellTest);
@@ -63,8 +64,7 @@ for (const width of [1440, 390, 820, 821]) for (const state of states) {
       }
       await expect(page.getByRole('dialog')).toBeVisible();
     } else await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-    await page.mouse.move(1, 1);
-    await page.evaluate(async () => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); await document.fonts.ready; window.scrollTo(0, 0); });
+    await settleCapture(page);
     const actual = await page.screenshot({ path: info.outputPath('actual-full.png'), fullPage: true, animations: 'disabled' });
     const changed = await compare(reference, actual, info.outputPath('comparison'));
     await writeFile(info.outputPath('result.json'), JSON.stringify({ state, width, reference: 'docs/design/flow2-step1-r73.html + flow1-step4-r85.html#look-a dialog geometry', approval: 'docs/design/design.md#shell-and-remaining-phase-2-feedback', revision: info.config.metadata, changedPixels: changed, tolerance: 0 }, null, 2));
