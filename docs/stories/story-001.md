@@ -7,6 +7,7 @@
 **Status:** 🔵 In Progress
 **Planning review:** an independent review (2026-10-29) found one P1 (the port scope missed about 100 hardcoded references and the fixed 4180 preview server) and two P2s (exception pass conditions, and the target-branch exception). All three are resolved; re-check **5/5**.
 **Start (2026-10-29):** Lou authorized starting Phase 3 Wave 1, beginning with this story ("lets stick to the plan … Are we ready to commence?"). Working branch `feat/parallel-sprint-foundation` from `phase-3` at `20a9fab`. This authorizes this story's implementation and its PR into `phase-3`, not the sprint branches.
+**Scope change (2026-10-29):** Lou moved the Mastra 1.80.x upgrade out of this story ("proceed without the upgrade first … when the sprints are done proceed with the upgrade"). pnpm 11's default 24-hour minimum release age blocked the new versions until about 14:00Z, and nothing in Wave 1 needs them. Both Wave 1 sprints run on the current 1.79.0 set; the upgrade becomes its own standalone story into `phase-3` after Wave 1 and before Wave 2 (backlog B-007). The approved transitive `zod-from-json-schema` 0.5.6→0.5.2 pin goes with it.
 **Target branch:** `phase-3`, the Phase 3 integration branch created from `main` at `c1397c3`. This is an explicit exception to the default-branch rule below: Lou approved Phase 3 packaging through `phase-3`, as Phase 2 did through `phase-2` (see Related). `main` changes only through Lou's `phase-3` → `main` merge.
 **Working branch:** `feat/parallel-sprint-foundation`
 **Related issue/spec/sprint/PR:** [Phase 3 sprint packaging](../specs/implementation-spec-001.md#phase-3-sprint-packaging); prerequisite of [Sprint 004](../sprints/sprint-004.md) and [Sprint 005](../sprints/sprint-005.md)
@@ -29,7 +30,7 @@
 
   Today none of these exist, and building any of them inside either sprint would create a cross-sprint dependency or a duplicate.
 - **Expected behavior/outcome:**
-  - `phase-3` carries the upgraded Mastra 1.80.x version set with the full suite unchanged.
+  - Both sprints use the current Mastra 1.79.0 set; the 1.80.x upgrade is deferred (see Scope change).
   - A per-checkout browser-test port is available.
   - A backend-composed owned-conversation check is supplied to `application`, with a test-only helper that creates native conversations for an account through supported native APIs.
   - Both sprints then branch from this head.
@@ -38,10 +39,11 @@
 
 **As a** maintainer, **I want** one shared, verified Phase 3 base for the native version set, conversation ownership and concurrent test ports, **so that** Sprints 004 and 005 can run in parallel without building on each other or duplicating foundations.
 
-- **Scope:** a dependency upgrade, a test-harness port setting, and one narrow trusted read collaborator plus its test-only fixture helper.
+- **Scope:** a test-harness port setting, and one narrow trusted read collaborator plus its test-only fixture helper.
 - **Non-goals:**
   - conversation create/list/load routes, UI or Recents (Sprint 004, Story 3);
-  - the B-001 fix (Sprint 004, Story 1), though this story records the upgraded ingress result;
+  - the Mastra 1.80.x upgrade (deferred by Lou on 2026-10-29; see Scope change);
+  - the B-001 fix (Sprint 004, Story 1), though this story records the current ingress result;
   - native Agent, send/stream or workflows;
   - application tables or migrations (Sprint 005);
   - any application operation becoming available;
@@ -64,23 +66,13 @@
 
 - **Existing flows affected:**
   - developer browser/visual verification, which gains a per-checkout port;
-  - build/dev/start and native storage preparation, on the upgraded Mastra version.
   
   No product flow changes: every application operation and native capability keeps its current outcome.
 - **New flows introduced:** the internal trusted conversation-ownership check used by later conversation-scoped operations. It has no browser-facing route of its own.
 
 ## Acceptance Criteria
 
-- [ ] **Mastra version set.**
-  - `mastra` becomes the current 1.36.x and `@mastra/core` the current 1.80.x. `@mastra/pg` and the other Mastra packages move to their matching compatible releases; the transitive `@mastra/deployer` becomes 1.80.x.
-  - The versions are exact, with a frozen lockfile and no other dependency changes.
-  - `pnpm install --frozen-lockfile`, `check`, `build` and `test` pass. `test:browser` passes with its count unchanged, and `test:visual` passes with zero drift.
-  - **Exceptions:**
-    - `qualify:ingress` may fail only on the two existing B-001 leaves;
-    - `audit` may report only the existing B-002 and B-004 advisories;
-    - each is recorded leaf by leaf or advisory by advisory and never counted as a pass;
-    - a new or worsened failure, or any new advisory, fails the story. If B-001 now passes, record it.
-  - A breaking change that needs more than version-mechanical adaptation stops the story for escalation.
+- **Mastra version set — moved out of this story** (Lou, 2026-10-29; see Scope change). Manifests, lockfile and release-age settings stay unchanged. The full ordered suite still runs at the final head, under the exceptions in Regression verification.
 - [ ] **Browser-test ports.**
   - One environment setting (default `4179`) defines the browser origin. It drives:
     - the Playwright `baseURL` and web-server URL;
@@ -105,28 +97,24 @@
 ## Implementation Plan
 
 - **Touched modules/files:**
-  - `package.json`, `apps/api/package.json`, `pnpm-lock.yaml`;
   - `scripts/browser/playwright.config.ts`, `apps/web/vite.test.config.ts`, the pair helpers and specs under `scripts/browser/`, the `apps/web/test/*-mount.tsx` origins, and the documented command/environment notes in `README.md`;
   - the collaborator type in `apps/api/src/application/`;
   - its implementation in `apps/api/src/agent/mastra/`, which the spec assigns trusted conversation access;
   - additive composition in `apps/api/src/mastra/`;
   - tests and the helper in `apps/api/test/`.
 - **Approach:**
-  1. Upgrade first and run the full ordered suite, so later commits sit on the settled version set.
+  1. Keep the current Mastra version set; the upgrade is deferred.
   2. Observe the real native thread shape before writing the mapping.
   3. Keep the collaborator to a single question. Sprint 004 builds conversation operations on it; Sprint 005 calls it for every conversation-scoped read or write.
   4. Replace the port literals mechanically through one shared harness origin helper, plus the page origin in mounts.
   5. Run the concurrent check as a scripted pair of full-suite runs in two checkouts, kept as evidence, not as a persistent suite.
 - **Risks/rollback:**
-  - Upgrade regressions in the generated server or native storage are caught by the full suite. If a fix needs non-mechanical change, stop for escalation.
   - Rollback is a normal `git revert` of the PR.
-  - If the upgrade happens to fix B-001, record that; Sprint 004 Story 1 still owns the qualification and its locking.
-- **New dependencies:** None. These are version upgrades of existing Mastra packages.
+- **New dependencies:** None.
 - **Planned commits:**
-  1. `Chore(deps): Upgrade Mastra to 1.80` — exact versions, frozen lockfile and the full ordered suite.
-  2. `Test(browser): Make test ports configurable` — one origin setting, preview port, literal replacement and the concurrent full-suite check.
-  3. `Feat(api): Add owned-conversation check` — the collaborator, native implementation and bootstrap composition.
-  4. `Test(api): Prove conversation ownership` — the fixture helper, two-account tests and exposure-check extension.
+  1. `Test(browser): Make test ports configurable` — one origin setting, preview port, literal replacement and the concurrent full-suite check.
+  2. `Feat(api): Add owned-conversation check` — the collaborator, native implementation and bootstrap composition.
+  3. `Test(api): Prove conversation ownership` — the fixture helper, two-account tests and exposure-check extension.
 
 ## Verification Plan
 
@@ -143,7 +131,7 @@
     - a run against an occupied port exits non-zero with a port error;
     - a repository search shows `4179`/`4180` only as the defaults;
     - logs are saved under `outputs/verification/foundation/<sha>/`.
-  - [ ] **Upgrade:** the full ordered suite passes on the upgraded version set, as stated in the acceptance criteria. The redacted observed native thread shape and the `qualify:ingress`/`audit` results are recorded in the PR.
+  - **Upgrade:** moved out of this story (see Scope change). The redacted observed native thread shape and the `qualify:ingress`/`audit` results are still recorded in the PR.
 - **Regression verification:**
   - [ ] The full ordered suite runs with the standard environment: `pnpm install --frozen-lockfile`, `check`, `build`, `test`, `test:browser`, `test:visual`, `qualify:ingress`, `audit`.
     - `WORKPRINT_AUTH_FIXTURE="$PWD/outputs/local-supabase.setup.json"`
