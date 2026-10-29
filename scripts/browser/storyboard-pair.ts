@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { compare } from './compare.js';
 import { settleCapture } from './capture.js';
 import { referenceFonts } from './material-reference.js';
+import { exportEntryMarkup } from './export-reference.js';
 import { requestReference, storyboardReference } from './storyboard-reference.js';
 
 /** Shared paired capture contract; expected markup remains independent tracked-reference substitutions. */
@@ -14,7 +15,7 @@ export async function captureStoryboardPair(page: Page, context: BrowserContext,
   const source = await readFile('docs/design/flow2-step7-r79.html', 'utf8');
   await page.goto('/references/flow2-step1-r73.html'); await page.addStyleTag({ content: referenceFonts });
   if (view === 'videos') await page.evaluate(requestReference, {});
-  await page.evaluate(storyboardReference, { source, view, ...(edit ? { edit } : {}) });
+  await page.evaluate(storyboardReference, { source, view, exportEntry: exportEntryMarkup(true), ...(edit ? { edit } : {}) });
   const selectors = ['.panel', '.ptabs,.wp-tabs', ...(view === 'videos' ? ['.take-item,.wp-video-row', '.take-hist,.wp-version-history,.wp-request-details', '.need,.wp-request-card'] : ['.sb-shot,.wp-storyboard-shot', '.sb-panel,.wp-storyboard-panel']), ...(view === 'panel' ? ['.lb-panel.wide,.wp-modal', '.notes,.wp-panel-version p', '.choose,.wp-version-use-viewer .wp-button-primary'] : view === 'board' ? ['.lb-panel.board,.wp-modal-board', '.lb-scroll,.wp-storyboard-board', '.bshot,.wp-board-shot', '.bgrid,.wp-board-grid', '.plabel .edit,.wp-version-pencil .wp-button-icon', '.viewboard,.wp-storyboard > .wp-button-secondary', 'html,body'] : []), ...(edit ? ['textarea', '.approved-edit-actions,.wp-version-edit-actions', '.approved-edit-actions button,.wp-version-edit-actions button'] : [])];
   const measure = () => page.evaluate(selectors => selectors.map(selector => { const nodes = [...document.querySelectorAll(selector)]; if (!nodes.length) throw new Error(`Missing paired geometry ${selector}`); return { selector, boxes: nodes.map(node => node.getBoundingClientRect().toJSON()), styles: nodes.map(node => { const style = getComputedStyle(node); return Object.fromEntries(['font', 'line-height', 'color', 'background', 'border', 'border-radius', 'appearance', 'position', 'z-index', 'padding', 'margin', 'transform', 'opacity', 'box-shadow', 'overflow', 'height'].map(key => [key, style.getPropertyValue(key)])); }) }; }), selectors);
   await settleCapture(page);

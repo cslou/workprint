@@ -1,0 +1,8 @@
+import { exportSchema, versionSchema, workspaceSchema } from '@workprint/contracts';
+// Labelled read-only prerequisites. No command produced these records or versions.
+export const exportVideo = versionSchema.parse({ id: 'video-exact', artifactId: 'video-artifact', revision: 4, kind: 'video', media: { contentType: 'video/mp4', byteSize: 512, width: 640, height: 360 }, createdBy: 'human', createdAt: '2026-10-29T00:00:00Z', dependencies: [] });
+export const exportWorkspace = workspaceSchema.parse({ script: null, assets: [], storyboard: { work: null, shots: [{ shotId: 'shot-exact', order: 7, intent: 'First Shot', chosenVideoVersionId: 'video-earlier', panels: [] }] }, videos: [{ id: 'request-exact', batchId: 'batch-exact', proposalId: 'proposal-exact', purpose: 'shot_video', target: { shotId: 'shot-exact' }, status: 'succeeded', resultVersionId: 'video-exact', remote: {} }], pendingQuestion: null, activeWork: [], selectionRevision: 17 });
+export const exportRecords = [
+  exportSchema.parse({ id: 'export-exact', status: 'succeeded', capturedSelectionRevision: 12, current: false, sources: [{ shotId: 'shot-exact', versionId: 'video-exact', order: 5 }, { shotId: 'missing-shot', versionId: 'missing-version', order: 1 }], compatibility: { compatible: true, issues: [] }, outputVersionId: 'output-exact' }),
+  exportSchema.parse({ id: 'export-failed', status: 'failed', capturedSelectionRevision: 17, current: true, sources: [{ shotId: 'shot-exact', versionId: 'video-exact', order: 5 }], compatibility: { compatible: false, issues: [{ versionId: 'video-exact', message: 'Frame rates differ.' }, { versionId: 'missing-version', message: 'Source is unavailable.' }] }, failureReason: 'Source streams are incompatible.' }),
+];

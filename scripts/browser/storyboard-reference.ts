@@ -1,12 +1,12 @@
 // Independent tracked r73 shell plus approved r11 item/disclosure/control substitutions.
-export function storyboardReference({ source, view, edit }: { source: string; view: 'storyboard' | 'panel' | 'board' | 'videos'; edit?: 'shot' | 'panel' }) {
+export function storyboardReference({ source, view, edit, exportEntry = '' }: { source: string; view: 'storyboard' | 'panel' | 'board' | 'videos'; edit?: 'shot' | 'panel'; exportEntry?: string }) {
   const required = (selector: string, root: ParentNode = document) => { const node = root.querySelector(selector); if (!node) throw new Error(`Missing tracked reference ${selector}`); return node; };
   const active = view === 'videos' ? 'p-takes' : 'p-storyboard';
   const tracked = new DOMParser().parseFromString(source, 'text/html');
   document.querySelectorAll('.pv.default,.ptabs a.default').forEach(node => node.classList.remove('default'));
   const target = required('#'+active); target.classList.add('default'); required(`.ptabs a[href="#${active}"]`).classList.add('default');
   if (view === 'videos') {
-    target.insertAdjacentHTML('afterbegin','<div class="take-item" style="display:block"><div class="ftitle"><b><span class="sn">1</span>First Shot</b></div><p style="margin:4px 0 6px;font-size:12px;color:var(--fg-subtle)">Version 2 · 5.1 s</p><div class="th-row" style="display:block;margin-top:0"><button class="use" disabled style="opacity:.45;line-height:1.5">Use this version</button></div><details class="take-hist"><summary>Version history</summary></details></div>');
+    target.insertAdjacentHTML('afterbegin', exportEntry + '<div class="take-item" style="display:block"><div class="ftitle"><b><span class="sn">1</span>First Shot</b></div><p style="margin:4px 0 6px;font-size:12px;color:var(--fg-subtle)">Version 2 · 5.1 s</p><div class="th-row" style="display:block;margin-top:0"><button class="use" disabled style="opacity:.45;line-height:1.5">Use this version</button></div><details class="take-hist"><summary>Version history</summary></details></div>');
     return;
   }
   // The approved dialog action uses a native button, not prototype hash navigation.

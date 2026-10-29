@@ -1,0 +1,18 @@
+.wp-export-entry { border: var(--border-width-default) solid var(--color-border-strong); border-radius: var(--radius-xl); background: var(--color-bg-canvas); padding: var(--space-14); margin-bottom: var(--space-24); }
+.wp-export-entry > p { font-size: var(--font-size-12); color: var(--color-text-subtle); margin: 0 0 var(--space-12); }
+.wp-export-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-8); }
+.wp-export-history { display: grid; gap: var(--space-8); }
+.wp-export-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2) var(--space-10); padding: var(--space-10) var(--space-12); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-md); background: var(--color-bg-canvas); }
+.wp-export-card > b { font-weight: var(--font-weight-semibold); }
+.wp-export-card > p { grid-column: 1 / -1; font-size: var(--font-size-12); color: var(--color-text-subtle); }
+.wp-export-card > div { grid-column: 1 / -1; margin-top: var(--space-6); }
+.wp-export-facts { display: grid; gap: var(--space-14); }
+.wp-export-facts p, .wp-export-facts li { font-size: var(--font-size-13); color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.wp-export-facts .wp-export-hint { font-size: var(--font-size-12); color: var(--color-text-subtle); margin-top: var(--space-6); }
+.wp-export-facts section { border-top: var(--border-width-default) solid var(--color-border-default); padding-top: var(--space-12); }
+.wp-export-label { color: var(--color-text-subtle); font-size: var(--font-size-12); margin-bottom: var(--space-6); }
+.wp-export-facts ol { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--space-8); }
+.wp-export-facts li { border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-md); background: var(--color-bg-canvas); padding: var(--space-10) var(--space-12); }
+.wp-export-facts .wp-button { justify-self: start; }
+.wp-export-unavailable p + p { margin-top: var(--space-4); }
+.wp-modal:has(.wp-export-facts), .wp-modal:has(.wp-export-history) { max-height: calc(100vh - 2 * var(--space-24)); overflow: auto; }

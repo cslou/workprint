@@ -700,7 +700,7 @@ Categories, names and images come only from labelled read-only display facts key
 
 Attach lines use the same plain line beneath the tray as the approved Use-version feedback, but attaching a reference is not selection: no line says the selection changed. A selected local file shows no chip, filename, thumbnail, progress or attachment; the input is cleared after the attempt. Attaching sends each exact version with purpose `reference`; with no current conversation the tray stays disabled and no `useVersion` or `requestUpload` is sent. Real transfer, validation, partial-success recovery and confirmation remain P3-S3/S4, not this wiring milestone. The ignored `outputs/verification/sprint-003/design-proposals/story3/` previews are historical evidence only, never runtime or comparison dependencies.
 
-**003/Story 4 — approved for later, not implemented here.** Reuse `demo-18.html#p-takes`'s direct Videos Export direction and the shared viewer dialog, excluding Editor/scene playback. Card: `Chosen source versions`, then `Export` and `Export history`. Remove displayed selection revision and test prerequisite lines. No settings profile, fake record/progress, generated URL or download is authorized.
+**Direct Export, history/status and download consumers — 003/Story 4.** **Provisionally approved by the orchestrator on 2026-10-29 under Lou's delegation; pending Lou's ratification at the Phase 2 handoff.** Reuse `demo-18.html#p-takes`'s direct Videos Export direction, `app-r11.css`'s item-card/neutral-status treatments and the shared 560px viewer dialog (342px wide at a 390px viewport). The populated history/detail layout structure, sectioning, wrapping, scrolling and shared loading pattern are approved with the binding substitutions below. Card: `Chosen source versions`, then `Export` and `Export history`. Creators never see opaque IDs, internal selection revisions, numeric source order or test-prerequisite lines. No Editor, scene playback, settings profile, fake record/progress, deletion or retry is authorized. Download is an exact output-version media-access consumer, not a generated URL or working export claim.
 
 | Surface | Exact unavailable text |
 | --- | --- |
@@ -708,6 +708,18 @@ Attach lines use the same plain line beneath the tray as the approved Use-versio
 | History | `Export history is not available yet.` / `No export records were loaded.` |
 | Detail | `Export details are not available yet.` / `No export record was loaded.` |
 | Download | `Download is not available yet.` / `No file was downloaded.` |
+
+The four unavailable pairs retain the same shared two-line empty treatment. Download uses its pair on every settled outcome, including successful media access, with no anchor, navigation or file. Phase 2 qualifies the exact media-access call only; trusted origin and attachment delivery remain P3-S10. Loading uses the existing shared treatment without progress or a fabricated record.
+
+- **Status pill:** capitalize the exact typed value: `Queued`, `Processing`, `Succeeded`, `Failed`, `Cancelled`. Technical success is not approval.
+- **History card:** title `Export`, status pill, then only the typed `current` boolean: true → `Uses your current chosen versions.`; false → `Uses earlier chosen versions.` Then visible `Export details`, with a position-distinguishing accessible name such as `Export details, export 2 of 3`. No ID or revision number.
+- **Detail:** heading `Export details`, the status pill and the same currentness line. Section `Shots in this export` contains one row per source in server `order`. Resolve the exact `shotId` and `versionId` against already-loaded Videos workspace data using own-property and exact-ID matching only: `Shot {n} · Version {revision}`. If either identity is absent, show `Not in the current Videos list`. Never expose raw IDs or numeric order.
+- **Compatibility:** show a section only when typed `compatible` is false, headed `Can't be combined`. Each issue line is its resolved source label (same rule) + ` — ` + the server's literal message.
+- **Failure:** when `failureReason` is present, section `Why it failed`, followed by the literal reason.
+- **Output:** when `outputVersionId` is present, show `Download` without its ID. It calls the existing `media` operation for exactly that version. No URL construction or independent download transport.
+- **Read-only contract projection:** status, currentness and compatibility come only from their typed fields. No local stale-submission rules, export state machine, stream validation, inferred currentness or processing is approved. Populated records remain labelled read-only prerequisites in isolated mounts until their real producer exists.
+
+The ignored `outputs/verification/sprint-003/design-proposals/story4/` previews preserve the initial candidates as `*-v1` and regenerate populated history/detail with these final substitutions. They are inspection evidence only; runtime and reference comparisons use tracked references plus this record, never ignored assets. This is provisional design approval, not implementation acceptance.
 
 ### Reference sheet
 
