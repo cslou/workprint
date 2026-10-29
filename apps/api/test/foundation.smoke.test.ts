@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { globSync } from 'node:fs';
-import { mkdir, readFile, stat } from 'node:fs/promises';
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -55,6 +55,25 @@ test('clean tracked export installs frozen, prepares, builds and serves built/de
     });
     try {
       assert.deepEqual(await (await server.response(`http://127.0.0.1:${port}/health`)).json(), { success: true });
+      if (mode === 'dev') {
+        const sourcePath = join(checkout, 'apps/api/src/mastra/server.ts');
+        const original = await readFile(sourcePath, 'utf8');
+        const modified = original.replace('context.json({ success: true })', 'context.json({ success: true, reloadProof: true })');
+        assert.notEqual(modified, original, 'Reload control changes the actual health handler');
+        try {
+          await writeFile(sourcePath, modified);
+          const reloadDeadline = Date.now() + 15000;
+          for (;;) {
+            try {
+              const response = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(1000) });
+              const body = await response.json() as { reloadProof?: boolean };
+              if (body.reloadProof === true) break;
+            } catch { /* A reload briefly closes the listener; only the changed response proves success. */ }
+            if (Date.now() > reloadDeadline) throw new Error('TypeScript watch / Node reload deadline exceeded');
+            await delay(100);
+          }
+        } finally { await writeFile(sourcePath, original); }
+      }
       const html = await (await server.response(`http://127.0.0.1:${webPort}`)).text();
       assert.match(html, /Workprint/, 'The served application page retains its identity');
       const asset = html.match(/src="([^"]+\.(?:js|tsx))"/)?.[1];
