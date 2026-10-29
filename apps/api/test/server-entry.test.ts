@@ -143,6 +143,7 @@ test('built entry preserves HTTP, worker, recovery and signal lifecycle', { time
     export const mastra = await createBackend([
       registerApiRoute('/__entry/error', { method: 'GET', handler: () => { throw new Error('Synthetic entry failure'); } }),
       registerApiRoute('/__entry/slow', { method: 'GET', handler: async c => { record('request-started'); await delay(600); return c.json({ completed: true }); } }),
+      registerApiRoute('/__entry/stalled', { method: 'POST', handler: async () => { record('stalled-handler-started'); return new Promise(() => {}); } }),
     ]);
     mastra.setServerMiddleware([async (c, next) => {
       if (c.req.path === '/__entry/error') throw new Error('Synthetic entry failure');
@@ -203,22 +204,21 @@ test('built entry preserves HTTP, worker, recovery and signal lifecycle', { time
   });
   const stalled = async (name: string) => {
     const target = await begin(name);
-    const upload = request(`${target.origin}/v1/conversations/c/versions`, { method: 'POST', headers: { ...target.headers, 'Content-Type': 'application/json' } });
+    const upload = request(`${target.origin}/__entry/stalled`, { method: 'POST', headers: { ...target.headers, 'Content-Type': 'application/json' } });
     const closed = new Promise<void>((resolve) => { upload.once('error', () => {}); upload.once('close', resolve); });
-    upload.write('{"unfinished":');
-    await new Promise<void>((resolve) => upload.once('socket', (socket) => { if (socket.connecting) socket.once('connect', resolve); else resolve(); }));
-    // The server has accepted this upload before shutdown; the client never ends it.
-    await delay(100);
+    upload.end('{}');
+    await waitFor('stalled-handler-started');
+    // Hold downstream work after completed-body admission; intake itself is now bounded.
     t.after(() => { upload.destroy(); });
     return { ...target, upload, closed };
   };
-  await t.test('stalled upload is server-closed at the five-second drain bound', async () => {
+  await t.test('stalled handler is server-closed at the five-second drain bound', async () => {
     const target = await stalled('stalled');
     const started = Date.now();
     await signal('workers-started', 'SIGTERM');
     assert.equal(await exitWithin(target.server, 7000), 0);
     await target.closed;
-    assert.equal(target.upload.writableEnded, false);
+    assert.equal(target.upload.writableEnded, true, 'The stalled work has a completed request body');
     assert.ok(Date.now() - started >= 4800 && Date.now() - started < 6500);
     assert.match(await readFile(join(fixture.logs, 'stalled.log'), 'utf8'), /drain timed out; closing remaining HTTP connections/);
   });
