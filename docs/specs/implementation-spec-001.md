@@ -1049,6 +1049,36 @@ The approved spec scope supersedes older architecture/design language about spen
 - [ ] Functional UI designs are approved; desktop/narrow keyboard/focus/loading/error checks, relevant automated suites and existing application-repository checks pass with reproducible evidence and no sensitive logs.
 - [ ] Agent-created prerequisites, tools/skills, provider execution and complete agent-driven flows remain explicitly assigned to Phase 4. Phase 4 now also owns remaining combined-product acceptance and release, not deferred Phase 3 feature correctness.
 
+#### Phase 3 sprint packaging
+
+Approved by Lou on 2026-10-29. Phase 3 runs as parallel waves. Sprints in one wave run concurrently in separate worktrees and do not depend on each other. Stories inside a sprint run strictly in order. Only Wave 1's documents are written; later sprint documents are created when their wave starts, from this allocation and the earlier waves' actual results.
+
+| Wave | Sprint | Stories, in order | Owns |
+| --- | --- | --- | --- |
+| Foundation | [Story 001](../stories/story-001.md) | Mastra 1.80.x upgrade; per-checkout browser-test port; trusted owned-conversation check and its test-only native-conversation helper | Dependency versions, browser harness port, the collaborator in `application`/`agent/mastra` |
+| 1 | [Sprint 004](../sprints/sprint-004.md) — Native runtime and conversations | B-001 → P3-S1a (account/session, then owned conversation navigation/history) → P3-S1b (send/stream/persist, then queue/reconnect/exact-turn Stop) → P3-S18 → P3-S19 | Backend `mastra/` serving/auth/native/workflow adapters, `agent/mastra/`, web `shell/` account/New video/Recents and native-history parts of `conversation/`, native/Auth client methods. No application tables |
+| 1 | [Sprint 005](../sprints/sprint-005.md) — Saved work, uploads and media | P3-S2 (schema and owned reads, then manual saves) → P3-S3 (storage/upload coordination, then media verification and upload UI) → P3-S4 → P3-S5 (storyboard edits with the selection revision, then exact Shot-video choice) → P3-S10 → real-R2 qualification | `supabase/` migrations, `db`, `artifacts`, `storage`, `application`; the `workspace`, version, `library`, save/use, `editStoryboard`, upload and `media` operations; web materials/versions/library/uploads/storyboard/videos choice/media; `player` |
+| 2 | 006 — Chat, decisions and generation records | P3-S1c (browser chat, live-model qualification, usage) → P3-S7 (with B-003 display names) → P3-S8 | `usage`, `generation`, question/answer additions in `artifacts`, web `conversation/` chat/question/proposal and `videos/` request views |
+| 2 | 007 — Export | P3-S11 → P3-S12 → P3-S13 | `exports`, FFmpeg assembly in `storage` (reusing 005's bounded media-process adapter), export workflow registration in `mastra/`, web `exports/`; output published through 005's artifacts media-version interface |
+| 3 | 008 — Refresh and Phase 3 acceptance | P3-S9 → P3-S17; retire remaining test pages (B-005); B-006 tidy-ups; carried Phase 2 items | Refresh/reconnect across features, acceptance evidence, surface catalog and Phase 4 hand-off |
+
+Wave 2 starts after both Wave 1 sprints integrate, because 006 and 007 need 004's qualified native execution (P3-S18/S19) and 005's saved-work, storage and selection rules. Wave 3 needs 005's manual changes and 007's export workflow updates.
+
+**Parallel rules**
+
+- **Ownership:** each sprint edits only its owned modules and implements its allocated existing contract operations.
+- **Shared files:** contracts/api-client indexes, `application`'s operation map, `apps/api/src/mastra/application-routes.ts`, backend registration/bootstrap, shell composition and the `storage` index take additive edits only.
+- **Lockfile:** `pnpm-lock.yaml` conflicts are regenerated with `pnpm install`, never hand-merged.
+- **Integration order:** each sprint integrates into `phase-3` on Lou's explicit merge command. Whichever wave-mate integrates second first merges `phase-3` into its branch, without a rebase, then reruns the full suite on the combined head. That rerun requalifies shared collaborators and the native version set.
+- **Escalation:** if a story finds it needs a wave-mate's unintegrated work, it stops and escalates; it never builds a substitute.
+
+**Decisions recorded with this packaging**
+
+- **R2, local first:** P3-S3/S10 are developed and tested against a pinned local S3-compatible emulator (SeaweedFS 4.51, by digest). Their real development-R2 criteria move to a dedicated final qualification story in Sprint 005. Sprint 005 cannot complete without it, and Lou provides the bucket before that story starts.
+- **P3-S1c moves to Wave 2:** it needs 005's migration workflow for usage records, plus Lou's live-model choice and call authorization.
+- **New designs:** unseen states get inert previews first. The orchestrator provisionally approves them under Lou's delegation, pending ratification at the Phase 3 handoff.
+- **Audit exceptions:** B-002 and B-004 have no upstream fix as of 2026-10-29. They gate shared or public deployment, not Phase 3 native-runtime qualification. B-001 does gate that qualification, and Sprint 004 resolves it first.
+
 ### Phase 4 — Agent Capabilities, Media Generation and Release
 
 #### Outcome
