@@ -1,5 +1,19 @@
 # Workprint — Application Design History
 
+## Owned saved-work reads — 2026-10-29
+
+**Provisionally approved by the orchestrator on 2026-10-29 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff.**
+
+- **What:** Sprint 005 Story 1's 14 new states:
+  - version-history and Library pagination, with loading, failure and complete states;
+  - initial history loading and failure;
+  - viewing an earlier exact version;
+  - the neutral empty-Library second line;
+  - text-only references with a `No image` thumbnail and sheet.
+- **Change:** one, from the preview. Library's `Load more` moves from a fixed band above the selection tray to the end of the scrolling grid, matching the history pattern.
+- **Where:** exact copy and behavior are in [Phase 3 saved-work reads](design.md#phase-3-saved-work-reads).
+- **Previews:** ignored files in `outputs/verification/sprint-005/design-proposals/owned-reads/` (the `workprint-2` clone), kept as historical evidence only.
+
 ## Phase 2 review — 2026-10-29
 
 **Lou ratified the Sprint 003 Story 2–4 designs** after a side-by-side review of all Phase 2 reference/app screenshot pairs: single-clip playback and unavailable media, material inputs and the populated Library picker, and direct Export history/status/download. Their entries below and in [design.md](design.md#shell-and-remaining-phase-2-feedback) now read as approved by Lou. No layout or copy changed.

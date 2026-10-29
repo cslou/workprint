@@ -723,6 +723,30 @@ The four unavailable pairs retain the same shared two-line empty treatment. Down
 
 The ignored `outputs/verification/sprint-003/design-proposals/story4/` previews preserve the initial candidates as `*-v1` and regenerate populated history/detail with these final substitutions. They are inspection evidence only; runtime and reference comparisons use tracked references plus this record, never ignored assets. This is design approval (by Lou, 2026-10-29), not implementation acceptance.
 
+### Phase 3 saved-work reads
+
+**Owned saved-work reads — 005/Story 1.** Provisionally approved by the orchestrator on 2026-10-29 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff. The approval covers 14 states shown as inert previews at 1440×900 and 390×844, with one change (Library pagination placement, below). Everything else reuses the approved Script sections, reference rows and sheets, Version/Use history rows, Library fallback tiles and shared buttons, with no token changes.
+
+- **Version history pagination:** after the loaded rows, a secondary `Load earlier versions` button. It loads only when activated, and pages are appended.
+  - Next-page loading keeps the rows, disables the button and adds the plain line `Loading earlier versions…`.
+  - Next-page failure keeps the rows, restores the same button and adds `Earlier versions could not be loaded. The versions already shown are unchanged.`
+  - The button is removed only when there is no next page. Only then does the summary show the known count, `Version history · N earlier`.
+  - The initial read shows `Loading version history…`. If it fails, the button `Load version history` plus `Version history could not be loaded.`
+- **Earlier exact version:** `Viewing version N` with a quiet `Back to current version`. Earlier content is read-only, with no edit pencil. Viewing or returning approves or selects nothing.
+- **Library pagination:** a secondary `Load more`, with `Loading more Library items…` and `More Library items could not be loaded. The items already shown are unchanged.`
+  - Loading keeps the tiles; the button is removed when there is no next page.
+  - **Change from the preview:** the button and its line sit inside the scrolling grid, directly after the last row of tiles and left-aligned, like the history button. They are not in a fixed band above the selection tray; the tray is unchanged.
+  - No Examples switch, and no Draft/Ready pills on Library tiles. Search keeps its approved loaded-items-only behavior.
+- **Empty Library:** `Nothing saved yet` / `Your saved work will appear here.`, in the shared two-line empty treatment.
+- **Reference without an image:** the Asset row keeps its layout with a dashed `No image` thumbnail; no invented media, and the reference is never hidden. Its Ready pill comes from the exact conversation use, not Library membership.
+  - The text-only sheet keeps its typography and sections and says `No images are supplied.` Section text comes only from validated exact-version content, never from IDs or guessed JSON.
+- **Behavior:**
+  - Enter/Space activates the pagination buttons, loading is announced politely, and repeat activation is disabled while loading.
+  - When the last page arrives, focus moves to the first newly added control before the load button is removed; otherwise focus stays on the button. No unexpected scroll jumps.
+  - Changing account, conversation, resource or filter discards loaded pages and late responses, with no replayed action.
+
+The ignored previews in `outputs/verification/sprint-005/design-proposals/owned-reads/` in the `workprint-2` clone are inspection evidence only. Runtime and visual comparisons use the tracked references plus this record. This is design approval, not implementation acceptance.
+
 ### Reference sheet
 
 `.livesheet`: a character or place sheet drawn from its structured record. The images are separate files; a PNG or PDF is only an export.
