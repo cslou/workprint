@@ -13,7 +13,7 @@ export function HistoryControls({ read, invalid = false }: { read: Read; invalid
     if (active === document.body || active === button) {
       if (read.result.ok && read.result.value.nextCursor === null) {
         const root = button?.closest('.wp-version-history');
-        const target = [...root?.querySelectorAll<HTMLButtonElement>('[data-history-id]') ?? []].find(node => node.dataset.historyId === read.addedIds[0]);
+        const target = [...root?.querySelectorAll<HTMLButtonElement>('[data-history-id]') ?? []].find(node => read.addedIds.includes(node.dataset.historyId ?? ''));
         (target ?? root?.querySelector<HTMLElement>('summary'))?.focus({ preventScroll: true });
       } else button?.focus({ preventScroll: true });
     }

@@ -173,3 +173,49 @@ test('an account without records receives the honest Library empty state', async
   };
   expect(await deny(saved.conversationA)).toEqual(await deny('unknown-saved-work-conversation'));
 });
+
+for (const query of ['Reference', 'No matching kind']) test(`terminal Library focus respects local filter ${query}`, async ({ page, materialNetwork }) => {
+  await open(page, materialNetwork);
+  allow(materialNetwork, '/v1/library');
+  const firstResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/v1/library');
+  await page.getByRole('button', { name: 'Library', exact: true }).click();
+  const first = await (await firstResponse).json() as { nextCursor: string | null };
+  if (!first.nextCursor) throw new Error('Required stored next page missing');
+  await expect(page.locator('.wp-picker-tile')).toHaveCount(20);
+  await page.getByPlaceholder('Search', { exact: true }).fill(query);
+  await expect(page.locator('.wp-picker-tile')).toHaveCount(0);
+  allow(materialNetwork, '/v1/library', { cursor: first.nextCursor });
+  await page.getByRole('button', { name: 'Load more', exact: true }).press('Enter');
+  await expect(page.getByRole('button', { name: 'Load more', exact: true })).toHaveCount(0);
+  await expect(page.getByPlaceholder('Search', { exact: true })).toHaveValue(query);
+  if (query === 'Reference') { await expect(page.locator('.wp-picker-tile')).toHaveCount(1); await expect(page.locator('.wp-picker-tile')).toBeFocused(); }
+  else { await expect(page.locator('.wp-picker-tile')).toHaveCount(0); await expect(page.getByRole('button', { name: 'Close', exact: true })).toBeFocused(); }
+});
+
+test('terminal history skips a pinned current version when focusing newly added alternatives', async ({ page, materialNetwork }) => {
+  test.setTimeout(120000);
+  const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
+  const { preparePagedSavedWork } = await import(pathToFileURL(resolve('apps/api/.test-build/test/paged-saved-work.js')).href) as { preparePagedSavedWork: typeof PreparePagedSavedWork };
+  let pinned: PagedSavedWork | undefined;
+  const localCleanup: (() => void | Promise<void>)[] = [];
+  try {
+    await verifyBuiltAdmission({ diagnostic() {}, after(fn) { localCleanup.push(fn); } }, async local => {
+      if (!pinned) throw new Error('Pinned owned setup missing');
+      const history = `/v1/artifacts/${pinned.current.artifactId}/versions`;
+      materialNetwork.expectOperations(...[`/v1/conversations/${pinned.conversationA}/workspace`, `/v1/versions/${pinned.current.id}`, `/v1/conversations/${pinned.conversationA}/generation-requests`, history].map(path => ({ origin: local.origin, method: 'GET', path, query: {}, count: 1 })));
+      await page.goto('/saved-work.html');
+      await page.waitForFunction(() => !!(window as unknown as { savedWorkTest?: unknown }).savedWorkTest);
+      await page.evaluate(input => (window as unknown as { savedWorkTest: { configure(input: unknown): void } }).savedWorkTest.configure(input), { apiOrigin: local.origin, token: local.accessTokens[0]!, accountId: pinned.accountA, conversationId: pinned.conversationA });
+      await expect(page.getByRole('tabpanel')).toContainText('Earlier Script revision 3.');
+      const firstResponse = page.waitForResponse(response => new URL(response.url()).pathname === history);
+      await page.locator('.wp-version-history summary').click();
+      const first = await (await firstResponse).json() as { nextCursor: string | null };
+      if (!first.nextCursor) throw new Error('Pinned history next page missing');
+      await expect(page.locator('.wp-version-history-row')).toHaveCount(20);
+      materialNetwork.expectOperations({ origin: local.origin, method: 'GET', path: history, query: { cursor: first.nextCursor }, count: 1 });
+      await page.getByRole('button', { name: 'Load earlier versions', exact: true }).press('Enter');
+      await expect(page.locator('.wp-version-history-row')).toHaveCount(22);
+      await expect(page.getByRole('button', { name: 'View version 2', exact: true })).toBeFocused();
+    }, { browserOrigin, prepareSavedWork: async setup => { pinned = await preparePagedSavedWork(setup, 3); } });
+  } finally { for (const fn of localCleanup.reverse()) await fn(); }
+});

@@ -12,8 +12,8 @@ export function LibraryPagination({ read }: { read: ReturnType<typeof useLibrary
     if (active === document.body || active === button) {
       if (read.result.ok && read.result.value.nextCursor === null) {
         const root = button?.closest('.wp-picker-body');
-        const target = [...root?.querySelectorAll<HTMLButtonElement>('[data-page-id]') ?? []].find(node => node.dataset.pageId === read.addedIds[0]);
-        target?.focus({ preventScroll: true });
+        const target = [...root?.querySelectorAll<HTMLButtonElement>('[data-page-id]') ?? []].find(node => read.addedIds.includes(node.dataset.pageId ?? ''));
+        (target ?? root?.closest('.wp-dialog')?.querySelector<HTMLButtonElement>('.wp-dialog-head button'))?.focus({ preventScroll: true });
       } else button?.focus({ preventScroll: true });
     }
     setRetain(false);
