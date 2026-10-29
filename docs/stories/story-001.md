@@ -4,8 +4,9 @@
 
 **Date:** 2026-10-29
 **Type:** Feature
-**Status:** 🟡 Planning
-**Planning review:** an independent review (2026-10-29) found one P1 (the port scope missed about 100 hardcoded references and the fixed 4180 preview server) and two P2s (exception pass conditions, and the target-branch exception). All three are resolved; re-check **5/5**. Implementation awaits Lou's authorization.
+**Status:** 🔵 In Progress
+**Planning review:** an independent review (2026-10-29) found one P1 (the port scope missed about 100 hardcoded references and the fixed 4180 preview server) and two P2s (exception pass conditions, and the target-branch exception). All three are resolved; re-check **5/5**.
+**Start (2026-10-29):** Lou authorized starting Phase 3 Wave 1, beginning with this story ("lets stick to the plan … Are we ready to commence?"). Working branch `feat/parallel-sprint-foundation` from `phase-3` at `20a9fab`. This authorizes this story's implementation and its PR into `phase-3`, not the sprint branches.
 **Target branch:** `phase-3`, the Phase 3 integration branch created from `main` at `c1397c3`. This is an explicit exception to the default-branch rule below: Lou approved Phase 3 packaging through `phase-3`, as Phase 2 did through `phase-2` (see Related). `main` changes only through Lou's `phase-3` → `main` merge.
 **Working branch:** `feat/parallel-sprint-foundation`
 **Related issue/spec/sprint/PR:** [Phase 3 sprint packaging](../specs/implementation-spec-001.md#phase-3-sprint-packaging); prerequisite of [Sprint 004](../sprints/sprint-004.md) and [Sprint 005](../sprints/sprint-005.md)
@@ -57,7 +58,7 @@
 - [x] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
 - [x] Affected flows are declared, or explicitly marked as none
 - [x] Non-goals are declared
-- [ ] Ready for implementation
+- [x] Ready for implementation
 
 ## Affected Flows
 
