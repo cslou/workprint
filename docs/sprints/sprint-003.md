@@ -321,6 +321,36 @@ Current-head results: aggregate 13/13, browser 161/161, visual 215/215. The 20 n
   3. Record complete surface/consumer evidence and Phase 3 dependencies in the PR; orchestrator carries the summary into Final Review.
 - **Technical notes:** this audit does not reimplement all feature tests or supply their first proof. Root `test/` may own cross-app journeys; keep component checks near their owners and reuse the established harness. Implementers never edit sprint/planning records themselves.
 
+**Story 5 delivery:** [PR #23](https://github.com/cslou/workprint/pull/23), accepted head `62473ecffad9288230b85c32b2ecfa6e4fd1260b`, merged into sprint-003 at `afcb8e7787e33ac05dad116d95cd11866b45ead1`.
+
+Implementer: a fresh `openai-codex/gpt-6.1-sol` worker at `xhigh` thinking. It was fresh because the Story 4 worker's context was at 75%, and this audit is cross-cutting. It used 5 prompts and hit the harness timeout twice. Both times its checkpoint was intact; the second time the orchestrator launched its prepared proof runner unchanged.
+
+Inventory (PR #23 body): all 19 operation keys, reconciled from code with no differences, each mapped to an owner, a genuine consumer, a §8 flow, cited evidence and a later owner.
+- Evidence classes: ordinary navigation (N), isolated actual consumers with labelled prerequisites (I) and completed flows (C). There are **no completed flows in Phase 2**.
+- Native unavailable methods, operational `/health` and intended non-browser owners (agent tools, generation admission, export processing, providers and usage) are recorded without adding routes.
+- Panel-change notice → api-client/workspace refetch is **unimplemented, owned by P3-S9**.
+
+Verification added:
+- **Exposure, at runtime:** the default production build and preview exclude every test entrypoint, module and fixture. The check is binary-safe: it inspects build inputs, compares the sha256 of every emitted file and searches for inlined forms. The default dev server was compared with the build.
+- **Built-backend Auth:** missing, malformed and expired tokens are rejected for all 19 operations.
+- **Exclusions:** qualification, test, fixture, Studio and static paths return 404.
+- **Walkthrough:** existing actual-consumer cases now cover keyboard as well as pointer, through the consumable observer, with a per-control pointer/keyboard audit. No new UI, visual state, dependency or production code.
+
+Orchestrator decisions:
+- **Dev-only exposure accepted:** the default dev server serves `apps/web/test/` mounts. This is accepted for private loopback Phase 2 development; the deny-policy hardening is recorded as backlog B-005.
+- **Duplicate reads deferred:** each Videos candidate makes two exact-version GETs, and hidden Videos panels make one list GET. The observer budgets these exactly; consolidation is deferred to P3-S2/S5.
+
+**Visual determinism fix, sprint-wide.** The fix-cycle full run exposed a pre-existing flake in an unchanged Sprint 002 spec, `proposal main reference at 1440`. The reference side intermittently rendered 2 pixels, each off by 1, at a rounded image edge inside a reverse-flex scroller at a fractional origin. Measured failures: 14/120 at base `76079df` (orchestrator probes) and 7/120 before the fix. The fix is a transient image settlement in the shared `settleCapture`, applied identically to both sides, with no lasting style and a guard that throws on any layout or opacity change. After the fix: **0/120**, then three consecutive full visual suites at 215/215, with no tolerance, masks, retries or baseline changes.
+
+Review:
+- **Initial review** at `6f403c0` scored 2/5, with two P1s: the binary fixture exclusion could falsely pass, and keyboard replacements had removed pointer coverage for Pause and chip removal.
+- **Fix cycle 1** resolved both with genuine red controls, and the determinism fix was verified. `/review-fix` coverage was complete, scoring **4/5**.
+- One P2 is carried to the Final Story: `config.spec.ts:63-66` skips the encoded-bytes scan above `assetsInlineLimit`, so a forced `?inline` of a larger binary could go undetected; the resolved-input check covers the ordinary path.
+
+The PR has four commits, all append-only; the fourth is the explained capture fix.
+
+Current-head results: aggregate 13/13, browser 162/162 (one new case), visual 215/215. Check, build and frozen install passed. The two B-001 ingress leaves still failed, and `pnpm audit` was NON-PASS under B-002 plus candidate B-004. Post-merge check passed. No planning file was changed by the worker, and no main merge occurred.
+
 #### Final Story: Sprint Verification & Completion
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
   - [x] Uses the story sections above and the existing regression suite as the verification source of truth
