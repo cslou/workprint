@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { contentSchema, exportSchema, generationRequestSchema, generationStatusSchema, idSchema, intendedUseSchema, kindSchema, proposalSchema, questionSchema, revisionSchema, storyboardEditSchema, useBindingSchema, useSchema, versionSchema, workspaceSchema } from './models.js';
 export * from './models.js';
 export * from './saved-content.js';
+export * from './response-limits.js';
 
 export const errorCodeSchema = z.enum(['unauthenticated', 'forbidden', 'not_found', 'invalid_input', 'stale_revision', 'superseded', 'unsupported', 'not_implemented', 'integration_failure']);
 export const errorEnvelopeSchema = z.strictObject({ error: z.strictObject({ code: errorCodeSchema, message: z.string().min(1), details: z.strictObject({ issues: z.array(z.strictObject({ path: z.array(z.union([z.string(), z.number()])), message: z.string() })).optional(), ids: z.array(idSchema).optional() }).optional() }) });

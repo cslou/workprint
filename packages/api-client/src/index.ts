@@ -1,4 +1,4 @@
-import { applicationError, errorEnvelopeSchema, errorStatus, operations, type OperationName, type OperationRequest, type OperationResponse } from '@workprint/contracts';
+import { applicationResponseBytes, workspaceResponseBytes, applicationError, errorEnvelopeSchema, errorStatus, operations, type OperationName, type OperationRequest, type OperationResponse } from '@workprint/contracts';
 
 import type { ClientError, ClientResult } from './result.js';
 export type { ClientError, ClientResult } from './result.js';
@@ -46,6 +46,7 @@ export function createApiClient(config: { baseUrl: string; getAccessToken: () =>
         });
         const reader = response.body?.getReader();
         if (!reader) return fail('invalid_response', 'Invalid API response');
+        const responseLimit = name === 'workspace' && response.ok ? workspaceResponseBytes : applicationResponseBytes;
         let size = 0;
         const chunks: Uint8Array[] = [];
         try {
@@ -53,7 +54,7 @@ export function createApiClient(config: { baseUrl: string; getAccessToken: () =>
             const { done, value } = await reader.read();
             if (done) break;
             size += value.byteLength;
-            if (size > 1024 * 1024) { await reader.cancel(); return fail('invalid_response', 'API response too large'); }
+            if (size > responseLimit) { await reader.cancel(); return fail('invalid_response', 'API response too large'); }
             chunks.push(value);
           }
         } finally { reader.releaseLock(); }
