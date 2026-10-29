@@ -52,7 +52,7 @@ process.on('SIGINT', () => { appendFileSync(journal, 'compiler cancelled\\n'); p
 const socket = createConnection({ port: ${address.port}, host: '127.0.0.1' }, () => socket.write(String(process.pid) + '\\n'));
 socket.on('data', () => { appendFileSync(journal, 'compiler failed\\n'); process.exit(7); });
 `;
-      for (const name of ['tsc', 'mastra', 'pnpm']) await writeFile(join(bin, name), script, { mode: 0o755 });
+      for (const name of ['tsc', 'pnpm']) await writeFile(join(bin, name), script, { mode: 0o755 });
       const child = spawn(process.execPath, [join(root, 'scripts/tasks.mjs'), task], {
         cwd: dir, env: { PATH: `${bin}:${process.env.PATH}` }, stdio: ['ignore', 'ignore', 'pipe'],
       });

@@ -1,86 +1,44 @@
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { createServer } from 'node:http';
-import { readFile, mkdir, symlink, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { environment, root, sentinel } from './environment.js';
-import { command, start, unusedPort } from './process.js';
+import { environment, sentinel } from './environment.js';
+import { loadAuthFixture, readPrivateJson, signInFixtureAccount, startAuthServer } from './auth-server.js';
 import { createApiClient } from '@workprint/api-client';
 import { operations, type OperationName, type OperationRequest } from '@workprint/contracts';
 import { applicationRequests } from './application-requests.js';
 import { query } from './postgres.js';
+import { buildServerComposition } from './built-server.js';
 
 // Shared by current-scope checks and the separately invoked B-001 qualification.
 // Private fixture input is never inherited by serving. Accounts already exist.
 export type BuiltAdmissionTarget = { origin: string; accessToken: string; accessTokens: readonly string[]; logs: string };
 type FixtureContext = { diagnostic(message: string): void; after(cleanup: () => void | Promise<void>): void };
 export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (server: BuiltAdmissionTarget) => Promise<void>, options: { browserOrigin?: string } = {}) {
-  const file = process.env.WORKPRINT_AUTH_FIXTURE;
-  assert.ok(file, 'Supply WORKPRINT_AUTH_FIXTURE with authorized Supabase URL, anonKey, servingUrl and two accounts');
+  const config = await loadAuthFixture();
   const fixture = await environment();
   t.diagnostic(`Evidence: ${fixture.logs}`);
-  const readPrivateJson = async (path: string): Promise<unknown> => {
-    try { return JSON.parse(await readFile(path, 'utf8')); }
-    catch { throw new Error('Unable to read private Auth fixture JSON; inspect it privately'); }
-  };
-  const config = await readPrivateJson(file) as {
-    url: string; anonKey: string; servingUrl: string; accounts: { email: string; password: string }[];
-  };
   const statusFile = process.env.WORKPRINT_AUTH_SIGNING_FIXTURE;
   assert.ok(statusFile, 'Supply private CLI status JSON to exercise a signed expired token');
   const { JWT_SECRET: signingKey } = await readPrivateJson(statusFile) as { JWT_SECRET: string };
   assert.ok(signingKey, 'Signing fixture must supply the authorized development signing key');
   assert.equal(config.accounts.length, 2);
-  for (const target of [config.url, config.servingUrl]) {
-    let hostname: string;
-    try { hostname = new URL(target).hostname; }
-    catch { throw new Error('Invalid private Auth fixture target'); }
-    assert.ok(hostname === '127.0.0.1', 'Auth qualification is restricted to the authorized loopback stack');
-  }
-  for (const account of config.accounts) assert.ok(/@[^@]+\.invalid$/.test(account.email), 'Only synthetic accounts are permitted');
-  // Build a separate test composition, not an environment-switched production probe.
-  const build = async (name: string, entry: string) => {
-    const project = join(fixture.logs, name);
-    await mkdir(join(project, 'src/mastra'), { recursive: true });
-    await writeFile(join(project, 'package.json'), await readFile(join(root, 'apps/api/package.json')));
-    await symlink(join(root, 'apps/api/node_modules'), join(project, 'node_modules'), 'dir');
-    await writeFile(join(project, 'src/mastra/index.ts'), entry);
-    await command('pnpm', ['exec', 'mastra', 'build', '--root', project], {
-      cwd: root, env: { ...fixture.env, MASTRA_BUILD_SKIP_INSTALL: '1' }, log: join(fixture.logs, `${name}-build.log`), timeout: 60000,
-    });
-    const output = join(project, '.mastra/output');
-    // The test artifact reuses exactly the frozen workspace dependencies, never a new install.
-    await symlink(join(root, 'node_modules/.pnpm/node_modules'), join(output, 'node_modules'), 'dir');
-    return join(output, 'index.mjs');
-  };
-  const probeEntry = await build('probe', `
-    import { createBackend } from ${JSON.stringify(join(root, 'apps/api/src/mastra/backend.ts'))};
+  // Separate compiled compositions share the production entry, never an environment-switched probe.
+  const probeEntry = await buildServerComposition(fixture.logs, 'probe', (directory) => `
+    import { createBackend } from ${JSON.stringify(join(directory, 'mastra/backend.js'))};
     import { registerApiRoute } from '@mastra/core/server';
-    export const mastra = await createBackend([registerApiRoute('/__auth_probe', {
+    const mastra = await createBackend([registerApiRoute('/__auth_probe', {
       method: 'GET', handler: (c) => c.json({ accountId: c.get('requestContext').get('accountId') })
     })]);
-  `);
-  const productionEntry = await build('production', `export { mastra } from ${JSON.stringify(join(root, 'apps/api/src/mastra/index.ts'))};`);
+  `, fixture.env);
+  const productionEntry = await buildServerComposition(fixture.logs, 'production', undefined, fixture.env);
   // Fresh sign-ins happen after building. Never log request/response credentials.
-  const identities = await Promise.all(config.accounts.map(async (account) => {
-    const response = await fetch(`${config.url}/auth/v1/token?grant_type=password`, {
-      method: 'POST', headers: { apikey: config.anonKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify(account), signal: AbortSignal.timeout(3000),
-    });
-    assert.equal(response.status, 200, 'Authorized fixture sign-in');
-    return await response.json() as { access_token: string; user: { id: string } };
-  }));
+  const identities = await Promise.all(config.accounts.map((account) => signInFixtureAccount(config, account)));
   assert.notEqual(identities[0]!.user.id, identities[1]!.user.id);
-  const port = await unusedPort();
-  const env = { ...fixture.env, DATABASE_URL: config.servingUrl, SUPABASE_URL: config.url,
-    SUPABASE_PUBLISHABLE_KEY: config.anonKey, PORT: String(port),
-    ...(options.browserOrigin ? { WORKPRINT_BROWSER_ORIGIN: options.browserOrigin } : {}) };
-  const probe = await start(process.execPath, [probeEntry], {
-    cwd: root, env, log: join(fixture.logs, 'probe.log'),
-  });
+  const servingEnv = options.browserOrigin ? { WORKPRINT_BROWSER_ORIGIN: options.browserOrigin } : {};
+  const { server: probe, origin, port } = await startAuthServer(probeEntry, fixture.env, config, join(fixture.logs, 'probe.log'), { env: servingEnv });
   t.after(probe.stop);
-  const origin = `http://127.0.0.1:${port}`;
-  await probe.response(`${origin}/health`);
   for (const identity of identities) {
     const response = await fetch(`${origin}/__auth_probe?ownerId=${identities[1]!.user.id}`, {
       headers: { Authorization: `Bearer ${identity.access_token}`, 'X-Owner-Id': identities[1]!.user.id },
@@ -121,12 +79,10 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
   const address = upstream.address();
   assert.ok(address && typeof address !== 'string');
   for (const key of ['failure', 'malformed', 'stall', 'body-stall']) {
-    const failure = await start(process.execPath, [probeEntry], {
-      cwd: root, env: { ...env, SUPABASE_URL: `http://127.0.0.1:${address.port}`, SUPABASE_PUBLISHABLE_KEY: key },
-      log: join(fixture.logs, `${key}.log`),
+    const { server: failure } = await startAuthServer(probeEntry, fixture.env, config, join(fixture.logs, `${key}.log`), {
+      port, env: { ...servingEnv, SUPABASE_URL: `http://127.0.0.1:${address.port}`, SUPABASE_PUBLISHABLE_KEY: key },
     });
     try {
-      await failure.response(`${origin}/health`);
       const before = Date.now();
       const response = await fetch(`${origin}/__auth_probe`, {
         headers: { Authorization: `Bearer ${identities[0]!.access_token}` }, signal: AbortSignal.timeout(4000),
@@ -139,11 +95,10 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
   upstream.closeAllConnections();
   await new Promise<void>((resolve, reject) => upstream.close((error) => error ? reject(error) : resolve()));
   // Production composition has no probe, even with valid auth and test-looking env flags.
-  const production = await start(process.execPath, [productionEntry], {
-    cwd: root, env: { ...env, WORKPRINT_AUTH_PROBE: '1', NODE_ENV: 'test' }, log: join(fixture.logs, 'production.log'),
+  const { server: production } = await startAuthServer(productionEntry, fixture.env, config, join(fixture.logs, 'production.log'), {
+    port, env: { ...servingEnv, WORKPRINT_AUTH_PROBE: '1', NODE_ENV: 'test' },
   });
   t.after(production.stop);
-  await production.response(`${origin}/health`);
   // The same built production artifact/admission fixture proves all application routes.
   const snapshot = async () => {
     const tables = await query(config.servingUrl, "SELECT tablename FROM pg_tables WHERE schemaname = 'mastra' ORDER BY tablename");

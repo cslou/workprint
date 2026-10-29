@@ -28,7 +28,6 @@
     "@types/pngjs": "6.0.5",
     "dependency-cruiser": "18.7.0",
     "eslint": "10.13.0",
-    "mastra": "1.35.0",
     "pngjs": "7.0.0",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.1"

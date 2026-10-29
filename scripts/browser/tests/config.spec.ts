@@ -52,13 +52,13 @@ test('default dev and production build expose no interchangeable test compositio
     }] });
   `], { cwd: web, env, log: join(fixture.logs, 'web-build.log') });
   const testRoot = await realpath(join(web, 'test'));
-  const nativeHelper = await realpath(resolve('apps/api/test/native-conversations.ts'));
+  const serverHelpers = await Promise.all(['native-conversations.ts', 'built-server.ts', 'server-entry.test.ts', 'auth-built-fixture.ts', 'auth-server.ts'].map(file => realpath(resolve('apps/api/test', file))));
   const graph = JSON.parse(await readFile(inputsFile, 'utf8')) as { inputs: string[]; inlineLimit: number | null };
   expect(graph.inputs.length).toBeGreaterThan(0);
   for (const input of new Set(graph.inputs)) {
     if (input.includes('\0') || !isAbsolute(input)) continue;
     const path = await realpath(input.split('?')[0]!);
-    expect.soft(path === testRoot || path.startsWith(testRoot + sep) || path === nativeHelper, `Test build input: ${path}`).toBe(false);
+    expect.soft(path === testRoot || path.startsWith(testRoot + sep) || serverHelpers.includes(path), `Test build input: ${path}`).toBe(false);
   }
   const entries = await readdir(testRoot, { recursive: true, withFileTypes: true });
   const files = entries.filter(entry => entry.isFile()).map(entry => relative(testRoot, join(entry.parentPath, entry.name)));
@@ -68,7 +68,7 @@ test('default dev and production build expose no interchangeable test compositio
   const digest = (value: Buffer) => createHash('sha256').update(value).digest('hex');
   const hashes = new Set(bytes.map(digest));
   const textAssets = emitted.filter(asset => /\.(html|js|css|map|json|svg|txt)$/.test(asset.file));
-  const sources = [...files.map(file => ({ file, path: join(testRoot, file) })), { file: 'native-conversations.ts', path: nativeHelper }];
+  const sources = [...files.map(file => ({ file, path: join(testRoot, file) })), ...serverHelpers.map(path => ({ file: path.split('/').at(-1)!, path }))];
   for (const { file, path } of sources) {
     const source = await readFile(path);
     expect.soft(hashes.has(digest(source)), `Test file SHA256 emitted: ${file}`).toBe(false);
@@ -111,12 +111,12 @@ test('default dev and production build expose no interchangeable test compositio
           expect(response.status, `Default dev serves ${path}`).toBe(200);
         }
       }
-      for (const path of ['/apps/api/test/native-conversations.ts', `/@fs/${nativeHelper}`]) {
+      for (const path of serverHelpers.flatMap(helper => [`/apps/api/test/${helper.split('/').at(-1)!}`, `/@fs/${helper}`])) {
         const response = await fetch(`${origin}${path}`, { signal: AbortSignal.timeout(3000) });
         const body = await response.text();
         exposure.push({ mode, path, status: response.status, disposition: 'Native fixture helper denied or ordinary application fallback' });
         expect(response.status === 403 || response.status === 404 || (response.status === 200 && body === html), path).toBe(true);
-        expect(body).not.toContain('createNativeConversation');
+        expect(body).not.toMatch(/createNativeConversation|buildServerComposition|startAuthServer|Synthetic startup recovery failure/);
       }
       for (const suffix of ['', '?context=viewer&reference=proposal&fixture=1&__qualification=1']) {
         await page.goto(origin + suffix);
