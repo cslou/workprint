@@ -5,7 +5,7 @@ import { createOwnedConversationCheck } from '../src/agent/index.js';
 import type { SavedWorkSetup } from './auth-built-fixture.js';
 import { createNativeConversation } from './native-conversations.js';
 
-export type PagedSavedWork = { accountA: string; accountB: string; conversationA: string; emptyA: string; emptyB: string; current: Version; versions: Version[] };
+export type PagedSavedWork = { accountA: string; accountB: string; conversationA: string; emptyA: string; emptyB: string; current: Version; versions: Version[]; reference: Version };
 /** Independently authored read-only prerequisites. No production fixture control or route. */
 export async function preparePagedSavedWork({ accountIds, native, servingUrl }: SavedWorkSetup): Promise<PagedSavedWork> {
   const [accountA, accountB] = accountIds;
@@ -21,8 +21,8 @@ export async function preparePagedSavedWork({ accountIds, native, servingUrl }: 
     for (let revision = 1; revision <= 23; revision++) {
       versions.push(await store.insert({ accountId: accountA, conversationId: conversation.id, kind: 'script', createdBy: 'human', dependencies: [], ...(versions[0] ? { artifactId: versions[0].artifactId } : {}), content: script(revision === 23 ? 'Ada waits beside the station clock.' : `Earlier Script revision ${revision}.`), ...(revision === 23 ? { use: { binding: { purpose: 'script' as const }, state: 'approved' as const } } : {}) }));
     }
-    await store.insert({ accountId: accountA, conversationId: conversation.id, kind: 'reference', createdBy: 'human', dependencies: [], content: { schemaVersion: 1, subject: { id: 'ada', kind: 'character', name: 'Ada reference', description: 'A traveller in a green coat.', continuityNotes: ['Keep the green coat.'] }, references: [] }, use: { binding: { purpose: 'reference', role: 'ada' }, state: 'draft' } });
+    const reference = await store.insert({ accountId: accountA, conversationId: conversation.id, kind: 'reference', createdBy: 'human', dependencies: [], content: { schemaVersion: 1, subject: { id: 'ada', kind: 'character', name: 'Ada reference', description: 'A traveller in a green coat.', continuityNotes: ['Keep the green coat.'] }, references: [] }, use: { binding: { purpose: 'reference', role: 'ada' }, state: 'draft' } });
     for (let index = 0; index < 22; index++) await store.insert({ accountId: accountA, conversationId: conversation.id, kind: 'script', createdBy: 'human', dependencies: [], content: script(`Synthetic saved Script ${index + 1}.`) });
-    return { accountA, accountB, conversationA: conversation.id, emptyA: emptyA.id, emptyB: emptyB.id, current: versions.at(-1)!, versions };
+    return { accountA, accountB, conversationA: conversation.id, emptyA: emptyA.id, emptyB: emptyB.id, current: versions.at(-1)!, versions, reference };
   } finally { await pool.end(); }
 }

@@ -161,4 +161,15 @@ test('an account without records receives the honest Library empty state', async
   await page.getByRole('button', { name: 'Library', exact: true }).click();
   await expect(page.getByRole('dialog')).toContainText('Nothing saved yet');
   await expect(page.getByRole('dialog')).toContainText('Your saved work will appear here.');
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  const deny = async (conversationId: string) => {
+    allow(materialNetwork, `/v1/conversations/${conversationId}/workspace`);
+    const response = page.waitForResponse(response => new URL(response.url()).pathname === `/v1/conversations/${conversationId}/workspace`);
+    await page.evaluate(input => (window as unknown as { savedWorkTest: { configure(input: unknown): void } }).savedWorkTest.configure(input), { apiOrigin: target.origin, token: target.accessTokens[1]!, accountId: saved.accountB, conversationId });
+    const denied = await response;
+    expect(denied.status()).toBe(404);
+    await expect(page.getByRole('tabpanel')).toHaveText('This video could not be loaded. Nothing was changed.');
+    return await denied.json() as unknown;
+  };
+  expect(await deny(saved.conversationA)).toEqual(await deny('unknown-saved-work-conversation'));
 });

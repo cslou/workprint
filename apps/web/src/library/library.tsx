@@ -18,7 +18,7 @@ export type LibraryFeedbackState = keyof typeof libraryFeedback;
 
 export function LibraryFeedback({ state }: { state: LibraryFeedbackState }) {
   const [title, message] = libraryFeedback[state];
-  return <div className="wp-library-feedback" role="status"><b>{title}</b><span>{message}</span></div>;
+  return <div className="wp-library-feedback" role="status" data-empty={state === 'empty' || undefined}><b>{title}</b><span>{message}</span></div>;
 }
 
 /** Actual Library read consumer. Material rendering is supplied by its owning view. */

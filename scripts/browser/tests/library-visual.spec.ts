@@ -24,6 +24,7 @@ for (const width of [1440, 390, 820, 821]) for (const [state, title, message] of
     await page.goto('/references/demo-05.html#lib-yours');
     await page.addStyleTag({ content: ':root{--font-sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-display:Georgia,"Times New Roman",serif}.lp-empty b{font-weight:600}' });
     await page.locator('.lp-empty').evaluate((element, copy) => { element.querySelector('b')!.textContent = copy[0] ?? ''; element.querySelector('span')!.textContent = copy[1] ?? ''; }, [title, message]);
+    if (state === 'empty') await page.addStyleTag({ content: '.lp-empty{align-content:center}' });
     await settleCapture(page);
     const bounds = await page.locator('.lp-empty').boundingBox();
     const reference = await page.locator('.lp-empty').screenshot({ path: info.outputPath('reference-region.png'), animations: 'disabled' });
@@ -44,7 +45,7 @@ for (const width of [1440, 390, 820, 821]) for (const [state, title, message] of
     const actualFull = await page.screenshot({ path: info.outputPath('actual-full.png'), fullPage: true, animations: 'disabled' });
     const changed = await compare(reference, actual, info.outputPath('comparison'));
     const fullPageChanged = await compare(referenceFull, actualFull, info.outputPath('full-page-comparison'));
-    await writeFile(info.outputPath('result.json'), JSON.stringify({ state, width, reference: 'docs/design/demo-05.html#lib-yours', referenceHash: createHash('sha256').update(await readFile('docs/design/demo-05.html')).digest('hex'), approval: 'docs/design/design.md#library-feedback', revision: info.config.metadata, browser: context.browser()?.version(), changedPixels: changed, fullPageChangedPixels: fullPageChanged, tolerance: 0, scope: 'Actual Library consumer, controlled read-only state, approved reference surroundings' }, null, 2));
+    await writeFile(info.outputPath('result.json'), JSON.stringify({ state, width, reference: 'docs/design/demo-05.html#lib-yours', referenceHash: createHash('sha256').update(await readFile('docs/design/demo-05.html')).digest('hex'), approval: state === 'empty' ? 'docs/design/design.md#phase-3-saved-work-reads' : 'docs/design/design.md#library-feedback', revision: info.config.metadata, browser: context.browser()?.version(), changedPixels: changed, fullPageChangedPixels: fullPageChanged, tolerance: 0, scope: 'Actual Library consumer, controlled read-only state, approved reference surroundings' }, null, 2));
     release?.();
     expect(changed).toBe(0);
     expect(fullPageChanged).toBe(0);
