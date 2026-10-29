@@ -1,7 +1,7 @@
 import { expect, test } from '../material-network.js';
-import { globSync } from 'node:fs';
-import { readFile, readdir } from 'node:fs/promises';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { createHash } from 'node:crypto';
+import { readFile, readdir, realpath } from 'node:fs/promises';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type * as Processes from '../../../apps/api/test/process.js';
 import type * as Environment from '../../../apps/api/test/environment.js';
@@ -21,21 +21,50 @@ test('default dev and production build expose no interchangeable test compositio
   const web = resolve('apps/web');
   const output = join(fixture.logs, 'browser-dist');
   const env = { ...fixture.env, WORKPRINT_AUTH_PROBE: '1', WORKPRINT_QUALIFICATION: '1' };
-  await processes.command('pnpm', ['--filter', '@workprint/web', 'exec', 'vite', 'build', '--sourcemap', '--outDir', output], { cwd: process.cwd(), env, log: join(fixture.logs, 'web-build.log') });
-  const entries = await readdir(join(web, 'test'), { recursive: true, withFileTypes: true });
-  const files = entries.filter(entry => entry.isFile()).map(entry => relative(join(web, 'test'), join(entry.parentPath, entry.name)));
-  const artifacts = globSync(`${output}/**/*`);
-  const bytes = await Promise.all(artifacts.filter(file => /\.(html|js|css|map)$/.test(file)).map(file => readFile(file)));
-  const maps = artifacts.filter(file => file.endsWith('.js.map'));
-  expect(maps.length).toBeGreaterThan(0);
-  for (const file of maps) {
-    const map = JSON.parse(await readFile(file, 'utf8')) as { sources: string[] };
-    expect(map.sources.length).toBeGreaterThan(0);
-    for (const source of map.sources) expect(resolve(dirname(file), source).startsWith(join(web, 'test') + sep), `Test module entered build graph: ${source}`).toBe(false);
+  const inputsFile = join(fixture.logs, 'build-inputs.json');
+  // Recording only: use the default production config without changing resolution or output.
+  await processes.command(process.execPath, ['--input-type=module', '-e', `
+    import { build } from 'vite';
+    import { writeFileSync } from 'node:fs';
+    import { resolve } from 'node:path';
+    let inlineLimit = null, root;
+    await build({ build: ${JSON.stringify({ outDir: output, sourcemap: true })}, plugins: [{
+      name: 'record-production-inputs',
+      configResolved(config) { root = config.root; if (typeof config.build.assetsInlineLimit === 'number') inlineLimit = config.build.assetsInlineLimit; },
+      generateBundle(_options, bundle) {
+        const inputs = new Set(this.getModuleIds());
+        for (const asset of Object.values(bundle)) if (asset.type === 'asset') {
+          for (const source of asset.originalFileNames) inputs.add(resolve(root, source));
+        }
+        writeFileSync(${JSON.stringify(inputsFile)}, JSON.stringify({ inputs: [...inputs], inlineLimit }));
+      }
+    }] });
+  `], { cwd: web, env, log: join(fixture.logs, 'web-build.log') });
+  const testRoot = await realpath(join(web, 'test'));
+  const graph = JSON.parse(await readFile(inputsFile, 'utf8')) as { inputs: string[]; inlineLimit: number | null };
+  expect(graph.inputs.length).toBeGreaterThan(0);
+  for (const input of new Set(graph.inputs)) {
+    if (input.includes('\0') || !isAbsolute(input)) continue;
+    const path = await realpath(input.split('?')[0]!);
+    expect.soft(path === testRoot || path.startsWith(testRoot + sep), `Test build input: ${path}`).toBe(false);
   }
+  const entries = await readdir(testRoot, { recursive: true, withFileTypes: true });
+  const files = entries.filter(entry => entry.isFile()).map(entry => relative(testRoot, join(entry.parentPath, entry.name)));
+  const artifacts = (await readdir(output, { recursive: true, withFileTypes: true })).filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name));
+  const emitted = await Promise.all(artifacts.map(async file => ({ file, bytes: await readFile(file) })));
+  const bytes = emitted.map(asset => asset.bytes);
+  const digest = (value: Buffer) => createHash('sha256').update(value).digest('hex');
+  const hashes = new Set(bytes.map(digest));
+  const textAssets = emitted.filter(asset => /\.(html|js|css|map|json|svg|txt)$/.test(asset.file));
   for (const file of files) {
-    const source = await readFile(join(web, 'test', file));
-    expect(bytes.some(asset => asset.includes(source)), `Test file bundled: ${file}`).toBe(false);
+    const source = await readFile(join(testRoot, file));
+    expect.soft(hashes.has(digest(source)), `Test file SHA256 emitted: ${file}`).toBe(false);
+    expect.soft(bytes.some(asset => asset.includes(source)), `Raw test bytes bundled: ${file}`).toBe(false);
+    if (graph.inlineLimit === null || source.length <= graph.inlineLimit) {
+      const forms = [source.toString('base64')];
+      if (/\.(html|tsx?|js|css|json|svg|txt|md)$/.test(file)) forms.push(encodeURIComponent(source.toString('utf8')), JSON.stringify(source.toString('utf8')).slice(1, -1));
+      for (const form of forms) expect.soft(textAssets.some(asset => asset.bytes.includes(form)), `Inlined test fixture: ${file}`).toBe(false);
+    }
     expect(artifacts.some(asset => asset.endsWith(`/test/${file}`)), `Test artifact emitted: ${file}`).toBe(false);
   }
   for (const privateFile of [process.env.WORKPRINT_AUTH_FIXTURE, process.env.WORKPRINT_AUTH_SIGNING_FIXTURE]) {

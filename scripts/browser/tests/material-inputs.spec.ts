@@ -209,11 +209,12 @@ test('picker filters and selects locally and attaches the exact versions against
       for (const [category, names] of [['Characters', ['Vale', 'Mercer']], ['Places', ['The gallery']], ['Props', ['Bench']], ['All', labels]] as const) {
         await page.getByRole('button', { name: category, exact: true }).press('Space');
         await expect(page.locator('.wp-picker-label')).toHaveText([...names]);
+        // Reset to a different category so a missing pointer handler cannot pass on existing state.
+        await page.getByRole('button', { name: category === 'All' ? 'Characters' : 'All', exact: true }).click();
+        await expect(page.locator('.wp-picker-label')).toHaveText(category === 'All' ? ['Vale', 'Mercer'] : labels);
+        await page.getByRole('button', { name: category, exact: true }).click();
+        await expect(page.locator('.wp-picker-label')).toHaveText([...names]);
       }
-      await page.getByRole('button', { name: 'Characters', exact: true }).click();
-      await expect(page.locator('.wp-picker-label')).toHaveText(['Vale', 'Mercer']);
-      await page.getByRole('button', { name: 'All', exact: true }).press('Space');
-      await expect(page.locator('.wp-picker-label')).toHaveText(labels);
       await page.getByRole('textbox', { name: 'Search Library', exact: true }).fill('  THE G  ');
       await expect(page.locator('.wp-picker-label')).toHaveText(['The gallery']);
       for (const hidden of ['vale-v1', 'secret-content-token']) {
@@ -244,6 +245,13 @@ test('picker filters and selects locally and attaches the exact versions against
       expect(seen).toEqual([]);
       await page.getByRole('button', { name: 'Remove Vale', exact: true }).press('Enter');
       await expect(page.locator('.wp-picker-count')).toHaveText('1 selected');
+      await expect(page.locator('.wp-picker-chip')).toHaveText(['Bench×']);
+      await page.locator('.wp-picker-tile').filter({ hasText: 'Vale' }).click();
+      await expect(page.locator('.wp-picker-count')).toHaveText('2 selected');
+      await page.getByRole('button', { name: 'Remove Vale', exact: true }).click();
+      await expect(page.locator('.wp-picker-count')).toHaveText('1 selected');
+      await expect(page.locator('.wp-picker-chip')).toHaveText(['Bench×']);
+      await expect(page.locator('.wp-picker-tile').filter({ hasText: 'Vale' })).toHaveAttribute('aria-pressed', 'false');
       await page.locator('.wp-picker-tile').filter({ hasText: 'Vale' }).click();
       expect(seen).toEqual([]);
       const attached = page.waitForResponse((value) => new URL(value.url()).pathname === '/v1/conversations/conversation-a/uses');

@@ -122,6 +122,12 @@ observedTest('a generated local clip proves supplied-source play, pause, seek an
   await expect.poll(() => page.evaluate(() => document.querySelector('video')?.currentTime ?? 0)).toBeGreaterThan(0.1);
   await page.getByRole('button', { name: 'Pause', exact: true }).press('Space');
   await expect.poll(() => page.evaluate(() => document.querySelector('video')?.paused)).toBe(true);
+  await expect(page.locator('.wp-clip-surface')).toHaveAttribute('data-player-status', 'paused');
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect(page.locator('.wp-clip-surface')).toHaveAttribute('data-player-status', 'playing');
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => document.querySelector('video')?.paused)).toBe(true);
+  await expect(page.locator('.wp-clip-surface')).toHaveAttribute('data-player-status', 'paused');
   const seek = page.locator('.wp-clip-seek');
   const bounds = await seek.boundingBox();
   if (!bounds) throw new Error('Missing seek control');
