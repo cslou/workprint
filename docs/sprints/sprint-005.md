@@ -1,25 +1,25 @@
 # Sprint 005 — Saved work, uploads and media
 
-**Date:** Planning suggestion 2026-10-29; start/end pending authorization
+**Date:** Planned and started 2026-10-29
 **Goal:** Make owned saved-work reads, manual saves, exact uses/choices, image/video upload and private single-clip playback persist and reload through the existing frontend, with local storage proof and mandatory real development-R2 qualification.
-**Status:** 🟡 Planning
+**Status:** 🔵 In Progress
 
-**Planning result:** sprint-doc-reviewer **4/5**, "Ready to start" (2026-10-29), with one P2 resolved below. The independent dependency review of the Phase 3 packaging returned "sound with fixes"; all its fixes are applied. Execution awaits Lou's authorization and the merge of [Story 001](../stories/story-001.md) into `phase-3`; Story 9 also needs the development R2 bucket. Lou's 2026-10-29 start decisions (two clones, built-in examples ignored, SeaweedFS, real-R2 check kept in this sprint) are recorded below. Confirm the start checklists then.
+**Planning result:** sprint-doc-reviewer **4/5**, "Ready to start" (2026-10-29), with one P2 resolved below. The independent dependency review of the Phase 3 packaging returned "sound with fixes"; all its fixes are applied. Lou authorized Phase 3 Wave 1 on 2026-10-29. [Story 001](../stories/story-001.md) merged into `phase-3` at `a7444a2` ([PR #33](https://github.com/cslou/workprint/pull/33)), and `sprint-005` branches from that head. Story 9 still needs the development R2 bucket. Lou's 2026-10-29 start decisions (two clones, built-in examples ignored, SeaweedFS, real-R2 check kept in this sprint) are recorded below. The start checklists are confirmed.
 
 ---
 
 ## Handoff
 
 ### Project Context
-- **Repo:** `/Users/lou/projects/workprint`
+- **Repo:** `/Users/lou/projects/workprint`, executed in the separate clone `/Users/lou/projects/workprint-2`
 - **Tech stack:** React/React Aria/Vite/TypeScript; browser-safe contracts/api-client and framework-free player; one Mastra backend, Supabase Auth and Postgres; Supabase CLI migrations, AWS SDK v3 S3 client/presigner and bounded FFmpeg/ffprobe introduced by their owning stories.
-- **Current state:** `main` = `c1397c3`, Phase 2 merged 2026-10-29. Existing `materials/`, `versions/`, `library/`, `uploads/`, `storyboard/`, `videos/` and `media/` consumers receive real 401/501, not successful persistence. Backend currently has `application/`, `db/` and `mastra/`; no application domain tables or `supabase/` migrations. Existing built-server/Auth/Postgres fixtures and browser/visual suites are reused; historical passes are not a fresh execution baseline.
+- **Current state:** `main` = `c1397c3`, Phase 2 merged 2026-10-29. Existing `materials/`, `versions/`, `library/`, `uploads/`, `storyboard/`, `videos/` and `media/` consumers receive real 401/501, not successful persistence. Backend currently has `application/`, `db/` and `mastra/`; no application domain tables or `supabase/` migrations. Existing built-server/Auth/Postgres fixtures and browser/visual suites are reused. Foundation baseline at `9afa670` (tree equal to `a7444a2`): frozen install, check and build PASS; test 15/15; browser 163/163; visual 215/215 with zero drift, including a concurrent run in this clone on ports 4279/4280. `qualify:ingress` NON-PASS on the two B-001 leaves; audit NON-PASS on B-002/B-004 only. Mastra stays on the pinned 1.79.0 set (CLI 1.35.0, `@mastra/pg` 1.32.0); Lou moved the 1.80.x upgrade to after Wave 1 on 2026-10-29 (backlog B-007).
 - **Implementation spec:** `docs/specs/implementation-spec-001.md`, P3-S2–S5/S10 and §§4, 6, 8; approved packaging [Phase 3 sprint packaging](../specs/implementation-spec-001.md#phase-3-sprint-packaging). Canonical vocabulary: `CONTEXT.md`.
 
 ### Sprint-Wide Context
 - **Sprint type:** Feature
 - **Story count:** nine implementation/qualification stories plus Final. This deliberately exceeds the usual 5–8 target: Lou asked for smaller stories where they improve quality and reviewability. The split separates persistence, saves, transfer, inspection, reuse, planning, choice, playback and external R2 qualification so each PR proves one boundary.
-- **Delivery authorization:** planning only; Lou has not authorized implementation. Execution starts only after Lou authorizes it and standalone `docs/stories/story-001.md` merges into `phase-3` (created from `main`). Foundation delivers a configurable browser-test port, Mastra 1.80.x / CLI 1.36.x upgrade, trusted owned-conversation collaborator and test-only supported-native conversation fixture helper. Branch `sprint-005` from that updated `phase-3`; in the separate clone `~/projects/workprint-2` (Lou chose two plain clones over worktrees), one implementer, sequential story PRs targeting `sprint-005`. Integration into `phase-3` needs Lou's explicit merge command; `phase-3` → `main` is Lou's.
+- **Delivery authorization:** authorized by Lou on 2026-10-29 (Phase 3 Wave 1). Standalone `docs/stories/story-001.md` merged into `phase-3` at `a7444a2`. It delivered a configurable browser-test port, the trusted owned-conversation collaborator and the test-only supported-native conversation fixture helper; the Mastra upgrade is deferred to after Wave 1. Branch `sprint-005` from that updated `phase-3`; in the separate clone `~/projects/workprint-2` (Lou chose two plain clones over worktrees), one implementer, sequential story PRs targeting `sprint-005`. Integration into `phase-3` needs Lou's explicit merge command; `phase-3` → `main` is Lou's.
 - **Shared context:** implement existing operations `workspace`, `artifactVersions`, `version`, `library`, `saveVersion`, `useVersion`, `editStoryboard`, `requestUpload`, `confirmUpload`, `media` from `packages/contracts/src/index.ts`. Contracts already exist; change them only for a demonstrated consumer need, with corresponding spec review/update. Every conversation-scoped read/write uses the foundation's trusted owned-conversation collaborator; indirect upload/use lookups derive and check the stored conversation, never caller ownership claims. No dependency on Sprint 004 conversation UI or execution work.
 - **Ownership / architecture:** own `supabase/`, API `db/`, `artifacts/`, `storage/`, `application/`, artifact/upload/media route files; web `materials/ versions/ library/ uploads/ storyboard/ videos/` (choice only), `media/ workspace/`; `packages/player` and matching contracts/api-client files. Domains own SQL and never call peer domains; application coordinates narrow interfaces and transactions without importing agent, either Mastra subtree or bootstrap. Components own styles; features import only shared `ui/` and `api/`, shell composes features. Packages never import apps; only web imports player; dependency-cruiser enforces boundaries. Keep one Mastra instance/execution owner; never alter native-owned schemas or add a server, scheduler, stream protocol or conversation store. Code names never contain sprint/story IDs.
 - **Parallel wave:** Sprints 004 and 005 run concurrently, without mutual dependencies. Edit only owned modules; shared contracts/api-client indexes, `apps/api/src/mastra/application-routes.ts`, backend registration/bootstrap, shell composition and `storage/` index take additive edits only, with logic in owned files. Resolve lockfile conflicts by rerunning `pnpm install`, never hand-merging. The second integrator first merges `phase-3` into its sprint branch (no rebase), then reruns the full suite on the combined head, requalifying the conversation collaborator and native cohort. Stop/escalate any discovered need for wave-mate work; do not substitute it. Both clones share one local Supabase stack and its two fixture accounts: no test may change their passwords, sessions or sign-in state; tests that need to (sign-out, reset, expiry) create and delete their own throwaway accounts.
@@ -50,10 +50,10 @@ The Final Verification Story runs all applicable sprint functional verification 
 - **Storage and external boundary:** Stories 3–4 and 8 develop/test against credential-configured SeaweedFS `chrislusf/seaweedfs:4.51`, resolved and pinned by immutable digest before first run. Use AWS SDK v3 S3 client and presigner, private isolated bucket and `PutBucketCors` for exact browser origins/methods/headers. Emulator evidence is not R2 qualification; Story 9 must pass real R2. Lou confirmed SeaweedFS over Cloudflare's experimental local R2 on 2026-10-29 (reasons in the spec's Phase 3 sprint packaging). Retain default loopback egress guards; only the explicit qualification run may allow the exact supplied dev-bucket origin, redacting query signatures/headers/bodies from reports and disabling secret-bearing traces.
 - **Visual contract:** main surfaces at 1440/390/820/821; representative success/loading/error/conflict/expired states at 1440/390, with pointer/keyboard/focus checks. Use tracked brand-book HTML/references, matched fonts/content/posters and all captures through `settleCapture` (`scripts/browser/capture.ts`). Zero tolerance, no masks, no retries; paired images/overlays/diffs plus two-sided geometry/overflow checks. Decoded-motion proof is separate from deterministic poster parity. Human side-by-side review passes only when all differences have an approved disposition.
 - **Test-page retirement:** B-005: when an ordinary real page/flow replaces `apps/web/test/*.html`, retire that mount and migrate browser/visual/race coverage at equal or greater strength. If the ordinary entry still depends on unintegrated Sprint 004, retain the isolated real consumer temporarily and disclose that boundary; never implement substitute sign-in/conversation creation or drop coverage to delete a page. Test-only providers, helpers, records and routes remain excluded from production build/exposure using `scripts/browser/tests/config.spec.ts` and `apps/api/test/web-files.security.test.ts` patterns.
-- **Commands / baseline:** after foundation, record a fresh accepted-head baseline; choose a distinct foundation-configured browser port per checkout. Set `WORKPRINT_AUTH_FIXTURE="$PWD/outputs/local-supabase.setup.json"`, `WORKPRINT_AUTH_SIGNING_FIXTURE="$PWD/outputs/local-supabase.status.json"`, `WORKPRINT_BROWSER_OUTPUT="$PWD/outputs/verification/sprint-005/<sha>"`. In order run `pnpm install --frozen-lockfile`, `pnpm check`, `pnpm build`, `pnpm test`, `pnpm test:browser`, `pnpm test:visual`, `pnpm qualify:ingress`, `pnpm audit`. Redirect each command's full stdout/stderr to local logs; report exit/result and path, inspect bounded excerpts on failure. Missing fixtures/service authorization fail or block, never skip/pass. Final verification runs every story's functional/targeted checks plus the full available regression suite; reusable checks become future regressions, one-off editorial evidence does not.
+- **Commands / baseline:** after foundation, record a fresh accepted-head baseline; this clone always uses `WORKPRINT_BROWSER_PORT=4279` and `WORKPRINT_PREVIEW_PORT=4280` (Sprint 004 uses the defaults in the other clone). Set `WORKPRINT_AUTH_FIXTURE="$PWD/outputs/local-supabase.setup.json"`, `WORKPRINT_AUTH_SIGNING_FIXTURE="$PWD/outputs/local-supabase.status.json"`, `WORKPRINT_BROWSER_OUTPUT="$PWD/outputs/verification/sprint-005/<sha>"`. In order run `pnpm install --frozen-lockfile`, `pnpm check`, `pnpm build`, `pnpm test`, `pnpm test:browser`, `pnpm test:visual`, `pnpm qualify:ingress`, `pnpm audit`. Redirect each command's full stdout/stderr to local logs; report exit/result and path, inspect bounded excerpts on failure. Missing fixtures/service authorization fail or block, never skip/pass. Final verification runs every story's functional/targeted checks plus the full available regression suite; reusable checks become future regressions, one-off editorial evidence does not.
 
 ### Stories
-**Constraints:** Nine implementation/qualification stories plus Final, in the approved split/order (story-count rationale in Sprint-Wide Context). Each is independently reviewable and targets ≤5 logical commits including verification. Subjects use `Type(scope): Capitalized description`, ≤50 characters. All start gates and planning reviews remain pending; this draft claims no independent review or execution readiness.
+**Constraints:** Nine implementation/qualification stories plus Final, in the approved split/order (story-count rationale in Sprint-Wide Context). Each is independently reviewable. The target is ≤5 logical commits including verification; Lou allowed exceeding it where that makes history clearer (2026-10-29). Subjects use `Type(scope): Capitalized description`, ≤50 characters.
 
 #### Story 1: Schema foundation and owned reads (P3-S2, S2-1)
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
@@ -63,7 +63,7 @@ The Final Verification Story runs all applicable sprint functional verification 
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: P2 [story-sizing] — the nine-story rationale sat under Stories/Constraints rather than Sprint-Wide Context.
   - Resolution: Moved the rationale to a Sprint-Wide Context "Story count" bullet.
@@ -92,7 +92,7 @@ The Final Verification Story runs all applicable sprint functional verification 
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: None
   - Resolution: N/A
@@ -121,7 +121,7 @@ The Final Verification Story runs all applicable sprint functional verification 
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: None
   - Resolution: N/A
@@ -150,7 +150,7 @@ The Final Verification Story runs all applicable sprint functional verification 
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: None
   - Resolution: N/A
@@ -179,7 +179,7 @@ The Final Verification Story runs all applicable sprint functional verification 
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: None
   - Resolution: N/A
@@ -208,7 +208,7 @@ The Final Verification Story runs all applicable sprint functional verification 
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: None
   - Resolution: N/A
@@ -237,7 +237,7 @@ The Final Verification Story runs all applicable sprint functional verification 
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: None
   - Resolution: N/A
@@ -265,7 +265,7 @@ The Final Verification Story runs all applicable sprint functional verification 
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: None
   - Resolution: N/A
@@ -294,7 +294,7 @@ The Final Verification Story runs all applicable sprint functional verification 
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: None
   - Resolution: N/A
@@ -317,10 +317,10 @@ The Final Verification Story runs all applicable sprint functional verification 
 
 #### Final Story: Sprint Verification & Completion
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
-  - [ ] Uses the story sections above and the existing regression suite as the verification source of truth
-  - [ ] Defines where final verification evidence will be recorded
-  - [ ] Includes full regression verification, not only areas believed to be touched
-  - [ ] Ready for Lou
+  - [x] Uses the story sections above and the existing regression suite as the verification source of truth
+  - [x] Defines where final verification evidence will be recorded
+  - [x] Includes full regression verification, not only areas believed to be touched
+  - [x] Ready for Lou
 - **As a** maintainer, **I want** all sprint functional verification and all available regression verification run, **so that** the sprint can be integrated with evidence that new behavior works and existing behavior did not regress.
 - **Dependencies:** All implementation stories
 - **Acceptance criteria:**
