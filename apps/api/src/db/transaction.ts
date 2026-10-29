@@ -35,7 +35,9 @@ export async function assertRestrictedApplicationRole(pool: Pool) {
     UNION SELECT typowner FROM pg_type WHERE typnamespace IN (SELECT oid FROM owned_schema)
   ) SELECT has_database_privilege(current_database(),'CREATE') OR
     EXISTS(SELECT 1 FROM owned_schema WHERE has_schema_privilege(oid,'CREATE')) OR
-    EXISTS(SELECT 1 FROM pg_roles r WHERE pg_has_role(current_user,r.oid,'SET') AND (r.rolsuper OR r.rolcreatedb OR r.rolcreaterole)) OR
+    EXISTS(SELECT 1 FROM pg_roles r WHERE pg_has_role(current_user,r.oid,'SET') AND
+      (r.rolsuper OR r.rolcreatedb OR r.rolcreaterole OR has_database_privilege(r.oid,current_database(),'CREATE') OR
+       EXISTS(SELECT 1 FROM owned_schema n WHERE has_schema_privilege(r.oid,n.oid,'CREATE')))) OR
     EXISTS(SELECT 1 FROM pg_roles r CROSS JOIN owners WHERE pg_has_role(current_user,r.oid,'SET') AND pg_has_role(r.oid,owners.owner,'USAGE')) AS privileged`);
   if (result.rows[0]?.privileged !== false) throw new Error('Privileged application serving connection');
 }
