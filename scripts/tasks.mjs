@@ -57,7 +57,6 @@ try {
     await run('tsc', ['-p', 'apps/api/tsconfig.build.json']);
   }
   if (task === 'build') {
-    await run('mastra', ['build'], 'apps/api');
     await run('pnpm', ['exec', 'vite', 'build'], 'apps/web', webEnv);
   } else if (task === 'db:prepare') {
     await run(process.execPath, ['dist/src/mastra/prepare.js'], 'apps/api');
@@ -66,11 +65,11 @@ try {
       await run('tsc', ['-p', 'packages/contracts/tsconfig.json']);
       await run('tsc', ['-p', 'packages/api-client/tsconfig.json']);
       await run('tsc', ['-p', 'packages/player/tsconfig.json']);
+      await run('tsc', ['-p', 'apps/api/tsconfig.build.json']);
     }
     await Promise.all([
-      task === 'dev'
-        ? run('mastra', ['dev'], 'apps/api', serving)
-        : run(process.execPath, ['apps/api/.mastra/output/index.mjs'], '.', serving),
+      ...(task === 'dev' ? [run('tsc', ['-p', 'apps/api/tsconfig.build.json', '--watch', '--preserveWatchOutput'], '.', serving)] : []),
+      run(process.execPath, [...(task === 'dev' ? ['--watch'] : []), 'apps/api/dist/src/mastra/server.js'], '.', serving),
       run('pnpm', ['exec', 'vite', ...(task === 'start' ? ['preview'] : []), '--host', '127.0.0.1', '--port', process.env.WEB_PORT ?? '5173', '--strictPort'], 'apps/web', webEnv),
     ]);
   }

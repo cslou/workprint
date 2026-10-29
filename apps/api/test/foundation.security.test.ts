@@ -14,13 +14,14 @@ test('built backend rejects unsafe config, separates setup privileges and exclud
   await command('pnpm', ['build'], { cwd: root, env: fixture.env, log: join(fixture.logs, 'build.log') });
   const inputs = join(fixture.logs, 'production-inputs.log');
   await command('pnpm', ['exec', 'tsc', '-p', 'apps/api/tsconfig.build.json', '--listFilesOnly'], { cwd: root, env: fixture.env, log: inputs });
-  const helper = await realpath(join(root, 'apps/api/test/native-conversations.ts'));
-  assert.ok(!(await readFile(inputs, 'utf8')).split(/\r?\n/).includes(helper), 'Native fixture helper is not a production compiler input');
-  const source = await readFile(helper);
-  for (const path of [...globSync('apps/api/dist/**/*'), ...globSync('apps/api/.mastra/output/**/*', { exclude: ['apps/api/.mastra/output/node_modules/**'] })]) {
+  const helpers = await Promise.all(['native-conversations.ts', 'built-server.ts', 'server-entry.test.ts', 'auth-built-fixture.ts'].map((file) => realpath(join(root, 'apps/api/test', file))));
+  const compilerInputs = (await readFile(inputs, 'utf8')).split(/\r?\n/);
+  for (const helper of helpers) assert.ok(!compilerInputs.includes(helper), 'Test composition is not a production compiler input');
+  const sources = await Promise.all(helpers.map((helper) => readFile(helper)));
+  for (const path of globSync('apps/api/dist/**/*')) {
     if (!(await stat(path)).isFile()) continue;
     const bytes = await readFile(path);
-    assert.ok(!bytes.includes(source) && !bytes.includes(source.toString('base64')), 'Native fixture source was bundled or inlined');
+    for (const source of sources) assert.ok(!bytes.includes(source) && !bytes.includes(source.toString('base64')), 'Test composition source was bundled or inlined');
     assert.ok(!bytes.includes('createNativeConversation') && !bytes.includes('Synthetic test conversation'), 'Executable native fixture entered a production artifact');
     assert.ok(!path.endsWith('/test/native-conversations.js'), 'Native fixture was emitted by the production build');
   }
@@ -53,7 +54,7 @@ test('built backend rejects unsafe config, separates setup privileges and exclud
   } finally { await store.close(); }
 
   for (const [name, model] of [['missing', ''], ['invalid', `https://${sentinel}`]]) {
-    const invalid = await start(process.execPath, ['apps/api/.mastra/output/index.mjs'], {
+    const invalid = await start(process.execPath, ['apps/api/dist/src/mastra/server.js'], {
       cwd: root, env: { ...fixture.env, DATABASE_URL: db.servingUrl, DEFAULT_ASSISTANT_MODEL: model }, log: join(fixture.logs, `${name}.log`),
     });
     try {
@@ -62,7 +63,7 @@ test('built backend rejects unsafe config, separates setup privileges and exclud
     } finally { await invalid.stop(); }
   }
 
-  const privileged = await start(process.execPath, ['apps/api/.mastra/output/index.mjs'], {
+  const privileged = await start(process.execPath, ['apps/api/dist/src/mastra/server.js'], {
     cwd: root, env: { ...fixture.env, DATABASE_URL: db.setupUrl }, log: join(fixture.logs, 'privileged-serving.log'),
   });
   try {
@@ -88,7 +89,7 @@ test('built backend rejects unsafe config, separates setup privileges and exclud
       if (name === 'settable-owner') assert.deepEqual((await query(url, "SELECT pg_has_role(current_user, 'wp_setup', 'USAGE') AS inherited, pg_has_role(current_user, 'wp_setup', 'SET') AS settable")).rows[0], { inherited: false, settable: true });
       const ownerPort = await unusedPort();
       const ownerLog = join(fixture.logs, `${name}.log`);
-      const owner = await start(process.execPath, ['apps/api/.mastra/output/index.mjs'], {
+      const owner = await start(process.execPath, ['apps/api/dist/src/mastra/server.js'], {
         cwd: root, env: { ...fixture.env, DATABASE_URL: url, PORT: String(ownerPort) }, log: ownerLog,
       });
       try {
@@ -102,7 +103,7 @@ test('built backend rejects unsafe config, separates setup privileges and exclud
   }
 
   const port = await unusedPort();
-  const server = await start(process.execPath, ['apps/api/.mastra/output/index.mjs'], {
+  const server = await start(process.execPath, ['apps/api/dist/src/mastra/server.js'], {
     cwd: root,
     env: { ...fixture.env, DATABASE_URL: db.servingUrl, PORT: String(port), WORKPRINT_TEST_PROVIDER: 'fake', WORKPRINT_TEST_BARRIER: 'enabled' },
     log: join(fixture.logs, 'server.log'),
@@ -116,6 +117,9 @@ test('built backend rejects unsafe config, separates setup privileges and exclud
     ['GET', '/swagger-ui'], ['GET', '/openapi.json'], ['POST', '/health'],
     ['GET', '/apps/api/test/native-conversations.ts'], ['GET', '/test/native-conversations.ts'],
     ['POST', '/__seed'], ['POST', '/v1/conversations'],
+    ['GET', '/__entry/slow'], ['GET', '/__entry/error'], ['POST', '/__entry-ordering'],
+    ['GET', '/api/agents/unregistered/browser/session'], ['GET', '/refresh-events'],
+    ['POST', '/__restart-active-workflow-runs'],
   ] as const) {
     const response = await fetch(`${origin}${path}`, { method, headers: { Authorization: `Bearer ${sentinel}` }, signal: AbortSignal.timeout(2000) });
     assert.equal(response.status, 404, `${method} ${path}`);

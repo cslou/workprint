@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { createServer } from 'node:http';
-import { readFile, mkdir, symlink, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { environment, root, sentinel } from './environment.js';
-import { command, start, unusedPort } from './process.js';
+import { start, unusedPort } from './process.js';
 import { createApiClient } from '@workprint/api-client';
 import { operations, type OperationName, type OperationRequest } from '@workprint/contracts';
 import { applicationRequests } from './application-requests.js';
 import { query } from './postgres.js';
+import { buildServerComposition } from './built-server.js';
 
 // Shared by current-scope checks and the separately invoked B-001 qualification.
 // Private fixture input is never inherited by serving. Accounts already exist.
@@ -38,29 +39,15 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
     assert.ok(hostname === '127.0.0.1', 'Auth qualification is restricted to the authorized loopback stack');
   }
   for (const account of config.accounts) assert.ok(/@[^@]+\.invalid$/.test(account.email), 'Only synthetic accounts are permitted');
-  // Build a separate test composition, not an environment-switched production probe.
-  const build = async (name: string, entry: string) => {
-    const project = join(fixture.logs, name);
-    await mkdir(join(project, 'src/mastra'), { recursive: true });
-    await writeFile(join(project, 'package.json'), await readFile(join(root, 'apps/api/package.json')));
-    await symlink(join(root, 'apps/api/node_modules'), join(project, 'node_modules'), 'dir');
-    await writeFile(join(project, 'src/mastra/index.ts'), entry);
-    await command('pnpm', ['exec', 'mastra', 'build', '--root', project], {
-      cwd: root, env: { ...fixture.env, MASTRA_BUILD_SKIP_INSTALL: '1' }, log: join(fixture.logs, `${name}-build.log`), timeout: 60000,
-    });
-    const output = join(project, '.mastra/output');
-    // The test artifact reuses exactly the frozen workspace dependencies, never a new install.
-    await symlink(join(root, 'node_modules/.pnpm/node_modules'), join(output, 'node_modules'), 'dir');
-    return join(output, 'index.mjs');
-  };
-  const probeEntry = await build('probe', `
-    import { createBackend } from ${JSON.stringify(join(root, 'apps/api/src/mastra/backend.ts'))};
+  // Separate compiled compositions share the production entry, never an environment-switched probe.
+  const probeEntry = await buildServerComposition(fixture.logs, 'probe', (directory) => `
+    import { createBackend } from ${JSON.stringify(join(directory, 'mastra/backend.js'))};
     import { registerApiRoute } from '@mastra/core/server';
-    export const mastra = await createBackend([registerApiRoute('/__auth_probe', {
+    const mastra = await createBackend([registerApiRoute('/__auth_probe', {
       method: 'GET', handler: (c) => c.json({ accountId: c.get('requestContext').get('accountId') })
     })]);
-  `);
-  const productionEntry = await build('production', `export { mastra } from ${JSON.stringify(join(root, 'apps/api/src/mastra/index.ts'))};`);
+  `, fixture.env);
+  const productionEntry = await buildServerComposition(fixture.logs, 'production', undefined, fixture.env);
   // Fresh sign-ins happen after building. Never log request/response credentials.
   const identities = await Promise.all(config.accounts.map(async (account) => {
     const response = await fetch(`${config.url}/auth/v1/token?grant_type=password`, {
