@@ -56,6 +56,11 @@ test('clean tracked export installs frozen, prepares, builds and serves built/de
     try {
       assert.deepEqual(await (await server.response(`http://127.0.0.1:${port}/health`)).json(), { success: true });
       if (mode === 'dev') {
+        const watchDeadline = Date.now() + 15000;
+        while (!(await readFile(join(fixture.logs, 'dev.log'), 'utf8')).includes('Watching for file changes.')) {
+          if (Date.now() > watchDeadline) throw new Error('TypeScript watch readiness deadline exceeded');
+          await delay(100);
+        }
         const sourcePath = join(checkout, 'apps/api/src/mastra/server.ts');
         const original = await readFile(sourcePath, 'utf8');
         const modified = original.replace('context.json({ success: true })', 'context.json({ success: true, reloadProof: true })');
