@@ -1,3 +1,4 @@
+import { browserOrigin } from './origin.js';
 import { expect, type Page, type TestInfo } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { compare } from './compare.js';
@@ -22,7 +23,7 @@ const union = (a: { x: number; y: number; width: number; height: number }, b: { 
 };
 export async function captureUploadPair(page: Page, info: TestInfo, width: number, kind: Kind) {
   await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
-  await page.route('**/*', async (route) => { if (new URL(route.request().url()).origin !== 'http://127.0.0.1:4179') throw new Error('Unauthorized visual egress'); await route.continue(); });
+  await page.route('**/*', async (route) => { if (new URL(route.request().url()).origin !== browserOrigin) throw new Error('Unauthorized visual egress'); await route.continue(); });
   await page.goto('/references/flow2-step1-r73.html');
   await page.addStyleTag({ content: fonts });
   await page.addStyleTag({ content: lineStyle });
@@ -43,7 +44,7 @@ export async function captureUploadPair(page: Page, info: TestInfo, width: numbe
     await page.goto('/shell.html');
     await page.waitForFunction(() => !!(window as unknown as { shellTest?: unknown }).shellTest);
     await page.route('**/v1/conversations/visual-conversation/uploads', async (route) => { await route.fulfill({ status: 501, json: { error: { code: 'not_implemented', message: 'Controlled visual prerequisite matched to the built backend 501' } } }); });
-    await page.evaluate((input) => (window as unknown as { shellTest: { configure(value: unknown): void } }).shellTest.configure(input), { session: { accountId: 'visual-account', name: 'Creator A' }, conversationId: 'visual-conversation', apiOrigin: 'http://127.0.0.1:4179', token: 'token' });
+    await page.evaluate((input) => (window as unknown as { shellTest: { configure(value: unknown): void } }).shellTest.configure(input), { session: { accountId: 'visual-account', name: 'Creator A' }, conversationId: 'visual-conversation', apiOrigin: browserOrigin, token: 'token' });
     await page.locator('.wp-opening-composer').waitFor();
     await page.locator('input[type=file]').setInputFiles('apps/web/test/fixtures/library-tile.png');
     await page.locator('.wp-chat-feedback').waitFor();
@@ -55,7 +56,7 @@ export async function captureUploadPair(page: Page, info: TestInfo, width: numbe
       const mount = (window as unknown as { uploadsTest: { configure(value: unknown): void; confirm(id: string): Promise<string> } }).uploadsTest;
       mount.configure(input);
       await mount.confirm('visual-upload');
-    }, { apiOrigin: 'http://127.0.0.1:4179', token: 'token', accountId: 'visual-account', conversationId: 'visual-conversation' });
+    }, { apiOrigin: browserOrigin, token: 'token', accountId: 'visual-account', conversationId: 'visual-conversation' });
     await page.locator('[data-confirm]').waitFor();
   }
   await expect(page.locator(kind === 'upload' ? '.wp-chat-feedback' : '[data-confirm]')).toHaveText(copy[kind]);

@@ -1,3 +1,4 @@
+import { browserOrigin } from '../origin.js';
 import type { Page } from '@playwright/test';
 import { expect, test } from '../material-network.js';
 
@@ -14,11 +15,11 @@ const hold = (page: Page, pattern: string, held: Held[]) => page.route(pattern, 
 const pending = async (held: Held[], count: number) => { await expect.poll(() => held.length).toBe(count); };
 
 async function uploadScope(page: Page, accountId: string, conversationId: string) {
-  await page.evaluate((input) => (window as unknown as UploadsHarness).uploadsTest.configure(input), { apiOrigin: 'http://127.0.0.1:4179', token: null, accountId, conversationId });
+  await page.evaluate((input) => (window as unknown as UploadsHarness).uploadsTest.configure(input), { apiOrigin: browserOrigin, token: null, accountId, conversationId });
 }
 
 for (const order of ['new-first', 'old-first'] as const) test(`pending upload responses cannot cross an account change (${order})`, async ({ page, materialNetwork }) => {
-  materialNetwork.expectOperations({ origin: 'http://127.0.0.1:4179', method: 'POST', path: '/v1/conversations/conversation-a/uploads', count: 2, query: {} });
+  materialNetwork.expectOperations({ origin: browserOrigin, method: 'POST', path: '/v1/conversations/conversation-a/uploads', count: 2, query: {} });
   const held: Held[] = [];
   await page.goto('/uploads.html');
   await page.waitForFunction(() => !!(window as unknown as UploadsHarness).uploadsTest);
@@ -51,8 +52,8 @@ for (const order of ['new-first', 'old-first'] as const) test(`pending upload re
 
 for (const order of ['new-first', 'old-first'] as const) test(`pending upload responses cannot cross a conversation change (${order})`, async ({ page, materialNetwork }) => {
   materialNetwork.expectOperations(
-    { origin: 'http://127.0.0.1:4179', method: 'POST', path: '/v1/conversations/conversation-a/uploads', count: 1, query: {} },
-    { origin: 'http://127.0.0.1:4179', method: 'POST', path: '/v1/conversations/conversation-b/uploads', count: 1, query: {} },
+    { origin: browserOrigin, method: 'POST', path: '/v1/conversations/conversation-a/uploads', count: 1, query: {} },
+    { origin: browserOrigin, method: 'POST', path: '/v1/conversations/conversation-b/uploads', count: 1, query: {} },
   );
   const held: Held[] = [];
   await page.goto('/uploads.html');
@@ -94,7 +95,7 @@ const libraryPage = {
 };
 const facts = { 'vale-v1': { name: 'Vale', tileLabel: 'Character', category: 'Characters' }, 'bench-v2': { name: 'Bench', tileLabel: 'Prop', category: 'Props' } };
 async function shellScope(page: Page, conversationId: string, session: string) {
-  await page.evaluate((input) => (window as unknown as ShellHarness).shellTest.configure(input), { session: { accountId: session, name: 'Creator A' }, apiOrigin: 'http://127.0.0.1:4179', token: 'token', conversationId, libraryPrerequisites: { display: facts } });
+  await page.evaluate((input) => (window as unknown as ShellHarness).shellTest.configure(input), { session: { accountId: session, name: 'Creator A' }, apiOrigin: browserOrigin, token: 'token', conversationId, libraryPrerequisites: { display: facts } });
 }
 async function openLibrary(page: Page) {
   await page.getByRole('button', { name: 'Library', exact: true }).click();
@@ -102,7 +103,7 @@ async function openLibrary(page: Page) {
 }
 
 for (const order of ['new-first', 'old-first'] as const) test(`pending attach responses cannot cross a conversation change (${order})`, async ({ page, materialNetwork }) => {
-  const origin = 'http://127.0.0.1:4179';
+  const origin = browserOrigin;
   materialNetwork.expectOperations(
     { origin, method: 'GET', path: '/v1/conversations/conversation-a/workspace', count: 1, query: {} },
     { origin, method: 'GET', path: '/v1/conversations/conversation-b/workspace', count: 1, query: {} },

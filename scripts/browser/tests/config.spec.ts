@@ -1,3 +1,4 @@
+import { browserTestSettings } from '../origin.js';
 import { expect, test } from '../material-network.js';
 import { createHash } from 'node:crypto';
 import { readFile, readdir, realpath } from 'node:fs/promises';
@@ -7,7 +8,17 @@ import type * as Processes from '../../../apps/api/test/process.js';
 import type * as Environment from '../../../apps/api/test/environment.js';
 import { parsePublicApiOrigin } from '../../../apps/web/src/api/public-config.js';
 
-test('public API configuration is explicit, origin-only and never reflects invalid secrets', () => {
+test('browser ports and public API configuration are explicit and reject malformed settings', () => {
+  expect(browserTestSettings({})).toEqual({ browserPort: 4179, browserOrigin: 'http://127.0.0.1:4179', previewPort: 4180, previewOrigin: 'http://127.0.0.1:4180' });
+  expect(browserTestSettings({ WORKPRINT_BROWSER_PORT: '4279', WORKPRINT_PREVIEW_PORT: '4280' })).toEqual({ browserPort: 4279, browserOrigin: 'http://127.0.0.1:4279', previewPort: 4280, previewOrigin: 'http://127.0.0.1:4280' });
+  const canonicalHttpOrigin = new URL('http://127.0.0.1:80').origin;
+  expect(canonicalHttpOrigin).toBe('http://127.0.0.1');
+  expect(browserTestSettings({ WORKPRINT_BROWSER_PORT: '80', WORKPRINT_PREVIEW_PORT: '80' })).toEqual({ browserPort: 80, browserOrigin: canonicalHttpOrigin, previewPort: 80, previewOrigin: canonicalHttpOrigin });
+  for (const setting of ['WORKPRINT_BROWSER_PORT', 'WORKPRINT_PREVIEW_PORT']) {
+    for (const value of ['', '0', '-1', '65536', '1.5', ' 4279', '4279/path', 'secret']) {
+      expect(() => browserTestSettings({ [setting]: value })).toThrow(`Invalid ${setting}: expected a TCP port`);
+    }
+  }
   for (const value of [undefined, null, '']) expect(parsePublicApiOrigin(value)).toEqual({ kind: 'missing' });
   for (const value of ['https://api.example.invalid', 'http://127.0.0.1:4111', 'http://localhost:4111', 'http://[::1]:4111']) expect(parsePublicApiOrigin(value)).toEqual({ kind: 'configured', apiOrigin: value });
   for (const value of ['http://remote.invalid', '/v1', 'https://user:secret@example.invalid', 'https://example.invalid/path', 'https://example.invalid/?secret=value', 'https://example.invalid/#token', ' https://example.invalid', 42, {}]) expect(parsePublicApiOrigin(value)).toEqual({ kind: 'invalid' });
@@ -41,12 +52,13 @@ test('default dev and production build expose no interchangeable test compositio
     }] });
   `], { cwd: web, env, log: join(fixture.logs, 'web-build.log') });
   const testRoot = await realpath(join(web, 'test'));
+  const nativeHelper = await realpath(resolve('apps/api/test/native-conversations.ts'));
   const graph = JSON.parse(await readFile(inputsFile, 'utf8')) as { inputs: string[]; inlineLimit: number | null };
   expect(graph.inputs.length).toBeGreaterThan(0);
   for (const input of new Set(graph.inputs)) {
     if (input.includes('\0') || !isAbsolute(input)) continue;
     const path = await realpath(input.split('?')[0]!);
-    expect.soft(path === testRoot || path.startsWith(testRoot + sep), `Test build input: ${path}`).toBe(false);
+    expect.soft(path === testRoot || path.startsWith(testRoot + sep) || path === nativeHelper, `Test build input: ${path}`).toBe(false);
   }
   const entries = await readdir(testRoot, { recursive: true, withFileTypes: true });
   const files = entries.filter(entry => entry.isFile()).map(entry => relative(testRoot, join(entry.parentPath, entry.name)));
@@ -56,8 +68,9 @@ test('default dev and production build expose no interchangeable test compositio
   const digest = (value: Buffer) => createHash('sha256').update(value).digest('hex');
   const hashes = new Set(bytes.map(digest));
   const textAssets = emitted.filter(asset => /\.(html|js|css|map|json|svg|txt)$/.test(asset.file));
-  for (const file of files) {
-    const source = await readFile(join(testRoot, file));
+  const sources = [...files.map(file => ({ file, path: join(testRoot, file) })), { file: 'native-conversations.ts', path: nativeHelper }];
+  for (const { file, path } of sources) {
+    const source = await readFile(path);
     expect.soft(hashes.has(digest(source)), `Test file SHA256 emitted: ${file}`).toBe(false);
     expect.soft(bytes.some(asset => asset.includes(source)), `Raw test bytes bundled: ${file}`).toBe(false);
     // A base64 payload also detects data URLs of any MIME type, including forced ?inline assets.
@@ -97,6 +110,13 @@ test('default dev and production build expose no interchangeable test compositio
         } else if (path.startsWith('/test/') && (path.endsWith('.html') || path.startsWith('/test/fixtures/'))) {
           expect(response.status, `Default dev serves ${path}`).toBe(200);
         }
+      }
+      for (const path of ['/apps/api/test/native-conversations.ts', `/@fs/${nativeHelper}`]) {
+        const response = await fetch(`${origin}${path}`, { signal: AbortSignal.timeout(3000) });
+        const body = await response.text();
+        exposure.push({ mode, path, status: response.status, disposition: 'Native fixture helper denied or ordinary application fallback' });
+        expect(response.status === 403 || response.status === 404 || (response.status === 200 && body === html), path).toBe(true);
+        expect(body).not.toContain('createNativeConversation');
       }
       for (const suffix of ['', '?context=viewer&reference=proposal&fixture=1&__qualification=1']) {
         await page.goto(origin + suffix);

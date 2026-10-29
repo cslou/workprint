@@ -22,7 +22,7 @@ type Input = { apiOrigin?: string; token?: string | null; accountId?: string; co
     const connection = input.apiOrigin === undefined ? { kind: 'missing' as const } : createBrowserClient(input.apiOrigin, async () => input.token ?? null);
     if (input.composition) {
       // Explicit read-only workspace delivery seam; mutations still use the real client.
-      const base = connection.kind === 'configured' ? connection : createBrowserClient('http://127.0.0.1:4179', async () => null);
+      const base = connection.kind === 'configured' ? connection : createBrowserClient(window.location.origin, async () => null);
       if (base.kind !== 'configured') throw new Error('Missing loopback client');
       const projected = input.workspace ?? (input.videos ? workspaceSchema.parse({ ...workspace, videos: ['queued', 'submitting', 'running', 'succeeded', 'failed', 'cancelled'].map((status, index) => generationRequestSchema.parse({ id: `request-${status}`, batchId: 'read-only-batch', proposalId: 'read-only-proposal', purpose: 'shot_video', target: { shotId: 'shot-a' }, status, remote: { taskId: `private-remote-${index}` }, ...(status === 'succeeded' ? { resultVersionId: 'video-v2' } : {}) })), storyboard: { ...workspace.storyboard, shots: workspace.storyboard.shots.map(shot => shot.shotId === 'shot-a' ? { ...shot, chosenVideoVersionId: 'video-v1' } : shot) } }) : workspace);
       const video = versionSchema.parse({ id: 'video-v2', artifactId: 'video-artifact', revision: 2, kind: 'video', media: { contentType: 'video/mp4', byteSize: 456, width: 1280, height: 720, durationMs: 5100 }, createdBy: 'assistant', createdAt: '2026-10-28T00:00:00Z', dependencies: ['panel-image-v2'] });

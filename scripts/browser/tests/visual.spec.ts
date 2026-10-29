@@ -1,3 +1,4 @@
+import { browserOrigin } from '../origin.js';
 import { expect, test } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -19,7 +20,7 @@ for (const width of [1440, 390, 820, 821]) for (const context of contexts) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
     // All resources are tracked local placeholders; fail on any off-origin request.
     await browser.route('**/*', async (route) => {
-      if (new URL(route.request().url()).origin !== 'http://127.0.0.1:4179') throw new Error('Unauthorized browser egress');
+      if (new URL(route.request().url()).origin !== browserOrigin) throw new Error('Unauthorized browser egress');
       await route.continue();
     });
     await page.goto(`/references/${context.reference}`);

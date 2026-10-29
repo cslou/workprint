@@ -1,3 +1,4 @@
+import { browserOrigin } from '../origin.js';
 import { expect, test } from '@playwright/test';
 import { test as observedTest } from '../material-network.js';
 import { activate } from '../activation.js';
@@ -51,7 +52,7 @@ observedTest('exact-version media reaches the built backend and renders 501/401 
         await page.evaluate(() => (window as unknown as Harness).mediaTest.unmount());
         await page.unrouteAll({ behavior: 'wait' });
       }
-    }, { browserOrigin: 'http://127.0.0.1:4179' });
+    }, { browserOrigin });
   } finally { for (const finish of cleanup.reverse()) await finish(); }
 });
 

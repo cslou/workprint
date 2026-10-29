@@ -1,3 +1,4 @@
+import { browserOrigin } from '../origin.js';
 import { expect, test } from '@playwright/test';
 import type { Locator } from '@playwright/test';
 
@@ -40,7 +41,7 @@ test('labelled input retains edits; tabs use arrows without moving other scope',
 
 test('text fields have no mouse or keyboard ring; buttons and tabs retain keyboard rings', async ({ page, context }) => {
   await context.route('**/*', async route => {
-    expect(new URL(route.request().url()).origin).toBe('http://127.0.0.1:4179');
+    expect(new URL(route.request().url()).origin).toBe(browserOrigin);
     await route.continue();
   });
   const noRing = async (target: Locator, label: string) => {

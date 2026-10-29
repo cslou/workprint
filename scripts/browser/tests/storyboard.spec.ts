@@ -1,3 +1,4 @@
+import { browserOrigin } from '../origin.js';
 import { expect, test } from '@playwright/test';
 import { test as observedTest } from '../material-network.js';
 import { activate } from '../activation.js';
@@ -13,7 +14,7 @@ test('aborted planning PATCH retains the exact base, selection and draft and re-
   await page.goto('/storyboard.html'); await page.waitForFunction(() => !!(window as unknown as Harness).storyboardTest);
   const patches: unknown[] = [];
   await page.route('**/v1/**', async route => { if (route.request().method() === 'PATCH') patches.push(route.request().postDataJSON()); else expect(route.request().method()).toBe('GET'); await route.abort('failed'); });
-  await page.evaluate(() => (window as unknown as Harness).storyboardTest.configure({ composition: true, videos: true, apiOrigin: 'http://127.0.0.1:4179' }));
+  await page.evaluate(() => (window as unknown as Harness).storyboardTest.configure({ composition: true, videos: true, apiOrigin: window.location.origin }));
   await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
   const selection = () => page.locator('.wp-video-row [data-current-version-id]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-current-version-id')));
   await expect.poll(selection).toEqual(['video-v1', 'video-v1']);
@@ -71,7 +72,7 @@ test('planning uses typed text only and viewing, Cancel and unmount never mutate
   await page.goto('/storyboard.html'); await page.waitForFunction(() => !!(window as unknown as Harness).storyboardTest);
   const requests: string[] = [];
   await page.route('**/v1/**', async route => { requests.push(route.request().method()); await route.abort('failed'); });
-  await page.evaluate(() => (window as unknown as Harness).storyboardTest.configure({ apiOrigin: 'http://127.0.0.1:4179' }));
+  await page.evaluate(() => (window as unknown as Harness).storyboardTest.configure({ apiOrigin: window.location.origin }));
   await expect(page.getByText(initial, { exact: true })).toBeVisible();
   await expect(page.getByText('Opaque camera must not render.', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Edit Panel description', exact: true }).click();
@@ -121,7 +122,7 @@ observedTest('Panel choice sends exact version and Shot/Panel binding to real 40
         expect(commands).toHaveLength(1);
         await page.unroute('**/v1/**');
       }
-    }, { browserOrigin: 'http://127.0.0.1:4179' });
+    }, { browserOrigin });
   } finally { for (const finish of cleanup.reverse()) await finish(); }
 });
 
@@ -157,6 +158,6 @@ for (const shot of [false, true]) observedTest(`planning ${shot ? 'Shot intent' 
         await expect(page.getByText(shot ? 'First Shot' : initial, { exact: true })).toBeVisible();
         await page.unroute('**/v1/**');
       }
-    }, { browserOrigin: 'http://127.0.0.1:4179' });
+    }, { browserOrigin });
   } finally { for (const finish of cleanup.reverse()) await finish(); }
 });

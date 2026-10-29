@@ -1,3 +1,4 @@
+import { browserOrigin } from '../origin.js';
 import type { Page } from '@playwright/test';
 import { expect, test } from '../material-network.js';
 import { readFile } from 'node:fs/promises';
@@ -116,13 +117,13 @@ test('the actual file input initiates the exact metadata and never transfers or 
       await expect(text).toHaveValue('A quiet moment in the gallery.');
       materialNetwork.assertSafe();
       await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.unmount());
-    }, { browserOrigin: 'http://127.0.0.1:4179' });
+    }, { browserOrigin });
   } finally { for (const finish of cleanup.reverse()) await finish(); }
 });
 
 test('upload transport failure, unsupported type and no conversation send nothing they must not', async ({ page, materialNetwork }, info) => {
   await info.attach('prerequisite', { body: 'Synthetic local files and a labelled isolated initiation acknowledgement with a loopback transfer trap URL. No bytes are transferred and no confirmation or persistence is simulated.', contentType: 'text/plain' });
-  materialNetwork.expectOperations({ origin: 'http://127.0.0.1:4179', method: 'POST', path: '/v1/conversations/conversation-a/uploads', count: 2, query: {} });
+  materialNetwork.expectOperations({ origin: browserOrigin, method: 'POST', path: '/v1/conversations/conversation-a/uploads', count: 2, query: {} });
   await page.goto('/uploads.html');
   await page.waitForFunction(() => !!(window as unknown as UploadsHarness).uploadsTest);
   const input = page.getByLabel('Choose an image or video', { exact: true });
@@ -130,24 +131,24 @@ test('upload transport failure, unsupported type and no conversation send nothin
   const seen: { method: string; path: string }[] = [];
   const image = await readFile('apps/web/test/fixtures/library-tile.png');
   await page.route('**/v1/**', async (route) => { seen.push({ method: route.request().method(), path: new URL(route.request().url()).pathname }); await route.abort('failed'); });
-  await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.configure({ apiOrigin: 'http://127.0.0.1:4179', token: 'token', accountId: 'account-a', conversationId: 'conversation-a' }));
+  await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.configure({ apiOrigin: window.location.origin, token: 'token', accountId: 'account-a', conversationId: 'conversation-a' }));
   await text.fill('Retained while the upload fails.');
   await input.setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: image });
   await expect(page.locator('.wp-chat-feedback')).toHaveText('The file was not uploaded. Nothing was changed.');
   materialNetwork.assertSafe();
   const before = seen.length;
-  await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.configure({ apiOrigin: 'http://127.0.0.1:4179', token: 'token', accountId: 'account-a', conversationId: 'conversation-a' }));
+  await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.configure({ apiOrigin: window.location.origin, token: 'token', accountId: 'account-a', conversationId: 'conversation-a' }));
   await input.setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not media') });
   await expect(page.locator('.wp-chat-feedback')).toHaveText('That file is not an image or video. The file was not sent.');
   materialNetwork.assertSafe();
-  await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.configure({ apiOrigin: 'http://127.0.0.1:4179', token: 'token', accountId: 'account-a' }));
+  await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.configure({ apiOrigin: window.location.origin, token: 'token', accountId: 'account-a' }));
   await input.setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: image });
   await expect(page.locator('.wp-chat-feedback')).toHaveText('Uploading files is not available yet. The file was not sent.');
   expect(seen.slice(before)).toEqual([]);
   expect(seen.some((entry) => /confirm$/.test(entry.path))).toBe(false);
   materialNetwork.assertSafe();
-  await page.route('**/v1/conversations/*/uploads', route => route.fulfill({ json: { uploadId: 'read-only-initiation', url: 'http://127.0.0.1:4179/forbidden-transfer', expiresAt: '2099-01-01T00:00:00Z', maxBytes: 4096 } }));
-  await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.configure({ apiOrigin: 'http://127.0.0.1:4179', token: null, accountId: 'account-a', conversationId: 'conversation-a' }));
+  await page.route('**/v1/conversations/*/uploads', route => route.fulfill({ json: { uploadId: 'read-only-initiation', url: `${browserOrigin}/forbidden-transfer`, expiresAt: '2099-01-01T00:00:00Z', maxBytes: 4096 } }));
+  await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.configure({ apiOrigin: window.location.origin, token: null, accountId: 'account-a', conversationId: 'conversation-a' }));
   await input.setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: image });
   await expect(page.locator('.wp-chat-feedback')).toHaveText('Uploading files is not available yet. The file was not sent.');
   materialNetwork.assertSafe();
@@ -181,7 +182,7 @@ test('the isolated confirmation consumer calls the real route and exposes no ver
       await expect(page.locator('[data-confirm]')).toHaveText('Sign-in required to confirm this upload. No version was created.');
       materialNetwork.assertSafe();
       await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.unmount());
-    }, { browserOrigin: 'http://127.0.0.1:4179' });
+    }, { browserOrigin });
   } finally { for (const finish of cleanup.reverse()) await finish(); }
 });
 
@@ -275,13 +276,13 @@ test('picker filters and selects locally and attaches the exact versions against
       await expect(page.locator('.wp-picker-chip')).toHaveText(['Vale×']);
       materialNetwork.assertSafe();
       await page.evaluate(() => (window as unknown as ShellHarness).shellTest.unmount());
-    }, { browserOrigin: 'http://127.0.0.1:4179' });
+    }, { browserOrigin });
   } finally { for (const finish of cleanup.reverse()) await finish(); }
 });
 
 test('picker without facts guesses nothing and attach needs a current conversation', async ({ page, materialNetwork }) => {
-  materialNetwork.expectOperations({ origin: 'http://127.0.0.1:4179', method: 'GET', path: '/v1/library', count: 1, query: {} });
-  await openPicker(page, 'http://127.0.0.1:4179', 'token', { prerequisites: {} });
+  materialNetwork.expectOperations({ origin: browserOrigin, method: 'GET', path: '/v1/library', count: 1, query: {} });
+  await openPicker(page, browserOrigin, 'token', { prerequisites: {} });
   await expect(page.locator('.wp-picker-pill')).toHaveCount(0);
   await expect(page.locator('.wp-picker-tile .wp-picker-label')).toHaveText(['Reference', 'Reference', 'Image', 'Reference']);
   await expect(page.locator('.wp-picker-sub')).toHaveText(['Version 1', 'Version 1', 'Version 3', 'Version 2']);
@@ -297,13 +298,13 @@ test('picker without facts guesses nothing and attach needs a current conversati
 });
 
 test('controlled partial success attaches one exact version and keeps the rest selected', async ({ page, materialNetwork }) => {
-  const origin = 'http://127.0.0.1:4179';
+  const origin = browserOrigin;
   materialNetwork.expectOperations(
     { origin, method: 'GET', path: '/v1/conversations/conversation-a/workspace', count: 1, query: {} },
     { origin, method: 'GET', path: '/v1/library', count: 1, query: {} },
     { origin, method: 'POST', path: '/v1/conversations/conversation-a/uses', count: 2, query: {} },
   );
-  await openPicker(page, 'http://127.0.0.1:4179', 'token', { conversationId: 'conversation-a' });
+  await openPicker(page, browserOrigin, 'token', { conversationId: 'conversation-a' });
   const bodies: Record<string, unknown>[] = [];
   await page.route('**/v1/conversations/conversation-a/uses', async (route) => {
     const body = JSON.parse(route.request().postData() ?? '{}') as Record<string, unknown>;
@@ -322,13 +323,13 @@ test('controlled partial success attaches one exact version and keeps the rest s
 });
 
 test('controlled full success clears the selection and claims nothing else locally', async ({ page, materialNetwork }) => {
-  const origin = 'http://127.0.0.1:4179';
+  const origin = browserOrigin;
   materialNetwork.expectOperations(
     { origin, method: 'GET', path: '/v1/conversations/conversation-a/workspace', count: 1, query: {} },
     { origin, method: 'GET', path: '/v1/library', count: 1, query: {} },
     { origin, method: 'POST', path: '/v1/conversations/conversation-a/uses', count: 2, query: {} },
   );
-  await openPicker(page, 'http://127.0.0.1:4179', 'token', { conversationId: 'conversation-a' });
+  await openPicker(page, browserOrigin, 'token', { conversationId: 'conversation-a' });
   const bodies: Record<string, unknown>[] = [];
   await page.route('**/v1/conversations/conversation-a/uses', async (route) => {
     const body = JSON.parse(route.request().postData() ?? '{}') as Record<string, unknown>;

@@ -3,6 +3,10 @@ import { applicationError, operations, type ErrorEnvelope, type OperationName } 
 /** Supplied by the admission adapter, never read from the request payload. */
 export type Admission = { kind: 'verified'; accountId: string } | { kind: 'unauthorized' } | { kind: 'unavailable' };
 export type Authenticate = () => Promise<Admission>;
+export type OwnedConversationOutcome = { kind: 'owned' } | { kind: 'not_found' } | { kind: 'unavailable'; reason: 'native_storage' };
+/** accountId is supplied by verified admission, never by caller owner claims. */
+export type CheckOwnedConversation = (accountId: string, conversationId: string) => Promise<OwnedConversationOutcome>;
+export type ApplicationCollaborators = Readonly<{ checkOwnedConversation: CheckOwnedConversation }>;
 export type UnavailableBoundary = (input: unknown, authenticate: Authenticate) => Promise<ErrorEnvelope>;
 
 function boundary(name: OperationName): UnavailableBoundary {
@@ -39,3 +43,9 @@ export const unavailableApplication = {
   exports: boundary('exports'),
   export: boundary('export'),
 } satisfies Record<OperationName, UnavailableBoundary>;
+
+/** Composition supplies trusted reads without enabling any application operation. */
+export function createApplication(collaborators: ApplicationCollaborators) {
+  return { operations: unavailableApplication, checkOwnedConversation: collaborators.checkOwnedConversation };
+}
+export type Application = ReturnType<typeof createApplication>;

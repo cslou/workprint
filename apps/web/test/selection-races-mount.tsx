@@ -13,7 +13,7 @@ import '../src/ui/foundations.css';
 // These are not a successful product backend or evidence of persisted approvals.
 const videos = [versionSchema.parse({ ...video, id: 'video-v1', revision: 1 }), video];
 const images = [versionSchema.parse({ ...image, id: 'panel-image-v1', revision: 1 }), image];
-const base = createBrowserClient('http://127.0.0.1:4179', async () => null);
+const base = createBrowserClient(window.location.origin, async () => null);
 if (base.kind !== 'configured') throw new Error('Missing loopback client');
 const pending: { body: Parameters<ApiClient['useVersion']>[0]['body']; resolve(value: ClientResult<OperationResponse<'useVersion'>>): void }[] = [];
 const client: ApiClient = { ...base.client,

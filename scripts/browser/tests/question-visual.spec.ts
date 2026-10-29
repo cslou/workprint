@@ -1,3 +1,4 @@
+import { browserOrigin } from '../origin.js';
 import { expect, test } from '@playwright/test';
 import { compare } from '../compare.js';
 import { settleCapture } from '../capture.js';
@@ -8,9 +9,9 @@ for (const width of [1440, 390, 820, 821]) for (const view of ['question', 'prop
   if ((view === 'answer' || view === 'send') && width !== 1440 && width !== 390) continue;
   test(`${view} main reference at ${width}`, async ({ page, context }, info) => {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
-    await context.route('**/*', async (route) => { if (new URL(route.request().url()).origin !== 'http://127.0.0.1:4179') throw new Error('Unauthorized visual egress'); await route.continue(); });
+    await context.route('**/*', async (route) => { if (new URL(route.request().url()).origin !== browserOrigin) throw new Error('Unauthorized visual egress'); await route.continue(); });
     // Apply the approved font mapping in the first stylesheet response, before layout.
-    await context.route('http://127.0.0.1:4179/references/app-r11.css', async (route) => {
+    await context.route(`${browserOrigin}/references/app-r11.css`, async (route) => {
       const response = await route.fetch();
       await route.fulfill({ response, body: `${await response.text()}\n:root{--font-sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-display:Georgia,"Times New Roman",serif}b,strong{font-weight:600}.viewboard{background:var(--raised)}` });
     });
@@ -67,7 +68,7 @@ for (const width of [1440, 390, 820, 821]) for (const view of ['question', 'prop
     } else {
       await page.goto(`/question.html?reference=${view === 'proposal' ? 'proposal' : 'question'}`);
       await page.waitForFunction(() => !!(window as unknown as { questionTest?: unknown }).questionTest);
-      await page.evaluate((view) => (window as unknown as { questionTest: { configure(value: unknown): void } }).questionTest.configure(view === 'answer' ? { apiOrigin: 'http://127.0.0.1:4179', question: { id: '.', revision: 7, status: 'pending', scope: {}, prompt: 'How does Mercer react?', options: [{ id: 'surprised', label: 'He looks up at Vale, surprised' }, { id: 'nod', label: 'He stays still, then gives a small nod' }] } } : { withProposal: view === 'proposal' }), view);
+      await page.evaluate((view) => (window as unknown as { questionTest: { configure(value: unknown): void } }).questionTest.configure(view === 'answer' ? { apiOrigin: window.location.origin, question: { id: '.', revision: 7, status: 'pending', scope: {}, prompt: 'How does Mercer react?', options: [{ id: 'surprised', label: 'He looks up at Vale, surprised' }, { id: 'nod', label: 'He stays still, then gives a small nod' }] } } : { withProposal: view === 'proposal' }), view);
       await expect(page.getByRole('region', { name: 'Question' })).toBeVisible();
       if (view === 'answer') { await page.getByRole('button', { name: 'He stays still, then gives a small nod', exact: true }).click(); await expect(page.getByRole('status')).toHaveText('The answer was not submitted. The question stays pending.'); }
       if (view === 'proposal') await expect(page.getByText('Cost: $0.12 · estimate', { exact: true })).toBeVisible();

@@ -1,3 +1,4 @@
+import { browserOrigin } from '../origin.js';
 import { expect, test } from '@playwright/test';
 import { test as observedTest } from '../material-network.js';
 import { activate } from '../activation.js';
@@ -89,6 +90,6 @@ observedTest('Video Use, list/details and cancellation receive real 401/501 and 
         expect(commands).toHaveLength(2); expect(await page.evaluate(() => (window as unknown as Harness).storyboardTest.nativeStopCalls())).toBe(0);
         await page.unroute('**/v1/**');
       }
-    }, { browserOrigin: 'http://127.0.0.1:4179' });
+    }, { browserOrigin });
   } finally { for (const finish of cleanup.reverse()) await finish(); }
 });

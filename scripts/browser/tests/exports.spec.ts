@@ -1,3 +1,4 @@
+import { browserOrigin } from '../origin.js';
 import type { Page } from '@playwright/test';
 import { expect, test } from '../material-network.js';
 import { activate } from '../activation.js';
@@ -6,7 +7,7 @@ import { resolve } from 'node:path';
 import type { verifyBuiltAdmission as VerifyBuiltAdmission } from '../../../apps/api/test/auth-built-fixture.js';
 
 type Harness = { exportsTest: { configure(input: unknown): void; unmount(): void; remount(): void } };
-const local = 'http://127.0.0.1:4179';
+const local = browserOrigin;
 async function mount(page: Page, input: unknown) {
   await page.goto('/exports.html');
   await page.waitForFunction(() => !!(window as unknown as Harness).exportsTest);
@@ -93,7 +94,7 @@ test('successful cross-origin media access still cannot download or navigate in 
   await page.goto('/exports.html'); await page.waitForFunction(() => !!(window as unknown as Harness).exportsTest);
   let navigations = 0, downloads = 0, popups = 0;
   page.on('framenavigated', () => { navigations++; }); page.on('download', () => { downloads++; }); context.on('page', () => { popups++; });
-  await page.evaluate(() => (window as unknown as Harness).exportsTest.configure({ apiOrigin: 'http://127.0.0.1:4179', mode: 'download' }));
+  await page.evaluate(() => (window as unknown as Harness).exportsTest.configure({ apiOrigin: window.location.origin, mode: 'download' }));
   await expect(page.locator('.wp-export-unavailable')).toHaveText('Download is not available yet.No file was downloaded.');
   await expect(page.locator('.wp-panel-body a')).toHaveCount(0);
   expect(navigations).toBe(0); expect(downloads).toBe(0); expect(popups).toBe(0);
@@ -144,9 +145,9 @@ test('transport failures leave no record, download link or selection command', a
   await page.getByRole('button', { name: 'Export history', exact: true }).click();
   await expect(page.getByText('No export records were loaded.', { exact: true })).toBeVisible();
   await expect(page.locator('.wp-export-card')).toHaveCount(0);
-  await page.evaluate(() => (window as unknown as Harness).exportsTest.configure({ apiOrigin: 'http://127.0.0.1:4179', mode: 'detail' }));
+  await page.evaluate(() => (window as unknown as Harness).exportsTest.configure({ apiOrigin: window.location.origin, mode: 'detail' }));
   await expect(page.getByText('No export record was loaded.', { exact: true })).toBeVisible();
-  await page.evaluate(() => (window as unknown as Harness).exportsTest.configure({ apiOrigin: 'http://127.0.0.1:4179', mode: 'download' }));
+  await page.evaluate(() => (window as unknown as Harness).exportsTest.configure({ apiOrigin: window.location.origin, mode: 'download' }));
   await expect(page.getByText('No file was downloaded.', { exact: true })).toBeVisible();
   await expect(page.locator('a[download],video,[role="progressbar"]')).toHaveCount(0);
 });

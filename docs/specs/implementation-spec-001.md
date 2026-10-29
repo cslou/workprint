@@ -1055,7 +1055,7 @@ Approved by Lou on 2026-10-29. Phase 3 runs as parallel waves. Sprints in one wa
 
 | Wave | Sprint | Stories, in order | Owns |
 | --- | --- | --- | --- |
-| Foundation | [Story 001](../stories/story-001.md) | Mastra 1.80.x upgrade; per-checkout browser-test port; trusted owned-conversation check and its test-only native-conversation helper | Dependency versions, browser harness port, the collaborator in `application`/`agent/mastra` |
+| Foundation | [Story 001](../stories/story-001.md) | Per-checkout browser-test port; trusted owned-conversation check and its test-only native-conversation helper | Browser harness port, the collaborator in `application`/`agent/mastra` |
 | 1 | [Sprint 004](../sprints/sprint-004.md) — Native runtime and conversations | B-001 → P3-S1a (account/session, then owned conversation navigation/history) → P3-S1b (send/stream/persist, then queue/reconnect/exact-turn Stop) → P3-S18 → P3-S19 | Backend `mastra/` serving/auth/native/workflow adapters, `agent/mastra/`, web `shell/` account/New video/Recents and native-history parts of `conversation/`, native/Auth client methods. No application tables |
 | 1 | [Sprint 005](../sprints/sprint-005.md) — Saved work, uploads and media | P3-S2 (schema and owned reads, then manual saves) → P3-S3 (storage/upload coordination, then media verification and upload UI) → P3-S4 → P3-S5 (storyboard edits with the selection revision, then exact Shot-video choice) → P3-S10 → real-R2 qualification | `supabase/` migrations, `db`, `artifacts`, `storage`, `application`; the `workspace`, version, `library`, save/use, `editStoryboard`, upload and `media` operations; web materials/versions/library/uploads/storyboard/videos choice/media; `player` |
 | 2 | 006 — Chat, decisions and generation records | P3-S1c (browser chat, live-model qualification, usage) → P3-S7 (with B-003 display names) → P3-S8 | `usage`, `generation`, question/answer additions in `artifacts`, web `conversation/` chat/question/proposal and `videos/` request views |
@@ -1081,6 +1081,7 @@ Wave 2 starts after both Wave 1 sprints integrate, because 006 and 007 need 004'
 - **Built-in Library examples:** ignored for now (Lou, 2026-10-29). Only the read-only `builtIn` semantics are implemented, proven with test-only records.
 - **P3-S1c moves to Wave 2:** it needs 005's migration workflow for usage records, plus Lou's live-model choice and call authorization.
 - **New designs:** unseen states get inert previews first. The orchestrator provisionally approves them under Lou's delegation, pending ratification at the Phase 3 handoff.
+- **Mastra upgrade after Wave 1:** Lou moved the 1.80.x upgrade out of the foundation on 2026-10-29. pnpm's default 24-hour release-age hold blocked it, and Wave 1 does not need it. Both Wave 1 sprints run on the current 1.79.0 set, so they still share one version. The upgrade becomes a standalone story into `phase-3` after both Wave 1 sprints integrate and before Wave 2 starts, rerunning the full suite against the combined code (backlog B-007).
 - **Audit exceptions:** B-002 and B-004 have no upstream fix as of 2026-10-29. They gate shared or public deployment, not Phase 3 native-runtime qualification. B-001 does gate that qualification, and Sprint 004 resolves it first.
 
 ### Phase 4 — Agent Capabilities, Media Generation and Release

@@ -1,7 +1,8 @@
+import { browserOrigin } from '../origin.js';
 import type { Page } from '@playwright/test';
 import { expect, test } from '../material-network.js';
 type Harness = { exportsTest: { configure(input: unknown): void; remount(): void; unmount(): void } };
-const origin = 'http://127.0.0.1:4179';
+const origin = browserOrigin;
 async function setup(page: Page) { await page.goto('/exports.html'); await page.waitForFunction(() => !!(window as unknown as Harness).exportsTest); }
 async function configure(page: Page, input: unknown) { await page.evaluate(input => (window as unknown as Harness).exportsTest.configure(input), input); }
 type Held = { respond(value: unknown): Promise<void> };

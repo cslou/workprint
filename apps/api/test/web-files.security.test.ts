@@ -12,6 +12,7 @@ test('Vite serves browser modules but denies private research and fixture creden
   await mkdir(join(web, 'src'), { recursive: true });
   await mkdir(join(checkout, 'docs/research'), { recursive: true });
   await mkdir(join(checkout, 'outputs'), { recursive: true });
+  await mkdir(join(checkout, 'apps/api/test'), { recursive: true });
   for (const file of ['package.json', 'pnpm-workspace.yaml']) await copyFile(join(root, file), join(checkout, file));
   for (const file of ['package.json', 'vite.config.ts', 'index.html']) await copyFile(join(root, 'apps/web', file), join(web, file));
   await cp(join(root, 'apps/web/src'), join(web, 'src'), { recursive: true });
@@ -19,6 +20,9 @@ test('Vite serves browser modules but denies private research and fixture creden
   await symlink(join(root, 'apps/web/node_modules'), join(web, 'node_modules'), 'dir');
   const paths = ['docs/research/synthetic-private.md', 'outputs/local-database.env'];
   for (const file of paths) await writeFile(join(checkout, file), sentinel);
+  const helper = 'apps/api/test/native-conversations.ts';
+  await copyFile(join(root, helper), join(checkout, helper));
+  paths.push(helper);
   const port = await unusedPort();
   const server = await start(process.execPath, [join(root, 'apps/web/node_modules/vite/bin/vite.js'), '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
     cwd: web, env: fixture.env, log: join(fixture.logs, 'vite.log'),

@@ -1,3 +1,4 @@
+import { browserOrigin } from '../origin.js';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { classifyWorkspaceFailure } from '../../../apps/web/src/shell/workspace.js';
@@ -93,7 +94,7 @@ test('composer draft survives delayed opening-to-question and question-to-openin
     if (route.request().url().endsWith('/workspace')) { const first = ++workspaceCalls === 1; if (first) await gate; await route.fulfill({ json: { ...emptyWorkspace(workspaceCalls), pendingQuestion: first ? pendingDraftQuestion : null } }); }
     else await route.abort('failed');
   });
-  const scope = { session: { accountId: 'draft-account', name: 'Draft account' }, conversationId: 'draft-conversation', apiOrigin: 'http://127.0.0.1:4179' };
+  const scope = { session: { accountId: 'draft-account', name: 'Draft account' }, conversationId: 'draft-conversation', apiOrigin: browserOrigin };
   await configure(page, scope); await expect.poll(() => workspaceCalls).toBe(1);
   const message = page.getByRole('textbox', { name: 'Message', exact: true });
   await expect(message).toHaveAttribute('placeholder', 'Describe your video…');
@@ -116,7 +117,7 @@ for (const axis of ['account', 'conversation']) test(`composer draft clears on $
   await page.goto('/shell.html'); const requests: string[] = [];
   await page.route('**/v1/**', async (route) => { expect(route.request().method()).toBe('GET'); requests.push(route.request().method()); if (route.request().url().endsWith('/workspace')) await route.fulfill({ json: { ...emptyWorkspace(1), pendingQuestion: pendingDraftQuestion } }); else await route.abort('failed'); });
   const session = { accountId: 'draft-account', name: 'Draft account' };
-  await configure(page, { session, conversationId: 'draft-conversation', apiOrigin: 'http://127.0.0.1:4179' });
+  await configure(page, { session, conversationId: 'draft-conversation', apiOrigin: browserOrigin });
   await expect(page.getByRole('region', { name: 'Question', exact: true })).toBeVisible();
   const message = page.getByRole('textbox', { name: 'Message', exact: true }); await message.fill('Scope-owned draft');
   const before = requests.length;
@@ -145,7 +146,7 @@ for (const axis of ['account-only', 'conversation-only'] as const) test(`${axis}
   });
   const session = { accountId: 'account-a', name: 'Creator A' };
   const next = { session: axis === 'account-only' ? { accountId: 'account-b', name: 'Creator B' } : session, conversationId: axis === 'conversation-only' ? 'conversation-b' : 'conversation-a' };
-  await configure(page, { session, conversationId: 'conversation-a', apiOrigin: 'http://127.0.0.1:4179' });
+  await configure(page, { session, conversationId: 'conversation-a', apiOrigin: browserOrigin });
   await expect.poll(() => requests).toBe(1);
   const oldRequest = page.waitForEvent('requestfailed', { predicate: (request) => request.url().includes('/workspace') });
   await page.getByRole('tab', { name: 'Assets', exact: true }).click();
@@ -179,7 +180,7 @@ for (const failure of ['unauthenticated', 'not_implemented', 'transport_failure'
     if (failure === 'transport_failure') await route.abort();
     else if (failure !== 'timed_out') await route.fulfill({ status: failure === 'unauthenticated' ? 401 : failure === 'forbidden' ? 403 : 501, json: { error: { code: failure, message: 'Controlled workspace read failure' } } });
   });
-  await configure(page, { apiOrigin: 'http://127.0.0.1:4179', timeoutMs: 100, session: { accountId: 'account-a', name: 'Creator A' }, conversationId: 'conversation-a' });
+  await configure(page, { apiOrigin: browserOrigin, timeoutMs: 100, session: { accountId: 'account-a', name: 'Creator A' }, conversationId: 'conversation-a' });
   await expect.poll(async () => (await reads(page))[0]?.settled).toBe(true);
   expect((await reads(page))[0]?.code).toBe(failure);
   await expect(page.getByRole('main')).toHaveAttribute('aria-busy', 'false');
@@ -197,7 +198,7 @@ test('workspace loading uses the approved skeleton until the read settles', asyn
   const gate = new Promise<void>((resolve) => { release = resolve; });
   let started = false;
   await page.route('**/v1/conversations/*/workspace', async (route) => { started = true; await gate; await route.fulfill({ json: emptyWorkspace(2) }); });
-  await configure(page, { apiOrigin: 'http://127.0.0.1:4179', session: { accountId: 'account-a', name: 'Creator A' }, conversationId: 'conversation-a' });
+  await configure(page, { apiOrigin: browserOrigin, session: { accountId: 'account-a', name: 'Creator A' }, conversationId: 'conversation-a' });
   await expect.poll(() => started).toBe(true);
   const skeleton = page.getByRole('progressbar', { name: 'Loading video' });
   await expect(skeleton).toBeVisible();
@@ -215,7 +216,7 @@ for (const absent of ['session', 'conversation'] as const) test(`absent ${absent
   await page.goto('/shell.html');
   let requests = 0;
   await page.route('**/v1/**', async (route) => { requests++; await route.abort(); });
-  await configure(page, { apiOrigin: 'http://127.0.0.1:4179', ...(absent === 'session' ? { session: null, conversationId: 'conversation-a' } : { session: { accountId: 'account-a', name: 'Creator A' } }) });
+  await configure(page, { apiOrigin: browserOrigin, ...(absent === 'session' ? { session: null, conversationId: 'conversation-a' } : { session: { accountId: 'account-a', name: 'Creator A' } }) });
   for (const [tab, empty] of [['Script', 'Your script will appear here once you describe your video.'], ['Assets', 'Characters, places and props will appear here.'], ['Storyboard', 'The storyboard is planned once the script is agreed.'], ['Videos', 'No videos yet.']]) {
     await page.getByRole('tab', { name: tab!, exact: true }).click();
     await expect(page.getByRole('tabpanel')).toHaveText(empty!);

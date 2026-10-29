@@ -1,10 +1,11 @@
+import { browserOrigin } from '../origin.js';
 import { expect, test } from '../material-network.js';
 
 const items = ['alpha', 'beta', 'gamma'].map(id => ({ id, kind: 'reference', builtIn: false, latestVersion: { id: `${id}-v1`, artifactId: id, revision: 1, kind: 'reference', content: {}, createdBy: 'human', createdAt: '2026-10-29T00:00:00Z', dependencies: [] } }));
 const display = Object.fromEntries(items.map(item => [item.latestVersion.id, { name: item.id, category: 'Props', tileLabel: 'Prop' }]));
 
 test('pending Attach locks selection and double press cannot duplicate the sequence', async ({ page, materialNetwork }, info) => {
-  const origin = 'http://127.0.0.1:4179';
+  const origin = browserOrigin;
   materialNetwork.expectOperations(
     { origin, method: 'GET', path: '/v1/conversations/conversation-a/workspace', count: 1, query: {} },
     { origin, method: 'GET', path: '/v1/library', count: 1, query: {} },
@@ -20,7 +21,7 @@ test('pending Attach locks selection and double press cannot duplicate the seque
   });
   await page.goto('/shell.html');
   await page.waitForFunction(() => !!(window as unknown as { shellTest?: unknown }).shellTest);
-  await page.evaluate(display => (window as unknown as { shellTest: { configure(input: unknown): void } }).shellTest.configure({ session: { accountId: 'account-a', name: 'Creator' }, conversationId: 'conversation-a', apiOrigin: 'http://127.0.0.1:4179', token: null, libraryPrerequisites: { display } }), display);
+  await page.evaluate(display => (window as unknown as { shellTest: { configure(input: unknown): void } }).shellTest.configure({ session: { accountId: 'account-a', name: 'Creator' }, conversationId: 'conversation-a', apiOrigin: window.location.origin, token: null, libraryPrerequisites: { display } }), display);
   await page.getByRole('button', { name: 'Library', exact: true }).click();
   const tiles = page.locator('.wp-picker-tile');
   await tiles.nth(0).click(); await tiles.nth(1).click();

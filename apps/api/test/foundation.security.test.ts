@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { globSync } from 'node:fs';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, realpath, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { environment, root, sentinel } from './environment.js';
@@ -12,6 +12,18 @@ test('built backend rejects unsafe config, separates setup privileges and exclud
   const fixture = await environment();
   t.diagnostic(`Evidence: ${fixture.logs}`);
   await command('pnpm', ['build'], { cwd: root, env: fixture.env, log: join(fixture.logs, 'build.log') });
+  const inputs = join(fixture.logs, 'production-inputs.log');
+  await command('pnpm', ['exec', 'tsc', '-p', 'apps/api/tsconfig.build.json', '--listFilesOnly'], { cwd: root, env: fixture.env, log: inputs });
+  const helper = await realpath(join(root, 'apps/api/test/native-conversations.ts'));
+  assert.ok(!(await readFile(inputs, 'utf8')).split(/\r?\n/).includes(helper), 'Native fixture helper is not a production compiler input');
+  const source = await readFile(helper);
+  for (const path of [...globSync('apps/api/dist/**/*'), ...globSync('apps/api/.mastra/output/**/*', { exclude: ['apps/api/.mastra/output/node_modules/**'] })]) {
+    if (!(await stat(path)).isFile()) continue;
+    const bytes = await readFile(path);
+    assert.ok(!bytes.includes(source) && !bytes.includes(source.toString('base64')), 'Native fixture source was bundled or inlined');
+    assert.ok(!bytes.includes('createNativeConversation') && !bytes.includes('Synthetic test conversation'), 'Executable native fixture entered a production artifact');
+    assert.ok(!path.endsWith('/test/native-conversations.js'), 'Native fixture was emitted by the production build');
+  }
   const db = await isolatedPostgres();
   t.after(db.close);
   const prepare = async (url: string, name: string) => {
@@ -102,6 +114,8 @@ test('built backend rejects unsafe config, separates setup privileges and exclud
     ['GET', '/__qualification'], ['POST', '/__qualification/release'],
     ['GET', '/api/agents'], ['GET', '/api/workflows'], ['POST', '/api/tools/test/execute'],
     ['GET', '/swagger-ui'], ['GET', '/openapi.json'], ['POST', '/health'],
+    ['GET', '/apps/api/test/native-conversations.ts'], ['GET', '/test/native-conversations.ts'],
+    ['POST', '/__seed'], ['POST', '/v1/conversations'],
   ] as const) {
     const response = await fetch(`${origin}${path}`, { method, headers: { Authorization: `Bearer ${sentinel}` }, signal: AbortSignal.timeout(2000) });
     assert.equal(response.status, 404, `${method} ${path}`);

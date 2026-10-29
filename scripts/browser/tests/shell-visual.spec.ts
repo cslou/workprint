@@ -1,3 +1,4 @@
+import { browserOrigin } from '../origin.js';
 import { expect, test } from '@playwright/test';
 import { compare } from '../compare.js';
 import { settleCapture } from '../capture.js';
@@ -11,7 +12,7 @@ for (const width of [1440, 390, 820, 821]) for (const state of states) {
   if ((state === 'navigation' && width > 820) || (state.startsWith('read-') && width !== 1440 && width !== 390)) continue;
   test(`shell ${state} approved reference at ${width}`, async ({ page, context }, info) => {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
-    await context.route('**/*', async (route) => { if (new URL(route.request().url()).origin !== 'http://127.0.0.1:4179') throw new Error('Unauthorized visual egress'); await route.continue(); });
+    await context.route('**/*', async (route) => { if (new URL(route.request().url()).origin !== browserOrigin) throw new Error('Unauthorized visual egress'); await route.continue(); });
     await page.goto('/references/flow2-step1-r73.html');
     await page.addStyleTag({ content: ':root{--font-sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-display:Georgia,"Times New Roman",serif}b,strong{font-weight:600}.approved-menu{display:none}.approved-rows{display:grid;gap:12px;color:var(--fg-muted);font-size:13px}.approved-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.approved-nav{display:flex;flex-direction:column;align-items:stretch;gap:4px}.approved-nav .navitem{display:flex!important}@media(max-width:820px){.approved-menu{display:block}}' });
     await page.evaluate(({ state }) => {
@@ -44,7 +45,7 @@ for (const width of [1440, 390, 820, 821]) for (const state of states) {
       if (state === 'read-error') await route.abort();
       else await route.fulfill({ status: state === 'read-unauthenticated' ? 401 : 501, json: { error: { code: state === 'read-unauthenticated' ? 'unauthenticated' : 'not_implemented', message: 'Controlled visual prerequisite' } } });
     });
-    await page.evaluate(({ signed, workspace }) => (window as unknown as { shellTest: { configure(value: unknown): void } }).shellTest.configure({ session: signed ? { accountId: 'visual-account', name: 'Creator A' } : null, ...(workspace ? { apiOrigin: 'http://127.0.0.1:4179', conversationId: 'visual-conversation' } : {}) }), { signed: state === 'signed-in' || state === 'account-unavailable' || state.startsWith('read-'), workspace: state.startsWith('read-') });
+    await page.evaluate(({ signed, workspace }) => (window as unknown as { shellTest: { configure(value: unknown): void } }).shellTest.configure({ session: signed ? { accountId: 'visual-account', name: 'Creator A' } : null, ...(workspace ? { apiOrigin: window.location.origin, conversationId: 'visual-conversation' } : {}) }), { signed: state === 'signed-in' || state === 'account-unavailable' || state.startsWith('read-'), workspace: state.startsWith('read-') });
     if (state === 'read-unauthenticated' || state === 'read-unavailable' || state === 'read-error') {
       await expect(page.getByRole('tabpanel')).toHaveText(workspaceCopy[state]);
     } else if (state === 'assets' || state === 'storyboard' || state === 'videos') {
