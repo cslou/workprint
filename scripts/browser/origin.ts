@@ -9,8 +9,8 @@ export function browserTestSettings(env: Readonly<Record<string, string | undefi
   const browserPort = port(env.WORKPRINT_BROWSER_PORT, 4179, 'WORKPRINT_BROWSER_PORT');
   const previewPort = port(env.WORKPRINT_PREVIEW_PORT, 4180, 'WORKPRINT_PREVIEW_PORT');
   return {
-    browserPort, browserOrigin: `http://127.0.0.1:${browserPort}`,
-    previewPort, previewOrigin: `http://127.0.0.1:${previewPort}`,
+    browserPort, browserOrigin: new URL(`http://127.0.0.1:${browserPort}`).origin,
+    previewPort, previewOrigin: new URL(`http://127.0.0.1:${previewPort}`).origin,
   };
 }
 

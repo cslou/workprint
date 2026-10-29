@@ -9,7 +9,11 @@ import type * as Environment from '../../../apps/api/test/environment.js';
 import { parsePublicApiOrigin } from '../../../apps/web/src/api/public-config.js';
 
 test('browser ports and public API configuration are explicit and reject malformed settings', () => {
+  expect(browserTestSettings({})).toEqual({ browserPort: 4179, browserOrigin: 'http://127.0.0.1:4179', previewPort: 4180, previewOrigin: 'http://127.0.0.1:4180' });
   expect(browserTestSettings({ WORKPRINT_BROWSER_PORT: '4279', WORKPRINT_PREVIEW_PORT: '4280' })).toEqual({ browserPort: 4279, browserOrigin: 'http://127.0.0.1:4279', previewPort: 4280, previewOrigin: 'http://127.0.0.1:4280' });
+  const canonicalHttpOrigin = new URL('http://127.0.0.1:80').origin;
+  expect(canonicalHttpOrigin).toBe('http://127.0.0.1');
+  expect(browserTestSettings({ WORKPRINT_BROWSER_PORT: '80', WORKPRINT_PREVIEW_PORT: '80' })).toEqual({ browserPort: 80, browserOrigin: canonicalHttpOrigin, previewPort: 80, previewOrigin: canonicalHttpOrigin });
   for (const setting of ['WORKPRINT_BROWSER_PORT', 'WORKPRINT_PREVIEW_PORT']) {
     for (const value of ['', '0', '-1', '65536', '1.5', ' 4279', '4279/path', 'secret']) {
       expect(() => browserTestSettings({ [setting]: value })).toThrow(`Invalid ${setting}: expected a TCP port`);
