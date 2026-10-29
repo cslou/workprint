@@ -7,6 +7,7 @@ import { createApplication } from '../application/index.js';
 import { loadServerConfig } from './config.js';
 import { verifyAccount } from './auth.js';
 import { applicationRoutes } from './application-routes.js';
+import { verifiedIngressAccount } from './ingress.js';
 
 /** One backend: cataloged application routes plus explicit test-composition additions. */
 export async function createBackend(routes: ApiRoute[] = []) {
@@ -71,6 +72,12 @@ export async function createBackend(routes: ApiRoute[] = []) {
         }),
       ],
       middleware: [async (context, next) => {
+        const admittedAccount = verifiedIngressAccount(context);
+        if (admittedAccount) {
+          context.get('requestContext').set('accountId', admittedAccount);
+          await next();
+          return context.res;
+        }
         const origin = context.req.header('Origin');
         const preflight = context.req.method === 'OPTIONS';
         const method = preflight ? context.req.header('Access-Control-Request-Method') ?? '' : context.req.method;

@@ -6,6 +6,7 @@ import { Hono, type MiddlewareHandler } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { timeout } from 'hono/timeout';
 import { createBackend } from './backend.js';
+import { createIngress } from './ingress.js';
 
 /** One listener and execution owner, shared by production and isolated compositions. */
 export async function startServer(mastra: Mastra, beforeMastra: readonly MiddlewareHandler[] = []) {
@@ -15,9 +16,10 @@ export async function startServer(mastra: Mastra, beforeMastra: readonly Middlew
     throw new RangeError('server.drainTimeout must be a finite number between 0 and 2147483647 milliseconds');
   }
   const app = new Hono<{ Variables: HonoVariables }>();
-  app.get('/health', (context) => context.json({ success: true }));
-  // Empty in production until bounded intake is qualified. Runs before native cloning/parsing.
+  // Trusted composition hooks may short-circuit; everything reaching Mastra passes ingress.
   for (const guard of beforeMastra) app.use('*', guard);
+  app.use('*', createIngress(mastra));
+  app.get('/health', (context) => context.json({ success: true }));
   app.notFound((context) => context.json({ error: { code: 'not_found', message: 'Not found' } }, 404));
   app.onError((error, context) => {
     if (options?.onError) return options.onError(error, context);
