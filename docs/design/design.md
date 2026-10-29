@@ -2,7 +2,7 @@
 
 **Migration (2026-10-27):** Workprint replaces the prototype name Generate. Layouts/tokens are retained; original media/screenshots are replaced with labelled placeholders. Historical verification below belongs to the source prototype, not this migrated copy. Editor, Project and comparison-player examples are not MVP scope; current scope follows the [architecture notice](../architecture.md). Typed chat is not approval; exact proposal approval and informational cost presentation follow the approved implementation plan.
 
-**Status:** Editor and component integration for inspection, with an accepted separate Project workspace roadmap reference. The accepted foundations and unaffected flows remain in force. Material-control direction is approved, with focus rings removed as requested. The roadmap flow is future design reference, not an addition to approved flows or the demo. Editing, recovery and export completion remain partial. No existing token value changed. Nothing here is implemented in application code.
+**Status:** Editor and component integration for inspection, with an accepted separate Project workspace roadmap reference. The accepted foundations and unaffected flows remain in force. Material-control direction is approved, with focus rings removed as requested. The roadmap flow is future design reference, not an addition to approved flows or the demo. Editing, recovery and export completion remain partial. No existing token value changed. Earlier entries describe reference artifacts; application delivery is tracked separately. The scoped Library feedback approval below is dated 2026-10-28.
 
 **Version:** 1.3 · **Updated:** 16 October 2026 · **History:** [Decisions](#decisions)
 
@@ -177,6 +177,7 @@ Product code uses semantic tokens. Primitives exist only so semantic tokens can 
 | `--font-line-height-1-4` | `1.4` |  |  |  |
 | `--font-line-height-1-45` | `1.45` |  |  |  |
 | `--font-line-height-1-5` | `1.5` |  |  |  |
+| `--font-line-height-1-55` | `1.55` |  |  | Approved `app-r11.css` `.snotes` leading; used for reference-sheet note paragraphs (`.wp-sheet-section p` in `apps/web/src/materials/sheet.css`). |
 | `--font-tracking-display` | `-0.2px` |  | `--tracking-display` | Opening and index titles. |
 | `--font-tracking-kicker` | `1.4px` |  | `--tracking-kicker` | Uppercase sheet kicker only. |
 
@@ -271,7 +272,7 @@ Responsive sizes: `display-xl` is 34px and `display-md` 28px at or below `--brea
 | `--opacity-dimmed` | `0.45` |  |  | Images of a shot changed but not regenerated. |
 | `--opacity-making` | `0.35` |  |  | Placeholder while an item is being made. |
 
-Circles (avatar, number badges, tab dot) use `border-radius: 50%`; it is a rule, not a token. The user message uses `--radius-bubble` on three corners and `--radius-bubble-tail` bottom-right. Focus: `--border-width-focus` solid `--color-border-focus`, offset `--border-width-focus-offset`, on every interactive element.
+Circles (avatar, number badges, tab dot) use `border-radius: 50%`; it is a rule, not a token. The user message uses `--radius-bubble` on three corners and `--radius-bubble-tail` bottom-right. Focus: `--border-width-focus` solid `--color-border-focus`, offset `--border-width-focus-offset`, except for [text inputs](#shell-and-remaining-phase-2-feedback) and the material controls' underline treatment below.
 
 ## Iconography and imagery
 
@@ -307,7 +308,7 @@ Every animation has a still alternative under `prefers-reduced-motion: reduce`: 
 
 Each component has the same anchor here and on the [Components page](brand-book/components.html). Mockup class names are given so implementers can find the reference markup; they are not a required naming scheme.
 
-**Rules that apply everywhere:** interactive elements retain a visible keyboard-focus cue. Existing controls keep their focus ring; the new material controls below use a label underline instead, without a ring. Disabled controls use 45–60% opacity and stay visible (open: pick one `--opacity-disabled` value); status is never colour only.
+**Rules that apply everywhere:** interactive elements other than [text inputs](#shell-and-remaining-phase-2-feedback) retain a visible keyboard-focus cue. Existing non-text controls keep their focus ring; the new material controls below use a label underline instead, without a ring. Disabled controls use 45–60% opacity and stay visible (open: pick one `--opacity-disabled` value); status is never colour only.
 
 ### App shell
 
@@ -595,6 +596,133 @@ Keyboard/focus: labelled native checkbox toggles with Space; group summaries tog
 - **Tray:** "1 selected", the chips, and **Attach (n)** as the primary button.
 - **Empty library:** "Nothing saved yet" plus one line of explanation.
 
+### Library feedback
+
+**Scoped approval — 2026-10-28.** The user approved the Story 2 feedback proposal derived from `demo-05.html#lib-yours`. Reuse `.lp-empty`: a centered two-line grid, 4px gap, 240px minimum height, 13px subtle body text and 15px/600 primary title. Retain this geometry at desktop/narrow widths; introduce no banner, new colors, sign-in/retry action or recovery flow.
+
+| Condition | Title | Message |
+| --- | --- | --- |
+| 401 / no valid session | Sign-in required | Your Library cannot be loaded without a valid session. |
+| 501 | Library not available yet | Library loading is not implemented in this build. |
+| Loading | Loading Library… | Looking for saved characters, places and props. |
+| Transport/error | Library could not be loaded | No saved material was changed. |
+| Missing public configuration | Library connection not configured | No API origin is configured for this build. |
+
+Empty success retains “Nothing saved yet” and “Characters, places and props you approve will appear here.” A failed read must never be presented as empty saved work. Use polite status semantics, with no credentials or raw error payloads in the message. This approves Library feedback only—not unrelated session, proposal/estimate or export layouts, actual sign-in, or detailed feature recovery.
+
+### Shell and remaining Phase 2 feedback
+
+**User approval — 2026-10-28.** Layouts were approved from the local proposal set at source revision `2e03eba`, with the exact copy below superseding its draft copy. Preview markers and test-fixture language are never product copy. No colors, banners, recovery flows or redesign are added. Approval is design authority, not implementation acceptance.
+
+**Text inputs have no focus ring.** Approved by Lou on 2026-10-29. The chat message box, the inline Script/Shot/Panel editors and Library search show no blue focus outline on focus, matching the brand-book CSS, which rings only links and buttons. Keyboard-only focus rings on buttons, tabs and other controls are unchanged.
+
+**002/Story 3 — implement now.** Reuse the opening shell in `flow2-step1-r73.html`, shared dialog geometry in `flow1-step4-r85.html#look-a`, and existing control/section typography. Reproduce new states by approved substitutions into those tracked references, never by loading ignored previews.
+
+| State | Exact copy and controls |
+| --- | --- |
+| Signed out | Account row: `Account`, empty avatar. Dialog: `Not signed in`; `Sign-in is not available yet.`; disabled `Sign in` |
+| Session present | Account row and dialog show the account name. Buttons: `Sign out`, `Switch account` |
+| Either account action | `Account actions are not available yet. Nothing about your session has changed.` |
+| Narrow navigation | At ≤820px, `Menu` beside `New video` opens `Navigation`: `New video`, `Library`, `Recents`, `No videos yet.` when empty, and `Account` (the supplied account name when present). Desktop sidebar unchanged |
+| New video unavailable | `New video is not available yet.` / `No conversation was created.` |
+| Recents unavailable | `Recents are not available yet.` / `No conversation list was loaded.` |
+| Conversation load unavailable | `Conversation loading is not available yet.` / `The current workspace is unchanged.` |
+
+**Workspace-read addition — 2026-10-28, 002/Story 3.** On a failed workspace HTTP read, replace only the text in the current tab's existing dashed empty box, preserving its style. Native-load copy stays only in its native action dialog; it is never an HTTP-read fallback. No banner, colors or recovery controls are added.
+
+| Workspace read | Exact text |
+| --- | --- |
+| 401 | Sign-in required to load this video. |
+| 501 | Loading this video is not available yet. |
+| Any other failure, including transport and timeout | This video could not be loaded. Nothing was changed. |
+
+Loading retains the approved skeleton (`demo-02.html`, [Panel sections](#panel-sections)); motion has the existing static reduced-motion alternative. With no session or no conversation, retain the approved per-tab empty text and make no workspace request. Comparisons substitute these texts into `flow2-step1-r73.html`'s current `.pempty`, with no layout changes.
+
+Dropped: the local-clear button and cleared-session presentation, and the separate switch-unavailable state. Session/account/conversation changes still clear scoped views internally. No actual Auth, fake recents, guessed identity or hidden sample account is authorized.
+
+**002/Story 4 — approved and implemented in PR #14.** Reuse `flow2-step6-r78.html#plan`'s question/plan/options and existing native disclosure treatment. Exact sample lines: `Shot 2 · Panel 2.1 · 1 image`; `Uses: Vale reference (version 1), Gallery reference (version 1)` (input order preserved); `Model: {provider} · {model}`; `Cost: $0.12 · estimate`. Basis words: provider → `provider price`, calculated → `calculated`, estimated → `estimate`. If basis is unknown, amount missing or currency missing: `Cost: unknown`. Follow with `For information only; not a quote.` The collapsible `Prompt and settings` holds the prompt, settings in words (for example `16:9 · still camera`) and any disclosures. Question cards render the options carried by the question record, using its labels. The option set and wording belong to the later-phase question producer (possibly an agent tool that generates the question UI), not to this design. Remove the visible proposal/question ID/revision line and illustrative-identifiers line; submitted answers still bind exact IDs and revisions. No spending gate, model selector, credits or provider qualification is implied.
+
+**Chat unavailable addition — 2026-10-28, 002/Story 4.** Every Send, including the opening composer and queued typing, shows one plain action-feedback line under the chat box: `Sending messages is not available yet. Your message is kept.` Keep the typed text in the box. Stop uses the same feedback style: `Stopping is not available yet.` Show Stop only while the assistant works; Phase 2 can reach that presentation only through an isolated, labelled read-only working prerequisite. These actions use the supported local native-unavailable boundary, with no banner, colors, recovery controls or successful turn/stop fiction.
+
+**002/Stories 4–5 — approved for later, not implemented here.** One plain line immediately under the owning answer, save or version-use controls. Reuse existing hint/activity typography and the owning question/Script/history layouts (`flow2-step2-r74.html`, `flow2-step10-r82.html#p-takes`), not a banner or recovery control. The Library approval alone did not cover these actions.
+
+| Action | Unavailable | Sign-in required | Error |
+| --- | --- | --- | --- |
+| Answer | Answering is not available yet. The question stays pending. | Sign-in required to answer. The question stays pending. | The answer was not submitted. The question stays pending. |
+| Save | Saving is not available yet. Your unsaved text is retained. | Sign-in required to save. Your unsaved text is retained. | Changes were not saved. Your unsaved text is retained. |
+| Use version | Using this version is not available yet. The current selection is unchanged. | Sign-in required to use this version. The current selection is unchanged. | This version was not selected. The current selection is unchanged. |
+
+**Script inline edit — approved 2026-10-28, 002/Story 5.** Clicking a section's edit pencil replaces that section's text with a typing box in the same panel, using the same fonts and colours. Use the displayed six-line textarea treatment: 14px text at 1.5 line height, 8px 12px padding, input border, canvas fill and 10px radius. Immediately below it, place **Cancel, then Save**, with an 8px gap and the existing secondary/primary pill treatments. Cancel restores the displayed version unchanged. Save uses the approved Save feedback above as one plain line under the owning controls and keeps typed text on 401, 501 or any error. Reproduce this state from tracked `flow2-step2-r74.html#p-script` plus this approved substitution; the ignored Story 5 preview is historical approval evidence, never a runtime or comparison dependency. Its draft label is never product copy. Only this inline edit state is newly approved; other states and boundaries are unchanged.
+
+**Storyboard, Videos and request controls — approved 2026-10-28, 003/Story 1.** The user approved the displayed layouts with the copy simplifications below. Reproduce from tracked `demo-12.html#p-storyboard` (planned Panels), `demo-13.html#board` / `flow2-step7-r79.html#board` (board and Shot/Panel grouping), and `demo-15.html#p-takes` through `demo-18.html#p-takes` / `flow2-step10-r82.html#p-takes` (individual candidate rows/history), plus these substitutions. Remove Play all, comparison, sequential/scene playback, Editor, Export and simulated generation progress. Existing approved empty texts and workspace-read feedback remain unchanged. The ignored `outputs/verification/sprint-003/design-proposals/story1/` previews are historical display evidence only, never runtime assets or comparison dependencies.
+
+- **Exact Panel version:** reuse the shared image-viewer dialog (`flow1-step7-r88.html#frame`), substituting the exact Panel/version caption, for example `Shot 1 · Panel 1.1 · Version 1`, and **Use this version**. Remove opening-Frame approval, 3D and Download controls. Panel choice uses `useVersion` with `panel_image`; Video choice uses `useVersion` with `shot_video`, never a question answer or an implicit approval from viewing. Reuse the three approved Use-version feedback lines unchanged beneath the owning controls.
+- **Planning edits:** inside the storyboard dialog, edit only the bound Shot intent or Panel description using the approved Script six-row typing box, **Cancel, then Save**, and the same 8px action gap. Preserve the exact base version, Shot/Panel identities, order and references; reuse all three approved Save feedback lines unchanged. Failures keep the unsaved text and displayed version.
+- **Generation requests:** under Videos, show one existing item-card treatment per exact request, for example `Shot 2 · Video request`, its neutral status pill, a native **Request details** disclosure, and **Cancel request** only for unfinished requests. Status labels are `Queued`, `Submitting`, `Running`, `Succeeded`, `Failed`, `Cancelled`; technical success is not approval. Reuse existing `.need`, `.status`, disclosure and hint typography from `app-r11.css`; plain feedback belongs beneath the owning controls and read/empty feedback uses the existing dashed box. Remove **Last known request state** from every card, and give cancelled cards no extra line beyond their `Cancelled` pill. Put exactly one line under the list: `Request status does not confirm that remote work or charges have stopped.` Cancellation targets `cancelGeneration`, never assistant Stop; closing or navigating sends neither.
+
+| Request surface | Empty / loading | 501 | 401 | Other error |
+| --- | --- | --- | --- | --- |
+| List | `No generation requests yet.` / `Loading generation requests…` | Generation requests are not available yet. | Sign-in required to load generation requests. | Generation requests could not be loaded. |
+| Details | Existing disclosure treatment | Request details are not available yet. | Sign-in required to load request details. | Request details could not be loaded. |
+| Cancel | Unfinished requests only | Cancelling this request is not available yet. The last known state is still shown. | Sign-in required to cancel this request. The last known state is still shown. | Request cancellation was not confirmed. The last known state is still shown. |
+
+Camera/lens/duration, rich text and images are not inferred from opaque JSON: any such facts require labelled, exact-version-bound read-only prerequisites in isolated compositions; production fails closed without supported public fields. The preview-only `Example media omitted` / `Layout reference only` box is never product copy. No new provider capability, working playback, cancellation guarantee or stopped-charge promise is approved. This records design approval, not implementation acceptance.
+
+**Single-clip playback and unavailable media — 003/Story 2.** **Approved by Lou on 2026-10-29 at the Phase 2 review.** The orchestrator had provisionally approved it earlier the same day under Lou's delegation. The user-approved single-clip playback appearance is reused from `flow1-step9-r90.html#take-1`, with the exact-version row treatment from `flow1-step9-r90.html#p-takes` and `flow2-step10-r82.html#p-takes`. The ignored `outputs/verification/sprint-003/design-proposals/story2/` previews are historical display evidence only, never runtime or comparison dependencies.
+
+- **Playback entry:** the existing Videos metadata line (`Version 2 · 5.1 s`) is a quiet exact-version trigger with accessible name `View Shot 1 version 2`. Its visible text, typography and layout are unchanged; no thumbnail or new visible control is added. Opening the viewer must not select the version.
+- **Single-clip viewer:** the shared viewer dialog opens the exact version with the approved 16:9 media surface, 64px play control, 4px progress track and 12px time from the supplied source only. Title `Version 2`; caption `Shot 1 · Version 2`; controls `Play`, `Pause` and `Seek`; the existing **Use this version** remains the only selection action. Download, scene/sequential playback, Play all, comparison, Editor and Export are removed. The same per-Shot selection owner as the Videos rows is used, so at most one Chosen version is shown per Shot.
+- **Loading:** `Loading this video…` in a 16:9 dashed surface with no play control, time or progress.
+- **401:** `Sign-in required to load this video.` **501:** `Loading this video is not available yet.` **Source, transport or decode failure:** `This video could not be loaded. Nothing was changed.` These reuse the approved workspace-read lines unchanged in the existing dashed box; no player chrome, banner, retry or recovery control. No loaded media or pretend timeline progress is shown.
+- **Facts and limits:** time and duration come only from the supplied source response. No resolution, frame-rate, sound, private-media or R2 claim is made. Reacquire targets the same exact version when the supplied URL expires while open and on reopen. The supplied-source play/pause/seek evidence uses a generated local clip; it is not private-transport or provider qualification. Playing is functional evidence, not a pixel-claimed decoded frame.
+
+**Material inputs and the populated Library picker — 003/Story 3.** **Approved by Lou on 2026-10-29 at the Phase 2 review.** The orchestrator had provisionally approved it earlier the same day under Lou's delegation. Layouts reuse `library-picker-r92.html#lib-yours` and its `#attached` tray for the picker, and `flow2-step1-r73.html`'s composer for paste and file feedback. Substitutions: the dialog heading is the approved `Library` title at the approved 15px modal-heading size; the Examples source switch and panes are removed; the populated read uses `--size-layout-picker-w` × `--size-layout-picker-h` (full screen at ≤820px), while loading, 401, 501, transport-error and empty-success presentations keep the existing 560px dialog and unchanged copy; the picker search is hidden at ≤820px exactly as in the tracked reference.
+
+Categories, names and images come only from labelled read-only display facts keyed by the exact `latestVersion.id`; no category, name or thumbnail is inferred from untyped content. Without facts there are no category pills, and each tile shows only the typed Library kind and latest revision with an empty dashed media square. The neutral reference placeholder (`Example media omitted` / `Layout reference only`) is never product copy; comparisons substitute one documented wordless local test image in both the reference media slots and the supplied image facts.
+
+| State | Exact copy and controls |
+| --- | --- |
+| All tiles | Pills `All` plus the categories present in the display facts; tray `Nothing selected yet` and disabled `Attach` |
+| Filter | The selected pill is inverted; only tiles carrying exactly that fact category are shown |
+| Selection | Pressed tile ring and check; tray `{n} selected`, chips, `Attach ({n})`; selection alone sends no request |
+| Search | Field placeholder `Search`, accessible name `Search Library`; filters only loaded tiles by displayed name; hidden ≤820px |
+| No match | `No matching items` / `Search only looks at the names shown here.` in the approved 4px-gap, 240px-minimum two-line empty treatment |
+| Loading | Approved `Loading Library…` feedback unchanged |
+| Attach 501 | `Attaching from your Library is not available yet. Nothing was attached.` |
+| Attach 401 | `Sign-in required to attach from your Library. Nothing was attached.` |
+| Attach error | `Nothing was attached. Your existing attachments are unchanged.` |
+| Attach partial | `Attached {k} of {n}. The rest were not attached.` Successful items leave the selection; failed and remaining items stay selected |
+| Attach success | Clear the selection; no fabricated attached chip or other local claim |
+| Paste | Pasted prose stays ordinary composer text; existing `Sending messages is not available yet. Your message is kept.` |
+| Upload 501 | `Uploading files is not available yet. The file was not sent.` |
+| Upload 401 | `Sign-in required to upload a file. The file was not sent.` |
+| Upload error | `The file was not uploaded. Nothing was changed.` |
+| Unsupported file | `That file is not an image or video. The file was not sent.` |
+| Isolated confirmation 501 | `Confirming this upload is not available yet. No version was created.` |
+
+Attach lines use the same plain line beneath the tray as the approved Use-version feedback, but attaching a reference is not selection: no line says the selection changed. A selected local file shows no chip, filename, thumbnail, progress or attachment; the input is cleared after the attempt. Attaching sends each exact version with purpose `reference`; with no current conversation the tray stays disabled and no `useVersion` or `requestUpload` is sent. Real transfer, validation, partial-success recovery and confirmation remain P3-S3/S4, not this wiring milestone. The ignored `outputs/verification/sprint-003/design-proposals/story3/` previews are historical evidence only, never runtime or comparison dependencies.
+
+**Direct Export, history/status and download consumers — 003/Story 4.** **Approved by Lou on 2026-10-29 at the Phase 2 review.** The orchestrator had provisionally approved it earlier the same day under Lou's delegation. Reuse `demo-18.html#p-takes`'s direct Videos Export direction, `app-r11.css`'s item-card/neutral-status treatments and the shared 560px viewer dialog (342px wide at a 390px viewport). The populated history/detail layout structure, sectioning, wrapping, scrolling and shared loading pattern are approved with the binding substitutions below. Card: `Chosen source versions`, then `Export` and `Export history`. Creators never see opaque IDs, internal selection revisions, numeric source order or test-prerequisite lines. No Editor, scene playback, settings profile, fake record/progress, deletion or retry is authorized. Download is an exact output-version media-access consumer, not a generated URL or working export claim.
+
+| Surface | Exact unavailable text |
+| --- | --- |
+| Export | `Export is not available yet.` / `No export was queued and no file was created.` |
+| History | `Export history is not available yet.` / `No export records were loaded.` |
+| Detail | `Export details are not available yet.` / `No export record was loaded.` |
+| Download | `Download is not available yet.` / `No file was downloaded.` |
+
+The four unavailable pairs retain the same shared two-line empty treatment. Download uses its pair on every settled outcome, including successful media access, with no anchor, navigation or file. Phase 2 qualifies the exact media-access call only; trusted origin and attachment delivery remain P3-S10. Loading uses the existing shared treatment without progress or a fabricated record.
+
+- **Status pill:** capitalize the exact typed value: `Queued`, `Processing`, `Succeeded`, `Failed`, `Cancelled`. Technical success is not approval.
+- **History card:** title `Export`, status pill, then only the typed `current` boolean: true → `Uses your current chosen versions.`; false → `Uses earlier chosen versions.` Then visible `Export details`, with a position-distinguishing accessible name such as `Export details, export 2 of 3`. No ID or revision number.
+- **Detail:** heading `Export details`, the status pill and the same currentness line. Section `Shots in this export` contains one row per source in server `order`. Resolve the exact `shotId` and `versionId` against already-loaded Videos workspace data using own-property and exact-ID matching only: `Shot {n} · Version {revision}`. If either identity is absent, show `Not in the current Videos list`. Never expose raw IDs or numeric order.
+- **Compatibility:** show a section only when typed `compatible` is false, headed `Can't be combined`. Each issue line is its resolved source label (same rule) + ` — ` + the server's literal message.
+- **Failure:** when `failureReason` is present, section `Why it failed`, followed by the literal reason.
+- **Output:** when `outputVersionId` is present, show `Download` without its ID. It calls the existing `media` operation for exactly that version. No URL construction or independent download transport.
+- **Read-only contract projection:** status, currentness and compatibility come only from their typed fields. No local stale-submission rules, export state machine, stream validation, inferred currentness or processing is approved. Populated records remain labelled read-only prerequisites in isolated mounts until their real producer exists.
+
+The ignored `outputs/verification/sprint-003/design-proposals/story4/` previews preserve the initial candidates as `*-v1` and regenerate populated history/detail with these final substitutions. They are inspection evidence only; runtime and reference comparisons use tracked references plus this record, never ignored assets. This is design approval (by Lou, 2026-10-29), not implementation acceptance.
+
 ### Reference sheet
 
 `.livesheet`: a character or place sheet drawn from its structured record. The images are separate files; a PNG or PDF is only an export.
@@ -646,7 +774,7 @@ Keyboard/focus: labelled native checkbox toggles with Space; group summaries tog
 | **`--color-border-input` on `--color-bg-surface` (chat box)** | **1.26** | **Below 3:1. Accepted gap**, your decision 2026-10-02 after a [side-by-side](brand-book/patterns.html#outline-compare) |
 | `--color-border-strong` on canvas (chip outline) | 1.38 | Acceptable: chips are identified by text; × has a 24px hit area |
 
-- **Focus:** every interactive control needs a visible keyboard cue. Existing controls retain the focus ring. The new single select, quiet action and Scene disclosure use a keyboard-only label underline (2px thick, 2px offset), not a ring; their text colors retain the existing contrast. This is a scoped material-component refinement, not a global removal of keyboard indication. Viewers and the picker trap focus, close on Escape and return focus to the opener.
+- **Focus:** every interactive control other than [text inputs](#shell-and-remaining-phase-2-feedback) needs a visible keyboard cue. Existing non-text controls retain the focus ring. The new single select, quiet action and Scene disclosure use a keyboard-only label underline (2px thick, 2px offset), not a ring; their text colors retain the existing contrast. This is a scoped material-component refinement, not a global removal of keyboard indication. Viewers and the picker trap focus, close on Escape and return focus to the opener.
 - **Targets:** at least `--size-target-min` (24px).
 - **Keyboard:** option rows, tiles, tabs and "Show" are reachable in reading order; lettered options can be chosen by typing the letter.
 - **Announcements:** activity lines and the agent's message use a polite live region; questions are labelled groups; a changed-tab dot needs a text alternative ("Assets, updated").
@@ -875,6 +1003,7 @@ These states have not been designed. They are listed so they are not mistaken fo
 
 | Date | Stage / scope | Revision | Decision and response | Conditions |
 | --- | --- | --- | --- | --- |
+| 2026-10-28 | Library feedback | Story 2 `demo-05.html#lib-yours` two-line proposal | User explicitly approved 401, 501, loading, transport/error and missing-configuration feedback treatment | No banner/colors/recovery controls; no blanket session/proposal/export approval; see [Library feedback](#library-feedback) |
 | Earlier | Flows and screens | Flow 1 r64/r83–r90, Flow 2 r73–r82, demo, picker r92 | Approved (D-77, D-80, D-85) | Reused as is |
 | 2026-09-28 | Visual direction | `app-r11.css` light theme | Chosen (D-18): Venice light colours as reference, no Venice branding | |
 | 2026-10-02 | Name and logo | — | Deferred | Working placeholders only |

@@ -1,0 +1,50 @@
+import { expect, test } from '@playwright/test';
+import { test as observedTest } from '../material-network.js';
+
+test('production material composition uses typed intents and never guesses opaque Script/reference content', async ({ page }) => {
+  await page.goto('/material.html');
+  await page.waitForFunction(() => !!(window as unknown as { materialTest?: unknown }).materialTest);
+  await page.evaluate(() => (window as unknown as { materialTest: { configure(value: unknown): void } }).materialTest.configure({}));
+  await expect(page.getByText('Vale and Mercer on the bench', { exact: true })).toBeVisible();
+  await expect(page.getByText('Vale recognises Mercer', { exact: true })).toBeVisible();
+  expect(await page.locator('.wp-script-shots li').allTextContents()).toEqual(['Vale and Mercer on the bench', 'Vale recognises Mercer']);
+  await expect(page.getByText(/Opaque/)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Edit What happens' })).toHaveCount(0);
+  await page.getByRole('tab', { name: 'Assets', exact: true }).click();
+  await expect(page.getByText('Characters, places and props will appear here.', { exact: true })).toBeVisible();
+  await expect(page.locator('.wp-asset-row')).toHaveCount(0);
+});
+
+observedTest('labelled material prerequisites render every field, retain drafts across tabs, and clear them across accounts', async ({ page }, info) => {
+  await info.attach('prerequisite', { body: 'Read-only public workspace, explicit version-bound display/edit facts and neutral placeholders; no persisted records or domain schema.', contentType: 'text/plain' });
+  await page.goto('/material.html');
+  await page.waitForFunction(() => !!(window as unknown as { materialTest?: unknown }).materialTest);
+  await page.route('**/v1/**', async () => { throw new Error('Viewing/local editing must not issue a mutation or application request without a client'); });
+  await page.evaluate(() => (window as unknown as { materialTest: { configure(value: unknown): void } }).materialTest.configure({ prerequisites: true }));
+  for (const text of ['Mercer and Vale sit side by side on the gallery bench.', 'Both of them, seen together from the front.', 'Close on Vale as he recognises Mercer.', 'Vale: “You must be Mercer.”', 'About 13 seconds in all.', 'Natural colour', 'Soft daylight', 'Widescreen']) await expect(page.getByText(text, { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit What happens', exact: true }).click();
+  await page.getByRole('textbox', { name: 'What happens', exact: true }).fill('Keep this draft while inspecting Assets');
+  await page.getByRole('tab', { name: 'Assets', exact: true }).click();
+  await expect(page.getByText('Vale reference', { exact: true })).toBeVisible();
+  await expect(page.getByText('Character sheet', { exact: true })).toBeVisible();
+  await expect(page.getByAltText('Vale thumbnail')).toBeVisible();
+  await page.locator('.wp-asset-row').click();
+  const dialog = page.getByRole('dialog');
+  for (const text of ['Character reference', 'Vale', 'Dark navy overcoat · charcoal suit', 'Identity', 'Late forties, light stubble.', 'Front · neutral expression', 'Wardrobe', 'Navy overcoat over a charcoal suit.', 'Missing views', 'Side and back views are not supplied.', 'Ready']) await expect(dialog.getByText(text, { exact: true })).toBeVisible();
+  await expect(dialog.getByAltText('Vale front view')).toBeVisible();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.locator('.wp-asset-row').press('Enter');
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.wp-asset-row')).toBeFocused();
+  await page.getByRole('tab', { name: 'Script', exact: true }).press('Enter');
+  await expect(page.getByRole('textbox', { name: 'What happens', exact: true })).toHaveValue('Keep this draft while inspecting Assets');
+  await page.evaluate(() => (window as unknown as { materialTest: { configure(value: unknown): void } }).materialTest.configure({ prerequisites: true, accountId: 'different-account' }));
+  await expect(page.getByRole('textbox')).toHaveCount(0);
+  await expect(page.getByText('Mercer and Vale sit side by side on the gallery bench.', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit What happens', exact: true }).click();
+  await page.getByRole('textbox').fill('Conversation-scoped draft');
+  await page.evaluate(() => (window as unknown as { materialTest: { configure(value: unknown): void } }).materialTest.configure({ prerequisites: true, accountId: 'different-account', conversationId: 'different-conversation' }));
+  await expect(page.getByRole('textbox')).toHaveCount(0);
+  await expect(page.getByText('Conversation-scoped draft', { exact: true })).toHaveCount(0);
+});

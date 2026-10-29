@@ -1,0 +1,10 @@
+.wp-script p { margin: 0; }
+.wp-script-shots { margin: 0; padding-left: var(--space-20); }
+.wp-script-shots li { margin: 0 0 var(--space-12); }
+.wp-script-shots li:last-child { margin-bottom: var(--space-6); }
+.wp-script-shots li b { font-weight: var(--font-weight-semibold); }
+.wp-script-shots li p { margin-top: calc(var(--space-4) - var(--border-width-default)); color: var(--color-text-secondary); }
+.wp-script-shots .wp-script-dialogue { font: var(--font-weight-regular) var(--font-size-14)/var(--font-line-height-1-4) var(--font-family-display); color: var(--color-text-primary); }
+.wp-script .wp-script-duration { font-size: var(--font-size-14); color: var(--color-text-subtle); margin-top: var(--space-6); }
+.wp-script-look { display: flex; gap: var(--space-6); flex-wrap: wrap; }
+.wp-script-look span { display: inline-flex; align-items: center; height: var(--size-control-sm); padding: 0 calc(var(--space-4) + var(--border-width-default)) 0 calc(var(--space-12) - var(--border-width-default)); border-radius: var(--radius-pill); border: var(--border-width-default) solid var(--color-status-ready-border); background: var(--color-status-ready-bg); font-size: var(--font-size-12); color: var(--color-status-ready-text); }

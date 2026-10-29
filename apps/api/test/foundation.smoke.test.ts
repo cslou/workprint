@@ -56,11 +56,25 @@ test('clean tracked export installs frozen, prepares, builds and serves built/de
     try {
       assert.deepEqual(await (await server.response(`http://127.0.0.1:${port}/health`)).json(), { success: true });
       const html = await (await server.response(`http://127.0.0.1:${webPort}`)).text();
+      assert.match(html, /Workprint/, 'The served application page retains its identity');
       const asset = html.match(/src="([^"]+\.(?:js|tsx))"/)?.[1];
       assert.ok(asset, 'HTML references a real JavaScript/TSX asset');
       const browser = await fetch(`http://127.0.0.1:${webPort}${asset}`, { signal: AbortSignal.timeout(2000) });
       assert.equal(browser.status, 200);
-      assert.match(await browser.text(), /Workprint/);
+      const module = await browser.text();
+      if (mode === 'dev') {
+        assert.match(module, /import \{ Shell \} from ["']\/src\/shell\/shell\.tsx["']/, 'The served entry imports the production shell');
+        const shell = await fetch(`http://127.0.0.1:${webPort}/src/shell/shell.tsx`, { signal: AbortSignal.timeout(2000) });
+        assert.equal(shell.status, 200);
+        assert.match(await shell.text(), /Workprint/, 'The imported production shell contains the application identity');
+      } else assert.match(module, /Workprint/);
+      if (mode === 'start') {
+        for (const path of ['/?context=viewer', '/test/index.html', '/test/mount.tsx', '/test/library.html', '/test/library-mount.tsx', '/shell.html', '/test/shell.html', '/test/shell-mount.tsx']) {
+          const response = await fetch(`http://127.0.0.1:${webPort}${path}`, { signal: AbortSignal.timeout(2000) });
+          const text = await response.text();
+          assert.doesNotMatch(text, /Isolated UI verification|Isolated Library|Isolated shell|Read-only details|mount\.tsx|libraryTest|shellTest/, 'Built serving cannot select test mounts');
+        }
+      }
     } finally { await server.stop(); }
     for (const address of [`http://127.0.0.1:${port}/health`, `http://127.0.0.1:${webPort}`]) {
       await assert.rejects(fetch(address, { signal: AbortSignal.timeout(1000) }), 'Owned listeners close after shutdown');
@@ -72,7 +86,9 @@ test('clean tracked export installs frozen, prepares, builds and serves built/de
   for (const file of [...globSync(`${checkout}/apps/web/dist/**/*`), ...globSync(`${fixture.logs}/*.log`), ...globSync(`${checkout}/outputs/*.log`)]) {
     if ((await stat(file)).isFile()) {
       // This checks generated assets/logs for escaped credentials, not source snapshots.
-      assert.ok(!(await readFile(file)).includes(sentinel), `Secret escaped into ${file}`);
+      const contents = await readFile(file);
+      assert.ok(!contents.includes(sentinel), `Secret escaped into ${file}`);
+      if (file.startsWith(join(checkout, 'apps/web/dist'))) assert.doesNotMatch(contents.toString(), /Isolated UI verification|Isolated Library|Isolated shell|Read-only details|test\/mount|references\/flow|libraryTest|shellTest/, 'Test compositions are absent from browser artifacts');
     }
   }
   await fixture.noNetwork();

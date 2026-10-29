@@ -1,5 +1,79 @@
 # Workprint — Application Design History
 
+## Phase 2 review — 2026-10-29
+
+**Lou ratified the Sprint 003 Story 2–4 designs** after a side-by-side review of all Phase 2 reference/app screenshot pairs: single-clip playback and unavailable media, material inputs and the populated Library picker, and direct Export history/status/download. Their entries below and in [design.md](design.md#shell-and-remaining-phase-2-feedback) now read as approved by Lou. No layout or copy changed.
+
+## Text-input focus treatment — 2026-10-29
+
+**Text inputs have no focus ring.** Approved by Lou on 2026-10-29. The chat message box, the inline Script/Shot/Panel editors and Library search show no blue focus outline on focus, matching the brand-book CSS, which rings only links and buttons. Keyboard-only focus rings on buttons, tabs and other controls are unchanged.
+
+## Direct Export, history/status and download — 2026-10-29
+
+**Approved by Lou on 2026-10-29 at the Phase 2 review.** The orchestrator had provisionally approved it earlier the same day under Lou's delegation. Reuse `demo-18.html#p-takes`, the existing r11 item cards/neutral pills and shared 560px viewer (342px at a 390px viewport). The orchestrator approved the entry, four unavailable states, shared loading pattern and populated history/detail layout structure, sectioning, wrapping and scrolling, with binding content substitutions. No Editor, settings, progress, deletion or retry.
+
+Creators never see opaque IDs, internal selection revisions or numeric source order. History cards are titled `Export`, show the capitalized exact status (`Queued`, `Processing`, `Succeeded`, `Failed`, `Cancelled`), and project only the typed current flag: true → `Uses your current chosen versions.`; false → `Uses earlier chosen versions.` Visible `Export details` has a position-distinguishing accessible name, for example `Export details, export 2 of 3`.
+
+Detail is headed `Export details`, with the same status and currentness line. `Shots in this export` lists sources in server order as `Shot {n} · Version {revision}`, resolved only by own-property/exact-ID matching against already-loaded Videos workspace data. If either identity is absent, display `Not in the current Videos list`. Show `Can't be combined` only when compatible is false, with each issue's resolved source label + ` — ` + literal server message. Optional failureReason appears under `Why it failed`; optional outputVersionId exposes only `Download`, bound to that exact version through existing media access. These are read-only typed projections, not a client state machine, stream validator or stale-submission rule.
+
+The existing unavailable pairs remain: Export `Export is not available yet.` / `No export was queued and no file was created.`; History `Export history is not available yet.` / `No export records were loaded.`; Detail `Export details are not available yet.` / `No export record was loaded.`; Download `Download is not available yet.` / `No file was downloaded.` Download uses its pair on every settled outcome, including successful media access, with no anchor, navigation, file or URL construction. The orchestrator's Story 4 fix-cycle decision keeps trusted origin and attachment delivery in P3-S10; Phase 2 qualifies only the exact access call. The entry stays `Chosen source versions`, `Export`, `Export history`, without revision/prerequisite lines. Shared loading has no fake progress or record.
+
+Exact guidance is in [the shell/Phase 2 section](design.md#shell-and-remaining-phase-2-feedback). Ignored previews in `outputs/verification/sprint-003/design-proposals/story4/` retain initial candidates as `*-v1`; regenerated populated previews use the final copy. They are inspection evidence, not runtime/comparison dependencies. Populated records are labelled read-only isolated prerequisites, not account-owned results. This records design approval (by Lou, 2026-10-29), not implementation acceptance.
+
+## Material inputs and the populated Library picker — 2026-10-29
+
+**Approved by Lou on 2026-10-29 at the Phase 2 review.** The orchestrator had provisionally approved it earlier the same day under Lou's delegation. The Story 3 picker reuses `library-picker-r92.html#lib-yours` and its `#attached` tray; paste and file feedback reuse `flow2-step1-r73.html`'s composer. The dialog heading is the approved `Library` title at the approved 15px modal-heading size, and the Examples source switch and panes are removed. A populated Library read uses the approved picker geometry `--size-layout-picker-w` × `--size-layout-picker-h` (full screen at ≤820px); loading, 401, 501, transport-error and empty-success presentations keep the existing 560px dialog and unchanged copy. Search is local to loaded tiles and hidden at ≤820px as in the tracked reference.
+
+Categories, names and images come only from labelled read-only display facts keyed by the exact `latestVersion.id`; no category, name or thumbnail is inferred from untyped content. Without facts, tiles show only the typed Library kind and latest revision with an empty dashed media square. The reference's `Example media omitted` / `Layout reference only` placeholder is never product copy; comparisons substitute one documented wordless local test image on both sides.
+
+Attach uses new lines that do not claim a selection change: 501 `Attaching from your Library is not available yet. Nothing was attached.`, 401 `Sign-in required to attach from your Library. Nothing was attached.`, error `Nothing was attached. Your existing attachments are unchanged.`, and partial `Attached {k} of {n}. The rest were not attached.` Full success clears the selection and claims nothing else locally. A selected local file is never presented as an attachment, and with no current conversation the tray stays disabled with no request. Paste remains ordinary composer text with the unchanged retained-message line. Upload initiation uses 501 `Uploading files is not available yet. The file was not sent.`, 401 `Sign-in required to upload a file. The file was not sent.`, error `The file was not uploaded. Nothing was changed.` and unsupported `That file is not an image or video. The file was not sent.` The isolated confirmation consumer shows `Confirming this upload is not available yet. No version was created.` The exact table and bounds are recorded in [the shell/Phase 2 section](design.md#shell-and-remaining-phase-2-feedback).
+
+The ignored `outputs/verification/sprint-003/design-proposals/story3/` previews are historical evidence only; implementation and comparisons use the tracked references plus these substitutions. Real transfer, validation, confirmation and partial-success recovery remain P3-S3/S4. This is design approval, not implementation acceptance.
+
+## Single-clip playback and unavailable media — 2026-10-29
+
+**Approved by Lou on 2026-10-29 at the Phase 2 review.** The orchestrator had provisionally approved it earlier the same day under Lou's delegation. The Story 2 layouts reuse the approved single-clip playback appearance in `flow1-step9-r90.html#take-1`, with the exact-version Videos row treatment from `flow1-step9-r90.html#p-takes` and `flow2-step10-r82.html#p-takes`. The existing Videos metadata line becomes a quiet exact-version trigger with unchanged visible text and accessible name `View Shot 1 version 2`. The shared viewer shows the exact version with the approved 16:9 surface, 64px play control, 4px progress track and time from the supplied source only; title `Version 2`, caption `Shot 1 · Version 2`, controls `Play`, `Pause`, `Seek`, and the existing **Use this version**. Opening, viewing, playing, seeking and closing select nothing.
+
+Loading is `Loading this video…` in a 16:9 dashed surface with no player chrome. The approved workspace-read lines are reused unchanged: 401 `Sign-in required to load this video.`, 501 `Loading this video is not available yet.`, and source/transport/decode failure `This video could not be loaded. Nothing was changed.` No banner, retry or recovery control is added, and no loaded media or pretend progress appears on failure. Download, scene/sequential playback, Play all, comparison, Editor and Export remain excluded.
+
+The ignored `outputs/verification/sprint-003/design-proposals/story2/` previews are historical evidence only; implementation and comparisons use the tracked references plus this substitution. Supplied-source playback is verified with a generated local clip, not private media; decoded frames are not claimed as pixel comparisons. This is design approval, not implementation acceptance.
+
+## Storyboard, Videos and request controls — 2026-10-28
+
+The user approved the Story 1 layouts: an exact Panel-version shared viewer with `Shot 1 · Panel 1.1 · Version 1`-style captions and **Use this version**; Shot intent and Panel description editing inside the storyboard dialog with the Script typing box and **Cancel, then Save**; and a Videos **Generation requests** list with exact-target cards, status pills, **Request details** and **Cancel request** only on unfinished requests.
+
+Copy was approved with two removals: no per-card **Last known request state** line, and no extra cancelled-card line beyond the `Cancelled` pill. The single list footer is `Request status does not confirm that remote work or charges have stopped.` The list/detail/cancel empty, loading, 401, 501 and error copy is recorded exactly in [the shell/Phase 2 section](design.md#shell-and-remaining-phase-2-feedback), together with the unchanged approved Save, Use-version, workspace-read and empty-state reuse. Video and Panel choice are exact `useVersion` actions; request cancellation is `cancelGeneration`, separate from assistant Stop. Failed actions do not change authority or discard planning input.
+
+That section records tracked demo 12–13, 15–18 and Flow 2 references plus the precise substitutions, including the shared image-viewer reference. The ignored `outputs/verification/sprint-003/design-proposals/story1/` previews are historical evidence only. Their `Example media omitted` / `Layout reference only` box is not product copy. No Play all/comparison, sequential playback, Editor, inferred opaque-content schema, actual generation/cancellation or stopped-charge promise is approved. This is design approval, not implementation acceptance.
+
+## Script inline edit — 2026-10-28
+
+The user approved the Story 5 inline Script edit preview with one correction: the action order is **Cancel, then Save**. Clicking a section's pencil turns that section's text into a typing box in the same panel, with the same fonts and colours. Cancel restores the displayed version unchanged. Save retains typed text and uses the already-approved unavailable, 401 and error feedback as one plain line beneath the controls. Nothing else is newly approved, and the draft label is not product copy.
+
+The exact layout and tracked-reference substitution are recorded in [the existing shell/Phase 2 section](design.md#shell-and-remaining-phase-2-feedback). The local `outputs/verification/sprint-002/design-proposals/story5/` previews are historical display evidence only; implementation and comparisons use the tracked Script reference plus the approved substitution, not those ignored files.
+
+## Chat unavailable feedback — 2026-10-28
+
+The user approved 002/Story 4 Send feedback as one plain action-feedback line beneath the chat box: “Sending messages is not available yet. Your message is kept.” This applies to every Send, including opening and queued typing, and retains the typed text. Stop feedback is “Stopping is not available yet.” in the same style; Stop is visible only while the assistant works, reachable in Phase 2 only from an isolated labelled read-only working prerequisite. No successful native turn/stop, banner, colors or recovery flow is implied. Exact bounds are recorded in [the existing shell/Phase 2 section](design.md#shell-and-remaining-phase-2-feedback).
+
+## Workspace-read feedback addition — 2026-10-28
+
+The user approved 002/Story 3 workspace HTTP-read failures as text substitutions in the current tab's existing dashed empty box: 401 — “Sign-in required to load this video.”; 501 — “Loading this video is not available yet.”; all other failures, including transport and timeout — “This video could not be loaded. Nothing was changed.” Loading keeps the approved skeleton and its static reduced-motion alternative; absent session or conversation keeps the existing empty text. No banner, colors or recovery controls. Native-load copy remains only in its dialog. Exact instructions and tracked reference substitutions are in [the existing shell section](design.md#shell-and-remaining-phase-2-feedback).
+
+The user also clarified that 002/Story 4 question cards use the options and labels in their question record; later-phase question producers own the option set/wording, not this design. All other recorded proposal-card lines remain unchanged; no Story 4 implementation is authorized here.
+
+## Shell and remaining Phase 2 states — 2026-10-28
+
+The user approved the layouts displayed in the local `outputs/verification/sprint-002/design-proposals/` set (source `2e03eba`), with explicit copy corrections. The exact texts and owning stories are recorded in [the guide](design.md#shell-and-remaining-phase-2-feedback). Only 002/Story 3 is authorized for implementation now; question/proposal disclosure, the nine answer/save/use feedback states and 003/Story 4 Export remain later-story approvals, not implemented capabilities.
+
+Removed from the approved design: preview markers, test-fixture wording, the local-clear button and its result, the separate switch-unavailable state, visible proposal/question IDs/revisions, and Export selection-revision/test-prerequisite lines. Sign out and Switch account share the unchanged-session unavailable response. Internal scope invalidation remains required. Existing tokens, desktop navigation, empty/loading states and Library feedback stay approved. Reproducible comparisons use tracked flow/demo references plus approved substitutions; ignored screenshots are historical display evidence, never runtime prerequisites. No actual Auth, model integration, spending gate, credits, model selector, working Export, new banner or recovery design is approved by this record.
+
+## Library feedback — 2026-10-28
+
+The user approved the scoped Library feedback proposal in the Story 2 implementation continuation: reuse `demo-05.html#lib-yours`'s existing two-line empty styling for unauthenticated (401), unavailable (501), loading, transport/error and missing-configuration states. The exact copy and bounds are recorded in [the guide](design.md#library-feedback). Local proposal captures remain under ignored `outputs/verification/sprint-002/story-2-feedback-proposal/`; they are not required runtime assets.
+
+This approval adds no banner, colors, recovery controls or functional sign-in. It does not approve unrelated session, proposal/estimate or export designs, nor does it establish implementation acceptance. Existing approved empty Library copy remains unchanged.
+
 ## Unmigrated prototype evidence
 
 This is historical context from the Generate prototype, not current application scope. Source Git revisions, ignored previews and old verification outputs below were not imported. Original example imagery is not published; image links now show neutral placeholders. Historical output/checkout descriptions refer to that source workspace, not this public repository. Current scope follows the [architecture notice](../architecture.md).

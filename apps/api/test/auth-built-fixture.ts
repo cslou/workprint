@@ -3,7 +3,6 @@ import { createHmac } from 'node:crypto';
 import { createServer } from 'node:http';
 import { readFile, mkdir, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { TestContext } from 'node:test';
 import { environment, root, sentinel } from './environment.js';
 import { command, start, unusedPort } from './process.js';
 import { createApiClient } from '@workprint/api-client';
@@ -13,7 +12,9 @@ import { query } from './postgres.js';
 
 // Shared by current-scope checks and the separately invoked B-001 qualification.
 // Private fixture input is never inherited by serving. Accounts already exist.
-export async function verifyBuiltAdmission(t: TestContext, qualifyIngress?: (server: { origin: string; accessToken: string }) => Promise<void>) {
+export type BuiltAdmissionTarget = { origin: string; accessToken: string; accessTokens: readonly string[]; logs: string };
+type FixtureContext = { diagnostic(message: string): void; after(cleanup: () => void | Promise<void>): void };
+export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (server: BuiltAdmissionTarget) => Promise<void>, options: { browserOrigin?: string } = {}) {
   const file = process.env.WORKPRINT_AUTH_FIXTURE;
   assert.ok(file, 'Supply WORKPRINT_AUTH_FIXTURE with authorized Supabase URL, anonKey, servingUrl and two accounts');
   const fixture = await environment();
@@ -72,7 +73,8 @@ export async function verifyBuiltAdmission(t: TestContext, qualifyIngress?: (ser
   assert.notEqual(identities[0]!.user.id, identities[1]!.user.id);
   const port = await unusedPort();
   const env = { ...fixture.env, DATABASE_URL: config.servingUrl, SUPABASE_URL: config.url,
-    SUPABASE_PUBLISHABLE_KEY: config.anonKey, PORT: String(port) };
+    SUPABASE_PUBLISHABLE_KEY: config.anonKey, PORT: String(port),
+    ...(options.browserOrigin ? { WORKPRINT_BROWSER_ORIGIN: options.browserOrigin } : {}) };
   const probe = await start(process.execPath, [probeEntry], {
     cwd: root, env, log: join(fixture.logs, 'probe.log'),
   });
@@ -169,9 +171,10 @@ export async function verifyBuiltAdmission(t: TestContext, qualifyIngress?: (ser
   };
   for (const token of ['', 'malformed', expired]) {
     const client = createApiClient({ baseUrl: origin, getAccessToken: async () => token || null });
-    const result = await client.library(applicationRequests.library);
-    assert.equal(result.ok, false);
-    if (!result.ok) assert.equal(result.error.code, 'unauthenticated');
+    const invoke = <N extends OperationName>(name: N) => (client[name] as (input: OperationRequest<N>) => Promise<unknown>)(applicationRequests[name]);
+    for (const name of Object.keys(operations) as OperationName[]) {
+      assert.deepEqual(await invoke(name), { ok: false, error: { code: 'unauthenticated', message: 'Authentication required' } }, `${name} must require real Auth`);
+    }
     const response = await raw('/v1/conversations/c/versions', 'POST', '{', token);
     assert.equal(response.status, 401, 'Identity rejects before application validation of completed malformed JSON');
     assert.equal(response.payload.error.code, 'unauthenticated');
@@ -198,14 +201,14 @@ export async function verifyBuiltAdmission(t: TestContext, qualifyIngress?: (ser
   assert.equal(oversized.status, 400, 'Application rejects completed JSON beyond 1 MiB');
   assert.equal(oversized.payload.error.code, 'invalid_input');
 
-  if (qualifyIngress) await qualifyIngress({ origin, accessToken: identities[0]!.access_token });
+  if (qualifyIngress) await qualifyIngress({ origin, accessToken: identities[0]!.access_token, accessTokens: identities.map((identity) => identity.access_token), logs: fixture.logs });
   for (const [path, method] of [['/v1/conversations/c/workspace/extra', 'GET'], ['/v1/conversations//workspace', 'GET'], ['/v1/conversations/c/workspace', 'POST'], ['/v1/library/', 'GET']] as const) {
     assert.equal((await raw(path, method, undefined)).status, 404, 'Only exact catalog paths/methods are admitted');
   }
   // No product resources exist; these arbitrary IDs prove no ownership semantics.
   assert.deepEqual(await snapshot(), beforeRequests, 'Unavailable matrix creates/changes no native records');
   const exposure: { path: string; bearer: boolean; status: number }[] = [];
-  for (const path of ['/api/auth/capabilities', '/api/auth/me', '/__auth_probe', '/api/agents', '/api/memory/threads', '/api/workflows', '/api/tools', '/api/telemetry', '/swagger-ui', '/openapi.json', '/health/']) {
+  for (const path of ['/api/auth/capabilities', '/api/auth/me', '/__auth_probe', '/api/agents', '/api/memory/threads', '/api/workflows', '/api/tools', '/api/telemetry', '/swagger-ui', '/openapi.json', '/health/', '/__qualification', '/__qualification/release', '/test/shell.html', '/fixtures/clip.webm', '/studio', '/assets/index.js', '/api/tools/test/execute']) {
     for (const bearer of [false, true]) {
       const response = await fetch(`${origin}${path}`, {
         headers: bearer ? { Authorization: `Bearer ${identities[0]!.access_token}` } : {}, signal: AbortSignal.timeout(3000),

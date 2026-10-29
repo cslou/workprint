@@ -13,8 +13,9 @@ const env = {
 };
 const serving = { ...env };
 delete serving.MIGRATION_DATABASE_URL;
-// The shell has no public configuration yet. Never pass backend environment to Vite.
-const webEnv = Object.fromEntries(['PATH', 'HOME', 'TMPDIR', 'SYSTEMROOT', 'NODE_OPTIONS'].filter((key) => env[key]).map((key) => [key, env[key]]));
+delete serving.WORKPRINT_PUBLIC_API_ORIGIN;
+// Only this explicit public origin may cross into Vite; never backend settings.
+const webEnv = Object.fromEntries(['PATH', 'HOME', 'TMPDIR', 'SYSTEMROOT', 'NODE_OPTIONS', 'WORKPRINT_PUBLIC_API_ORIGIN'].filter((key) => env[key]).map((key) => [key, env[key]]));
 const children = new Set();
 let stopping = false;
 function stop(signal = 'SIGTERM') {
@@ -51,6 +52,7 @@ try {
   if (task === 'build' || task === 'db:prepare') {
     await run('tsc', ['-p', 'packages/contracts/tsconfig.json']);
     await run('tsc', ['-p', 'packages/api-client/tsconfig.json']);
+    await run('tsc', ['-p', 'packages/player/tsconfig.json']);
     rmSync('apps/api/dist', { recursive: true, force: true });
     await run('tsc', ['-p', 'apps/api/tsconfig.build.json']);
   }
@@ -63,6 +65,7 @@ try {
     if (task === 'dev') {
       await run('tsc', ['-p', 'packages/contracts/tsconfig.json']);
       await run('tsc', ['-p', 'packages/api-client/tsconfig.json']);
+      await run('tsc', ['-p', 'packages/player/tsconfig.json']);
     }
     await Promise.all([
       task === 'dev'

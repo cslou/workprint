@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { copyFile, mkdir, readFile, realpath, symlink, writeFile } from 'node:fs/promises';
+import { copyFile, cp, mkdir, readFile, realpath, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { environment, root, sentinel } from './environment.js';
@@ -13,7 +13,8 @@ test('Vite serves browser modules but denies private research and fixture creden
   await mkdir(join(checkout, 'docs/research'), { recursive: true });
   await mkdir(join(checkout, 'outputs'), { recursive: true });
   for (const file of ['package.json', 'pnpm-workspace.yaml']) await copyFile(join(root, file), join(checkout, file));
-  for (const file of ['package.json', 'vite.config.ts', 'index.html', 'src/main.tsx']) await copyFile(join(root, 'apps/web', file), join(web, file));
+  for (const file of ['package.json', 'vite.config.ts', 'index.html']) await copyFile(join(root, 'apps/web', file), join(web, file));
+  await cp(join(root, 'apps/web/src'), join(web, 'src'), { recursive: true });
   await symlink(join(root, 'node_modules'), join(checkout, 'node_modules'), 'dir');
   await symlink(join(root, 'apps/web/node_modules'), join(web, 'node_modules'), 'dir');
   const paths = ['docs/research/synthetic-private.md', 'outputs/local-database.env'];
@@ -26,7 +27,8 @@ test('Vite serves browser modules but denies private research and fixture creden
     const origin = `http://127.0.0.1:${port}`;
     assert.match(await (await server.response(origin)).text(), /src\/main.tsx/);
     const module = await (await server.response(`${origin}/src/main.tsx`)).text();
-    assert.match(module, /Workprint/);
+    assert.match(module, /import \{ Shell \} from/);
+    assert.match(await (await server.response(`${origin}/src/shell/shell.tsx`)).text(), /Workprint/);
     const dependency = module.match(/from "([^"]*react-dom[^"]*)"/)?.[1];
     assert.ok(dependency, 'Transformed module uses a real React dependency');
     assert.equal((await fetch(new URL(dependency, origin))).status, 200);

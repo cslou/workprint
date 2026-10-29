@@ -7,6 +7,8 @@ const contracts = spawnSync('tsc', ['-p', 'packages/contracts/tsconfig.json'], {
 if (contracts.status !== 0) process.exit(contracts.status ?? 1);
 const client = spawnSync('tsc', ['-p', 'packages/api-client/tsconfig.json'], { stdio: 'inherit' });
 if (client.status !== 0) process.exit(client.status ?? 1);
+const player = spawnSync('tsc', ['-p', 'packages/player/tsconfig.json'], { stdio: 'inherit' });
+if (player.status !== 0) process.exit(player.status ?? 1);
 const compile = spawnSync('tsc', ['-p', 'apps/api/tsconfig.json'], { stdio: 'inherit' });
 if (compile.status !== 0) process.exit(compile.status ?? 1);
 const group = process.argv[2];

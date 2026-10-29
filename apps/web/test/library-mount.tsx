@@ -1,0 +1,45 @@
+import { createRoot } from 'react-dom/client';
+import { loadReference } from './reference-loader.js';
+import { useLayoutEffect } from 'react';
+import type { ReadScope } from '../src/api/use-scoped-read.js';
+import { createBrowserClient } from '../src/api/client.js';
+import { createConfiguredBrowserClient } from '../src/api/runtime.js';
+import { Library } from '../src/library/library.js';
+import type { BrowserClient } from '../src/api/client.js';
+import '../src/ui/tokens.css';
+import '../src/ui/foundations.css';
+
+let node = document.getElementById('root');
+if (new URLSearchParams(location.search).has('reference')) {
+  const reference = await loadReference('demo-05.html');
+  document.body.className = reference.body.className;
+  document.documentElement.style.setProperty('--font-sans', 'var(--font-family-sans)');
+  document.documentElement.style.setProperty('--font-display', 'var(--font-family-display)');
+  const empty = document.querySelector('.lp-empty');
+  if (!empty) throw new Error('Missing Library reference');
+  node = document.createElement('div'); node.style.display = 'contents'; empty.replaceWith(node);
+  location.hash = 'lib-yours';
+}
+if (!node) throw new Error('Missing Library test root');
+const root = createRoot(node);
+let accessToken: string | null = null;
+let connection: BrowserClient = createConfiguredBrowserClient(async () => accessToken);
+const observations: { active: boolean; feedback: string }[] = [];
+function ObservedLibrary({ connection, scope }: { connection: BrowserClient; scope: ReadScope | null }) {
+  // Observe the committed child DOM before passive read effects can replace it.
+  useLayoutEffect(() => { observations.push({ active: scope !== null, feedback: node?.querySelector('[role="status"]')?.textContent ?? '' }); }, [connection, scope]);
+  return <Library connection={connection} scope={scope}>{() => { throw new Error('Unexpected populated Library fixture'); }}</Library>;
+}
+(window as unknown as { libraryTest: unknown }).libraryTest = {
+  configure({ apiOrigin, token, accountId, conversationId, timeoutMs }: { apiOrigin?: string; token: string | null; accountId: string; conversationId?: string; timeoutMs?: number }) {
+    accessToken = token;
+    if (apiOrigin !== undefined) {
+      const configured = createBrowserClient(apiOrigin, async () => accessToken, timeoutMs);
+      connection = configured;
+    }
+    root.render(<ObservedLibrary connection={connection} scope={{ accountId, ...(conversationId === undefined ? {} : { conversationId }) }} />);
+  },
+  deactivate() { root.render(<ObservedLibrary connection={connection} scope={null} />); },
+  observations() { return observations; },
+  unmount() { root.render(null); },
+};

@@ -1,0 +1,42 @@
+import { expect, test } from '@playwright/test';
+import { createHash } from 'node:crypto';
+import { readFile, writeFile } from 'node:fs/promises';
+import { compare } from '../compare.js';
+import { settleCapture } from '../capture.js';
+import { referenceFonts as fonts, scriptPrerequisite } from '../material-reference.js';
+for (const width of [1440, 390, 820, 821]) for (const view of ['script', 'edit', 'history'] as const) test(`${view} material main reference at ${width}`, async ({ page, context }, info) => {
+  await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+  await context.route('**/*', async (route) => {
+    if (new URL(route.request().url()).origin !== 'http://127.0.0.1:4179') throw new Error('Unauthorized material visual egress');
+    if (route.request().method() !== 'GET') throw new Error('Viewing/local editing must not mutate');
+    await route.continue();
+  });
+  await context.route('**/references/app-r11.css', async (route) => { const response = await route.fetch(); await route.fulfill({ response, body: `${await response.text()}\n${fonts}` }); });
+  await page.goto('/references/flow2-step2-r74.html');
+  await page.addStyleTag({ content: fonts });
+  await page.evaluate(scriptPrerequisite, view);
+  const selectors = ['.panel', '.ptabs,.wp-tabs', '#p-script > section:first-child,.wp-script > section:first-child', '.breakdown,.wp-script-shots', '.chips,.wp-script-look', '.take-hist,.wp-version-history', ...(view === 'edit' ? ['textarea', '.approved-edit-actions,.wp-version-edit-actions'] : []), ...(view === 'history' ? ['.th-row,.wp-version-history-row', '.use,.wp-version-use .wp-button-secondary'] : [])];
+  const measure = () => page.evaluate((selectors) => selectors.map((selector) => {
+    const node = document.querySelector(selector); if (!node) throw new Error(`Missing expected measurement ${selector}`);
+    const style = getComputedStyle(node);
+    return { selector, box: node.getBoundingClientRect().toJSON(), styles: Object.fromEntries(['font','color','background-color','border','padding','margin','opacity'].map((key) => [key, style.getPropertyValue(key)])) };
+  }), selectors);
+  await settleCapture(page);
+  const reference = await measure();
+  const expected = await page.screenshot({ path: info.outputPath('reference-full.png'), fullPage: true, animations: 'disabled' });
+  await page.goto('/material.html?reference=script');
+  await page.waitForFunction(() => !!(window as unknown as { materialTest?: unknown }).materialTest);
+  await page.evaluate(() => (window as unknown as { materialTest: { configure(value: unknown): void } }).materialTest.configure({ prerequisites: true }));
+  await expect(page.getByText('Natural colour', { exact: true })).toBeVisible();
+  if (view === 'edit') await page.getByRole('button', { name: 'Edit What happens', exact: true }).click();
+  if (view === 'history') await page.locator('.wp-version-history summary').click();
+  await settleCapture(page);
+  const actual = await measure();
+  await writeFile(info.outputPath('geometry.json'), JSON.stringify({ reference, actual }, null, 2));
+  const screenshot = await page.screenshot({ path: info.outputPath('actual-full.png'), fullPage: true, animations: 'disabled' });
+  const changedPixels = await compare(expected, screenshot, info.outputPath('comparison'));
+  await writeFile(info.outputPath('result.json'), JSON.stringify({ view, width, changedPixels, tolerance: 0, revision: info.config.metadata, browser: context.browser()?.version(), source: 'docs/design/flow2-step2-r74.html#p-script', sourceSha256: createHash('sha256').update(await readFile('docs/design/flow2-step2-r74.html')).digest('hex'), cssSha256: createHash('sha256').update(await readFile('docs/design/app-r11.css')).digest('hex'), approval: 'docs/design/design.md#shell-and-remaining-phase-2-feedback', substitutions: 'Explicit exact-version text/shot/look prerequisites, no untyped shot editor or look mutations; Script history reuses r82 take-hist/th-row/use without an unavailable thumbnail; existing disabled-control opacity .45; approved inline editor with Cancel then Save. Only MaterialPanel is mounted in inert tracked surroundings, never seeded product work.' }, null, 2));
+  expect(actual.map((item) => item.box)).toEqual(reference.map((item) => item.box));
+  expect(changedPixels).toBe(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
