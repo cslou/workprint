@@ -21,7 +21,7 @@
   - **Native storage:** prepared separately by `apps/api/src/mastra/prepare.ts` (`PostgresStore`, schema `mastra`). Nothing reads native conversations yet, and no ownership check exists.
   - **Browser harness:** the browser origin `http://127.0.0.1:4179` is hardcoded in about 100 places across about 40 files: the Playwright config, the test Vite config, pair helpers, egress guards, spec allowances and `apps/web/test/*-mount.tsx`. `connectivity.spec.ts` also starts a fixed `4180` preview server. With `reuseExistingServer: false`, a second checkout running browser/visual suites at the same time fails to start. API test ports are already dynamic.
   - **Exceptions:** B-001 (`qualify:ingress`) and B-002/B-004 (`audit`) are user-approved private/local NON-PASS.
-- **Problem/current behavior:** Sprints 004 and 005 must run concurrently in separate worktrees without depending on each other. Both need:
+- **Problem/current behavior:** Sprints 004 and 005 must run concurrently in two separate clones (`~/projects/workprint` and `~/projects/workprint-2`) without depending on each other. Both need:
   1. the same Mastra version;
   2. one trusted answer to "does this native conversation belong to this verified account?";
   3. browser-test ports that don't collide.
