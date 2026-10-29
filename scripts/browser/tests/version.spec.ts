@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { test as observedTest } from '../material-network.js';
+import { activate } from '../activation.js';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import type { verifyBuiltAdmission as VerifyBuiltAdmission } from '../../../apps/api/test/auth-built-fixture.js';
@@ -97,8 +99,8 @@ test('section editing is local and Cancel restores the exact displayed version',
   expect(mutations).toEqual([]);
 });
 
-test('exact Save uses real admission, retains unsaved text and does not change the displayed version on 401/501', async ({ page }, info) => {
-  test.setTimeout(120000);
+observedTest('exact Save uses real admission, retains unsaved text and does not change the displayed version on 401/501', async ({ page, materialNetwork }, info) => {
+  observedTest.setTimeout(120000);
   await info.attach('prerequisite', { body: 'Read-only public version and explicit synopsis field mapping; not persisted product work.', contentType: 'text/plain' });
   const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
   const cleanup: (() => void | Promise<void>)[] = [];
@@ -115,16 +117,17 @@ test('exact Save uses real admission, retains unsaved text and does not change t
           await route.continue();
         });
         await page.evaluate((input) => (window as unknown as { versionTest: { configure(value: unknown): void } }).versionTest.configure(input), { apiOrigin: origin, token });
-        await page.getByRole('button', { name: 'Edit What happens', exact: true }).click();
+        materialNetwork.expectOperations({ origin, method: 'POST', path: '/v1/conversations/read-only-conversation/versions', count: 1, query: {} });
+        await activate(page.getByRole('button', { name: 'Edit What happens', exact: true }), status === 501);
         await page.getByRole('textbox', { name: 'What happens', exact: true }).fill('Mercer stays still, then gives a small nod.');
         const response = page.waitForResponse((value) => value.url() === `${origin}/v1/conversations/read-only-conversation/versions`);
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
+        await activate(page.getByRole('button', { name: 'Save', exact: true }), status === 501);
         expect((await response).status()).toBe(status);
         await expect(page.getByRole('status')).toHaveText(feedback);
         await expect(page.getByRole('textbox')).toHaveValue('Mercer stays still, then gives a small nod.');
         expect(requests).toEqual([{ path: '/v1/conversations/read-only-conversation/versions', body: { operationId: expect.stringMatching(/^[0-9a-f-]{36}$/), artifactId: 'script-example', kind: 'script', baseVersionId: 'script-v7', dependencies: ['reference-v1'], content: { synopsis: 'Mercer stays still, then gives a small nod.', retained: 'Keep this unrelated field.' } } }]);
         await expect(page.locator('[data-version-id]')).toHaveAttribute('data-version-id', 'script-v7');
-        await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+        await activate(page.getByRole('button', { name: 'Cancel', exact: true }), status === 501);
         await expect(page.getByText(initial, { exact: true })).toBeVisible();
         await page.unrouteAll({ behavior: 'wait' });
       }
@@ -132,8 +135,8 @@ test('exact Save uses real admission, retains unsaved text and does not change t
   } finally { for (const fn of cleanup.reverse()) await fn(); }
 });
 
-test('history viewing stays read-only, binds the requested older version, and exact Use failures preserve selection', async ({ page }, info) => {
-  test.setTimeout(120000);
+observedTest('history viewing stays read-only, binds the requested older version, and exact Use failures preserve selection', async ({ page, materialNetwork }, info) => {
+  observedTest.setTimeout(120000);
   await info.attach('prerequisite', { body: 'Read-only current/earlier public versions, selected use and explicit field mapping; not saved product records.', contentType: 'text/plain' });
   const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
   const cleanup: (() => void | Promise<void>)[] = [];
@@ -142,6 +145,12 @@ test('history viewing stays read-only, binds the requested older version, and ex
       for (const [token, status, feedback] of [[accessTokens[0], 501, 'Using this version is not available yet. The current selection is unchanged.'], [null, 401, 'Sign-in required to use this version. The current selection is unchanged.']] as const) {
         await page.goto('/version.html');
         await page.waitForFunction(() => !!(window as unknown as { versionTest?: unknown }).versionTest);
+        materialNetwork.expectOperations(
+          { origin, method: 'GET', path: '/v1/versions/script-v7', count: 1, query: {} },
+          { origin, method: 'GET', path: '/v1/artifacts/script-example/versions', count: 1, query: {} },
+          { origin, method: 'GET', path: '/v1/versions/script-v6', count: 1, query: {} },
+          { origin, method: 'POST', path: '/v1/conversations/read-only-conversation/uses', count: 1, query: {}, purpose: 'script' },
+        );
         let allowMutation = false;
         const requests: { method: string; path: string; body: unknown }[] = [];
         await page.route('**/*', async (route) => {
@@ -155,16 +164,16 @@ test('history viewing stays read-only, binds the requested older version, and ex
         });
         await page.evaluate((input) => (window as unknown as { versionTest: { configure(value: unknown): void } }).versionTest.configure(input), { apiOrigin: origin, token, review: true });
         await expect.poll(() => requests.length).toBe(1);
-        await page.locator('.wp-version-history summary').click();
+        await activate(page.locator('.wp-version-history summary'), status === 501);
         await expect.poll(() => requests.length).toBe(2);
-        await page.getByRole('button', { name: 'View version 6', exact: true }).click();
+        await activate(page.getByRole('button', { name: 'View version 6', exact: true }), status === 501);
         await expect.poll(() => requests.length).toBe(3);
         await expect(page.locator('[data-displayed-version-id]')).toHaveAttribute('data-displayed-version-id', 'script-v6');
         await expect(page.getByText('Earlier Script text.', { exact: true })).toBeVisible();
         expect(requests.map(({ method, path }) => ({ method, path }))).toEqual([{ method: 'GET', path: '/v1/versions/script-v7' }, { method: 'GET', path: '/v1/artifacts/script-example/versions' }, { method: 'GET', path: '/v1/versions/script-v6' }]);
         allowMutation = true;
         const response = page.waitForResponse((value) => value.url() === `${origin}/v1/conversations/read-only-conversation/uses`);
-        await page.getByRole('button', { name: 'Use this version', exact: true }).click();
+        await activate(page.getByRole('button', { name: 'Use this version', exact: true }), status === 501);
         expect((await response).status()).toBe(status);
         await expect(page.getByRole('status')).toHaveText(feedback);
         expect(requests[3]).toEqual({ method: 'POST', path: '/v1/conversations/read-only-conversation/uses', body: { purpose: 'script', versionId: 'script-v6', operationId: expect.stringMatching(/^[0-9a-f-]{36}$/) } });

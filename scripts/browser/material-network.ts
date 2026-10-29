@@ -1,7 +1,8 @@
 import { expect, test as base, type Request } from '@playwright/test';
+import type { OperationRequest } from '../../packages/contracts/src/index.js';
 
 type Entry = { method: string; url: URL; body: unknown };
-type Operation = Readonly<{ origin: string; method: string; path: string; count: number; query: Readonly<Record<string, string>>; purpose?: 'reference' | 'shot_video' }>;
+type Operation = Readonly<{ origin: string; method: string; path: string; count: number; query: Readonly<Record<string, string>>; purpose?: OperationRequest<'useVersion'>['body']['purpose'] }>;
 type Allowance = Omit<Operation, 'count' | 'query'> & { query: string; consumed: boolean };
 export type MaterialNetwork = { entries: Entry[]; expectOperations(...operations: Operation[]): void; assertSafe(): void };
 const queryKey = (entries: Iterable<[string, string]>) => JSON.stringify([...entries].sort(([a, av], [b, bv]) => a.localeCompare(b) || av.localeCompare(bv)));
@@ -29,7 +30,7 @@ export const test = base.extend<{ materialNetwork: MaterialNetwork }>({
       expect(unexpected.map(entry => `${entry.method} ${entry.url.origin}${entry.url.pathname}${entry.url.search}`), 'Unexpected or repeated operation/transfer').toEqual([]);
       for (const entry of entries) {
         expect(['127.0.0.1', 'localhost', '[::1]']).toContain(entry.url.hostname);
-        if (!(entry.method === 'GET' && /^\/v1\/(conversations\/[^/]+\/)?generation-requests(\/[^/]+)?$/.test(entry.url.pathname))) expect(entry.url.pathname).not.toMatch(/generation|provider/);
+        if (!((entry.method === 'GET' && /^\/v1\/(conversations\/[^/]+\/)?generation-requests(\/[^/]+)?$/.test(entry.url.pathname)) || (entry.method === 'POST' && /^\/v1\/generation-requests\/[^/]+\/cancel$/.test(entry.url.pathname)))) expect(entry.url.pathname).not.toMatch(/generation|provider/);
         if (entry.url.pathname === '/v1/library') {
           expect(entry.method).toBe('GET');
           expect([...entry.url.searchParams.keys()].filter(key => key !== 'cursor')).toEqual([]);

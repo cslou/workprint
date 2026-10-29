@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from '../material-network.js';
+import { activate } from '../activation.js';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import type { verifyBuiltAdmission as VerifyBuiltAdmission } from '../../../apps/api/test/auth-built-fixture.js';
@@ -35,7 +36,7 @@ test('actual Videos Export, history, detail and download receive built 401/501 w
         const initialChoice = await choiceIds(page);
         expect(initialChoice).toEqual(['video-earlier']);
         const firstHistory = page.waitForResponse(value => value.request().method() === 'GET' && value.url() === `${origin}/v1/conversations/conversation-a/exports`);
-        await page.getByRole('button', { name: 'Export history', exact: true }).click();
+        await activate(page.getByRole('button', { name: 'Export history', exact: true }), status === 501);
         expect((await firstHistory).status()).toBe(status);
         await expect(page.getByText('No export records were loaded.', { exact: true })).toBeVisible();
         const before = await page.locator('.wp-export-card').allTextContents();
@@ -47,7 +48,7 @@ test('actual Videos Export, history, detail and download receive built 401/501 w
         page.on('download', downloaded); page.on('framenavigated', navigated); page.on('popup', opened);
         for (let attempt = 0; attempt < 2; attempt++) {
           const response = page.waitForResponse(value => value.request().method() === 'POST' && value.url() === `${origin}/v1/conversations/conversation-a/exports`);
-          await page.getByRole('button', { name: 'Export', exact: true }).click();
+          await activate(page.getByRole('button', { name: 'Export', exact: true }), status === 501);
           const result = await response;
           expect(result.status()).toBe(status);
           commands.push(result.request().postDataJSON());
@@ -59,16 +60,16 @@ test('actual Videos Export, history, detail and download receive built 401/501 w
         expect(commands).toEqual(Array.from({ length: 2 }, () => ({ operationId: expect.stringMatching(/^[0-9a-f-]{36}$/), selectionRevision: 17 })));
         expect((commands[0] as { operationId: string }).operationId).not.toBe((commands[1] as { operationId: string }).operationId);
         const repeatedHistory = page.waitForResponse(value => value.request().method() === 'GET' && value.url() === `${origin}/v1/conversations/conversation-a/exports`);
-        await page.getByRole('button', { name: 'Export history', exact: true }).click();
+        await activate(page.getByRole('button', { name: 'Export history', exact: true }), status === 501);
         expect((await repeatedHistory).status()).toBe(status);
         await expect(page.getByText('No export records were loaded.', { exact: true })).toBeVisible();
         expect(await page.locator('.wp-export-card').allTextContents()).toEqual(before);
         const detail = page.waitForResponse(value => value.url() === `${origin}/v1/exports/export-exact`);
-        await page.getByRole('button', { name: 'Export details, export 1 of 2', exact: true }).click();
+        await activate(page.getByRole('button', { name: 'Export details, export 1 of 2', exact: true }), status === 501);
         expect((await detail).status()).toBe(status);
         await expect(page.getByText('No export record was loaded.', { exact: true })).toBeVisible();
         const media = page.waitForResponse(value => value.url() === `${origin}/v1/versions/output-exact/media`);
-        await page.getByRole('button', { name: 'Download', exact: true }).click();
+        await activate(page.getByRole('button', { name: 'Download', exact: true }), status === 501);
         expect((await media).status()).toBe(status);
         await expect(page.getByText('Download is not available yet.', { exact: true })).toBeVisible();
         await expect(page.getByText('No file was downloaded.', { exact: true })).toBeVisible();
