@@ -55,4 +55,3 @@ export async function signIn(page: Page, email: string, password: string) {
   await privateFill(page.getByLabel('Password', { exact: true }), password);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
-
