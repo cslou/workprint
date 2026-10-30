@@ -20,7 +20,7 @@ test('Vite serves browser modules but denies private research and fixture creden
   await symlink(join(root, 'apps/web/node_modules'), join(web, 'node_modules'), 'dir');
   const paths = ['docs/research/synthetic-private.md', 'outputs/local-database.env'];
   for (const file of paths) await writeFile(join(checkout, file), sentinel);
-  for (const name of ['native-conversations.ts', 'built-server.ts', 'server-entry.test.ts', 'auth-built-fixture.ts', 'auth-server.ts', 'request-intake.test.ts', 'isolated-auth.ts', 'auth-fixture-resources.ts', 'auth-mail.ts', 'isolated-auth.security.test.ts', 'account-browser-fixture.ts']) {
+  for (const name of ['native-conversations.ts', 'built-server.ts', 'server-entry.test.ts', 'auth-built-fixture.ts', 'auth-server.ts', 'request-intake.test.ts', 'isolated-auth.ts', 'auth-fixture-resources.ts', 'auth-mail.ts', 'isolated-auth.security.test.ts', 'account-browser-fixture.ts', 'native-navigation.test.ts', 'native-client.contracts.test.ts']) {
     const helper = `apps/api/test/${name}`;
     await copyFile(join(root, helper), join(checkout, helper));
     paths.push(helper);
@@ -33,7 +33,10 @@ test('Vite serves browser modules but denies private research and fixture creden
     const origin = `http://127.0.0.1:${port}`;
     assert.match(await (await server.response(origin)).text(), /src\/main.tsx/);
     const module = await (await server.response(`${origin}/src/main.tsx`)).text();
-    assert.match(module, /import \{ Shell \} from/);
+    assert.match(module, /import \{ OwnedShell \} from/);
+    const composition = await (await server.response(`${origin}/src/shell/owned-shell.tsx`)).text();
+    assert.match(composition, /import \{ Shell \} from/);
+    assert.match(composition, /useNativeNavigation/);
     assert.match(await (await server.response(`${origin}/src/shell/shell.tsx`)).text(), /Workprint/);
     const dependency = module.match(/from "([^"]*react-dom[^"]*)"/)?.[1];
     assert.ok(dependency, 'Transformed module uses a real React dependency');

@@ -22,11 +22,11 @@ export default defineConfig({
   build: { rollupOptions: { input: fileURLToPath(new URL('./test/library.html', import.meta.url)) } },
   server: { host: '127.0.0.1', port: browserPort, strictPort: true, fs: { strict: true, allow: [web, fileURLToPath(new URL('../../packages/api-client/dist/', import.meta.url)), fileURLToPath(new URL('../../packages/contracts/dist/', import.meta.url)), fileURLToPath(new URL('../../packages/player/dist/', import.meta.url)), fileURLToPath(new URL('../../node_modules/', import.meta.url))] } },
   plugins: [{ name: 'tracked-design-references', configureServer(server) {
-    server.middlewares.use('/references', async (req, res, next) => {
+    for (const [prefix, base] of [['/references', design], ['/navigation-references', resolve(web, 'test/navigation-reference')]] as const) server.middlewares.use(prefix, async (req, res, next) => {
       try {
-        const path = await realpath(resolve(design, `.${decodeURIComponent((req.url ?? '').split('?')[0] ?? '')}`));
+        const path = await realpath(resolve(base, `.${decodeURIComponent((req.url ?? '').split('?')[0] ?? '')}`));
         const type = new Map([['.html', 'text/html'], ['.css', 'text/css'], ['.svg', 'image/svg+xml']]).get(extname(path));
-        if (!path.startsWith(design + sep) || !type) { res.statusCode = 403; res.end(); return; }
+        if (!path.startsWith(base + sep) || !type) { res.statusCode = 403; res.end(); return; }
         res.setHeader('Content-Type', type);
         res.end(await readFile(path));
       } catch (error) { next(error); }

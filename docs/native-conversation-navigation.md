@@ -37,6 +37,12 @@ Observed list: `{threads, total, page, perPage, hasMore}`. Observed history: `{m
 
 The exact client-js 1.56.0 dependency avoids copying a native client/protocol/type catalog. It resolves to the existing core 1.79.0/schema-compat 1.3.16 cohort; the additional transitive package is canonicalize 1.0.8. Shared application transport types move unchanged into an inward `types.ts` module to keep native/index composition acyclic; the public exports are preserved. Audit after installation remains **NON-PASS only for approved B-004** (`GHSA-rmxm-3fg6-px4f`, moderate `@hono/node-server`); it is not a clean audit or deployment qualification.
 
+## Independent visual references
+
+The test-only `apps/web/test/navigation-reference/` freezes all 29 independently authored approved views. Verification never reads ignored previews or derives expected markup/CSS from the consumer. `scripts/browser/navigation-reference.ts` supplies only fictional content and composes tracked references. Main surfaces cover 1440/390/820/821; every representative state covers 1440/390. Comparisons are full-context, zero tolerance, with paired geometry and source hashes.
+
+Two explicit compositions reconcile exploratory artifacts with the binding guide: Session states preserve the earlier approved Auth notice colour/action inset rather than changing Auth to a generic modal; desktop long-title grid tracks are constrained so the required ellipsis works (the unconstrained exploratory track was about 691px inside a 235px sidebar). Frozen files remain unchanged. These are guide-based reference corrections, not masks, weakened assertions or acceptance of current screenshots. Original failures remain recorded. Human ratification and independent review remain separate.
+
 ## Verification and remaining delivery
 
 Automated production-entry checks use isolated Auth/Postgres and the supported `createNativeConversation` helper for preexisting messages. They cover real native create/pagination, exact message identity/text/order, two-account/forged-scope denial, foreign/absent equivalence, no-effect reads and closed generic mutations. Browser checks drive the actual app and native client with exact network allowances, more than one page of explicit creates, keyboard/page focus, reload, earlier-history anchoring, honest empty/error/unknown outcomes, and held real success/failure responses across newer selections/accounts. Public-factory delegation observes promise settlement without exporting credentials or adding production test hooks.

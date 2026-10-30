@@ -16,8 +16,8 @@ These are implemented module responsibilities, not claims of working business op
 
 | Module | Responsibility |
 | --- | --- |
-| `shell/` | Responsive navigation, session presentation, scoped workspace reads and feature composition, including Videos/Exports assembly. |
-| `conversation/` | Composer, question/option and proposal review; local unavailable native-conversation controls. |
+| `shell/` | Responsive navigation, session presentation, owned native Recents/history and scoped workspace/feature composition, including Videos/Exports assembly. |
+| `conversation/` | Composer, question/option and proposal review; Send/Stop remain locally unavailable. |
 | `library/`, `uploads/` | Scoped Library reads, local picker and exact attachment controls; upload-metadata initiation and isolated confirmation consumers, not byte transfer. |
 | `materials/`, `versions/` | Script/Assets/reference presentation; shared exact-version reads, history, manual edit/Save and Use controls. |
 | `storyboard/`, `videos/` | Shot/Panel planning views and edits; candidates, per-Shot choice, generation-request list/detail/cancellation controls. |
@@ -92,6 +92,8 @@ Owned native navigation uses only the four qualified `/memory/threads` create/li
 **Conversation creation rule for Sprint 004:** use the verified Supabase `accountId` unchanged as the native thread's `resourceId` (and the resource identity of its messages). Never use a caller's owner field, conversation ID, email, display name, prefix or normalized substitute. This is native storage identity, not a second conversation table. Before writing the adapter, isolated Postgres on core 1.79.0 / pg 1.32.0 returned the redacted native shape `{ id: string, resourceId: string, title: string, metadata: {}, createdAt: Date, updatedAt: Date }`; the supplied resource identity round-tripped exactly.
 
 `apps/api/test/native-conversations.ts` creates native threads and optional messages only for isolated tests through supported storage APIs. Tests own their Postgres and teardown. The helper is not a production compiler input, bundle, asset or route; no seed endpoint is enabled.
+
+The product `OwnedShell` keeps only ephemeral list/selection/history presentation. New video alone creates; Recents paging, opening, reload and reconnect never create or send. A URL conversation reference restores through verified read-only native requests, not a browser conversation store. Account changes clear old presentation/drafts and the reference; late create/list/history results cannot replace a newer scope. Load earlier messages preserves the visible anchor. Unknown create acknowledgement directs to Recents without automatic retry. Native history is not Script/workspace material, approval or tool state; the existing unavailable workspace feedback remains truthful. This navigation implementation still requires the complete story regression/visual qualification and independent review.
 
 Auth qualification requires privately supplied dedicated Supabase Auth configuration, two existing authorized synthetic identities, and restricted serving credentials identifying the approved target. Provisioning/accounts remain outside the product and serving process. Do not substitute a trusted-identity bypass or use an arbitrary shared project. R2, media tooling and real model keys are not prerequisites here.
 
