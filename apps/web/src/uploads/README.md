@@ -20,6 +20,7 @@ signed requests in memory while redacting signature/credential query values and
 never retaining private transfer bodies; traces/video are disabled. API bearer
 and cookie absence is checked at the actual browser storage request.
 
-Production has no media verifier: confirmation explicitly fails and creates no
-usable version/use. Completed chooser-to-verified-success UI and decoding belong
-to their separately approved owner. Emulator transport is not R2 qualification.
+The built backend now supports explicit qualified local verification and owned
+image/poster reads; absent media configuration still explicitly fails confirmation.
+The chooser-to-verified-success UI remains pending under its approved Story4 scope;
+existing consumer controls above are not yet that completed workflow. Emulator transport is not R2 qualification.

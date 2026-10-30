@@ -45,7 +45,7 @@ export const applicationRoutes = (application: Application | SavedWorkApplicatio
       return context.json(applicationError('invalid_input', 'Invalid application request'), 400);
     }
     const result = await application.operations[name]({ params: context.req.param(), query, body }, async () => ({ kind: 'verified', accountId }));
-    if (!('error' in result)) return Response.json(result, { status: name === 'requestUpload' ? 201 : 200 });
+    if (!('error' in result)) return Response.json(result, { status: name === 'requestUpload' ? 201 : 200, ...(name === 'media' ? { headers: { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } } : {}) });
     return Response.json(result, { status: errorStatus[result.error.code] });
   } });
 });

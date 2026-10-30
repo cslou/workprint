@@ -4,5 +4,6 @@ export { configuredObjectStorage } from './config.js';
 export { StorageError } from './errors.js';
 export type { StorageFailure } from './errors.js';
 export { createMediaSandbox } from './media/sandbox.js';
+export { configuredMediaSandbox } from './media/config.js';
 export type { MediaSandbox } from './media/sandbox.js';
 export { MediaProcessError } from './media/errors.js';

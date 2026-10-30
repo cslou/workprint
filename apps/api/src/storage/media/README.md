@@ -25,7 +25,13 @@ stay below256MiB. Memory/swap768MiB, pids64, oneCPU and CPU30s are hard containe
 limits; no network, capabilities, root writes or host secret/socket mounts.
 Cleanup verifies captured ID, name and UUID label; an identity/cleanup failure
 retains its private resource record and quarantines capacity until explicit close.
-This mechanical adapter is not yet wired to a production media verifier.
+Backend composition now supplies the real verifier only with explicit qualified
+local settings: MEDIA_TOOLCHAIN_DIRECTORY and absolute MEDIA_DOCKER_PATH, with
+optional MEDIA_ARCHIVE_PATH. Partial/mismatched/unavailable inputs fail startup;
+absent inputs leave verification unavailable. ResourceMastra extends the native
+shutdown() lifecycle to close media work before storage/database disposal, with
+no additional execution owner or signal loop. Cleanup uncertainty still retains
+private references; forced host exit is not claimed as verified deletion.
 
 Tool archive SHA256:
 `6a601112e0d032676f2048205fabe998900d44bac2a57f7ca35619c705326002`.
@@ -79,8 +85,9 @@ CRC/structure/dimension checked and captured. No conversion service is exposed.
 Positive actual synthetic PNG/JPEG/H264+AAC/poster tests and spoof/truncation,
 CRC, oversized dimensions, damaged H264, snapshot-mutation, unsupported metadata
 and decoder-count negatives exercise the real pinned tools. Additional H264/image
-profiles and dimension/fps/duration boundary fixtures remain to qualify before
-expanding this allowlist. Production composition still supplies no verifier.
+profiles remain to qualify before expanding this allowlist. Actual encoded
+4096square PNG,1920x1080/60fps and120second MP4 pass;4097width,1922width,
+61fps and121seconds reject under the same bounded tools.
 
 Owned PG/S3 publication tests now use the actual verifier and native ownership:
 missing-capability501 baseline, exact captured media/poster hashes, human draft
@@ -91,5 +98,8 @@ padding) crosses client transfer, SQL, S3, full native decode/poster and immutab
 publication/readback; one-byte-over transport/policy/storage and unchanged image
 bounds have separate regressions. No external inspection/storage waits hold SQL.
 Prior owner-first manual-save/lease tests remain required regressions. Built API
-composition, browser/UI, further boundary fixtures and full-suite qualification
-remain pending; core proof does not qualify those layers or production deployment.
+composition now has actual Auth/PG/S3 image/video success, replay, foreign-owner
+denial, exact source bytes and measured poster access proof. Native shutdown of
+active work, missing configuration, cleanup failure and actual signed GET expiry
+also have controls. Browser/UI and full-suite qualification remain pending;
+these proofs do not qualify production distribution, playback or R2.

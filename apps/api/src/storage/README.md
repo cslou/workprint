@@ -4,16 +4,17 @@ This module owns S3 transport/signing and bounded mechanical object operations,
 not conversation ownership, upload policy, approval or version publication.
 `artifacts` owns upload state and publication; composition supplies collaborators.
 The same AWS SDK adapter is intended for local SeaweedFS and later R2. Local
-qualification is not cloud/R2 acceptance. No media verifier is supplied here;
-production upload confirmation must remain unavailable until real verification
-is installed by its owning slice. No URL or successful PUT is usable work.
+qualification is not cloud/R2 acceptance. The separate bounded media mechanics
+are supplied through explicit backend-only configuration; artifacts owns the
+closed verifier policy. Missing configuration leaves confirmation unavailable. No URL or successful PUT is usable work.
 
 ## Adapter boundaries
 
 `createPrivateObjectStorage` accepts backend-only endpoint/region/bucket and
 credentials. HTTP endpoints must be loopback; HTTPS permits later authorized R2
 configuration without another adapter. It exposes staging-only `presignPut`,
-private `read`, conditional immutable `publish`, mechanical `remove`, and `close`.
+published/poster-only `presignRead`, private `read`, conditional immutable
+`publish`, mechanical `remove`, and `close`.
 It does not load browser configuration or expose credentials.
 
 Hard caps are 100 MiB per object, two active operations and ten seconds per

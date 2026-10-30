@@ -14,6 +14,7 @@ export type StoredSnapshot = Readonly<{ bytes: Buffer; byteSize: number; content
 export type PutGrant = Readonly<{ key: string; byteSize: number; contentType: string; issuedAt: Date; expiresAt: Date }>;
 export type PrivateObjectStorage = Readonly<{
   presignPut(input: PutGrant): Promise<string>;
+  presignRead(input: Omit<PutGrant, 'byteSize' | 'contentType'>): Promise<string>;
   read(key: string, maxBytes?: number): Promise<StoredSnapshot>;
   publish(key: string, bytes: Uint8Array, contentType: string): Promise<Readonly<{ etag: string; sha256: string; byteSize: number }>>;
   remove(key: string): Promise<void>;
@@ -48,6 +49,13 @@ export function createPrivateObjectStorage(configuration: PrivateStorageConfigur
       if (!boundedSize(input.byteSize, maxBytes) || !validType(input.contentType) || !Number.isInteger(seconds) || seconds < 1 || seconds > MAX_UPLOAD_URL_SECONDS || input.issuedAt.getTime() > Date.now() + 1000) throw new StorageError('invalid_object');
       if (input.expiresAt.getTime() <= Date.now()) throw new StorageError('expired');
       return run(async () => getSignedUrl(client, new PutObjectCommand({ Bucket: configuration.bucket, Key: input.key, ContentType: input.contentType, ContentLength: input.byteSize }), { signingDate: input.issuedAt, expiresIn: seconds, signableHeaders: new Set(['content-type', 'content-length']) }));
+    },
+    presignRead: async input => {
+      assertKey(input.key, ['published', 'posters']);
+      const seconds = (input.expiresAt.getTime() - input.issuedAt.getTime()) / 1000;
+      if (!Number.isInteger(seconds) || seconds < 1 || seconds > MAX_UPLOAD_URL_SECONDS || input.issuedAt.getTime() > Date.now() + 1000) throw new StorageError('invalid_object');
+      if (input.expiresAt.getTime() <= Date.now()) throw new StorageError('expired');
+      return run(async () => getSignedUrl(client, new GetObjectCommand({ Bucket: configuration.bucket, Key: input.key, ResponseCacheControl: 'private, no-store' }), { signingDate: input.issuedAt, expiresIn: seconds }));
     },
     read: async (key: string, requestedMaximum = maxBytes) => {
       assertKey(key, ['staging', 'published', 'posters']);
