@@ -24,15 +24,21 @@ export async function accountBrowserFixture(options: Parameters<typeof isolatedA
     const entry = await buildServerComposition(env.logs, 'account-browser', undefined, env.env);
     const server = await startAuthServer(entry, env.env, { url: auth.url, anonKey: auth.anonKey, servingUrl: db.servingUrl, accounts: [] }, join(env.logs, 'account-api.log'), { env: { WORKPRINT_BROWSER_ORIGIN: 'http://127.0.0.1:4180' } });
     cleanups.push(server.server.stop); cleanups.push(env.noNetwork);
-    const threadIds: string[] = [];
     return { auth, apiOrigin: server.origin, close,
-      saveNative: async (accountId: string) => {
-        const thread = await createNativeConversation(store, accountId, [{ role: 'user', text: 'Synthetic saved work' }]); threadIds.push(thread.id); return thread;
+      saveNative: async (accountId: string, messages: readonly { role: 'user' | 'assistant'; text: string }[] = [{ role: 'user', text: 'Synthetic saved work' }], title?: string) => {
+        return createNativeConversation(store, accountId, messages, title);
+      },
+      readNative: async (accountId: string, threadId: string) => {
+        const memory = await store.getStore('memory');
+        if (!memory) throw new Error('Fixture native memory unavailable');
+        return memory.listMessages({ threadId, resourceId: accountId, page: 0, perPage: 1000, orderBy: { field: 'createdAt', direction: 'ASC' } });
       },
       snapshot: async () => {
         const memory = await store.getStore('memory');
         if (!memory) throw new Error('Fixture native memory unavailable');
-        return JSON.stringify({ threads: await memory.listThreads({ page: 0, perPage: 100 }), messages: await memory.listMessages({ threadId: threadIds, perPage: 100 }) });
+        const threads = await memory.listThreads({ page: 0, perPage: 100 });
+        const ids = threads.threads.map(thread => thread.id);
+        return JSON.stringify({ threads, messages: ids.length ? await memory.listMessages({ threadId: ids, perPage: 1000 }) : { messages: [] } });
       },
     };
   } catch (error) { try { await close(); } catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Account fixture acquisition failed', { cause: cleanupError }); } throw error; }

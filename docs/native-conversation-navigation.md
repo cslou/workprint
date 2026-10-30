@@ -1,0 +1,44 @@
+# Native conversation navigation qualification
+
+Scope: Sprint 004 owned create/list/thread/history reads only, following the approved [navigation/history design](design/design.md#owned-conversation-navigation-and-history). This is implementation/qualification documentation, not acceptance, a planning update or permission to enable native turns. Browser Send, tools, administration and workflows remain unavailable.
+
+## Runtime and wire boundary
+
+`apps/api/src/mastra/native-navigation.ts` adds only these entries to the existing pre-Mastra catalog:
+
+| Method / native path | Supported native operation |
+| --- | --- |
+| `POST /memory/threads` | `MemoryStorage.saveThread`, fresh server UUID, verified account as resource identity |
+| `GET /memory/threads` | `MemoryStorage.listThreads`, verified resource filter |
+| `GET /memory/threads/:threadId` | Foundation `checkOwnedConversation`, then scoped `getThreadById` |
+| `GET /memory/threads/:threadId/messages` | Same ownership collaborator, then resource/thread-scoped `listMessages` |
+
+There is still one Mastra instance/listener, one native store and no Agent/model or application table. Authentication, CORS and bounded intake run before these handlers. Caller `resourceId` is only an equality precondition against online-verified identity, never ownership authority; create requires it to prevent an old UI intent from creating under a newer token. Other create fields, owner claims, filters, cursors, request contexts and duplicate/unknown query keys are rejected. Reads never change native timestamps, messages, approvals or execution state. Foreign/absent references return identical safe 404 envelopes.
+
+The native route names and response shapes are retained. These paths intentionally have no `/api` prefix: the official adapter rejects custom adapters inside its reserved native prefix. Generic `/api` and unqualified native routes remain closed. The supported built-in create handler requires an Agent, so navigation uses the already qualified public native storage interface instead of enabling an Agent or inventing a conversation store/protocol. Public native read handlers were exercised through a separately built isolated composition before parser implementation; their unsupported no-Agent create result was retained, not called a success.
+
+Limits: page index 0–1000, per-page 1–50; defaults six threads / twenty messages; descending native `createdAt` order. Native offset pages are not advertised as a snapshot across concurrent insertions. The existing 1 MiB/two-second intake is unchanged. Adapter settlement is bounded at eight seconds; the existing restricted pool also bounds connection acquisition and SQL execution. A timed-out write is uncertain and may still commit: it is never described as cancelled/no-write or retried. Responses are capped at 1 MiB and marked no-store. Only supported user/assistant format-2 text is exposed; system/tool/unsupported history fails closed into the existing load-failure state. Private metadata/provider fields are not browser state. No native schema is patched.
+
+## Observed native shapes
+
+Core/server 1.79.0, pg 1.32.0, and official client-js **1.56.0** were exercised with real isolated Auth, built serving entry and native PostgreSQL. Credentials and reset data were not collected. Before parser work, native thread/list/history HTTP observations were saved locally in `/tmp/workprint-sprint-004/owned-conversations/native-observed.json`. IDs were replaced with noncredential labels; the original reserved-prefix setup failure and no-Agent create rejection remain in the evidence.
+
+Observed thread JSON:
+
+```json
+{"id":"<thread>","resourceId":"<verified-account>","title":"Synthetic test conversation","metadata":{},"createdAt":"2026-10-30T15:38:49.255Z","updatedAt":"2026-10-30T15:38:49.260Z"}
+```
+
+Observed list: `{threads, total, page, perPage, hasMore}`. Observed history: `{messages, total, page, perPage, hasMore, uiMessages:null}`; each message has native `id`, `threadId`, `resourceId`, `role`, ISO `createdAt`, and `content:{format:2,parts:[{type:"text",text:string}]}`. The production adapter's successful create was subsequently observed as HTTP 200 with empty title, metadata `{}` and the same native identity/timestamp fields. `native-navigation.test.ts` emits sanitized structural observations from actual responses; it never logs credentials or private native metadata.
+
+## Client and dependency choice
+
+`packages/api-client/src/native.ts` uses official `MastraClient` read methods with `apiPrefix:''` and **zero retries**, and reuses published native DTOs. Create uses the same native wire shape through the supported storage-backed adapter. Its transport supplies the existing account token callback, omits cookies, refuses redirects, caps response bytes, validates scope/IDs/page/content and bounds the whole operation including token acquisition. Caller cancellation settles without waiting for a suspended token callback. Error envelopes must match HTTP status; malformed/oversized/mismatched responses cannot become definite no-write create rejections. Neither this client nor the SDK may retry create.
+
+The exact client-js 1.56.0 dependency avoids copying a native client/protocol/type catalog. It resolves to the existing core 1.79.0/schema-compat 1.3.16 cohort; the additional transitive package is canonicalize 1.0.8. Shared application transport types move unchanged into an inward `types.ts` module to keep native/index composition acyclic; the public exports are preserved. Audit after installation remains **NON-PASS only for approved B-004** (`GHSA-rmxm-3fg6-px4f`, moderate `@hono/node-server`); it is not a clean audit or deployment qualification.
+
+## Verification and remaining delivery
+
+Automated production-entry checks use isolated Auth/Postgres and the supported `createNativeConversation` helper for preexisting messages. They cover real native create/pagination, exact message identity/text/order, two-account/forged-scope denial, foreign/absent equivalence, no-effect reads and closed generic mutations. Browser checks drive the actual app and native client with exact network allowances, more than one page of explicit creates, keyboard/page focus, reload, earlier-history anchoring, honest empty/error/unknown outcomes, and held real success/failure responses across newer selections/accounts. Public-factory delegation observes promise settlement without exporting credentials or adding production test hooks.
+
+Evidence is local under `/tmp/workprint-sprint-004/owned-conversations/`. Initial route/UI functional failures, client transport failures, the corrected focus race, setup/compile/modularity failures and subsequent passing targets are retained separately. Targeted verification is not the full clean committed-head suite, reference parity, independent review or human acceptance. Remaining story delivery includes the complete regression/visual/privacy/ingress sequence, real-history coverage migration of the fake test entry, PR creation and orchestrator-owned independent review/acceptance.

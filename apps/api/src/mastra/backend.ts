@@ -9,6 +9,7 @@ import { verifyAccount } from './auth.js';
 import { applicationRoutes } from './application-routes.js';
 import { verifiedIngressAccount } from './ingress.js';
 import { createAdmissionPolicy, decorateCors } from './admission.js';
+import { nativeNavigationRoutes } from './native-navigation.js';
 
 /** One backend: cataloged application routes plus explicit test-composition additions. */
 export async function createBackend(routes: ApiRoute[] = []) {
@@ -48,7 +49,7 @@ export async function createBackend(routes: ApiRoute[] = []) {
   }
   const storage = new PostgresStore({ id: 'workprint-native', schemaName: 'mastra', disableInit: true, pool });
   const application = createApplication({ checkOwnedConversation: createOwnedConversationCheck(storage) });
-  const protectedRoutes = [...applicationRoutes(application), ...routes];
+  const protectedRoutes = [...applicationRoutes(application), ...nativeNavigationRoutes(storage, application.checkOwnedConversation), ...routes];
   const policy = createAdmissionPolicy(protectedRoutes, config.browserOrigin);
   return new Mastra({
     storage,
