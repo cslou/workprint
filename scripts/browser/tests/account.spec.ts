@@ -113,14 +113,8 @@ test('real refresh preserves the same-account draft; revoked refresh fences it w
     const proactive = page.waitForResponse(response => new URL(response.url()).pathname === '/auth/v1/token' && new URL(response.url()).searchParams.get('grant_type') === 'refresh_token');
     await page.clock.fastForward(30000);
     expect((await proactive).status()).toBeGreaterThanOrEqual(400);
-    await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('Keep on successful refresh');
-    // SDK 2.118 deliberately preserves still-valid access after proactive rejection.
-    // Move Date past real JWT expiry without firing the separate presentation timer;
-    // the next SDK tick must reject the expired session through actual Auth.
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'refresh_token' }, count: 1 });
-    await page.clock.setSystemTime(Date.now() + 240000);
-    await page.clock.runFor(30000);
-    await expect(page.getByRole('dialog')).toContainText('Sign in again to continue. Local drafts were cleared; saved work is unchanged.');
+    // The application fences confirmed terminal rejection immediately, even while the SDK preserves its JWT.
+    await expect(page.getByRole('dialog')).toContainText('Your session couldn’t be refreshed.');
     await page.keyboard.press('Escape');
     await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('');
     expect(await f.application!.snapshot() === saved, 'Refresh/expiry changed saved native records').toBe(true);

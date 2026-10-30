@@ -1,4 +1,5 @@
 import { AuthClient, type Session, type AuthChangeEvent } from '@supabase/auth-js';
+import { terminalRefreshRejection } from './refresh.js';
 import type { PublicAuthConfig } from './public-config.js';
 type AccountIdentity = { accountId: string; name: string };
 
@@ -17,6 +18,7 @@ export class AccountOwner {
   private operation = false;
   private restoring = false;
   private refreshRejected = false;
+  private revocationUnconfirmed = false;
   private expiry: ReturnType<typeof setTimeout> | undefined;
   private unsubscribe: (() => void) | undefined;
   private readonly onStorage = (event: StorageEvent) => { if (event.key === fenceKey && event.newValue) this.fence('expired', false); };
@@ -37,11 +39,16 @@ export class AccountOwner {
       flowType: 'pkce', persistSession: true, autoRefreshToken: !this.blocked,
       detectSessionInUrl: false, debug: false,
       fetch: async (input, init) => {
+        const epoch = this.epoch;
         const refresh = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url).searchParams.get('grant_type') === 'refresh_token';
+        if (refresh && this.blocked) throw new DOMException('Account access is fenced', 'AbortError');
         if (refresh && this.state.account && !this.blocked) this.set({ screen: 'refreshing', busy: true });
         try {
           const response = await fetch(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(5000)]) : AbortSignal.timeout(5000) });
-          if (refresh) this.refreshRejected = !response.ok;
+          if (refresh) {
+            this.refreshRejected = !response.ok;
+            if (epoch === this.epoch && !this.blocked && await terminalRefreshRejection(response)) this.fence('refresh-failed');
+          }
           return response;
         } catch (error) { if (refresh) this.refreshRejected = true; throw error; }
         finally { if (refresh && this.state.screen === 'refreshing' && !this.blocked) this.set({ screen: 'account', busy: false }); }
@@ -72,19 +79,22 @@ export class AccountOwner {
     if (this.recovery) return;
     if (this.blocked) { if (this.state.screen === 'checking') this.set({ screen: 'sign-in' }); return; }
     if (!session) { this.set({ screen: 'sign-in' }); return; }
+    // SDK visibility/recovery broadcasts are not a new login for an already verified scope.
+    if (event === 'SIGNED_IN' && this.state.account?.accountId === session.user.id) return;
     if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
       const epoch = this.epoch;
       // Never await another SDK method inside its Auth event callback (SDK lock).
-      setTimeout(() => { void this.restore(epoch); }, 0);
+      setTimeout(() => { void this.restore(epoch, session.user.id); }, 0);
     } else if (event === 'TOKEN_REFRESHED') this.present(session);
   }
-  private async restore(epoch: number) {
+  private async restore(epoch: number, expectedAccountId: string) {
     if (!this.client || this.blocked || this.recovery || epoch !== this.epoch || this.restoring) return;
     this.restoring = true;
     try {
       const { data, error } = await this.client.getUser();
       if (epoch !== this.epoch || this.blocked || this.recovery) return;
       if (error || !data.user) {
+        if (error && (!error.status || error.status === 429 || error.status >= 500) && this.state.account?.accountId === expectedAccountId) return;
         if (error && error.status !== 401 && error.status !== 403) this.set({ screen: 'startup-failed', account: null, busy: false });
         else this.fence('expired');
         return;
@@ -105,8 +115,12 @@ export class AccountOwner {
   }
   private fence(screen: AccountScreen, persist = true) {
     ++this.epoch; this.blocked = true; clearTimeout(this.expiry); this.client?.stopAutoRefresh();
-    if (persist) localStorage.setItem(fenceKey, crypto.randomUUID());
     this.set({ account: null, screen, busy: false, message: '', open: this.state.open || screen === 'expired' || screen === 'refresh-failed' });
+    if (persist) {
+      try { localStorage.setItem(fenceKey, crypto.randomUUID()); }
+      catch { return false; } // Memory is fenced regardless; sign-out must still reach the SDK.
+    }
+    return true;
   }
   open = () => this.set({ open: true });
   close = () => this.set({ open: false });
@@ -118,12 +132,13 @@ export class AccountOwner {
   validation = (message: string) => this.set({ message });
   signIn = async (email: string, password: string) => {
     if (!this.client || this.operation) return;
-    this.fence('sign-in');
+    if (!this.fence('sign-in')) { this.set({ screen: 'unconfigured', message: 'Account access requires browser storage. Allow storage and reload.' }); return; }
     const epoch = this.epoch; this.operation = true; this.set({ busy: true, message: '' });
     try {
       const { data, error } = await this.client.signInWithPassword({ email, password });
       if (epoch !== this.epoch) return;
       if (error || !data.session) { this.set({ busy: false, message: error?.code === 'invalid_credentials' ? 'Email or password is incorrect. Check both and try again.' : 'We couldn’t complete sign-in. Check your connection and try again.' }); return; }
+      this.revocationUnconfirmed = false;
       this.recovery = false; this.blocked = false; localStorage.removeItem(fenceKey); this.client.startAutoRefresh(); this.present(data.session); this.set({ open: false });
     } finally { this.operation = false; }
   };
@@ -132,7 +147,9 @@ export class AccountOwner {
     this.fence(switchAccount ? 'switching' : 'signed-out'); this.operation = true; this.set({ open: true, busy: true });
     try {
       const { error } = await this.client.signOut({ scope: 'local' });
-      this.set({ screen: error ? 'signout-unconfirmed' : switchAccount ? 'sign-in' : 'signed-out', busy: false, message: '' });
+      // SDK 2.118 clears local credentials even on logout failure. A later no-op is not revocation proof.
+      this.revocationUnconfirmed ||= error !== null;
+      this.set({ screen: this.revocationUnconfirmed ? 'signout-unconfirmed' : switchAccount ? 'sign-in' : 'signed-out', busy: false, message: '' });
     } finally { this.operation = false; }
   };
   reset = async (email: string) => {
