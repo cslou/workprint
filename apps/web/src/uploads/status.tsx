@@ -9,7 +9,7 @@ const labels={authorizing:'Checking permission for this conversation. The select
 export function UploadStatus({state,session,connection,choose,close,onSaved}:{state:UploadState;session:UploadSession;connection:BrowserClient|undefined;choose():void;close():void;onSaved?():void}){
   const preview=useUploadPreview(connection,state.saved);if(['idle','blocked'].includes(state.phase))return null;
   const {phase,file,saved}=state,video=file?.kind==='video';const version=saved?.version,media=version && (version.kind==='image' || version.kind==='video')?version.media:null;
-  const busy=['authorizing','uploading','verifying'].includes(phase);const noun=video?'video':'image';
+  const busy=['authorizing','uploading','verifying'].includes(phase);const noun=file?.type.startsWith('video/')?'video':file?.type.startsWith('image/')?'image':'file';
   let title=phase==='authorizing'?`Preparing ${file?.name}…`:phase==='uploading'?`Uploading ${file?.name}…`:phase==='verifying'?'Verifying upload…':phase==='expired'?'Upload link expired':phase==='interrupted'?'Upload interrupted':phase==='unknown'?'Save could not be confirmed':phase==='stopped'?'Stopped waiting for this upload':phase==='scope-cleared'?'Upload closed after scope change':phase==='rejected-damaged'?'This file could not be verified':`This ${noun} is ${phase==='rejected-size'?'too large':'not supported'}`;
   let copy=phase in labels?labels[phase as keyof typeof labels]:video?'Use MP4 with H.264 8-bit video and optional AAC audio. No version was saved.':'Use JPEG or PNG up to 10 MiB and 4096 × 4096 pixels. No version was saved.';
   if(phase==='saved'){

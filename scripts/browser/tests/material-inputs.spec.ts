@@ -60,7 +60,7 @@ test('pasted prose stays ordinary text and Send keeps it with zero network', asy
   expect(requests).toEqual([]);
 });
 
-test('the actual file input initiates the exact metadata and never transfers or confirms', async ({ page, materialNetwork }, info) => {
+test('denied file metadata never transfers or confirms; unqualified video stays local', async ({ page, materialNetwork }, info) => {
   test.setTimeout(120000);
   await info.attach('prerequisite', { body: 'Synthetic local image and video files; the initiation request is continued to the built loopback backend, never fulfilled with a success.', contentType: 'text/plain' });
   const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
@@ -71,7 +71,7 @@ test('the actual file input initiates the exact metadata and never transfers or 
       await page.goto('/uploads.html');
       await page.waitForFunction(() => !!(window as unknown as UploadsHarness).uploadsTest);
       await page.evaluate((input) => (window as unknown as UploadsHarness).uploadsTest.configure(input), { apiOrigin: origin, token, accountId: 'account-a', conversationId: 'conversation-a' });
-      materialNetwork.expectOperations({ origin, method: 'POST', path: '/v1/conversations/conversation-a/uploads', count: 3, query: {} });
+      materialNetwork.expectOperations({ origin, method: 'POST', path: '/v1/conversations/conversation-a/uploads', count: 2, query: {} });
       const input = page.getByLabel('Choose an image or video', { exact: true });
       const text = page.getByRole('textbox', { name: 'Message', exact: true });
       await text.fill('A quiet moment in the gallery.');
@@ -98,10 +98,9 @@ test('the actual file input initiates the exact metadata and never transfers or 
       expect(await input.evaluate((element) => (element as HTMLInputElement).files?.length ?? 0)).toBe(0);
       await expect(text).toHaveValue('A quiet moment in the gallery.');
       const video = await readFile('apps/web/test/fixtures/clip.webm');
-      const videoResponse = page.waitForResponse((value) => new URL(value.url()).pathname === '/v1/conversations/conversation-a/uploads');
       await input.setInputFiles({ name: 'clip.webm', mimeType: 'video/webm', buffer: video });
-      const deniedVideo = await videoResponse; expect(deniedVideo.status()).toBe(404); expect(await deniedVideo.json()).toEqual({ error: { code: 'not_found', message: 'Saved work not found' } });
-      expect(seen[1]!.body).toMatchObject({ kind: 'video', filename: 'clip.webm', contentType: 'video/webm', byteSize: video.byteLength });
+      await expect(page.getByRole('heading', { name: 'This video is not supported' })).toBeVisible();
+      expect(seen, 'Unqualified video must not reach authorization or storage').toHaveLength(1);
       expect(seen.every((entry) => entry.path === '/v1/conversations/conversation-a/uploads' && entry.method === 'POST')).toBe(true);
       expect(seen.some((entry) => /\/confirm$/.test(entry.path))).toBe(false);
       materialNetwork.assertSafe();
@@ -113,7 +112,7 @@ test('the actual file input initiates the exact metadata and never transfers or 
       await (await pointerChooser).setFiles({ name: 'vale portrait.png', mimeType: 'image/png', buffer: image });
       expect((await unauthorized).status()).toBe(401);
       await expect(page.locator('.wp-chat-feedback')).toHaveText('Sign-in required to upload a file. The file was not sent.');
-      expect(seen[2]!.body).toMatchObject({ kind: 'image', filename: 'vale portrait.png', contentType: 'image/png', byteSize: image.byteLength });
+      expect(seen[1]!.body).toMatchObject({ kind: 'image', filename: 'vale portrait.png', contentType: 'image/png', byteSize: image.byteLength });
       await expect(text).toHaveValue('A quiet moment in the gallery.');
       materialNetwork.assertSafe();
       await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.unmount());
@@ -134,12 +133,12 @@ test('upload transport failure, unsupported type and no conversation send nothin
   await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.configure({ apiOrigin: window.location.origin, token: 'token', accountId: 'account-a', conversationId: 'conversation-a' }));
   await text.fill('Retained while the upload fails.');
   await input.setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: image });
-  await expect(page.locator('.wp-chat-feedback')).toHaveText('The file was not uploaded. Nothing was changed.');
+  await expect(page.getByRole('heading', { name: 'Stopped waiting for this upload' })).toBeVisible();
   materialNetwork.assertSafe();
   const before = seen.length;
   await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.configure({ apiOrigin: window.location.origin, token: 'token', accountId: 'account-a', conversationId: 'conversation-a' }));
   await input.setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not media') });
-  await expect(page.locator('.wp-chat-feedback')).toHaveText('That file is not an image or video. The file was not sent.');
+  await expect(page.getByRole('heading', { name: 'This file is not supported' })).toBeVisible();
   materialNetwork.assertSafe();
   await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.configure({ apiOrigin: window.location.origin, token: 'token', accountId: 'account-a' }));
   await input.setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: image });
@@ -150,7 +149,8 @@ test('upload transport failure, unsupported type and no conversation send nothin
   await page.route('**/v1/conversations/*/uploads', route => route.fulfill({ json: { uploadId: 'read-only-initiation', url: `${browserOrigin}/forbidden-transfer`, expiresAt: '2099-01-01T00:00:00Z', maxBytes: 4096 } }));
   await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.configure({ apiOrigin: window.location.origin, token: null, accountId: 'account-a', conversationId: 'conversation-a' }));
   await input.setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: image });
-  await expect(page.locator('.wp-chat-feedback')).toHaveText('Uploading files is not available yet. The file was not sent.');
+  await expect(page.getByRole('heading', { name: 'Stopped waiting for this upload' })).toBeVisible();
+  expect(seen.some((entry) => /forbidden-transfer|confirm$/.test(entry.path))).toBe(false);
   materialNetwork.assertSafe();
   await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.unmount());
 });

@@ -23,7 +23,7 @@ export function createUploadSession(transfer:typeof transferUpload=transferUploa
     try{
       if(mode==='authorize'){
         update({phase:'authorizing',failure:null});const result=await api.requestUpload(structuredClone(command.request),{signal:controller.signal});if(!live())return;
-        if(!result.ok){const code=result.error.code;update({phase:uncertain(code)?'stopped':code==='not_found'?'expired':code==='unsupported'?'rejected-format':'blocked',failure:code});return;}
+        if(!result.ok){const code=result.error.code;update({phase:uncertain(code)?'stopped':code==='unsupported'?'rejected-format':'blocked',failure:code});return;}
         if(result.value.maxBytes!==command.file.size){update({phase:'stopped',failure:'invalid_response'});return;}command.grant=Object.freeze({...result.value});
         if(onlyCheck){update({phase:'interrupted',failure:null});return;}mode='transfer';
       }

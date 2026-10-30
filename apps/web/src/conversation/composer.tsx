@@ -37,7 +37,7 @@ export function Composer({ native, working = false, docked = false, placeholder 
   };
   const closeUpload = () => { uploadState.session.close(); fileInput.current?.parentElement?.querySelector('button')?.focus(); };
   const blockedCopy = uploadState.state.confirmationStarted ? confirmFeedback : uploadFeedback;
-  const blocked = uploadState.state.phase === 'blocked' ? uploadState.state.failure === 'unauthenticated' ? blockedCopy.unauthenticated : blockedCopy.unavailable : null;
+  const blocked = uploadState.state.phase === 'blocked' ? uploadState.state.failure === 'unauthenticated' ? blockedCopy.unauthenticated : uploadState.state.failure === 'not_implemented' ? blockedCopy.unavailable : blockedCopy.error : null;
   return <>
     <form className={`wp-opening-composer${docked ? ' wp-chat-docked' : ''}`} onSubmit={(event) => { event.preventDefault(); void send(); }}>
       <textarea className="wp-opening-field wp-chat-input" aria-label="Message" placeholder={placeholder} value={text} onChange={(event) => setText(event.target.value)} />
