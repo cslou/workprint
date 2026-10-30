@@ -6,9 +6,10 @@ ceilings of 64 KiB, and at most a 30-second command deadline. Limits may be
 lowered, never raised. Overflow, cancellation and deadline kill the owned Unix
 process group; settlement waits for its streams to close. Expected process
 failures expose typed safe errors, not raw command/output/credential payloads.
-It is not a standalone sandbox or user-supplied-command API. The mechanical
-sandbox must still own one-job/no-queue admission, absolute lifetime, Docker
-container identity, hard resource limits and verified cleanup/shutdown.
+It is not a standalone sandbox or user-supplied-command API. `sandbox.ts` owns
+one-job/no-queue admission, absolute lifetime, Docker identity, hard resource
+limits and verified cleanup/shutdown. `toolchain.ts` verifies an explicit exact
+local archive and paired read-only binaries; it never downloads or falls back.
 
 `pins.ts` records the approved Linux AArch64 paired toolchain and the official
 same-version Node24.22.1 slim ARM64 sandbox. The Node image is selected for an
@@ -16,8 +17,15 @@ absolute-deadline PID1 watchdog: a relative sleep alone cannot fence a container
 whose startup was delayed. This is a bounded mechanical process, not another
 backend, native conversation owner, agent, scheduler or service. The Docker
 image manifest was resolved before pulling/execution; actual RepoDigests and
-ARM64 identity were checked. The watchdog/container implementation and adversarial
-resource qualification are not yet enabled by these primitives.
+ARM64 identity were checked. The fixed watchdog checks the absolute deadline at
+startup, so a delayed start cannot grant a fresh lifetime. The sandbox mounts
+only tools/input read-only and one precreated poster file writable, with an8MiB
+kernel file limit. Work tmpfs128MiB, shm1MiB, input100MiB and poster8MiB together
+stay below256MiB. Memory/swap768MiB, pids64, oneCPU and CPU30s are hard container
+limits; no network, capabilities, root writes or host secret/socket mounts.
+Cleanup verifies captured ID, name and UUID label; an identity/cleanup failure
+retains its private resource record and quarantines capacity until explicit close.
+This mechanical adapter is not yet wired to a production media verifier.
 
 Tool archive SHA256:
 `6a601112e0d032676f2048205fabe998900d44bac2a57f7ca35619c705326002`.
@@ -48,6 +56,8 @@ stall deadline, explicit abort, process-group descendant teardown after leader
 exit, literal shell metacharacters, missing executables and invalid bounds.
 Existing controlled Linux qualification captured real PNG/JPEG/H264+AAC probe,
 full-decode and poster shapes before any product parser. Those are normal-fixture
-proofs, not the still-required sandbox fault, media-policy, publication or browser
-verification. Production upload confirmation remains without a verifier until
+proofs, not media-policy, publication or browser verification. Actual sandbox
+fault tests also exercise OOM, PID exhaustion, tmpfs ENOSPC, read-only writes,
+poster file limits, cancellation/deadline/shutdown and ownership-mismatch quarantine.
+Dedicated delayed-start watchdog and CPU-budget fault controls remain to qualify. Production upload confirmation remains without a verifier until
 those owning pieces are implemented and qualified.
