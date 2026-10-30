@@ -131,3 +131,66 @@ for (const width of [1440, 390]) test(`owned windows traverse 1105 records and r
     }, { browserOrigin, prepareSavedWork: async setup => { saved = await prepareLibraryWindow(setup); } });
   } finally { for (const fn of cleanup.reverse()) await fn(); }
 });
+
+test('maximum exact choices retain enabled keyboard focus on terminal pages and first-page return', async ({ page, materialNetwork }) => {
+  test.setTimeout(240000);
+  const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
+  const { prepareLibraryWindow } = await import(pathToFileURL(resolve('apps/api/.test-build/test/paged-saved-work.js')).href) as { prepareLibraryWindow: typeof PrepareLibraryWindow };
+  let saved: Awaited<ReturnType<typeof PrepareLibraryWindow>> | undefined;
+  const cleanup: (() => void | Promise<void>)[] = [];
+  try {
+    await verifyBuiltAdmission({ diagnostic() {}, after(fn) { cleanup.push(fn); } }, async target => {
+      if (!saved) throw new Error('Maximum-choice prerequisites missing');
+      const data = saved;
+      const allow = (path: string, query: Record<string, string> = {}) => materialNetwork.expectOperations({ origin: target.origin, method: 'GET', path, query, count: 1 });
+      allow(`/v1/conversations/${data.conversationA}/workspace`); allow(`/v1/versions/${data.current.id}`); allow(`/v1/conversations/${data.conversationA}/generation-requests`);
+      await page.goto('/saved-work.html'); await page.waitForFunction(() => !!(window as unknown as { savedWorkTest?: unknown }).savedWorkTest);
+      await page.evaluate(input => (window as unknown as { savedWorkTest: { configure(input: unknown): void } }).savedWorkTest.configure(input), { apiOrigin: target.origin, token: target.accessTokens[0]!, accountId: data.accountA, conversationId: data.conversationA });
+      await expect(page.getByRole('tabpanel')).toContainText('Ada waits beside the station clock.');
+      allow('/v1/library'); let pending = page.waitForResponse(response => new URL(response.url()).pathname === '/v1/library');
+      await page.getByRole('button', { name: 'Library', exact: true }).click();
+      let batch = await (await pending).json() as Batch; const firstIds = batch.items.map(item => item.id); const firstCursor = batch.nextCursor;
+      if (!firstCursor) throw new Error('Initial maximum-choice cursor missing');
+      const more = async () => {
+        if (!batch.nextCursor) throw new Error('Required maximum-choice continuation missing');
+        allow('/v1/library', { cursor: batch.nextCursor }); pending = page.waitForResponse(response => new URL(response.url()).pathname === '/v1/library');
+        await page.getByRole('button', { name: 'Load more', exact: true }).press('Enter');
+        batch = await (await pending).json() as Batch;
+        await expect(page.locator(`.wp-picker-tile[data-page-id="${batch.items.at(-1)!.id}"]`)).toBeAttached();
+      };
+      for (let count = 20; count < 1000; count += 20) await more();
+      await expect(page.locator('.wp-picker-tile')).toHaveCount(1000);
+      await page.locator('.wp-picker-tile').first().press('Space');
+      // Set up the stress boundary through actual DOM clicks and production handlers, not injected selection state.
+      await page.locator('.wp-picker-tile[aria-pressed="false"]').evaluateAll(nodes => nodes.forEach(node => (node as HTMLButtonElement).click()));
+      await expect(page.locator('.wp-picker-count')).toHaveText('1000 selected');
+      while (batch.nextCursor) await more();
+      const close = page.getByRole('button', { name: 'Close', exact: true });
+      await expect(close).toBeFocused();
+      await expect(page.getByRole('button', { name: 'Load more', exact: true })).toHaveCount(0);
+      await page.locator('.wp-picker-chip button').first().press('Enter');
+      await expect(page.locator('.wp-picker-count')).toHaveText('999 selected');
+      await page.locator('.wp-picker-tile').last().evaluate(node => (node as HTMLButtonElement).click());
+      await expect(page.locator('.wp-picker-count')).toHaveText('1000 selected');
+      await page.getByRole('button', { name: 'Back to first page', exact: true }).press('Enter');
+      await expect(page.locator(`.wp-picker-tile[data-page-id="${firstIds[0]!}"]`)).toBeDisabled();
+      await expect(page.locator(`.wp-picker-tile[data-page-id="${firstIds[1]!}"]`)).toBeFocused();
+      await expect(page.getByRole('button', { name: 'Back to first page', exact: true })).toHaveCount(0);
+      await page.locator('.wp-picker-tile[aria-pressed="true"]').evaluateAll(nodes => nodes.forEach(node => (node as HTMLButtonElement).click()));
+      await expect(page.locator('.wp-picker-count')).toHaveText('981 selected');
+      batch = { items: firstIds.map(id => ({ id })), nextCursor: null };
+      // The captured first-page continuation is reused by the real reader, without fetching the first page again.
+      const nextRequest = page.waitForRequest(request => new URL(request.url()).pathname === '/v1/library');
+      materialNetwork.expectOperations({ origin: target.origin, method: 'GET', path: '/v1/library', query: { cursor: firstCursor }, count: 1 });
+      pending = page.waitForResponse(response => new URL(response.url()).pathname === '/v1/library');
+      await page.getByRole('button', { name: 'Load more', exact: true }).press('Enter'); await nextRequest; batch = await (await pending).json() as Batch;
+      while (batch.nextCursor) await more();
+      await page.locator('.wp-picker-tile[aria-pressed="false"]:enabled').evaluateAll(nodes => nodes.slice(0, 19).forEach(node => (node as HTMLButtonElement).click()));
+      await expect(page.locator('.wp-picker-count')).toHaveText('1000 selected');
+      await page.getByRole('button', { name: 'Back to first page', exact: true }).press('Enter');
+      await expect(page.locator('.wp-picker-tile:enabled')).toHaveCount(0);
+      await expect(close).toBeFocused();
+      await expect(page.getByRole('button', { name: 'Back to first page', exact: true })).toHaveCount(0);
+    }, { browserOrigin, prepareSavedWork: async setup => { saved = await prepareLibraryWindow(setup); } });
+  } finally { for (const fn of cleanup.reverse()) await fn(); }
+});

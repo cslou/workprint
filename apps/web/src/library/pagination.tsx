@@ -10,8 +10,9 @@ export function LibraryPagination({ read }: { read: ReturnType<typeof useLibrary
     addedIds: read.addedIds, loadMore: read.loadMore, returnToFirstPage: read.returnToFirstPage,
     focusTerminal(button, ids, returning) {
       const root = button?.closest('.wp-picker-body');
-      const target = [...root?.querySelectorAll<HTMLButtonElement>('[data-page-id]') ?? []].find(node => ids.includes(node.dataset.pageId ?? ''));
-      (target ?? root?.closest('.wp-dialog')?.querySelector<HTMLButtonElement>('.wp-dialog-head button'))?.focus({ preventScroll: !returning });
+      const target = [...root?.querySelectorAll<HTMLButtonElement>('[data-page-id]') ?? []].find(node => ids.includes(node.dataset.pageId ?? '') && !node.disabled && node.tabIndex >= 0 && !node.closest('[inert]') && node.getClientRects().length > 0 && getComputedStyle(node).visibility !== 'hidden');
+      target?.focus({ preventScroll: !returning });
+      if (!target || document.activeElement !== target) root?.closest('.wp-dialog')?.querySelector<HTMLButtonElement>('.wp-dialog-head button')?.focus({ preventScroll: !returning });
     },
   });
   if (read.kind !== 'settled' || !read.result.ok || (read.result.value.nextCursor === null && !retain && !read.omittedItems && !returning)) return null;
