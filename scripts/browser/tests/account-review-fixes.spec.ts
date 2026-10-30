@@ -85,7 +85,7 @@ test('retryable refresh outage preserves valid scope and drafts through supporte
   } finally { release?.(); await f.close(); }
 });
 
-test('actual presentation expiry clears scope and ignores a held late refresh result', async ({ page, materialNetwork }) => {
+test('unavailable SDK expiry check locks this tab and ignores a held late refresh result', async ({ page, materialNetwork }) => {
   test.setTimeout(30000); const f = await fixture(page, false, { jwtExpirySeconds: 180 });
   let release: (() => void) | undefined;
   try {
@@ -93,7 +93,8 @@ test('actual presentation expiry clears scope and ignores a held late refresh re
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
     await signIn(page, user.email, user.password); await expect(page.getByRole('dialog')).toBeHidden();
     await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Clear at expiry');
-    let held = false; const gate = new Promise<void>(resolve => { release = resolve; });
+    let held = false, failed = false; const gate = new Promise<void>(resolve => { release = resolve; });
+    page.on('requestfailed', request => { if (new URL(request.url()).searchParams.get('grant_type') === 'refresh_token') failed = true; });
     let finished!: () => void; const settled = new Promise<void>(resolve => { finished = resolve; });
     await page.route(f.auth.url + '/auth/v1/token?grant_type=refresh_token', async route => {
       try {
@@ -103,11 +104,14 @@ test('actual presentation expiry clears scope and ignores a held late refresh re
     });
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'refresh_token' }, count: 1 });
     await page.clock.fastForward(60000); await expect.poll(() => held).toBe(true);
+    const intent = await page.evaluate(() => localStorage.getItem('workprint.auth-intent'));
     await page.clock.fastForward(130000);
-    await expect(page.getByRole('dialog')).toContainText('Your session has ended.');
+    // Advancing past the native request deadline makes this an SDK read failure, not
+    // authoritative proof of shared-session expiry. Release every intercepted response.
+    release!(); await settled; await expect.poll(() => failed).toBe(true);
+    await expect(page.getByRole('dialog')).toContainText('Your session couldn’t be refreshed.');
+    expect(await page.evaluate(() => localStorage.getItem('workprint.auth-intent')) === intent).toBe(true);
     await expect(page.locator('.wp-main textarea')).toHaveValue('');
-    release!(); await settled;
-    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
     await expect(page.getByRole('button', { name: user.email, exact: true, includeHidden: true })).toHaveCount(0);
     await expect(page.locator('.wp-main textarea')).toHaveValue('');
   } finally { release?.(); await f.close(); }

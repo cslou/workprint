@@ -6,7 +6,8 @@ import type { PublicAuthConfig } from './public-config.js';
 type AccountIdentity = { accountId: string; name: string };
 type Scope = { epoch: number; intent: string | null };
 type Recovery = { scope: Scope; accountId: string };
-type Exit = { intent: string | null; accountId: string | null; confirmed: boolean; switchAccount: boolean };
+type ScopeStatus = 'current' | 'superseded' | 'unavailable';
+type Exit = { intent: string | null; accountId: string | null; confirmed: boolean; switchAccount: boolean; recoveryOutcome?: 'password-updated' | 'update-unconfirmed' | 'invalid-link' };
 export type AccountScreen = 'sign-in' | 'account' | 'reset' | 'reset-sent' | 'password' | 'password-rejected' | 'password-updated' | 'update-unconfirmed' | 'invalid-link' | 'checking-link' | 'checking' | 'refreshing' | 'refresh-failed' | 'expired' | 'startup-failed' | 'signed-out' | 'signout-unconfirmed' | 'switching' | 'unconfigured' | 'account-lock-not-saved' | 'signout-pending-lock-not-saved' | 'signout-confirmed-lock-not-saved' | 'signout-unconfirmed-lock-not-saved';
 export type AccountPresentation = { screen: AccountScreen; account: AccountIdentity | null; open: boolean; busy: boolean; message: string };
 
@@ -31,12 +32,13 @@ export class AccountOwner {
   private read: { scope: Scope; abort: AbortController } | undefined;
   private passwordAttempt: AbortController | undefined;
   private expiry: ReturnType<typeof setTimeout> | undefined;
+  private expiryCheck: Scope | undefined;
   private unsubscribe: (() => void) | undefined;
   private readonly onStorage = (event: StorageEvent) => {
     if (event.key !== intentKey && event.key !== fenceKey) return;
     try { if (currentIntent() === this.intent && (event.key !== fenceKey || !event.newValue)) return; }
-    catch { this.fence('account-lock-not-saved', false); return; }
-    this.fence(this.recoveryWanted || this.state.screen === 'invalid-link' ? 'invalid-link' : 'expired', false);
+    catch { this.storageUnavailable(); return; }
+    this.invalidate(this.recoveryWanted || this.state.screen === 'invalid-link' ? 'invalid-link' : 'expired');
   };
   constructor(private readonly config: PublicAuthConfig) {
     this.recoveryWanted = location.pathname === '/auth/callback';
@@ -85,8 +87,22 @@ export class AccountOwner {
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   private set(value: Partial<AccountPresentation>) { this.state = { ...this.state, ...value }; for (const listener of this.listeners) listener(); }
   private scope(): Scope { return { epoch: this.epoch, intent: this.intent }; }
+  private status(scope: Scope): ScopeStatus {
+    if (scope.epoch !== this.epoch) return 'superseded';
+    try { return scope.intent === currentIntent() ? 'current' : 'superseded'; }
+    catch { return 'unavailable'; }
+  }
   private current(scope: Scope): boolean {
-    try { return scope.epoch === this.epoch && scope.intent === currentIntent(); } catch { return false; }
+    const status = this.status(scope);
+    if (status === 'unavailable') this.storageUnavailable();
+    return status === 'current';
+  }
+  private invalidate(screen: 'expired' | 'invalid-link') {
+    this.exit = undefined; this.fence(screen, false); this.set({ screen });
+  }
+  private storageUnavailable() {
+    this.fenceSaved = false; this.fence('account-lock-not-saved', false);
+    if (this.exit) this.showExit(this.exit);
   }
   private fetch: typeof fetch = async (input, init) => {
     const scope = this.scope(), read = this.read;
@@ -117,7 +133,9 @@ export class AccountOwner {
   };
   private changed(event: AuthChangeEvent, session: Session | null) {
     if (this.initializing || this.operation) return;
-    if (!this.current(this.scope())) { this.fence(this.recoveryWanted || this.state.screen === 'invalid-link' ? 'invalid-link' : 'expired', false); return; }
+    const status = this.status(this.scope());
+    if (status === 'unavailable') { this.storageUnavailable(); return; }
+    if (status === 'superseded') { this.invalidate(this.recoveryWanted || this.state.screen === 'invalid-link' ? 'invalid-link' : 'expired'); return; }
     // Only consume() can establish this tab's recovery purpose/identity, not a broadcast.
     if (event === 'PASSWORD_RECOVERY') { if (!this.recoveryWanted) this.fence('expired', false); return; }
     if (event === 'SIGNED_OUT') {
@@ -176,10 +194,31 @@ export class AccountOwner {
   }
   private present(session: Session) {
     if (this.blocked || this.recoveryWanted) return;
-    clearTimeout(this.expiry); const remaining = (session.expires_at ?? 0) * 1000 - Date.now();
-    if (remaining <= 0) { this.fence('expired'); return; }
-    this.expiry = setTimeout(() => this.fence('expired'), remaining);
+    clearTimeout(this.expiry); const remaining = (session.expires_at ?? 0) * 1000 - Date.now(), scope = this.scope(), accountId = session.user.id;
+    if (remaining <= 0) { void this.expire(scope, accountId); return; }
+    this.expiry = setTimeout(() => this.expire(scope, accountId), remaining);
     this.set({ account: { accountId: session.user.id, name: session.user.email ?? 'Account' }, screen: 'account', busy: false, message: '' });
+  }
+  private async expire(scope: Scope, accountId: string) {
+    if (scope.epoch !== this.epoch || this.blocked || this.recoveryWanted) return;
+    if (this.expiryCheck?.epoch === scope.epoch && this.expiryCheck.intent === scope.intent) return;
+    const status = this.status(scope);
+    if (status === 'superseded') { this.invalidate('expired'); return; }
+    if (status === 'unavailable') { this.storageUnavailable(); return; }
+    this.expiryCheck = scope;
+    try {
+      // Like the token seam, this uses the SDK's guarded refresh, not destructive getUser.
+      // Do not hold publication behind a potentially pending native refresh.
+      const result = await this.client!.getSession();
+      if (!this.current(scope) || this.blocked) return;
+      const session = result.data.session;
+      if (session && session.user.id !== accountId) { this.invalidate('expired'); return; }
+      if (session && (session.expires_at ?? 0) * 1000 > Date.now()) { this.present(session); return; }
+      // An unavailable SDK read is not proof that every tab's current session expired.
+      // Shared expiry belongs to the SDK; a presentation deadline can only close this tab.
+      this.fence(result.error ? 'refresh-failed' : 'expired', false);
+    } catch { if (this.current(scope)) this.storageUnavailable(); }
+    finally { if (this.expiryCheck === scope) this.expiryCheck = undefined; }
   }
   private fence(screen: AccountScreen, persist = true) {
     ++this.epoch; this.passwordAttempt?.abort(); this.read?.abort.abort(); this.blocked = true;
@@ -230,34 +269,57 @@ export class AccountOwner {
   };
   signOut = async (switchAccount = false) => {
     if (!this.client || this.operation) return;
-    if (!this.current(this.scope())) { this.fence('expired', false); return; }
-    const previous = this.exit;
+    const previous = this.exit, initial = this.scope(), status = this.status(initial);
+    if (status === 'superseded') { this.invalidate('expired'); return; }
     const accountId = previous?.accountId ?? this.state.account?.accountId ?? this.recovery?.accountId ?? null;
+    if (status === 'unavailable') {
+      this.exit = previous ?? { accountId, intent: initial.intent, confirmed: false, switchAccount };
+      this.storageUnavailable(); this.set({ open: true }); return;
+    }
     this.fence(switchAccount ? 'switching' : 'signed-out');
-    const scope = this.scope(), exit: Exit = { accountId, intent: scope.intent, confirmed: previous?.confirmed ?? false, switchAccount };
+    const scope = this.scope(), exit: Exit = { accountId, intent: scope.intent, confirmed: previous?.confirmed ?? false, switchAccount, ...(previous?.recoveryOutcome ? { recoveryOutcome: previous.recoveryOutcome } : {}) };
     this.exit = exit; this.operation = true; this.set({ open: true, busy: true, screen: this.fenceSaved ? switchAccount ? 'switching' : 'signed-out' : 'signout-pending-lock-not-saved' });
     try {
       await this.ready;
-      await this.guarded(scope, async () => {
-        const session = await this.client!.getSession();
-        if (!this.current(scope)) return;
-        if (session.data.session && accountId && session.data.session.user.id !== accountId) { this.fence('expired', false); return; }
-        const revoke = { confirmed: false }; this.revoking = revoke;
-        try { await this.client!.signOut({ scope: 'local' }); }
-        finally { this.revoking = undefined; }
-        if (!this.current(scope)) return;
-        exit.confirmed ||= revoke.confirmed;
-        this.showExit(exit);
-      });
-    } catch { if (this.current(scope)) this.showExit(exit); }
+      await this.guarded(scope, () => this.revoke(scope, exit));
+      this.settleExit(exit);
+    } catch { this.fenceSaved = false; this.settleExit(exit); }
     finally { this.operation = false; }
   };
+  private async revoke(scope: Scope, exit: Exit) {
+    const receipt = { confirmed: false };
+    try {
+      if (!this.current(scope)) return;
+      const result = await this.client!.getSession(), session = result.data.session;
+      if (!this.current(scope)) return;
+      if (session && session.user.id !== exit.accountId) { this.invalidate('expired'); return; }
+      if (result.error || !session || !exit.accountId) return;
+      this.revoking = receipt;
+      await this.client!.signOut({ scope: 'local' });
+    } catch { this.fenceSaved = false; throw new Error('Browser account lock completion failed'); }
+    finally {
+      if (this.revoking === receipt) this.revoking = undefined;
+      // The authenticated acknowledgement is independent of a subsequent SDK storage exception.
+      if (this.exit === exit && this.status({ epoch: this.epoch, intent: exit.intent }) !== 'superseded') exit.confirmed ||= receipt.confirmed;
+    }
+  }
+  private settleExit(exit: Exit) {
+    if (this.exit !== exit) return;
+    const status = this.status({ epoch: this.epoch, intent: exit.intent });
+    if (status === 'superseded') { this.invalidate('expired'); return; }
+    if (status === 'unavailable') { this.storageUnavailable(); return; }
+    this.showExit(exit);
+  }
   private showExit(exit: Exit) {
-    this.set({ busy: false, screen: this.fenceSaved ? exit.confirmed ? exit.switchAccount ? 'sign-in' : 'signed-out' : 'signout-unconfirmed' : exit.confirmed ? 'signout-confirmed-lock-not-saved' : 'signout-unconfirmed-lock-not-saved' });
+    this.set({ busy: false, screen: this.fenceSaved ? exit.confirmed ? exit.recoveryOutcome ?? (exit.switchAccount ? 'sign-in' : 'signed-out') : 'signout-unconfirmed' : exit.confirmed ? 'signout-confirmed-lock-not-saved' : 'signout-unconfirmed-lock-not-saved' });
   }
   retryFence = async () => {
     if (this.operation) return;
-    if (this.client && !this.current(this.scope())) { this.fence('expired', false); return; }
+    if (this.client) {
+      const status = this.status(this.scope());
+      if (status === 'superseded') { this.invalidate('expired'); return; }
+      if (status === 'unavailable') { this.storageUnavailable(); return; }
+    }
     const exit = this.exit;
     this.fence('expired');
     if (exit) { exit.intent = this.intent; this.showExit(exit); }
@@ -282,6 +344,7 @@ export class AccountOwner {
     const binding = this.recovery;
     if (!this.client || this.operation || !binding) return;
     this.operation = true; this.set({ busy: true, message: '' });
+    let settlement = binding.scope, exit: Exit | undefined;
     try {
       await this.guarded(binding.scope, async () => {
         const verified = await this.client!.getUser();
@@ -289,12 +352,16 @@ export class AccountOwner {
         const { error } = await this.client!.updateUser({ password });
         if (!this.current(binding.scope)) return;
         if (error && (error.code === 'weak_password' || error.code === 'same_password')) { this.set({ screen: 'password-rejected', busy: false, message: 'The password wasn’t accepted. Choose a different password and try again.' }); return; }
-        this.fence(error ? error.status && error.status >= 400 && error.status < 500 ? 'invalid-link' : 'update-unconfirmed' : 'password-updated');
-        this.set({ busy: true }); const signedOut = await this.client!.signOut({ scope: 'local' });
-        this.set({ busy: false, ...(signedOut.error ? { message: 'We couldn’t confirm session revocation. Sign in again to continue.' } : {}) });
+        const outcome = error ? error.status && error.status >= 400 && error.status < 500 ? 'invalid-link' : 'update-unconfirmed' : 'password-updated';
+        this.fence(outcome); settlement = this.scope();
+        exit = { accountId: binding.accountId, intent: settlement.intent, confirmed: false, switchAccount: false, recoveryOutcome: outcome }; this.exit = exit;
+        this.set({ busy: true }); await this.revoke(settlement, exit); this.settleExit(exit);
       });
       if (!this.current(binding.scope) && this.recoveryWanted) this.fence('invalid-link', false);
-    } catch { if (this.current(binding.scope)) { this.fence('update-unconfirmed'); this.set({ busy: false }); } }
+    } catch {
+      if (exit) { this.fenceSaved = false; this.settleExit(exit); }
+      else if (this.current(settlement)) { this.fence('update-unconfirmed'); this.set({ busy: false }); }
+    }
     finally { this.operation = false; }
   };
   getAccessToken = async (): Promise<string | null> => {
@@ -303,7 +370,7 @@ export class AccountOwner {
     // SDK 2.118 guards its own refresh commits; this operation never calls mutating getUser.
     const result = await this.client.getSession();
     if (!this.current(scope) || this.blocked || this.recoveryWanted) return null;
-    if (result.error || !result.data.session || result.data.session.user.id !== account.accountId || (result.data.session.expires_at ?? 0) * 1000 <= Date.now()) { this.fence('expired'); return null; }
+    if (result.error || !result.data.session || result.data.session.user.id !== account.accountId || (result.data.session.expires_at ?? 0) * 1000 <= Date.now()) { await this.expire(scope, account.accountId); return null; }
     return result.data.session.access_token;
   };
   dispose() { ++this.epoch; this.read?.abort.abort(); this.passwordAttempt?.abort(); clearTimeout(this.expiry); this.unsubscribe?.(); void this.client?.stopAutoRefresh(); window.removeEventListener('storage', this.onStorage); this.listeners.clear(); }
