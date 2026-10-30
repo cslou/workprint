@@ -112,6 +112,21 @@ test('built backend rejects unsafe config, separates setup privileges and exclud
   }
 
   await applyArtifactMigrations(db.setupUrl);
+  await query(db.adminUrl, 'CREATE ROLE wp_create_bridge NOLOGIN; GRANT wp_create_bridge TO wp_serving WITH INHERIT FALSE');
+  try {
+    for (const schema of ['mastra', 'public', 'artifacts']) await t.test(`SET-reachable CREATE on ${schema} rejects built serving`, async () => {
+      await query(db.adminUrl, `GRANT CREATE ON SCHEMA ${schema} TO wp_create_bridge`);
+      const creatorPort = await unusedPort(); const creatorLog = join(fixture.logs, `set-create-${schema}.log`);
+      const creator = await start(process.execPath, ['apps/api/.mastra/output/index.mjs'], { cwd: root, env: { ...fixture.env, DATABASE_URL: db.servingUrl, PORT: String(creatorPort) }, log: creatorLog });
+      try {
+        const grants = await query(db.servingUrl, `SELECT pg_has_role(current_user,'wp_create_bridge','USAGE') AS inherited,pg_has_role(current_user,'wp_create_bridge','SET') AS settable,has_schema_privilege('${schema}','CREATE') AS direct_create`);
+        assert.deepEqual(grants.rows[0], { inherited: false, settable: true, direct_create: false });
+        const code = await Promise.race([creator.exited, creator.response(`http://127.0.0.1:${creatorPort}/health`).then(async response => { await response.body?.cancel(); return 0; })]);
+        assert.notEqual(code, 0, `SET-reachable CREATE on ${schema} must reject serving`);
+        assert.match(await readFile(creatorLog, 'utf8'), /Serving storage unavailable or privileged/);
+      } finally { await creator.stop(); await query(db.adminUrl, `REVOKE CREATE ON SCHEMA ${schema} FROM wp_create_bridge`); }
+    });
+  } finally { await query(db.adminUrl, 'REVOKE wp_create_bridge FROM wp_serving; DROP ROLE wp_create_bridge'); }
   // Native-role checks alone cannot detect ownership of application objects.
   await query(db.adminUrl, 'ALTER TABLE artifacts.versions OWNER TO wp_serving');
   try {

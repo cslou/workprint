@@ -12,3 +12,4 @@ export function databaseUrl(value: string | undefined, name: string): string {
 }
 
 export { transaction, assertRestrictedApplicationRole } from './transaction.js';
+export { assertRestrictedRole, type ServingRolePolicy } from './privileges.js';

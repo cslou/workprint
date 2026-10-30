@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from 'pg';
+import { assertRestrictedRole } from './privileges.js';
 
 /** Mechanics only. Callers own SQL; never wait on native/provider collaborators here. */
 export async function transaction<T>(pool: Pool, work: (client: PoolClient) => Promise<T>): Promise<T> {
@@ -24,20 +25,7 @@ export async function transaction<T>(pool: Pool, work: (client: PoolClient) => P
   }
 }
 
-/** Include SET ROLE reachability, not only privileges inherited by the login. */
-export async function assertRestrictedApplicationRole(pool: Pool) {
-  const result = await pool.query<{ privileged: boolean }>(`WITH owned_schema AS (
-    SELECT oid,nspowner FROM pg_namespace WHERE nspname='artifacts'
-  ), owners AS (
-    SELECT nspowner AS owner FROM owned_schema
-    UNION SELECT relowner FROM pg_class WHERE relnamespace IN (SELECT oid FROM owned_schema)
-    UNION SELECT proowner FROM pg_proc WHERE pronamespace IN (SELECT oid FROM owned_schema)
-    UNION SELECT typowner FROM pg_type WHERE typnamespace IN (SELECT oid FROM owned_schema)
-  ) SELECT has_database_privilege(current_database(),'CREATE') OR
-    EXISTS(SELECT 1 FROM owned_schema WHERE has_schema_privilege(oid,'CREATE')) OR
-    EXISTS(SELECT 1 FROM pg_roles r WHERE pg_has_role(current_user,r.oid,'SET') AND
-      (r.rolsuper OR r.rolcreatedb OR r.rolcreaterole OR has_database_privilege(r.oid,current_database(),'CREATE') OR
-       EXISTS(SELECT 1 FROM owned_schema n WHERE has_schema_privilege(r.oid,n.oid,'CREATE')))) OR
-    EXISTS(SELECT 1 FROM pg_roles r CROSS JOIN owners WHERE pg_has_role(current_user,r.oid,'SET') AND pg_has_role(r.oid,owners.owner,'USAGE')) AS privileged`);
-  if (result.rows[0]?.privileged !== false) throw new Error('Privileged application serving connection');
+/** Application checks do not require native bootstrap schemas. */
+export function assertRestrictedApplicationRole(pool: Pool): Promise<void> {
+  return assertRestrictedRole(pool, { createSchemas: ['artifacts'], ownershipSchemas: ['artifacts'], errorMessage: 'Privileged application serving connection' });
 }
