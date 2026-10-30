@@ -1,25 +1,14 @@
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { Page } from '@playwright/test';
-import { test, expect, type MaterialNetwork } from '../material-network.js';
+import { test, expect } from '../owned-backend.js';
+import type { MaterialNetwork } from '../material-network.js';
 import { browserOrigin } from '../origin.js';
 import type { verifyBuiltAdmission as VerifyBuiltAdmission, BuiltAdmissionTarget } from '../../../apps/api/test/auth-built-fixture.js';
 import type { preparePagedSavedWork as PreparePagedSavedWork, PagedSavedWork } from '../../../apps/api/test/paged-saved-work.js';
 
 let target: BuiltAdmissionTarget; let saved: PagedSavedWork;
-let release!: () => void; let backend: Promise<void>;
-const cleanup: (() => void | Promise<void>)[] = [];
-test.beforeAll(async () => {
-  test.setTimeout(120000);
-  const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
-  const { preparePagedSavedWork } = await import(pathToFileURL(resolve('apps/api/.test-build/test/paged-saved-work.js')).href) as { preparePagedSavedWork: typeof PreparePagedSavedWork };
-  const gate = new Promise<void>(resolve => { release = resolve; });
-  let ready!: () => void; let fail!: (error: unknown) => void;
-  const available = new Promise<void>((resolve, reject) => { ready = resolve; fail = reject; });
-  backend = verifyBuiltAdmission({ diagnostic() {}, after(fn) { cleanup.push(fn); } }, async value => { target = value; ready(); await gate; }, { browserOrigin, prepareSavedWork: async setup => { saved = await preparePagedSavedWork(setup); } });
-  void backend.catch(fail); await available;
-});
-test.afterAll(async () => { try { release?.(); await backend; } finally { for (const fn of cleanup.reverse()) await fn(); } });
+test.beforeEach(async ({ ownedSavedWork }) => { target = ownedSavedWork.target; saved = ownedSavedWork.saved; });
 const historyPath = () => `/v1/artifacts/${saved.current.artifactId}/versions`;
 function allow(network: MaterialNetwork, path: string, query: Record<string, string> = {}, count = 1) { network.expectOperations({ origin: target.origin, method: 'GET', path, query, count }); }
 async function configure(page: Page, network: MaterialNetwork, account: 'a' | 'b' = 'a', empty = false) {
@@ -133,12 +122,16 @@ test('next history failure keeps loaded rows and permits exactly one explicit re
 for (const account of ['a', 'b'] as const) test(`late history pages never populate a new ${account === 'a' ? 'conversation' : 'account'} scope`, async ({ page, materialNetwork }) => {
   await open(page, materialNetwork);
   const cursor = await history(page, materialNetwork);
-  let releasePage!: () => void; let held!: () => void;
+  let releasePage!: () => void; let held!: () => void; let completed!: () => void; let requestSettled!: () => void;
   const gate = new Promise<void>(resolve => { releasePage = resolve; });
   const available = new Promise<void>(resolve => { held = resolve; });
+  const completion = new Promise<void>(resolve => { completed = resolve; });
+  const settlement = new Promise<void>(resolve => { requestSettled = resolve; });
+  const onSettled = (request: import('@playwright/test').Request) => { const url = new URL(request.url()); if (url.pathname === historyPath() && url.searchParams.has('cursor')) requestSettled(); };
+  page.on('requestfinished', onSettled); page.on('requestfailed', onSettled);
   await page.route(url => url.pathname === historyPath() && url.searchParams.has('cursor'), async route => {
-    const response = await route.fetch(); held(); await gate;
-    await route.fulfill({ response });
+    try { const response = await route.fetch(); held(); await gate; await route.fulfill({ response }); }
+    finally { completed(); }
   });
   allow(materialNetwork, historyPath(), { cursor });
   try {
@@ -148,9 +141,11 @@ for (const account of ['a', 'b'] as const) test(`late history pages never popula
     await expect(page.getByRole('status')).toHaveText('Loading earlier versions…');
     await configure(page, materialNetwork, account, true);
     releasePage();
+    await Promise.all([completion, settlement]);
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
     await expect(page.getByRole('tabpanel')).toHaveText('Your script will appear here once you describe your video.');
     await expect(page.locator('.wp-version-history-row')).toHaveCount(0);
-  } finally { releasePage(); }
+  } finally { releasePage(); page.off('requestfinished', onSettled); page.off('requestfailed', onSettled); }
 });
 
 test('an account without records receives the honest Library empty state', async ({ page, materialNetwork }) => {

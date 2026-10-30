@@ -6,6 +6,21 @@ import type { SavedWorkSetup } from './auth-built-fixture.js';
 import { createNativeConversation } from './native-conversations.js';
 
 export type PagedSavedWork = { accountA: string; accountB: string; conversationA: string; emptyA: string; emptyB: string; current: Version; versions: Version[]; reference: Version };
+export async function prepareLibraryWindow({ accountIds, native, servingUrl }: SavedWorkSetup) {
+  const accountA = accountIds[0]!, accountB = accountIds[1]!;
+  const emptyB = (await createNativeConversation(native, accountB)).id;
+  const conversationA = (await createNativeConversation(native, accountA)).id;
+  const pool = new Pool({ connectionString: servingUrl, max: 2, connectionTimeoutMillis: 1000, statement_timeout: 2000 });
+  try {
+    const store = createArtifactStore(pool, createOwnedConversationCheck(native));
+    let current: Version | undefined;
+    for (let revision = 1; revision <= 1105; revision++) current = await store.insert({ accountId: accountA, conversationId: conversationA, ...(current ? { artifactId: current.artifactId } : {}), kind: 'script', createdBy: 'human', dependencies: [], content: { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'Station', time: 'morning' }, characters: [], script: [{ action: 'Ada waits beside the station clock.' }] }] }, ...(revision === 1105 ? { use: { binding: { purpose: 'script' as const }, state: 'approved' as const } } : {}) });
+    for (let index = 0; index < 1104; index++) await store.insert({ accountId: accountA, conversationId: conversationA, kind: 'script', createdBy: 'human', dependencies: [], content: { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'Station', time: 'morning' }, characters: [], script: [{ action: `Saved work ${index + 1}.` }] }] } });
+    if (!current) throw new Error('Large history prerequisite missing');
+    return { accountA, accountB, conversationA, emptyB, current };
+  } finally { await pool.end(); }
+}
+
 /** Independently authored read-only prerequisites. No production fixture control or route. */
 export async function preparePagedSavedWork({ accountIds, native, servingUrl }: SavedWorkSetup, currentRevision = 23): Promise<PagedSavedWork> {
   if (!Number.isInteger(currentRevision) || currentRevision < 1 || currentRevision > 23) throw new Error('Pinned fixture revision must be between 1 and 23');

@@ -13,8 +13,18 @@ export function useExactVersion(client: ApiClient | null, scope: ReadScope | nul
 }
 export function useVersionHistory(client: ApiClient | null, scope: ReadScope | null, artifactId: string, open: boolean) {
   const active = !!scope && open;
-  const pages = useMemo(() => client && active ? createPageRead<Version>((cursor, signal) => client.artifactVersions({ params: { id: artifactId }, query: cursor ? { cursor } : {}, body: {} }, { signal })) : null, [client, active, scope?.accountId, scope?.conversationId, artifactId]);
+  const binding = useMemo(() => {
+    if (!client || !active) return null;
+    let newest = 0;
+    const pages = createPageRead<Version>(async (cursor, signal) => {
+      const result = await client.artifactVersions({ params: { id: artifactId }, query: cursor ? { cursor } : {}, body: {} }, { signal });
+      if (!cursor && result.ok) newest = result.value.items[0]?.revision ?? 0;
+      return result;
+    });
+    return { pages, newest: () => newest };
+  }, [client, active, scope?.accountId, scope?.conversationId, artifactId]);
+  const pages = binding?.pages;
   const snapshot = useSyncExternalStore(pages?.subscribe ?? subscribeIdle, pages?.getSnapshot ?? getIdle);
   useEffect(() => { if (!pages) return; void pages.start(); return pages.dispose; }, [pages]);
-  return { ...snapshot, retry: pages?.start ?? inactive, loadMore: pages?.loadMore ?? inactive };
+  return { ...snapshot, newestRevision: binding?.newest() ?? 0, retry: pages?.start ?? inactive, loadMore: pages?.loadMore ?? inactive, returnToFirstPage: pages?.returnToFirstPage ?? inactive };
 }

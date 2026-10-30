@@ -17,5 +17,5 @@ export function useLibrary(client: ApiClient | null, scope: ReadScope | null, qu
   }) : null, [client, active, scope?.accountId, scope?.conversationId, kind, initialCursor, limit]);
   const snapshot = useSyncExternalStore(pages?.subscribe ?? subscribeIdle, pages?.getSnapshot ?? getIdle);
   useEffect(() => { if (!pages) return; void pages.start(); return pages.dispose; }, [pages]);
-  return { ...snapshot, retry: pages?.start ?? inactive, loadMore: pages?.loadMore ?? inactive };
+  return { ...snapshot, retry: pages?.start ?? inactive, loadMore: pages?.loadMore ?? inactive, returnToFirstPage: pages?.returnToFirstPage ?? inactive };
 }

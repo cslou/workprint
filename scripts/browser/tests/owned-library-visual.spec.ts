@@ -1,28 +1,14 @@
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { writeFile } from 'node:fs/promises';
-import { test, expect } from '../material-network.js';
-import { browserOrigin } from '../origin.js';
+import { test, expect } from '../owned-backend.js';
 import { settleCapture } from '../capture.js';
+import { mountOwnedReadReference } from '../owned-read-mount.js';
 import { compare } from '../compare.js';
 import { ownedLibraryReference, type OwnedLibraryState } from '../owned-read-reference.js';
-import type { verifyBuiltAdmission as VerifyBuiltAdmission, BuiltAdmissionTarget } from '../../../apps/api/test/auth-built-fixture.js';
-import type { preparePagedSavedWork as PreparePagedSavedWork, PagedSavedWork } from '../../../apps/api/test/paged-saved-work.js';
+import type { BuiltAdmissionTarget } from '../../../apps/api/test/auth-built-fixture.js';
+import type { PagedSavedWork } from '../../../apps/api/test/paged-saved-work.js';
 
 let target: BuiltAdmissionTarget; let saved: PagedSavedWork;
-let release!: () => void; let backend: Promise<void>;
-const cleanup: (() => void | Promise<void>)[] = [];
-test.beforeAll(async () => {
-  test.setTimeout(120000);
-  const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
-  const { preparePagedSavedWork } = await import(pathToFileURL(resolve('apps/api/.test-build/test/paged-saved-work.js')).href) as { preparePagedSavedWork: typeof PreparePagedSavedWork };
-  const gate = new Promise<void>(resolve => { release = resolve; });
-  let ready!: () => void; let fail!: (error: unknown) => void;
-  const available = new Promise<void>((resolve, reject) => { ready = resolve; fail = reject; });
-  backend = verifyBuiltAdmission({ diagnostic() {}, after(fn) { cleanup.push(fn); } }, async value => { target = value; ready(); await gate; }, { browserOrigin, prepareSavedWork: async setup => { saved = await preparePagedSavedWork(setup); } });
-  void backend.catch(fail); await available;
-});
-test.afterAll(async () => { try { release?.(); await backend; } finally { for (const fn of cleanup.reverse()) await fn(); } });
+test.beforeEach(async ({ ownedSavedWork }) => { target = ownedSavedWork.target; saved = ownedSavedWork.saved; });
 
 for (const width of [1440, 390, 820, 821]) for (const state of ['page', 'loading', 'error', 'complete', 'empty'] as OwnedLibraryState[]) test(`owned Library ${state} approved pagination at ${width}`, async ({ page, context, materialNetwork }, info) => {
   await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
@@ -69,7 +55,7 @@ for (const width of [1440, 390, 820, 821]) for (const state of ['page', 'loading
     const source = await ownedLibraryReference(state);
     const reference = await context.newPage();
     await reference.setViewportSize({ width, height: width === 390 ? 844 : 900 });
-    await reference.setContent(source.html);
+    await mountOwnedReadReference(reference, source);
     if (state !== 'empty') await reference.evaluate(complete => {
       const grid = document.querySelector('.wp-picker-grid');
       const template = grid?.firstElementChild;

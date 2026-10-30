@@ -1,31 +1,16 @@
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { writeFile } from 'node:fs/promises';
-import { test, expect } from '../material-network.js';
-import { browserOrigin } from '../origin.js';
+import { test, expect } from '../owned-backend.js';
 import { settleCapture } from '../capture.js';
+import { mountOwnedReadReference } from '../owned-read-mount.js';
+import { ownedPanelFrame } from '../owned-panel-frame.js';
 import { compare } from '../compare.js';
 import { ownedReadReference, type OwnedReadState } from '../owned-read-reference.js';
-import type { verifyBuiltAdmission as VerifyBuiltAdmission, BuiltAdmissionTarget } from '../../../apps/api/test/auth-built-fixture.js';
-import type { preparePagedSavedWork as PreparePagedSavedWork, PagedSavedWork } from '../../../apps/api/test/paged-saved-work.js';
+import type { BuiltAdmissionTarget } from '../../../apps/api/test/auth-built-fixture.js';
+import type { PagedSavedWork } from '../../../apps/api/test/paged-saved-work.js';
 
 let target: BuiltAdmissionTarget; let saved: PagedSavedWork;
-let release!: () => void; let backend: Promise<void>;
-const cleanup: (() => void | Promise<void>)[] = [];
-test.beforeAll(async () => {
-  test.setTimeout(120000);
-  const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
-  const { preparePagedSavedWork } = await import(pathToFileURL(resolve('apps/api/.test-build/test/paged-saved-work.js')).href) as { preparePagedSavedWork: typeof PreparePagedSavedWork };
-  const gate = new Promise<void>(resolve => { release = resolve; });
-  let ready!: () => void; let fail!: (error: unknown) => void;
-  const available = new Promise<void>((resolve, reject) => { ready = resolve; fail = reject; });
-  backend = verifyBuiltAdmission({ diagnostic() {}, after(fn) { cleanup.push(fn); } }, async value => { target = value; ready(); await gate; }, { browserOrigin, prepareSavedWork: async setup => { saved = await preparePagedSavedWork(setup); } });
-  void backend.catch(fail); await available;
-});
-test.afterAll(async () => { try { release?.(); await backend; } finally { for (const fn of cleanup.reverse()) await fn(); } });
+test.beforeEach(async ({ ownedSavedWork }) => { target = ownedSavedWork.target; saved = ownedSavedWork.saved; });
 
-// Only inert surroundings. No application component, field, overflow or hit-target rule is overridden.
-const framing = '.preview-note{margin:0;padding:12px 20px;font-size:12px;line-height:1.4;color:var(--color-text-secondary);background:var(--color-bg-canvas);border-bottom:1px solid var(--color-border-default)}.preview-note strong{font-weight:600}.preview-note p{margin:4px 0 0}.preview-note a{color:var(--color-text-link)}.preview-stage{padding:24px;display:flex;justify-content:center}.preview-panel{flex:none;width:var(--size-layout-panel);border:1px solid var(--color-border-default)}@media(max-width:820px){.preview-stage{padding:16px 4px}.preview-panel{width:100%}}';
 const main: OwnedReadState[] = ['script-history', 'text-reference-row', 'text-reference-sheet'];
 const feedback: OwnedReadState[] = ['history-loading', 'history-error', 'history-initial-loading', 'history-initial-error', 'history-complete', 'historical-version'];
 for (const width of [1440, 390, 820, 821]) for (const state of [...main, ...(width === 1440 || width === 390 ? feedback : [])]) test(`owned ${state} approved material at ${width}`, async ({ page, context, materialNetwork }, info) => {
@@ -36,15 +21,7 @@ for (const width of [1440, 390, 820, 821]) for (const state of [...main, ...(wid
   allow(`/v1/conversations/${saved.conversationA}/workspace`); allow(`/v1/versions/${saved.current.id}`);
   await page.goto('/saved-work.html');
   await page.waitForFunction(() => !!(window as unknown as { savedWorkTest?: unknown }).savedWorkTest);
-  await page.addStyleTag({ content: framing });
-  await page.evaluate(html => {
-    const root = document.getElementById('root'); if (!root) throw new Error('Actual consumer root missing');
-    const documentSource = new DOMParser().parseFromString(html, 'text/html');
-    const body = document.importNode(documentSource.body, true);
-    document.body.replaceChildren(...body.childNodes);
-    const panel = document.querySelector('.preview-panel'); if (!panel) throw new Error('Approved inert frame missing');
-    panel.replaceChildren(root);
-  }, frame.html);
+  await ownedPanelFrame(page, frame.html);
   await page.evaluate(input => (window as unknown as { savedWorkTest: { configure(input: unknown): void } }).savedWorkTest.configure(input), { apiOrigin: target.origin, token: target.accessTokens[0]!, accountId: saved.accountA, conversationId: saved.conversationA, panelOnly: true });
   await expect(page.getByRole('tabpanel')).toContainText('Ada waits beside the station clock.');
   const historyPath = `/v1/artifacts/${saved.current.artifactId}/versions`;
@@ -84,12 +61,10 @@ for (const width of [1440, 390, 820, 821]) for (const state of [...main, ...(wid
         if (state === 'historical-version') { allow(`/v1/versions/${saved.versions[21]!.id}`); await page.getByRole('button', { name: 'View version 22', exact: true }).click(); await expect(page.getByText('Viewing version 22', { exact: true })).toBeVisible(); }
       }
     }
-    const reference = await context.newPage(); await reference.setViewportSize({ width, height: width === 390 ? 844 : 900 }); await reference.setContent(source.html);
-    // Match the existing approved control's unitless 1.5 line height, not the native button UA default.
-    await reference.addStyleTag({ content: '.preview-panel .wp-tab{line-height:1.5}' });
+    const reference = await context.newPage(); await reference.setViewportSize({ width, height: width === 390 ? 844 : 900 }); await mountOwnedReadReference(reference, source);
     await reference.evaluate(state => {
       if (state.startsWith('text-reference')) {
-        const status = document.querySelector('.wp-status'); if (status) { status.className = 'wp-status wp-status-draft'; status.textContent = 'Draft'; }
+        const status = document.querySelector('.wp-status'); if (status) { status.className = 'status draft wp-status wp-status-draft'; status.textContent = 'Draft'; }
         if (state === 'text-reference-row') { document.querySelector('.wp-asset-row b')!.textContent = 'Ada reference'; document.querySelector('.wp-asset-row small')!.textContent = 'Character reference'; }
         else { document.querySelector('.wp-dialog-head h2')!.textContent = 'Ada reference'; document.querySelector('.wp-reference-sheet header h2')!.textContent = 'Ada reference'; document.querySelector('.wp-reference-sheet header > p:not(.wp-sheet-kicker)')!.textContent = 'A traveller in a green coat.'; const sections = [...document.querySelectorAll('.wp-sheet-section')]; sections[0]!.querySelector('p')!.textContent = 'Keep the green coat.'; sections.find(section => section.querySelector('h3')?.textContent === 'Wardrobe')?.remove(); }
         return;

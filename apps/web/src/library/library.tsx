@@ -22,7 +22,7 @@ export function LibraryFeedback({ state }: { state: LibraryFeedbackState }) {
 }
 
 /** Actual Library read consumer. Material rendering is supplied by its owning view. */
-export function Library({ connection, scope, children }: { connection: BrowserClient; scope: ReadScope | null; children: (library: OperationResponse<'library'>, pagination: ReactNode) => ReactNode }) {
+export function Library({ connection, scope, children }: { connection: BrowserClient; scope: ReadScope | null; children: (library: OperationResponse<'library'>, pagination: ReactNode, windowOffset: number) => ReactNode }) {
   const read = useLibrary(connection.kind === 'configured' ? connection.client : null, scope);
   if (connection.kind !== 'configured') return <LibraryFeedback state="unconfigured" />;
   if (!scope) return <LibraryFeedback state="unauthenticated" />;
@@ -31,5 +31,5 @@ export function Library({ connection, scope, children }: { connection: BrowserCl
     const code = read.result.error.code;
     return <LibraryFeedback state={code === 'unauthenticated' ? 'unauthenticated' : code === 'not_implemented' ? 'unavailable' : 'error'} />;
   }
-  return read.result.value.items.length === 0 ? <LibraryFeedback state="empty" /> : children(read.result.value, <LibraryPagination read={read} />);
+  return read.result.value.items.length === 0 ? <LibraryFeedback state="empty" /> : children(read.result.value, <LibraryPagination read={read} />, read.omittedItems ?? 0);
 }
