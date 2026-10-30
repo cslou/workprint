@@ -1,5 +1,5 @@
 import { MastraClient, type CreateMemoryThreadResponse, type ListMemoryThreadsResponse, type ListMemoryThreadMessagesResponse } from '@mastra/client-js';
-import { errorEnvelopeSchema, errorStatus } from '@workprint/contracts';
+import { readJsonResponse } from './response.js';
 import type { CallOptions, ClientError, ClientResult } from './types.js';
 
 export type NativeThread = CreateMemoryThreadResponse;
@@ -45,20 +45,9 @@ export function createNativeNavigation(config: { baseUrl: string; getAccessToken
         const fetcher: typeof fetch = async (url, init) => {
           controller.signal.throwIfAborted();
           const response = await fetch(url, { ...init, headers: { ...init?.headers, Authorization: `Bearer ${token}` }, signal: controller.signal, redirect: 'error', credentials: 'omit', cache: 'no-store' });
-          const reader = response.body?.getReader(); if (!reader) { error = failed('invalid_response', 'Invalid native response'); throw new Error('Invalid native response'); }
-          let size = 0; const chunks: Uint8Array[] = [];
-          try { for (;;) { const { done, value } = await reader.read(); if (done) break; size += value.byteLength; if (size > 1024 * 1024) { error = failed('invalid_response', 'Invalid native response'); await reader.cancel(); throw new Error('Native response limit'); } chunks.push(value); } }
-          finally { reader.releaseLock(); }
-          const bytes = new Uint8Array(size); let offset = 0; for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-          let value: unknown;
-          try { value = JSON.parse(new TextDecoder().decode(bytes)); }
-          catch { error = failed('invalid_response', 'Invalid native response'); throw new Error('Invalid native response'); }
-          if (!response.ok) {
-            const decoded = errorEnvelopeSchema.safeParse(value);
-            error = decoded.success && errorStatus[decoded.data.error.code] === response.status ? { ok: false, error: decoded.data.error } : failed('invalid_response', 'Invalid native response');
-            throw new Error('Native request failed');
-          }
-          return new Response(bytes, { status: response.status, headers: { 'Content-Type': 'application/json' } });
+          const decoded = await readJsonResponse(response, { invalid: 'Invalid native response' });
+          if (!decoded.ok) { error = decoded; throw new Error('Native request failed'); }
+          return new Response(decoded.value.bytes, { status: response.status, headers: { 'Content-Type': 'application/json' } });
         };
         const client = new MastraClient({ baseUrl: config.baseUrl, apiPrefix: '', retries: 0, credentials: 'omit', fetch: fetcher });
         const result = await perform(client, fetcher);

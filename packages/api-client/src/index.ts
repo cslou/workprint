@@ -1,4 +1,5 @@
-import { applicationError, errorEnvelopeSchema, errorStatus, operations, type OperationName, type OperationRequest, type OperationResponse } from '@workprint/contracts';
+import { applicationError, operations, type OperationName, type OperationRequest, type OperationResponse } from '@workprint/contracts';
+import { readJsonResponse } from './response.js';
 import { createNativeNavigation, type NativeNavigation } from './native.js';
 export type { NativeThread, NativeThreads, NativeMessages, NativeNavigation } from './native.js';
 
@@ -44,31 +45,9 @@ export function createApiClient(config: { baseUrl: string; getAccessToken: () =>
           ...(operation.method !== 'GET' ? { body: JSON.stringify(input.body) } : {}),
           signal: controller.signal, redirect: 'error', credentials: 'omit',
         });
-        const reader = response.body?.getReader();
-        if (!reader) return fail('invalid_response', 'Invalid API response');
-        let size = 0;
-        const chunks: Uint8Array[] = [];
-        try {
-          for (;;) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            size += value.byteLength;
-            if (size > 1024 * 1024) { await reader.cancel(); return fail('invalid_response', 'API response too large'); }
-            chunks.push(value);
-          }
-        } finally { reader.releaseLock(); }
-        const bytes = new Uint8Array(size);
-        let offset = 0;
-        for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-        let payload: unknown;
-        try { payload = JSON.parse(new TextDecoder().decode(bytes)); }
-        catch { return fail('invalid_response', 'Invalid API response'); }
-        if (!response.ok) {
-          const decoded = errorEnvelopeSchema.safeParse(payload);
-          return decoded.success && errorStatus[decoded.data.error.code] === response.status
-            ? { ok: false, error: decoded.data.error } : fail('invalid_response', 'Invalid API error response');
-        }
-        const decoded = operation.response.safeParse(payload);
+        const payload = await readJsonResponse(response, { invalid: 'Invalid API response', tooLarge: 'API response too large', invalidError: 'Invalid API error response' });
+        if (!payload.ok) return payload;
+        const decoded = operation.response.safeParse(payload.value.value);
         return decoded.success ? { ok: true, value: decoded.data as OperationResponse<N> } : fail('invalid_response', 'Invalid API response');
       } catch {
         // Deadline/cancellation races settle through interrupted, never raw error text.
