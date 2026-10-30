@@ -18,6 +18,12 @@ Binding behavior decisions: non-enumerating sign-in/reset feedback; invalid/expi
 
 Preview measurements report 60 captures, no overflow and no external loads; this is design evidence, not functional verification or human acceptance. Implementation must qualify real Auth, keyboard/focus/announcements, 200% reflow and main surfaces at 1440/390/820/821. Visual comparisons use tracked references plus these approved substitutions, never ignored preview inputs.
 
+### Account failure clarification
+
+**Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Five additional inert states were inspected at narrow width and a representative full desktop view in ignored `outputs/verification/sprint-004/pr37-cycle2-previews/r1/`: initial session-check failure, unsaved local account lock, and pending/confirmed/unconfirmed sign-out with unsaved lock. These extend, rather than retroactively claim coverage from, the original 30-state inventory.
+
+Initial validation failure says `Your session couldn’t be checked.` / `Check your connection and sign in again to continue.` with Sign in; same-account transient revalidation instead preserves verified scope/drafts. Unsaved-lock feedback explicitly says access is locked only in this tab and asks the person to close other Workprint tabs, allow browser storage and try again; saved work is unchanged. Pending sign-out still proceeds through the SDK despite failed local persistence. Confirmed sign-out wording requires actual authenticated successful revocation for the bound identity/intent, not a credential-free no-op. Unconfirmed wording persists until genuine confirmation, but a later real authenticated success may clear it. Try again retries only the incomplete local fence; Try sign-out again retries safely bound SDK/local steps. Neither may replay password updates, commands or affect a newer account. No reload shortcut or automatic tab closure. Existing modal, neutral copy and control styles remain unchanged; runtime, privacy and tracked-reference comparisons are still required.
+
 ## Overview
 
 **Section 01** · **Status:** Approved

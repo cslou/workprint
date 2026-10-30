@@ -1,5 +1,9 @@
 # Workprint — Application Design History
 
+## Account failure clarification — 2026-10-30
+
+**Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Five additional session-check/storage-lock/sign-out feedback states extend the original account inventory. Distinguish this-tab lock from persisted fencing and authenticated revocation from credential-free no-op; retry never affects a newer account or replays a mutation. See [binding clarification](design.md#account-failure-clarification). This corrects the earlier implementation’s unsupported assumption that startup-failed was already approved; implementation evidence remains subject to independent review.
+
 ## Account and session flows — 2026-10-30
 
 **Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** The 30 inert account/recovery/session states reuse existing dialogs, with labelled 44px Auth fields, neutral feedback, non-enumerating reset messages and explicit uncertain-update handling. Recovery is quarantined; sign-out/expiry fence old scope without deleting saved data or replaying commands. See [binding decisions](design.md#phase-3-account-and-session-flows). Preview inspection is not implemented behavior or Lou’s ratification.
