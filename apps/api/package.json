@@ -6,6 +6,7 @@
     "@hono/node-server": "1.19.17",
     "@mastra/core": "1.79.0",
     "@mastra/hono": "1.7.21",
+    "@mastra/memory": "1.39.0",
     "@mastra/pg": "1.32.0",
     "@workprint/contracts": "workspace:*",
     "hono": "4.13.14",

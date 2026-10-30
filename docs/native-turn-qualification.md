@@ -1,0 +1,29 @@
+# Native turn transport qualification — checkpoint
+
+Sprint 004 Story 4 is transport-only: browser Send and normal application inference remain disabled. No live provider, creative tools/skills, usage tables or application persistence schema is enabled. This document records controlled observations, not story acceptance or completed transport qualification.
+
+## Compatible Memory dependency
+
+At Story 4 start, the pinned core/server 1.79.0 and pg 1.32.0 cohort had no concrete native Memory implementation installed. `@mastra/memory` **1.39.0** is pinned to use the supported native Agent persistence implementation rather than implement a competing memory/store. Its registry peer range admits core 1.79.0 and its schema-compat dependency is the already qualified 1.3.16. Memory 1.39.1 requires core >=1.80 and was not selected. No release-age exception, override, core upgrade or live provider credential was introduced. Dependency audit remains NON-PASS only for approved B-004 (`GHSA-rmxm-3fg6-px4f`, moderate `@hono/node-server`).
+
+The controlled probe disables semantic recall, vectors, working/observational memory and title generation. It uses the existing restricted backend storage, one Mastra instance and the app-owned server entry. The provider and control route are generated only inside a separately built temporary test composition; neither is a production build input or an environment-selected implementation.
+
+## Actual native observations before adapters
+
+Local redacted evidence: `/tmp/workprint-sprint-004/native-turn-transport/`. The probe uses actual isolated GoTrue/Auth and native PostgreSQL, two synthetic accounts, the supported conversation fixture, public `mastra.addAgent`, official client-js 1.56.0 and the native Hono routes. No custom stream framing/parser was written.
+
+- `Agent.stream` returned HTTP 200 `text/event-stream`. The official `processDataStream` callback observed native `start`, `step-start`, `text-start`, `text-delta`, `text-end`, `step-finish` and `finish` parts.
+- Native `start.runId` identifies execution; `start.payload.messageId` / final message identity matched the assistant ID subsequently read from native Postgres. User/assistant text, native message IDs, thread/resource IDs and chronology were observed directly. Native `sendMessage` returned `{accepted:true, runId, signal:{id,type,contents,...}}`.
+- A supported durable Agent with `shouldPersistSnapshot` configured yielded matching native `durable-agentic-execution` / `durable-agentic-loop` run IDs and successful snapshots immediately after normal completion. A later 250 ms read did not retain those rows; stable terminal run-identity retention is **not yet qualified**. Do not invent a replacement turn ledger or claim that transient snapshots prove durable reload.
+- A controlled 2.5-second provider wait completed in roughly 2.7 seconds and saved both messages in full through the built HTTP server. This is a probe showing execution can outlast the two-second body-intake deadline, not the final permanent boundary test.
+- Native `TokenLimiterProcessor({limit:64,strategy:'abort'})` allowed 64 single-character text-delta contributions and saved the full assistant response. A 65th contribution emitted a native `tripwire` after 64 visible characters and saved only the user message. This probes the native estimated-token control; it is not a universal provider-token or byte-cap claim. An immediate over-cap workflow snapshot remained `running`, so terminal settlement/release still needs qualification.
+- Raw provider failure produced a native error part and `finish.stepResult.reason:'error'`. Persistence retained an assistant **error part**, not a normal empty text completion; flattening it to text would lose that evidence. The existing read-only text navigation projection correctly does not treat unsupported parts as successful text history.
+- A provider that closed without its terminal parts was normalized by the unguarded native path into `reason:'stop'` and saved assistant text. This is a genuine integrity hazard. A supported `processLLMResponse` processor checking the observed native `step-finish` / stop outcome emitted a native tripwire and prevented that incomplete assistant from being saved. The guard remains probe-only until permanent tests qualify it with all failure/boundary cases.
+
+Initial 404 probes were integration/setup failures: Mastra executes custom wildcard routes inside a nested router, so `next()` there does not fall through to outer native routes. They are retained, not called successful transport or functional reds. The working admission seam uses an explicit trusted native catalog with the existing pre-Mastra Auth/CORS/body guards; compositions with that catalog cannot retain a terminal custom wildcard. Default production composition remains closed and has no native Agent/provider.
+
+## Remaining work
+
+Implement the owned Agent binding and unavailable-by-default capability, narrow verified-account/owned-thread admission before provider work, finite send/stream/execution/output controls, and a bounded api-client facade over the official native transport. Convert probes to persistent separately built controlled-provider tests; independently qualify native client and api-client with both accounts, exact identities/reload, error/incomplete/cap/deadline outcomes and resource cleanup. Investigate supported terminal native identity retention before making a durable-turn claim; an essential unsupported contract blocks dependent work rather than authorizing a store or scheduler.
+
+Production exclusion, no-effect browser Send, all 19 application contracts and existing ownership/Auth/ingress/CORS/privacy/client regressions must pass. Full ordered clean-head verification, unchanged visual/artifact proof, PR delivery and independent review remain unrun/pending for Story 4. No planning record, next story or merge is part of this checkpoint.
