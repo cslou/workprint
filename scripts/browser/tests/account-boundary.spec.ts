@@ -202,16 +202,25 @@ for (const same of [false, true]) test(`suspended recovery cannot update a newer
   } finally { if (frozen) await cdp.send('Page.setWebLifecycleState', { state: 'active' }); await cdp.detach(); await f.close(); }
 });
 
+test('failed initial session validation offers the approved fresh sign-in action', async ({ page, materialNetwork }) => {
+  test.setTimeout(45000); const f = await fixture(page);
+  try {
+    const user = await f.auth.createAccount(); await page.goto(origin); await account(page); login(materialNetwork, f.auth.url); await signIn(page, user.email, user.password); await expect(page.getByRole('dialog')).toBeHidden();
+    await page.route(f.auth.url + '/auth/v1/user', route => route.fulfill({ status: 503, json: { message: 'Controlled initial validation outage' } }));
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
+    await page.reload(); await account(page); await expect(page.getByRole('dialog')).toContainText('Your session couldn’t be checked.');
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click(); await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
+    await page.unroute(f.auth.url + '/auth/v1/user'); login(materialNetwork, f.auth.url); await signIn(page, user.email, user.password); await expect(page.getByRole('button', { name: user.email, exact: true })).toBeVisible();
+  } finally { await f.close(); }
+});
+
 test('actual session_not_found restoration cannot remove a newer SDK session', async ({ page, context, materialNetwork }) => {
   test.setTimeout(60000); const f = await fixture(page, true); let release: (() => void) | undefined;
   try {
     const old = await f.auth.createAccount(), newer = await f.auth.createAccount(); await f.application!.saveNative(old.id); const saved = await f.application!.snapshot();
     await page.goto(origin); await account(page); login(materialNetwork, f.auth.url); await signIn(page, old.email, old.password); await expect(page.getByRole('dialog')).toBeHidden();
-    // A failed startup check exposes the approved fresh-sign-in action without a cleanup logout.
-    await page.route(f.auth.url + '/auth/v1/user', route => route.fulfill({ status: 503, json: { message: 'Controlled initial validation outage' } }));
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
-    await page.reload(); await account(page); await expect(page.getByRole('dialog')).toContainText('Your session couldn’t be checked.');
-    await page.unroute(f.auth.url + '/auth/v1/user');
+    // An ordinary same-account initialization broadcast cannot replace this verified account UI.
+    await account(page, old.email);
     const waiting = await context.newPage(); let held = false; let finished!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; }), settled = new Promise<void>(resolve => { finished = resolve; });
     await waiting.route(f.auth.url + '/auth/v1/user', async route => {
@@ -226,12 +235,16 @@ test('actual session_not_found restoration cannot remove a newer SDK session', a
       } finally { finished(); }
     });
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 }); await waiting.goto(origin); await expect.poll(() => held).toBe(true);
-    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-    await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
-    login(materialNetwork, f.auth.url); await signIn(page, newer.email, newer.password); await expect(page.getByRole('button', { name: newer.email, exact: true })).toBeVisible();
-    release!(); await settled; await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
-    await expect(page.getByRole('button', { name: newer.email, exact: true })).toBeVisible();
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 }); await page.reload(); await expect(page.getByRole('button', { name: newer.email, exact: true })).toBeVisible();
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/logout', query: { scope: 'local' }, count: 1 });
+    await page.getByRole('button', { name: 'Switch account', exact: true }).click();
+    // The exact old session was revoked above, so its SDK logout cannot claim authenticated success.
+    await expect(page.getByRole('button', { name: 'Try sign-out again', exact: true })).toBeEnabled();
+    const fresh = await context.newPage(); await fresh.goto(origin); await account(fresh);
+    login(materialNetwork, f.auth.url); await signIn(fresh, newer.email, newer.password); await expect(fresh.getByRole('button', { name: newer.email, exact: true })).toBeVisible();
+    release!(); await settled;
+    await expect.poll(() => waiting.evaluate(async () => (await navigator.locks.query()).held?.some(lock => lock.name === 'workprint.auth-change') ?? false)).toBe(false);
+    await expect(fresh.getByRole('button', { name: newer.email, exact: true })).toBeVisible();
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 }); await fresh.reload(); await expect(fresh.getByRole('button', { name: newer.email, exact: true })).toBeVisible();
     expect(await f.application!.snapshot() === saved).toBe(true);
   } finally { release?.(); await f.close(); }
 });
