@@ -23,10 +23,10 @@ test('actual file chooser saves an image and a video poster with credential-free
     context.on('request',request=>{if(new URL(request.url()).origin!==service.endpoint)return;const row:Transport={method:request.method(),headersReady:false,bearer:false,cookie:false,responses:0,failures:0};observed.push(row);byRequest.set(request,row);headers.push(request.allHeaders().then(h=>{row.headersReady=true;row.bearer=Object.hasOwn(h,'authorization');row.cookie=Object.hasOwn(h,'cookie');}));});
     context.on('response',response=>{const row=byRequest.get(response.request());if(row){row.responses++;row.status=response.status();row.cors=response.headers()['access-control-allow-origin']??null;}});
     context.on('requestfailed',request=>{const row=byRequest.get(request);if(row){row.failures++;const failure=request.failure()?.errorText??'';row.failure=/^net::[A-Z_]+$/.test(failure)?failure:'redacted failure';}});
-    let lastUpload='',mode:'normal'|'lost'|'held'='normal',held!:()=>void,release!:()=>void,gate:Promise<void>=Promise.resolve();let lostVersion='';
+    let lastUpload='',mode:'normal'|'lost'|'held'='normal',held!:()=>void,release!:()=>void,gate:Promise<void>=Promise.resolve();let lostVersion='';const pinned:{image?:string;video?:string}={};
     const heldConfirmation=()=>{mode='held';gate=new Promise<void>(r=>{release=r;});return new Promise<void>(r=>{held=r;});};
     await page.route(url=>url.origin===target.origin && url.pathname.endsWith('/uploads'),async route=>{const response=await route.fetch(),grant=await response.json() as OperationResponse<'requestUpload'>;lastUpload=grant.uploadId;materialNetwork.expectObjectTransfer(grant.url);materialNetwork.expectOperations({origin:target.origin,method:'POST',path:`/v1/uploads/${grant.uploadId}/confirm`,query:{},count:1});await route.fulfill({response});});
-    await page.route(url=>url.origin===target.origin && url.pathname.endsWith('/confirm'),async route=>{const response=await route.fetch(),saved=await response.json() as OperationResponse<'confirmUpload'>;expect(response.status()).toBe(200);
+    await page.route(url=>url.origin===target.origin && url.pathname.endsWith('/confirm'),async route=>{const response=await route.fetch(),saved=await response.json() as OperationResponse<'confirmUpload'>;expect(response.status()).toBe(200);if((saved.version.kind==='image'||saved.version.kind==='video')&&!pinned[saved.version.kind])pinned[saved.version.kind]=saved.version.id;
       if(mode==='lost'){mode='normal';lostVersion=saved.version.id;await route.abort('failed');return;}
       if(mode==='held'){mode='normal';held();await gate;try{await route.fulfill({response});}catch(error){if(!route.request().failure())throw error;}return;}
       if(lostVersion){expect(saved.version.id).toBe(lostVersion);lostVersion='';}
@@ -44,8 +44,16 @@ test('actual file chooser saves an image and a video poster with credential-free
     const atLate=heldConfirmation();await selectImage('late-scope.png');await atLate;
     await page.evaluate(input=>(window as unknown as {uploadsTest:{configure(input:unknown):void}}).uploadsTest.configure(input),{apiOrigin:target.origin,token:target.accessTokens[1]!,accountId:otherAccount,conversationId:otherConversation});
     await expect(page.getByRole('heading',{name:'Upload closed after scope change'})).toBeVisible();release();await expect(page.getByRole('region',{name:'Upload status'})).not.toContainText('late-scope.png');await expect(page.getByRole('img')).toHaveCount(0);
+    // Reload reads real persisted uses; no upload/controller state or seeded media verdict survives.
+    await page.goto('/saved-work.html');await page.waitForFunction(()=>!!(window as unknown as {savedWorkTest:unknown}).savedWorkTest);
+    materialNetwork.expectOperations({origin:target.origin,method:'GET',path:`/v1/conversations/${conversation}/workspace`,query:{},count:1},{origin:target.origin,method:'GET',path:`/v1/conversations/${conversation}/generation-requests`,query:{},count:1});
+    const unavailableStatus=page.waitForResponse(response=>new URL(response.url()).pathname===`/v1/conversations/${conversation}/generation-requests`);
+    await page.evaluate(input=>(window as unknown as {savedWorkTest:{configure(input:unknown):void}}).savedWorkTest.configure(input),{apiOrigin:target.origin,token:target.accessTokens[0]!,accountId:account,conversationId:conversation});
+    const status=await unavailableStatus;expect(status.status()).toBe(501);expect((await status.json() as {error:{code:string}}).error.code).toBe('not_implemented');
+    await page.getByRole('tab',{name:'Assets',exact:true}).click();
+    for(const kind of ['image','video'] as const){const id=pinned[kind];expect(id).toBeTruthy();const row=page.locator(`.wp-asset-row[data-media-version-id="${id}"]`);await expect(row).toBeVisible();materialNetwork.expectOperations({origin:target.origin,method:'GET',path:`/v1/versions/${id}/media`,query:{},count:1});await row.click();const dialog=page.getByRole('dialog');await expect(dialog.locator(`[data-media-version-id="${id}"]`)).toBeVisible();await expect(dialog.getByRole('img',{name:kind==='video'?'Saved video poster':'Saved image',exact:true})).toBeVisible();await expect(dialog.getByRole('button',{name:/Approve|Choose|Use this/})).toHaveCount(0);await dialog.getByRole('button',{name:'Close',exact:true}).last().click();}
     await Promise.all(headers);const evidence=test.info().outputPath('redacted-private-request-results.json');await writeFile(evidence,JSON.stringify(observed,null,2));await test.info().attach('redacted-private-request-results',{path:evidence,contentType:'application/json'});
-    expect(observed.map(v=>v.method)).toEqual(['PUT','GET','PUT','GET','PUT','GET','PUT','GET','PUT']);
+    expect(observed.map(v=>v.method)).toEqual(['PUT','GET','PUT','GET','PUT','GET','PUT','GET','PUT','GET','GET']);
     expect(observed.every(v=>v.headersReady&&!v.bearer&&!v.cookie)).toBe(true);
     expect(observed.every(v=>v.responses===1&&v.status===200&&v.cors===browserOrigin)).toBe(true);
     // Cancelling the unused PUT response body can emit requestfailed after HTTP200.

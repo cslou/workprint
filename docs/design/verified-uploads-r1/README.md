@@ -12,6 +12,9 @@ These independently authored inert HTML/CSS/SVG sources were promoted from the a
 - [Unsupported variant](rejected-format.html), [size rejection](rejected-size.html), [damaged/type mismatch](rejected-damaged.html)
 - [Exact-version image loading](image-loading.html), [image failure](image-error.html), [poster access expiry](poster-expired.html)
 - [Generic scope clearing](scope-cleared.html)
+- Existing image-viewer placement: [persisted image](persisted-image.html), [persisted poster](persisted-poster.html)
+
+The persisted placements compose the approved receipt unchanged inside the existing image ViewerDialog primitive (560px maximum,24px overlay padding,16px inner padding and existing header Close). They do not create another modal design or decision workflow. The actual Assets entry reads the use-pinned exact version; it exposes no approval, reuse, Shot choice or playback controls. Main-context reference assembly uses the frozen r73 shell plus these tracked sources, never an application DOM snapshot.
 
 ## Comparison contract still to execute
 
