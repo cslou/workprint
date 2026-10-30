@@ -87,16 +87,19 @@ test('clean tracked export installs frozen, prepares, builds and serves built/de
       assert.equal(browser.status, 200);
       const module = await browser.text();
       if (mode === 'dev') {
-        assert.match(module, /import \{ Shell \} from ["']\/src\/shell\/shell\.tsx["']/, 'The served entry imports the production shell');
+        assert.match(module, /import \{ OwnedShell \} from ["']\/src\/shell\/owned-shell\.tsx["']/, 'The served entry imports the owned production composition');
+        const composition = await (await server.response(`http://127.0.0.1:${webPort}/src/shell/owned-shell.tsx`)).text();
+        assert.match(composition, /import \{ Shell \} from ["']\/src\/shell\/shell\.tsx["']/, 'The composition imports the production shell');
+        assert.match(composition, /useNativeNavigation/, 'The production composition wires owned navigation');
         const shell = await fetch(`http://127.0.0.1:${webPort}/src/shell/shell.tsx`, { signal: AbortSignal.timeout(2000) });
         assert.equal(shell.status, 200);
         assert.match(await shell.text(), /Workprint/, 'The imported production shell contains the application identity');
       } else assert.match(module, /Workprint/);
       if (mode === 'start') {
-        for (const path of ['/?context=viewer', '/test/index.html', '/test/mount.tsx', '/test/library.html', '/test/library-mount.tsx', '/shell.html', '/test/shell.html', '/test/shell-mount.tsx']) {
+        for (const path of ['/?context=viewer', '/test/index.html', '/test/mount.tsx', '/test/library.html', '/test/library-mount.tsx', '/shell.html', '/test/shell.html', '/test/shell-mount.tsx', '/navigation-visual.html', '/test/navigation-visual.html', '/test/navigation-visual-mount.tsx', '/navigation-references/history-loaded.html', '/test/navigation-reference/history-loaded.html']) {
           const response = await fetch(`http://127.0.0.1:${webPort}${path}`, { signal: AbortSignal.timeout(2000) });
           const text = await response.text();
-          assert.doesNotMatch(text, /Isolated UI verification|Isolated Library|Isolated shell|Read-only details|mount\.tsx|libraryTest|shellTest/, 'Built serving cannot select test mounts');
+          assert.doesNotMatch(text, /Isolated UI verification|Isolated Library|Isolated shell|Read-only details|mount\.tsx|libraryTest|shellTest|navigationVisual|navigation-reference|Presentation-only native navigation examples/, 'Built serving cannot select test mounts');
         }
       }
     } finally { await server.stop(); }
@@ -112,7 +115,7 @@ test('clean tracked export installs frozen, prepares, builds and serves built/de
       // This checks generated assets/logs for escaped credentials, not source snapshots.
       const contents = await readFile(file);
       assert.ok(!contents.includes(sentinel), `Secret escaped into ${file}`);
-      if (file.startsWith(join(checkout, 'apps/web/dist'))) assert.doesNotMatch(contents.toString(), /Isolated UI verification|Isolated Library|Isolated shell|Read-only details|test\/mount|references\/flow|libraryTest|shellTest/, 'Test compositions are absent from browser artifacts');
+      if (file.startsWith(join(checkout, 'apps/web/dist'))) assert.doesNotMatch(contents.toString(), /Isolated UI verification|Isolated Library|Isolated shell|Read-only details|test\/mount|references\/flow|libraryTest|shellTest|navigationVisual|navigation-reference|Presentation-only native navigation examples/, 'Test compositions are absent from browser artifacts');
     }
   }
   await fixture.noNetwork();

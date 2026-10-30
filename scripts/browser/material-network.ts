@@ -27,7 +27,7 @@ export const test = base.extend<{ materialNetwork: MaterialNetwork }>({
       }
       const entry = { method: request.method(), url, body };
       entries.push(entry);
-      if (entry.url.pathname.startsWith('/v1/') || auth && entry.method !== 'OPTIONS' || !['GET', 'HEAD', 'OPTIONS'].includes(entry.method)) {
+      if ((entry.url.pathname.startsWith('/v1/') || entry.url.pathname.startsWith('/memory/')) || auth && entry.method !== 'OPTIONS' || !['GET', 'HEAD', 'OPTIONS'].includes(entry.method)) {
         const allowance = allowances.find(value => !value.consumed && value.method === entry.method && value.origin === entry.url.origin && value.path === entry.url.pathname && value.query === queryKey(entry.url.searchParams.entries()));
         if (allowance) {
           allowance.consumed = true;

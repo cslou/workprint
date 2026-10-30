@@ -6,13 +6,14 @@ import type { MastraDBMessage } from '@mastra/core/agent';
 export async function createNativeConversation(
   store: Pick<MastraCompositeStore, 'getStore'>,
   accountId: string,
-  messages: readonly { role: 'user' | 'assistant'; text: string }[] = [],
+  messages: readonly { role: MastraDBMessage['role']; text: string }[] = [],
+  title = 'Synthetic test conversation',
 ) {
   const memory = await store.getStore('memory');
   if (!memory) throw new Error('Native memory storage is required for this fixture');
   const now = new Date();
   const thread = await memory.saveThread({ thread: {
-    id: randomUUID(), resourceId: accountId, title: 'Synthetic test conversation',
+    id: randomUUID(), resourceId: accountId, title,
     metadata: {}, createdAt: now, updatedAt: now,
   } });
   if (messages.length) {

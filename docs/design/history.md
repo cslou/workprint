@@ -1,5 +1,9 @@
 # Workprint — Application Design History
 
+## Owned conversation navigation and history — 2026-10-30
+
+**Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Twenty-nine inert navigation/history states reuse shell, dialogs and message styles. Explicit Previous/Next Recents, read-only earlier history and uncertain-create feedback avoid automatic mutation replay or invented workspace persistence. All narrow sheets were inspected; [binding decisions](design.md#owned-conversation-navigation-and-history) retain runtime, keyboard, visual and human-ratification gates. Send stays unavailable.
+
 ## Account failure clarification — 2026-10-30
 
 **Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Five additional session-check/storage-lock/sign-out feedback states extend the original account inventory. Distinguish this-tab lock from persisted fencing and authenticated revocation from credential-free no-op; retry never affects a newer account or replays a mutation. See [binding clarification](design.md#account-failure-clarification). This corrects the earlier implementation’s unsupported assumption that startup-failed was already approved; implementation evidence remains subject to independent review.
