@@ -80,6 +80,11 @@ test('transactional writers enforce separate producer capabilities, immutable co
     const referenceSaved = await writers.human.save('writer-a', a.id, { operationId: randomUUID(), artifactId: reference.artifactId, baseVersionId: reference.id, kind: 'reference', content: referenceContent, dependencies: [], intendedUse: { purpose: 'reference', role: 'ada' } });
     assert.equal(referenceSaved.use?.state, 'approved');
     assert.ok('content' in referenceSaved.version); assert.deepEqual(referenceSaved.version.content, referenceContent);
+    const ambiguous = await store.insert({ accountId: 'writer-a', conversationId: a.id, kind: 'reference', createdBy: 'human', dependencies: [], content: referenceContent, use: { binding: { purpose: 'reference', role: 'ambiguous' }, state: 'draft' } });
+    const ambiguousLatest = await store.insert({ accountId: 'writer-a', conversationId: a.id, artifactId: ambiguous.artifactId, kind: 'reference', createdBy: 'human', dependencies: [], content: referenceContent, use: { binding: { purpose: 'reference', role: 'ambiguous' }, state: 'draft' } });
+    const beforeAmbiguous = await fingerprint();
+    await assert.rejects(writers.human.save('writer-a', a.id, { operationId: randomUUID(), artifactId: ambiguous.artifactId, baseVersionId: ambiguousLatest.id, kind: 'reference', content: referenceContent, dependencies: [], intendedUse: { purpose: 'reference', role: 'ambiguous' } }), { code: 'invalid_input' }, 'An ambiguous binding must not move an arbitrary exact reference use');
+    assert.deepEqual(await fingerprint(), beforeAmbiguous, 'Ambiguity changes no version, use, publication, journal or command');
     const planContent = { schemaVersion: 1, sourceScriptVersionId: first.id, shots: [
       { shotId: 's1', order: 0, intent: 'Ada waits.', panels: [{ panelId: 'p1', order: 0, description: 'Ada beneath the clock.', references: [referenceSaved.version.id] }] },
       { shotId: 's2', order: 1, intent: 'A train arrives.', panels: [{ panelId: 'p2', order: 0, description: 'The train reaches the platform.', references: [] }] },

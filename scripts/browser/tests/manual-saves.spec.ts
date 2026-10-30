@@ -135,22 +135,27 @@ for (const width of [1440, 390]) test(`manual Script edit saves and reloads exac
       const cancelled = await currentVersion(); expect(cancelled.revision).toBe(7); await loadCurrent(cancelled.id);
       await expect(page.getByRole('tabpanel')).toContainText('Committed before an unknown-outcome Cancel.');
 
-      // The server may commit while a disconnected observer's account/conversation scope disappears.
-      await page.getByRole('button', { name: 'Edit What happens', exact: true }).click(); await editor.fill('Committed while the original scope closes.');
-      let release!: () => void, held!: () => void, settled!: () => void;
-      const gate = new Promise<void>(done => { release = done; }), reached = new Promise<void>(done => { held = done; }), completed = new Promise<void>(done => { settled = done; });
-      await page.route(url => url.pathname === savePath, async route => { const response = await route.fetch(); expect(response.status()).toBe(200); held(); await gate; await route.fulfill({ response }); settled(); }, { times: 1 });
-      allow('POST', savePath);
-      await page.getByRole('button', { name: 'Save', exact: true }).click(); await reached;
-      await expect(editor).toHaveJSProperty('readOnly', true);
-      allow('GET', `/v1/conversations/${saved.otherConversationId}/workspace`);
-      await page.evaluate(input => (window as unknown as { savedWorkTest: { configure(input: unknown): void } }).savedWorkTest.configure(input), { ...configure, conversationId: saved.otherConversationId });
-      await expect(page.getByRole('tabpanel')).toContainText('Your script will appear here');
-      release(); await completed; await page.evaluate(() => new Promise<void>(done => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
-      await expect(page.getByRole('textbox')).toHaveCount(0); await expect(page.getByText('Committed while the original scope closes.', { exact: true })).toHaveCount(0);
-      const late = await currentVersion(); expect(late.revision).toBe(8); await loadCurrent(late.id);
+      // Prove each scope boundary independently against a committed, delayed real response.
+      for (const [index, dimension] of ['conversation', 'account'].entries()) {
+        const text = `Committed while the original ${dimension} closes.`;
+        await page.getByRole('button', { name: 'Edit What happens', exact: true }).click(); await editor.fill(text);
+        let release!: () => void, held!: () => void, settled!: () => void;
+        const gate = new Promise<void>(done => { release = done; }), reached = new Promise<void>(done => { held = done; }), completed = new Promise<void>(done => { settled = done; });
+        await page.route(url => url.pathname === savePath, async route => { const response = await route.fetch(); expect(response.status()).toBe(200); held(); await gate; await route.fulfill({ response }); settled(); }, { times: 1 });
+        allow('POST', savePath);
+        await page.getByRole('button', { name: 'Save', exact: true }).click(); await reached;
+        await expect(editor).toHaveJSProperty('readOnly', true);
+        const next = dimension === 'conversation' ? { ...configure, conversationId: saved.otherConversationId } : { ...configure, accountId: saved.foreignAccountId, token: target.accessTokens[1]! };
+        allow('GET', `/v1/conversations/${next.conversationId}/workspace`);
+        await page.evaluate(input => (window as unknown as { savedWorkTest: { configure(input: unknown): void } }).savedWorkTest.configure(input), next);
+        if (dimension === 'conversation') await expect(page.getByRole('tabpanel')).toContainText('Your script will appear here');
+        else await expect(page.getByRole('tabpanel').getByRole('status')).toBeVisible();
+        release(); await completed; await page.evaluate(() => new Promise<void>(done => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+        await expect(page.getByRole('textbox')).toHaveCount(0); await expect(page.getByText(text, { exact: true })).toHaveCount(0);
+        const late = await currentVersion(); expect(late.revision).toBe(8 + index); await loadCurrent(late.id);
+      }
 
-      await publishManualScriptDraft(servingUrl, saved, late);
+      await publishManualScriptDraft(servingUrl, saved, await currentVersion());
       await page.getByRole('button', { name: 'Edit What happens', exact: true }).click(); await editor.fill('Never flatten my retained input.');
       allow('POST', savePath); await page.getByRole('button', { name: 'Save', exact: true }).click();
       await expect(page.getByRole('status')).toContainText('A newer version was saved.');
@@ -183,8 +188,8 @@ for (const width of [1440, 390]) test(`manual Script edit saves and reloads exac
     }, {
       browserOrigin, prepareSavedWork: async setup => { if (!setup.setupUrl) throw new Error('Owned rollback setup is required'); setupUrl = setup.setupUrl; servingUrl = setup.servingUrl; saved = await prepareManualSavedWork(setup); },
       verifySavedEffects: async servingUrl => {
-        expect((await query(servingUrl, 'SELECT (SELECT count(*)::int FROM artifacts.versions) AS versions,(SELECT count(*)::int FROM artifacts.commands) AS commands,(SELECT count(*)::int FROM artifacts.manual_changes) AS changes')).rows).toEqual([{ versions: 13, commands: 10, changes: 9 }]);
-        expect((await query(servingUrl, 'SELECT v.kind,v.revision,u.state FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.owner_id AND v.version_id=u.version_id ORDER BY v.kind')).rows).toEqual([{ kind: 'reference', revision: 2, state: 'approved' }, { kind: 'script', revision: 8, state: 'approved' }, { kind: 'storyboard', revision: 2, state: 'approved' }]);
+        expect((await query(servingUrl, 'SELECT (SELECT count(*)::int FROM artifacts.versions) AS versions,(SELECT count(*)::int FROM artifacts.commands) AS commands,(SELECT count(*)::int FROM artifacts.manual_changes) AS changes')).rows).toEqual([{ versions: 14, commands: 11, changes: 10 }]);
+        expect((await query(servingUrl, 'SELECT v.kind,v.revision,u.state FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.owner_id AND v.version_id=u.version_id ORDER BY v.kind')).rows).toEqual([{ kind: 'reference', revision: 2, state: 'approved' }, { kind: 'script', revision: 9, state: 'approved' }, { kind: 'storyboard', revision: 2, state: 'approved' }]);
       },
     });
   } finally { for (const fn of cleanup.reverse()) await fn(); }

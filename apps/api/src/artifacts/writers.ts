@@ -54,8 +54,10 @@ export function createArtifactWriters(pool: Pool, checkOwnedConversation: OwnedC
       if (producer === 'human') assertManualTextChange(base, content, body.dependencies);
       let intended: { use_id: string; version_id: string } | undefined;
       if (body.intendedUse) {
-        intended = (await pool.query<{ use_id: string; version_id: string }>(`SELECT u.use_id,u.version_id FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.owner_id AND v.version_id=u.version_id
-          WHERE u.owner_id=$1 AND u.conversation_id=$2 AND u.binding=$3::jsonb AND v.artifact_id=$4`, [account, conversation, body.intendedUse, body.artifactId])).rows[0];
+        const matches = (await pool.query<{ use_id: string; version_id: string }>(`SELECT u.use_id,u.version_id FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.owner_id AND v.version_id=u.version_id
+          WHERE u.owner_id=$1 AND u.conversation_id=$2 AND u.binding=$3::jsonb AND v.artifact_id=$4 LIMIT 2`, [account, conversation, body.intendedUse, body.artifactId])).rows;
+        if (matches.length > 1) throw new ArtifactError('invalid_input');
+        intended = matches[0];
         if (!intended) throw new ArtifactError('not_found');
         const used = await reads.version(account, intended.version_id);
         // Promoting a structural planning draft would bypass later selection-revision rules.
@@ -71,8 +73,10 @@ export function createArtifactWriters(pool: Pool, checkOwnedConversation: OwnedC
         let previousUseVersion: string | null = null;
         if (body.intendedUse) {
           // Save only moves the exact existing use of this artifact, not a new association.
-          const current = (await client.query<{ use_id: string; version_id: string }>(`SELECT u.use_id,u.version_id FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.owner_id AND v.version_id=u.version_id
-            WHERE u.owner_id=$1 AND u.conversation_id=$2 AND u.binding=$3::jsonb AND v.artifact_id=$4 FOR UPDATE OF u`, [account, conversation, body.intendedUse, body.artifactId])).rows[0];
+          const matches = (await client.query<{ use_id: string; version_id: string }>(`SELECT u.use_id,u.version_id FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.owner_id AND v.version_id=u.version_id
+            WHERE u.owner_id=$1 AND u.conversation_id=$2 AND u.binding=$3::jsonb AND v.artifact_id=$4 LIMIT 2 FOR UPDATE OF u`, [account, conversation, body.intendedUse, body.artifactId])).rows;
+          if (matches.length > 1) throw new ArtifactError('invalid_input');
+          const current = matches[0];
           if (!current) throw new ArtifactError('not_found');
           if (current.use_id !== intended?.use_id || current.version_id !== intended.version_id) throw new ArtifactError('stale_revision');
           previousUseVersion = current.version_id;
