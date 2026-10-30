@@ -31,7 +31,7 @@ test('default dev and production build expose no interchangeable test compositio
   const fixture = await environment();
   const web = resolve('apps/web');
   const output = join(fixture.logs, 'browser-dist');
-  const env = { ...fixture.env, WORKPRINT_AUTH_PROBE: '1', WORKPRINT_QUALIFICATION: '1' };
+  const env = { ...fixture.env, WORKPRINT_AUTH_PROBE: '1', WORKPRINT_QUALIFICATION: '1', S3_ACCESS_KEY_ID: 'private-storage-build-sentinel-access', S3_SECRET_ACCESS_KEY: 'private-storage-build-sentinel-secret' };
   const inputsFile = join(fixture.logs, 'build-inputs.json');
   // Recording only: use the default production config without changing resolution or output.
   await processes.command(process.execPath, ['--input-type=module', '-e', `
@@ -65,6 +65,7 @@ test('default dev and production build expose no interchangeable test compositio
   const artifacts = (await readdir(output, { recursive: true, withFileTypes: true })).filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name));
   const emitted = await Promise.all(artifacts.map(async file => ({ file, bytes: await readFile(file) })));
   const bytes = emitted.map(asset => asset.bytes);
+  expect(bytes.some(asset => asset.includes(env.S3_ACCESS_KEY_ID) || asset.includes(env.S3_SECRET_ACCESS_KEY)), 'Backend S3 credentials must not enter browser output').toBe(false);
   const digest = (value: Buffer) => createHash('sha256').update(value).digest('hex');
   const hashes = new Set(bytes.map(digest));
   const textAssets = emitted.filter(asset => /\.(html|js|css|map|json|svg|txt)$/.test(asset.file));

@@ -4,7 +4,9 @@ import type { OperationRequest } from '../../packages/contracts/src/index.js';
 type Entry = { method: string; url: URL; body: unknown };
 type Operation = Readonly<{ origin: string; method: string; path: string; count: number; query: Readonly<Record<string, string>>; purpose?: OperationRequest<'useVersion'>['body']['purpose'] }>;
 type Allowance = Omit<Operation, 'count' | 'query'> & { query: string; consumed: boolean };
-export type MaterialNetwork = { entries: Entry[]; expectOperations(...operations: Operation[]): void; assertSafe(): void };
+export type MaterialNetwork = { entries: Entry[]; expectOperations(...operations: Operation[]): void; expectObjectTransfer(url: string, count?: number): void; assertSafe(): void };
+const redactQuery = (entries: Iterable<[string, string]>) => [...entries].map(([key, value]): [string, string] => [key, /^x-amz-/i.test(key) ? '[redacted]' : value]);
+const safeURL = (input: URL) => { const url = new URL(input); url.search = new URLSearchParams(redactQuery(url.searchParams)).toString(); return url; };
 const queryKey = (entries: Iterable<[string, string]>) => JSON.stringify([...entries].sort(([a, av], [b, bv]) => a.localeCompare(b) || av.localeCompare(bv)));
 
 /** Records every HTTP request; exact operation allowances are consumed at observation, never retroactively. */
@@ -13,13 +15,20 @@ export const test = base.extend<{ materialNetwork: MaterialNetwork }>({
     const entries: Entry[] = [];
     const allowances: Allowance[] = [];
     const unexpected: Entry[] = [];
+    const objectOrigins = new Set<string>();
     const record = (request: Request) => {
-      let body: unknown = null;
-      if (request.postData()) { try { body = request.postDataJSON(); } catch { body = 'non-JSON transfer'; } }
-      const entry = { method: request.method(), url: new URL(request.url()), body };
+      const actualURL = new URL(request.url());
+      const objectRequest = objectOrigins.has(actualURL.origin) || actualURL.searchParams.has('X-Amz-Signature');
+      let body: unknown = objectRequest ? 'private object transfer' : null;
+      if (!objectRequest && request.postData()) { try { body = request.postDataJSON(); } catch { body = 'non-JSON transfer'; } }
+      const entry = { method: request.method(), url: safeURL(actualURL), body };
       entries.push(entry);
-      if (entry.url.pathname.startsWith('/v1/') || !['GET', 'HEAD', 'OPTIONS'].includes(entry.method)) {
-        const allowance = allowances.find(value => !value.consumed && value.method === entry.method && value.origin === entry.url.origin && value.path === entry.url.pathname && value.query === queryKey(entry.url.searchParams.entries()));
+      if (objectRequest) {
+        expect(Object.hasOwn(request.headers(), 'authorization'), 'API bearer must never reach object storage').toBe(false);
+        expect(Object.hasOwn(request.headers(), 'cookie'), 'Application cookies must never reach object storage').toBe(false);
+      }
+      if (objectRequest || entry.url.pathname.startsWith('/v1/') || !['GET', 'HEAD', 'OPTIONS'].includes(entry.method)) {
+        const allowance = allowances.find(value => !value.consumed && value.method === entry.method && value.origin === actualURL.origin && value.path === actualURL.pathname && value.query === queryKey(actualURL.searchParams.entries()));
         if (allowance) {
           allowance.consumed = true;
           if (entry.method === 'POST' && entry.url.pathname.endsWith('/uses')) expect(entry.body).toMatchObject({ purpose: allowance.purpose ?? 'reference' });
@@ -52,12 +61,18 @@ export const test = base.extend<{ materialNetwork: MaterialNetwork }>({
           expect(Number.isInteger(operation.count) && operation.count > 0).toBe(true);
           for (let index = 0; index < operation.count; index++) allowances.push({ origin: operation.origin, method: operation.method, path: operation.path, query: queryKey(Object.entries(operation.query)), ...(operation.purpose ? { purpose: operation.purpose } : {}), consumed: false });
         }
+      }, expectObjectTransfer(value, count = 1) {
+        const url = new URL(value);
+        expect(url.searchParams.has('X-Amz-Signature'), 'Only an exact signed object grant may be allowed').toBe(true);
+        expect(Number.isInteger(count) && count > 0).toBe(true);
+        objectOrigins.add(url.origin);
+        for (let index = 0; index < count; index++) allowances.push({ origin: url.origin, method: 'PUT', path: url.pathname, query: queryKey(url.searchParams), consumed: false });
       }, assertSafe });
     } finally {
       await context.close();
       try {
         assertSafe();
-        expect(allowances.filter(value => !value.consumed).map(value => `${value.method} ${value.origin}${value.path} query=${value.query}`), 'Expected operations were not consumed').toEqual([]);
+        expect(allowances.filter(value => !value.consumed).map(value => `${value.method} ${value.origin}${value.path} query=${JSON.stringify(redactQuery(JSON.parse(value.query) as [string, string][]))}`), 'Expected operations were not consumed').toEqual([]);
       } finally { context.off('request', record); }
     }
   }, { auto: true }],
