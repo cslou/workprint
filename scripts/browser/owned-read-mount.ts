@@ -60,6 +60,12 @@ export async function mountOwnedReadReference(page: Page, reference: Awaited<Ret
       const grid = required(sheet, '.sgrid'); grid.classList.add('wp-sheet-grid'); grid.replaceChildren();
       for (const [title, text] of [['Identity', 'Late forties, light stubble.'], ['Wardrobe', 'Navy overcoat over a charcoal suit.'], ['Missing views', 'No images are supplied.']]) { const section = document.createElement('section'); section.className = 'ssec wp-sheet-section'; const heading = document.createElement('h3'); heading.textContent = title!; const paragraph = document.createElement('p'); paragraph.className = 'snotes'; paragraph.textContent = text!; section.append(heading, paragraph); grid.append(section); }
       required(sheet, '.status').classList.add('wp-status');
+      const description = document.createElement('div'); description.className = 'ref-description';
+      const section = clone(script, '#p-script > section:first-child');
+      required(section, '.plabel span').textContent = 'Description';
+      const pencil = required(section, '.edit') as HTMLButtonElement; pencil.disabled = false; pencil.type = 'button';
+      const summary = required(sheet, '.ssum'); const paragraph = required(section, 'p'); paragraph.className = 'ref-description-text'; paragraph.textContent = summary.textContent;
+      description.append(section); summary.replaceWith(description);
       const details = makeHistory(); details.removeAttribute('open'); details.replaceChildren(required(details, 'summary')); panel.replaceChildren(header, scroll, details); stage.replaceChildren(panel); return;
     }
     const panel = required(document, '.preview-panel');
@@ -100,7 +106,7 @@ export async function mountOwnedWindowReference(page: Page, reference: Awaited<R
       }));
     } else {
       document.querySelector('.wp-script p')!.textContent = 'Ada waits beside the station clock.';
-      document.querySelector('.wp-panel-label button')?.remove(); document.querySelectorAll('.wp-script .wp-panel-section:not(:first-child)').forEach(node => node.remove());
+      document.querySelector<HTMLButtonElement>('.wp-panel-label button')?.removeAttribute('disabled'); document.querySelectorAll('.wp-script .wp-panel-section:not(:first-child)').forEach(node => node.remove());
       const history = document.querySelector('.wp-version-history')!; const template = history.querySelector('.wp-version-history-row');
       if (!template) throw new Error('Tracked history row missing'); template.remove();
       const before = history.querySelector('.preview-page-controls');

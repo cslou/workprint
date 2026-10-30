@@ -16,7 +16,7 @@ const subscribeIdle = () => () => {};
 export function ManualVersionEditor(props: Props) {
   return <BoundManualEditor key={JSON.stringify([props.scope?.accountId, props.scope?.conversationId, props.version.artifactId, props.target])} {...props} />;
 }
-function BoundManualEditor({ connection, scope, version, target, label, currentUse, readOnly, pencilPadding, onSaved }: Props) {
+function BoundManualEditor({ connection, scope, version, target, label, currentUse, readOnly, pencilPadding = 'native', onSaved }: Props) {
   const mapping = useMemo(() => savedTextTarget(target), [target]);
   const [controller, setController] = useState<ManualSave | null>(null);
   const [saved, setSaved] = useState<Version | null>(null);

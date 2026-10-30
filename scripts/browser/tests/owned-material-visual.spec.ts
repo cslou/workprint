@@ -66,11 +66,11 @@ for (const width of [1440, 390, 820, 821]) for (const state of [...main, ...(wid
       if (state.startsWith('text-reference')) {
         const status = document.querySelector('.wp-status'); if (status) { status.className = 'status draft wp-status wp-status-draft'; status.textContent = 'Draft'; }
         if (state === 'text-reference-row') { document.querySelector('.wp-asset-row b')!.textContent = 'Ada reference'; document.querySelector('.wp-asset-row small')!.textContent = 'Character reference'; }
-        else { document.querySelector('.wp-dialog-head h2')!.textContent = 'Ada reference'; document.querySelector('.wp-reference-sheet header h2')!.textContent = 'Ada reference'; document.querySelector('.wp-reference-sheet header > p:not(.wp-sheet-kicker)')!.textContent = 'A traveller in a green coat.'; const sections = [...document.querySelectorAll('.wp-sheet-section')]; sections[0]!.querySelector('p')!.textContent = 'Keep the green coat.'; sections.find(section => section.querySelector('h3')?.textContent === 'Wardrobe')?.remove(); }
+        else { document.querySelector('.wp-dialog-head h2')!.textContent = 'Ada reference'; document.querySelector('.wp-reference-sheet header h2')!.textContent = 'Ada reference'; document.querySelector('.wp-reference-sheet .ref-description-text')!.textContent = 'A traveller in a green coat.'; const sections = [...document.querySelectorAll('.wp-sheet-section')]; sections[0]!.querySelector('p')!.textContent = 'Keep the green coat.'; sections.find(section => section.querySelector('h3')?.textContent === 'Wardrobe')?.remove(); }
         return;
       }
       document.querySelector('.wp-script p')!.textContent = state === 'historical-version' ? 'Earlier Script revision 22.' : 'Ada waits beside the station clock.';
-      document.querySelector('.wp-panel-label button')?.remove(); document.querySelectorAll('.wp-script .wp-panel-section:not(:first-child)').forEach(node => node.remove());
+      const pencil = document.querySelector<HTMLButtonElement>('.wp-panel-label button'); if (state === 'historical-version') pencil?.remove(); else pencil?.removeAttribute('disabled'); document.querySelectorAll('.wp-script .wp-panel-section:not(:first-child)').forEach(node => node.remove());
       const details = document.querySelector('.wp-version-history')!; const template = details.querySelector('.wp-version-history-row');
       const count = state.startsWith('history-initial') ? 0 : state === 'history-complete' ? 22 : 19;
       details.querySelectorAll('.wp-version-history-row').forEach(node => node.remove());
@@ -86,7 +86,7 @@ for (const width of [1440, 390, 820, 821]) for (const state of [...main, ...(wid
     const actualGeometry = await measure(page); const actual = await page.locator(selector).screenshot({ path: info.outputPath('actual-region.png'), animations: 'disabled' }); await page.screenshot({ path: info.outputPath('actual-full.png'), fullPage: true, animations: 'disabled' });
     await writeFile(info.outputPath('geometry.json'), JSON.stringify({ expectedGeometry, actualGeometry }, null, 2));
     const changedPixels = await compare(expected, actual, info.outputPath('comparison'));
-    await writeFile(info.outputPath('result.json'), JSON.stringify({ state, width, expectedGeometry, actualGeometry, changedPixels, tolerance: 0, referenceHashes: source.hashes, revision: info.config.metadata, approval: 'docs/design/design.md#phase-3-saved-work-reads', scope: 'Actual MaterialPanel, real owned workspace/version/history reads, inert approved framing. Matched persisted Script text with no unsupported Look/editor, complete known revision list, independently specified reference text; no producer overrides or application CSS normalization.' }, null, 2));
+    await writeFile(info.outputPath('result.json'), JSON.stringify({ state, width, expectedGeometry, actualGeometry, changedPixels, tolerance: 0, referenceHashes: source.hashes, revision: info.config.metadata, approval: 'docs/design/design.md#phase-3-saved-work-reads', scope: 'Actual MaterialPanel, real owned workspace/version/history reads, inert approved framing. Matched persisted Script text with no unsupported Look; the inspected single-action target restores its approved pencil under docs/design/design.md#manual-save-recovery, complete known revision list, independently specified reference text; no producer overrides or application CSS normalization.' }, null, 2));
     expect(actualGeometry).toEqual(expectedGeometry); expect(changedPixels).toBe(0);
   } finally { resume(); if (completion) await completion; }
 });

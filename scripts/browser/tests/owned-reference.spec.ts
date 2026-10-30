@@ -4,9 +4,10 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { test, expect } from '../material-network.js';
 import { ownedReadReference } from '../owned-read-reference.js';
+import { manualReference, mountManualReference } from '../manual-reference.js';
 import { mountOwnedReadReference } from '../owned-read-mount.js';
 
-const files = ['docs/design/design.md', 'docs/design/flow2-step2-r74.html', 'docs/design/flow2-step10-r82.html', 'docs/design/library-picker-r92.html', 'docs/design/app-r11.css', 'docs/design/brand-book/book.css', 'scripts/browser/owned-read-substitutions.css'];
+const files = ['docs/design/design.md', 'docs/design/flow2-step2-r74.html', 'docs/design/flow2-step7-r79.html', 'docs/design/flow2-step10-r82.html', 'docs/design/library-picker-r92.html', 'docs/design/app-r11.css', 'docs/design/brand-book/book.css', 'scripts/browser/owned-read-substitutions.css'];
 test('saved-read comparisons render from tracked-only inputs without an inspection-output directory', async ({ page }) => {
   const root = await mkdtemp(join(tmpdir(), 'owned-tracked-reference-'));
   try {
@@ -16,6 +17,12 @@ test('saved-read comparisons render from tracked-only inputs without an inspecti
       assert.deepEqual(Object.keys(reference.hashes).sort(), [...files].sort());
       await mountOwnedReadReference(page, reference);
       await expect(page.locator('.preview-panel,.preview-modal-stage').first()).toBeVisible();
+      expect(await page.locator('script,img[src]').count()).toBe(0);
+    }
+    for (const state of ['script-review', 'reference-conflict', 'planning-conflict'] as const) {
+      const reference = await manualReference(state, root);
+      await mountManualReference(page, reference);
+      await expect(page.locator('.ref-manual')).toBeVisible();
       expect(await page.locator('script,img[src]').count()).toBe(0);
     }
   } finally { await rm(root, { recursive: true, force: true }); }
