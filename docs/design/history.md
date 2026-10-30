@@ -1,5 +1,9 @@
 # Workprint — Application Design History
 
+## Account and session flows — 2026-10-30
+
+**Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** The 30 inert account/recovery/session states reuse existing dialogs, with labelled 44px Auth fields, neutral feedback, non-enumerating reset messages and explicit uncertain-update handling. Recovery is quarantined; sign-out/expiry fence old scope without deleting saved data or replaying commands. See [binding decisions](design.md#phase-3-account-and-session-flows). Preview inspection is not implemented behavior or Lou’s ratification.
+
 ## Phase 2 review — 2026-10-29
 
 **Lou ratified the Sprint 003 Story 2–4 designs** after a side-by-side review of all Phase 2 reference/app screenshot pairs: single-clip playback and unavailable media, material inputs and the populated Library picker, and direct Export history/status/download. Their entries below and in [design.md](design.md#shell-and-remaining-phase-2-feedback) now read as approved by Lou. No layout or copy changed.
