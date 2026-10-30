@@ -72,6 +72,9 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
+      '@mastra/client-js':
+        specifier: 1.56.0
+        version: 1.56.0(supports-color@7.2.0)(zod@4.6.7)
       '@workprint/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client

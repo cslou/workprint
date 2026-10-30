@@ -13,5 +13,8 @@
     "pg": "8.23.1",
     "zod": "4.6.7"
   },
-  "devDependencies": { "@workprint/api-client": "workspace:*" }
+  "devDependencies": {
+    "@mastra/client-js": "1.56.0",
+    "@workprint/api-client": "workspace:*"
+  }
 }

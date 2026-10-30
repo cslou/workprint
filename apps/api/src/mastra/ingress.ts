@@ -5,6 +5,7 @@ import { verifyAccount } from './auth.js';
 import { loadServerConfig } from './config.js';
 import { readIntake } from './body.js';
 import { createAdmissionPolicy, decorateCors } from './admission.js';
+import { nativeTurnRoutes, isNativeTurnRoute, nativeTurnAdmission } from './native-turns.js';
 
 const verifiedAccountKey = 'workprintVerifiedIngressAccount';
 
@@ -18,7 +19,8 @@ export function verifiedIngressAccount(context: Context): string | undefined {
 export function createIngress(mastra: Mastra): MiddlewareHandler<{ Bindings: HttpBindings; Variables: { [verifiedAccountKey]: string } }> {
   const config = loadServerConfig(process.env);
   const auth = config.supabase;
-  const policy = createAdmissionPolicy(mastra.getServer()?.apiRoutes ?? [], config.browserOrigin);
+  const policy = createAdmissionPolicy([...(mastra.getServer()?.apiRoutes ?? []), ...nativeTurnRoutes], config.browserOrigin);
+  const admitTurn = nativeTurnAdmission(mastra);
   return async (context, next) => {
     const { origin, preflight } = policy.cors(context);
     if (origin && preflight) return context.body(null, 204);
@@ -60,8 +62,13 @@ export function createIngress(mastra: Mastra): MiddlewareHandler<{ Bindings: Htt
       if (getHasBody) return invalid();
       context.set(verifiedAccountKey, identity.accountId);
       try {
-        const { bytes } = await readIntake(context.req.raw);
+        const { bytes, body } = await readIntake(context.req.raw);
         if (cancellation.signal.aborted) return invalid();
+        if (isNativeTurnRoute(context)) {
+          const rejected = await admitTurn(context, identity.accountId, body);
+          if (rejected) return rejected;
+          if (cancellation.signal.aborted) return invalid();
+        }
         context.req.raw = new Request(context.req.raw, {
           body: bytes ?? null, signal: AbortSignal.any([context.req.raw.signal, cancellation.signal]),
         });
