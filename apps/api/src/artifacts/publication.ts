@@ -9,8 +9,15 @@ type Publication = {
   dependencies: readonly string[]; baseVersionId?: string | undefined;
 } & ({ kind: 'script' | 'reference' | 'storyboard'; content: ReturnType<typeof parseContent>; createdBy: 'human' | 'assistant' }
   | { kind: 'image' | 'video'; media: Extract<Version, { kind: 'image' | 'video' }>['media']; createdBy: 'human' });
+/** All publishers take this owner lock before Artifact, upload, reference or intended-use locks. */
+export async function lockPublicationOwner(client: PoolClient, account: string): Promise<void> {
+  await client.query('INSERT INTO artifacts.publication_counters(owner_id,revision) VALUES($1,0) ON CONFLICT(owner_id) DO NOTHING', [account]);
+  await client.query('SELECT owner_id FROM artifacts.publication_counters WHERE owner_id=$1 FOR UPDATE', [account]);
+}
+
 /** Transaction-local SQL shared by controlled prerequisites and command writers. No external collaborators. */
 export async function publishVersion(client: PoolClient, input: Publication): Promise<Version> {
+  await lockPublicationOwner(client, input.accountId);
   const artifact = input.artifactId ?? randomUUID();
   const publication = (await client.query<{ revision: string }>('INSERT INTO artifacts.publication_counters(owner_id,revision) VALUES($1,1) ON CONFLICT(owner_id) DO UPDATE SET revision=publication_counters.revision+1 RETURNING revision::text', [input.accountId])).rows[0]!.revision;
   if (!input.artifactId) await client.query('INSERT INTO artifacts.artifacts(owner_id,artifact_id,kind) VALUES($1,$2,$3)', [input.accountId, artifact, input.kind]);

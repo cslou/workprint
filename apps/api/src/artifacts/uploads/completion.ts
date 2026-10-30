@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import { operations, useSchema } from '@workprint/contracts';
 import { transaction } from '../../db/index.js';
-import { publishVersion } from '../publication.js';
+import { lockPublicationOwner, publishVersion } from '../publication.js';
 import { UploadError } from './errors.js';
 import { lockUploadTarget } from './policy.js';
 import { lockedUpload, requireUploadLease } from './records.js';
@@ -12,6 +12,7 @@ type Publication = { key: string; sha256: string; media: MediaVersion['media']; 
 /** Atomic visibility only; all verification and object I/O have already finished outside SQL. */
 export function completeUpload(pool: Pool, admitted: UploadRow, token: string, publication: Publication): Promise<UploadResult> {
   return transaction(pool, async client => {
+    await lockPublicationOwner(client, admitted.owner_id);
     const row = await lockedUpload(client, admitted.owner_id, admitted.upload_id); requireUploadLease(row, token);
     await lockUploadTarget(client, row);
     const keys = [publication.key, ...(publication.posterKey ? [publication.posterKey] : [])];
