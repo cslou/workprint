@@ -10,7 +10,7 @@ import { DECODE_ARGS, MEDIA_JOB_BYTES, MEDIA_JOB_MS, MEDIA_LABEL, MEDIA_POSTER_B
 import { verifyMediaToolchain } from './toolchain.js';
 
 type Job = { owner: string; name: string; id?: string; directory?: string; attempted: boolean; closed: boolean; controller: AbortController; end: number; reason: 'cancelled' | 'deadline'; running: Set<Promise<unknown>>; done: Promise<void>; finish(): void };
-export type MediaSandboxSession = Readonly<{ resource: SandboxResource; probe(): Promise<Buffer>; decode(): Promise<void>; poster(): Promise<{ bytes: Buffer; probe: Buffer }> }>;
+export type MediaSandboxSession = Readonly<{ resource: SandboxResource; probe(): Promise<Buffer>; decode(): Promise<Buffer>; poster(): Promise<{ bytes: Buffer; probe: Buffer; decode: Buffer }> }>;
 
 /** One bounded mechanical job, never a backend/queue or caller-provided command surface. */
 export async function createMediaSandbox(options: { toolchainDirectory: string; archivePath?: string; dockerPath: string; timeoutMs?: number }) {
@@ -70,10 +70,10 @@ export async function createMediaSandbox(options: { toolchainDirectory: string; 
         if (identity !== `${id}|/${job.name}|${job.owner}`) throw new MediaProcessError('cleanup');
         await cli(['start', id]);
         const execute = async (tool: 'ffmpeg' | 'ffprobe', args: string[]) => { live(); if (job.running.size) throw new MediaProcessError('capacity'); return cli(['exec', id, `/tools/${tool}`, ...args]); };
-        const session: MediaSandboxSession = Object.freeze({ resource: Object.freeze({ owner, name: job.name, id }), probe: () => execute('ffprobe', [...PROBE_ARGS, '/input.bin']), decode: async () => { await execute('ffmpeg', DECODE_ARGS); }, poster: async () => {
-          await execute('ffmpeg', POSTER_ARGS); const probe = await execute('ffprobe', [...PROBE_ARGS, '/poster.png']); live();
+        const session: MediaSandboxSession = Object.freeze({ resource: Object.freeze({ owner, name: job.name, id }), probe: () => execute('ffprobe', [...PROBE_ARGS, '/input.bin']), decode: () => execute('ffmpeg', DECODE_ARGS), poster: async () => {
+          await execute('ffmpeg', POSTER_ARGS); const probe = await execute('ffprobe', [...PROBE_ARGS, '/poster.png']); const decode = await execute('ffmpeg', DECODE_ARGS.map(arg => arg === '/input.bin' ? '/poster.png' : arg)); live();
           const file = await open(posterFile, constants.O_RDONLY | constants.O_NOFOLLOW);
-          try { const stat = await file.stat(); if (!stat.isFile() || stat.nlink !== 1 || !stat.size || stat.size > MEDIA_POSTER_BYTES) throw new MediaProcessError('failed'); return { bytes: await file.readFile(), probe }; } finally { await file.close(); }
+          try { const stat = await file.stat(); if (!stat.isFile() || stat.nlink !== 1 || !stat.size || stat.size > MEDIA_POSTER_BYTES) throw new MediaProcessError('failed'); return { bytes: await file.readFile(), probe, decode }; } finally { await file.close(); }
         } });
         const interrupted = new Promise<never>((_, reject) => { job.controller.signal.addEventListener('abort', () => reject(new MediaProcessError(job.reason)), { once: true }); });
         live(); const task = Promise.resolve().then(() => work(session)).catch(error => { callbackFailure = error; throw error; });

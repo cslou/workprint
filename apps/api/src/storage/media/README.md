@@ -59,5 +59,30 @@ full-decode and poster shapes before any product parser. Those are normal-fixtur
 proofs, not media-policy, publication or browser verification. Actual sandbox
 fault tests also exercise OOM, PID exhaustion, tmpfs ENOSPC, read-only writes,
 poster file limits, cancellation/deadline/shutdown and ownership-mismatch quarantine.
-Dedicated delayed-start watchdog and CPU-budget fault controls remain to qualify. Production upload confirmation remains without a verifier until
-those owning pieces are implemented and qualified.
+Dedicated controls now prove expired late startup, host-independent termination
+of stalled work, actual one-CPU cgroup throttling with four busy workers, and
+both output floods through the sandbox with subsequent capacity recovery.
+
+The artifacts-owned `uploads/media-verifier.ts` applies a closed initial allowlist:
+noninterlaced 8-bit RGB/RGBA PNG (IHDR/IDAT/IEND/pHYs only), baseline 8-bit
+three-component yuvj420p JPEG without EXIF/ICC, and nonfragmented isom MP4 with
+Constrained Baseline H264 yuv420p, square pixels, progressive constant frame rate,
+optionally AAC-LC stereo at48kHz. Other variants are explicitly unqualified, not
+implicitly supported. Limits are10MiB/4096square for images and100MiB/1920x1080,
+60fps/120s for video. These are inspection limits; production upload caps are
+still64MiB pending coordinated changes. Full decode must match declared frame
+count and duration; generated PNG posters are separately probed, fully decoded,
+CRC/structure/dimension checked and captured. No conversion service is exposed.
+
+Positive actual synthetic PNG/JPEG/H264+AAC/poster tests and spoof/truncation,
+CRC, oversized dimensions, damaged H264, snapshot-mutation, unsupported metadata
+and decoder-count negatives exercise the real pinned tools. Mono/lower-rate AAC,
+additional H264/image profiles and boundary fixtures remain to qualify before
+expanding this allowlist. Production composition still supplies no verifier.
+
+Next publication verification must use owned PG/S3 and the real verifier: retain
+the existing501 baseline, then prove exact captured media/poster hashes, one
+human draft version/use, unchanged approval/selection, original-result replay,
+staging replacement, rollback, owner-first manual-save contention and final
+post-write lease/target fences. No external inspection/storage waits may move
+inside SQL. These API/publication/browser and full-suite checks are still unrun.
