@@ -199,7 +199,9 @@ export class AccountOwner {
     if (binding) {
       this.operation = true;
       try { await this.guarded(binding.scope, async () => { const session = await this.client!.getSession(); if (this.current(binding.scope) && session.data.session?.user.id === binding.accountId) await this.client!.signOut({ scope: 'local' }); }); }
+      catch { this.fence('invalid-link', false); return; }
       finally { this.operation = false; }
+      if (!this.current(binding.scope)) { this.fence('invalid-link', false); return; }
     }
     this.fence(screen); this.set({ screen: this.fenceSaved ? this.client ? screen : 'unconfigured' : 'account-lock-not-saved' });
   };
