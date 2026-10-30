@@ -11,13 +11,14 @@ import { applicationRequests } from './application-requests.js';
 import { query, isolatedPostgres } from './postgres.js';
 import { PostgresStore } from '@mastra/pg';
 import { applyArtifactMigrations } from './artifact-database.js';
+import type { PrivateStorageConfiguration } from '../src/storage/index.js';
 
 // Shared by current-scope checks and the separately invoked B-001 qualification.
 // Private fixture input is never inherited by serving. Accounts already exist.
 export type BuiltAdmissionTarget = { origin: string; accessToken: string; accessTokens: readonly string[]; logs: string };
 export type SavedWorkSetup = { accountIds: readonly string[]; native: PostgresStore; servingUrl: string; setupUrl?: string };
 type FixtureContext = { diagnostic(message: string): void; after(cleanup: () => void | Promise<void>): void };
-export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (server: BuiltAdmissionTarget) => Promise<void>, options: { browserOrigin?: string; prepareSavedWork?: (setup: SavedWorkSetup) => Promise<void>; verifySavedEffects?: (servingUrl: string) => Promise<void> } = {}) {
+export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (server: BuiltAdmissionTarget) => Promise<void>, options: { browserOrigin?: string; storage?: PrivateStorageConfiguration; prepareSavedWork?: (setup: SavedWorkSetup) => Promise<void>; verifySavedEffects?: (servingUrl: string) => Promise<void> } = {}) {
   const file = process.env.WORKPRINT_AUTH_FIXTURE;
   assert.ok(file, 'Supply WORKPRINT_AUTH_FIXTURE with authorized Supabase URL, anonKey, servingUrl and two accounts');
   const fixture = await environment();
@@ -85,7 +86,8 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
   const port = await unusedPort();
   const env = { ...fixture.env, DATABASE_URL: database.servingUrl, SUPABASE_URL: config.url,
     SUPABASE_PUBLISHABLE_KEY: config.anonKey, PORT: String(port),
-    ...(options.browserOrigin ? { WORKPRINT_BROWSER_ORIGIN: options.browserOrigin } : {}) };
+    ...(options.browserOrigin ? { WORKPRINT_BROWSER_ORIGIN: options.browserOrigin } : {}),
+    ...(options.storage ? { S3_ENDPOINT: options.storage.endpoint, S3_REGION: options.storage.region, S3_BUCKET: options.storage.bucket, S3_ACCESS_KEY_ID: options.storage.credentials.accessKeyId, S3_SECRET_ACCESS_KEY: options.storage.credentials.secretAccessKey } : {}) };
   const probe = await start(process.execPath, [probeEntry], {
     cwd: root, env, log: join(fixture.logs, 'probe.log'),
   });
@@ -183,7 +185,7 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
         const settled = result as { ok: boolean; value: unknown };
         assert.equal(settled.ok, true, 'Owned Library read settles successfully');
         assert.ok(operations.library.response.safeParse(settled.value).success);
-      } else if (name === 'workspace' || name === 'artifactVersions' || name === 'version') {
+      } else if (name === 'workspace' || name === 'artifactVersions' || name === 'version' || name === 'requestUpload' || name === 'confirmUpload') {
         assert.deepEqual(result, { ok: false, error: { code: 'not_found', message: 'Saved work not found' } }, 'Unknown and foreign reads share their denial');
       } else if (name === 'saveVersion') {
         assert.deepEqual(result, { ok: false, error: { code: 'invalid_input', message: 'Invalid saved-work request' } }, 'Unsupported initial/empty save creates no effects');
