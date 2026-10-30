@@ -22,6 +22,7 @@ export async function ownedReadReference(state: OwnedReadState | `library-${Owne
   const sources = {
     script: await load('docs/design/flow2-step2-r74.html'),
     assets: await load('docs/design/flow2-step10-r82.html'),
+    planning: await load('docs/design/flow2-step7-r79.html'),
     history: await load('docs/design/flow2-step10-r82.html'),
     library: await load('docs/design/library-picker-r92.html'),
   };

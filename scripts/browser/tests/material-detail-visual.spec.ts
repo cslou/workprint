@@ -54,8 +54,8 @@ for (const width of [1440, 390, 820, 821]) for (const view of ['assets', 'viewer
       allowMutation = true;
       const response = page.waitForResponse((value) => value.request().method() === 'POST');
       await page.getByRole('button', { name: view === 'save' ? 'Save' : 'Use this version', exact: true }).click();
-      expect((await response).status()).toBe(501);
-      await expect(page.getByRole('status')).toHaveText(view === 'save' ? 'Saving is not available yet. Your unsaved text is retained.' : 'Using this version is not available yet. The current selection is unchanged.');
+      expect((await response).status()).toBe(view === 'save' ? 404 : 501);
+      await expect(page.getByRole('status')).toHaveText(view === 'save' ? 'Changes were not saved. Your unsaved text is retained.' : 'Using this version is not available yet. The current selection is unchanged.');
       expect(mutations).toEqual([`/v1/conversations/read-only-conversation/${view === 'save' ? 'versions' : 'uses'}`]);
     } else expect(mutations).toEqual([]);
     await settleCapture(page); const actual = await measure();
@@ -63,7 +63,7 @@ for (const width of [1440, 390, 820, 821]) for (const view of ['assets', 'viewer
     const screenshot = await page.screenshot({ path: info.outputPath('actual-full.png'), fullPage: true, animations: 'disabled' });
     const changedPixels = await compare(expected, screenshot, info.outputPath('comparison'));
     const hashes = Object.fromEntries(await Promise.all(['flow2-step2-r74.html','flow2-step10-r82.html','app-r11.css'].map(async (name) => [name, createHash('sha256').update(await readFile(`docs/design/${name}`)).digest('hex')])));
-    await writeFile(info.outputPath('result.json'), JSON.stringify({ view, width, changedPixels, tolerance: 0, revision: info.config.metadata, browser: context.browser()?.version(), sources: hashes, approval: 'docs/design/design.md#shell-and-remaining-phase-2-feedback', substitutions: 'Read-only exact-version field/image prerequisites; tracked r82 Assets/live sheet in inert r74 frame; no invented attach/export/library metadata; shared version history and approved inline edit/501 feedback; real backend responses only.' }, null, 2));
+    await writeFile(info.outputPath('result.json'), JSON.stringify({ view, width, changedPixels, tolerance: 0, revision: info.config.metadata, browser: context.browser()?.version(), sources: hashes, approval: 'docs/design/design.md#shell-and-remaining-phase-2-feedback', substitutions: 'Read-only exact-version field/image prerequisites; tracked r82 Assets/live sheet in inert r74 frame; no invented attach/export/library metadata; shared version history and approved inline edit/rejected-save feedback; exact Use remains unavailable; real backend responses only.' }, null, 2));
     expect(actual.map((item) => item.box)).toEqual(reference.map((item) => item.box)); expect(changedPixels).toBe(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });

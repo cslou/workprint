@@ -1,5 +1,9 @@
 # Workprint — Application Design History
 
+## Manual save recovery — 2026-10-30
+
+**Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Existing text editors retain input through conflicts and uncertain outcomes. Explicit same-command retry is distinct from a new save; reviewed-base continuation is local only and blocks changed targets. Reference descriptions and stable planning text reuse these controls without granting later-story structure or selection authority. See [binding recovery decisions](design.md#manual-save-recovery). Inspection of 13 inert states does not claim runtime behavior or human ratification.
+
 ## Bounded saved-work navigation — 2026-10-30
 
 **Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Option B adds a loaded-window range and Back to first page after bounded eviction, preserving exact Library choices and keeping navigation inside the scrolling rows. This replaces the inaccessible 1,000-item ceiling without silent loss of back-navigation. [Binding details](design.md#bounded-saved-work-navigation) refine the prior append-only description. Desktop/narrow inert Library/history previews were inspected; runtime and visual parity remain to be verified.

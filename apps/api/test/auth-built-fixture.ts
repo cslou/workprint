@@ -15,9 +15,9 @@ import { applyArtifactMigrations } from './artifact-database.js';
 // Shared by current-scope checks and the separately invoked B-001 qualification.
 // Private fixture input is never inherited by serving. Accounts already exist.
 export type BuiltAdmissionTarget = { origin: string; accessToken: string; accessTokens: readonly string[]; logs: string };
-export type SavedWorkSetup = { accountIds: readonly string[]; native: PostgresStore; servingUrl: string };
+export type SavedWorkSetup = { accountIds: readonly string[]; native: PostgresStore; servingUrl: string; setupUrl?: string };
 type FixtureContext = { diagnostic(message: string): void; after(cleanup: () => void | Promise<void>): void };
-export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (server: BuiltAdmissionTarget) => Promise<void>, options: { browserOrigin?: string; prepareSavedWork?: (setup: SavedWorkSetup) => Promise<void> } = {}) {
+export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (server: BuiltAdmissionTarget) => Promise<void>, options: { browserOrigin?: string; prepareSavedWork?: (setup: SavedWorkSetup) => Promise<void>; verifySavedEffects?: (servingUrl: string) => Promise<void> } = {}) {
   const file = process.env.WORKPRINT_AUTH_FIXTURE;
   assert.ok(file, 'Supply WORKPRINT_AUTH_FIXTURE with authorized Supabase URL, anonKey, servingUrl and two accounts');
   const fixture = await environment();
@@ -80,7 +80,7 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
   const setup = new PostgresStore({ id: 'admission-native-setup', connectionString: database.setupUrl, schemaName: 'mastra' });
   try {
     await setup.init(); await database.grantServing(); await applyArtifactMigrations(database.setupUrl);
-    await options.prepareSavedWork?.({ accountIds: identities.map(identity => identity.user.id), native: setup, servingUrl: database.servingUrl });
+    await options.prepareSavedWork?.({ accountIds: identities.map(identity => identity.user.id), native: setup, servingUrl: database.servingUrl, setupUrl: database.setupUrl });
   } finally { await setup.close(); }
   const port = await unusedPort();
   const env = { ...fixture.env, DATABASE_URL: database.servingUrl, SUPABASE_URL: config.url,
@@ -185,6 +185,8 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
         assert.ok(operations.library.response.safeParse(settled.value).success);
       } else if (name === 'workspace' || name === 'artifactVersions' || name === 'version') {
         assert.deepEqual(result, { ok: false, error: { code: 'not_found', message: 'Saved work not found' } }, 'Unknown and foreign reads share their denial');
+      } else if (name === 'saveVersion') {
+        assert.deepEqual(result, { ok: false, error: { code: 'invalid_input', message: 'Invalid saved-work request' } }, 'Unsupported initial/empty save creates no effects');
       } else assert.deepEqual(result, { ok: false, error: { code: 'not_implemented', message: 'This operation is not implemented' } }, name);
     }
   }
@@ -228,8 +230,11 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
   for (const [path, method] of [['/v1/conversations/c/workspace/extra', 'GET'], ['/v1/conversations//workspace', 'GET'], ['/v1/conversations/c/workspace', 'POST'], ['/v1/library/', 'GET']] as const) {
     assert.equal((await raw(path, method, undefined)).status, 404, 'Only exact catalog paths/methods are admitted');
   }
-  // Reads and unavailable commands preserve both native and application records.
-  assert.deepEqual(await snapshot(), beforeRequests, 'Read and unavailable-command matrix creates/changes no native or application records');
+  // All cases preserve native records; only explicit write qualifications may change application records.
+  const afterRequests = await snapshot();
+  assert.deepEqual(afterRequests.filter(row => !String((row as unknown[])[0]).startsWith('artifacts.')), beforeRequests.filter(row => !String((row as unknown[])[0]).startsWith('artifacts.')), 'Application commands never start or modify native turns');
+  if (options.verifySavedEffects) await options.verifySavedEffects(database.servingUrl);
+  else assert.deepEqual(afterRequests, beforeRequests, 'Read and unavailable-command matrix creates/changes no native or application records');
   const exposure: { path: string; bearer: boolean; status: number }[] = [];
   for (const path of ['/api/auth/capabilities', '/api/auth/me', '/__auth_probe', '/api/agents', '/api/memory/threads', '/api/workflows', '/api/tools', '/api/telemetry', '/swagger-ui', '/openapi.json', '/health/', '/__qualification', '/__qualification/release', '/test/shell.html', '/fixtures/clip.webm', '/studio', '/assets/index.js', '/api/tools/test/execute']) {
     for (const bearer of [false, true]) {

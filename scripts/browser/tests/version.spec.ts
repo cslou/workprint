@@ -100,14 +100,14 @@ test('section editing is local and Cancel restores the exact displayed version',
   expect(mutations).toEqual([]);
 });
 
-observedTest('exact Save uses real admission, retains unsaved text and does not change the displayed version on 401/501', async ({ page, materialNetwork }, info) => {
+observedTest('exact Save uses real admission and retains input and displayed version on 401/404', async ({ page, materialNetwork }, info) => {
   observedTest.setTimeout(120000);
   await info.attach('prerequisite', { body: 'Read-only public version and explicit synopsis field mapping; not persisted product work.', contentType: 'text/plain' });
   const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
   const cleanup: (() => void | Promise<void>)[] = [];
   try {
     await verifyBuiltAdmission({ diagnostic(message) { console.log(message); }, after(fn) { cleanup.push(fn); } }, async ({ origin, accessTokens }) => {
-      for (const [token, status, feedback] of [[accessTokens[0], 501, 'Saving is not available yet. Your unsaved text is retained.'], [null, 401, 'Sign-in required to save. Your unsaved text is retained.']] as const) {
+      for (const [token, status, feedback] of [[accessTokens[0], 404, 'Changes were not saved. Your unsaved text is retained.'], [null, 401, 'Sign-in required to save. Your unsaved text is retained.']] as const) {
         await page.goto('/version.html');
         await page.waitForFunction(() => !!(window as unknown as { versionTest?: unknown }).versionTest);
         const requests: { path: string; body: unknown }[] = [];
@@ -119,16 +119,18 @@ observedTest('exact Save uses real admission, retains unsaved text and does not 
         });
         await page.evaluate((input) => (window as unknown as { versionTest: { configure(value: unknown): void } }).versionTest.configure(input), { apiOrigin: origin, token });
         materialNetwork.expectOperations({ origin, method: 'POST', path: '/v1/conversations/read-only-conversation/versions', count: 1, query: {} });
-        await activate(page.getByRole('button', { name: 'Edit What happens', exact: true }), status === 501);
+        await activate(page.getByRole('button', { name: 'Edit What happens', exact: true }), status === 404);
         await page.getByRole('textbox', { name: 'What happens', exact: true }).fill('Mercer stays still, then gives a small nod.');
         const response = page.waitForResponse((value) => value.url() === `${origin}/v1/conversations/read-only-conversation/versions`);
-        await activate(page.getByRole('button', { name: 'Save', exact: true }), status === 501);
-        expect((await response).status()).toBe(status);
+        await activate(page.getByRole('button', { name: 'Save', exact: true }), status === 404);
+        const denial = await response;
+        expect(denial.status()).toBe(status);
+        expect(await denial.json()).toEqual({ error: status === 404 ? { code: 'not_found', message: 'Saved work not found' } : { code: 'unauthenticated', message: 'Authentication required' } });
         await expect(page.getByRole('status')).toHaveText(feedback);
         await expect(page.getByRole('textbox')).toHaveValue('Mercer stays still, then gives a small nod.');
         expect(requests).toEqual([{ path: '/v1/conversations/read-only-conversation/versions', body: { operationId: expect.stringMatching(/^[0-9a-f-]{36}$/), artifactId: 'script-example', kind: 'script', baseVersionId: 'script-v7', dependencies: ['reference-v1'], content: { synopsis: 'Mercer stays still, then gives a small nod.', retained: 'Keep this unrelated field.' } } }]);
         await expect(page.locator('[data-version-id]')).toHaveAttribute('data-version-id', 'script-v7');
-        await activate(page.getByRole('button', { name: 'Cancel', exact: true }), status === 501);
+        await activate(page.getByRole('button', { name: 'Cancel', exact: true }), status === 404);
         await expect(page.getByText(initial, { exact: true })).toBeVisible();
         await page.unrouteAll({ behavior: 'wait' });
       }

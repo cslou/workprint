@@ -11,7 +11,7 @@ export function useExactVersion(client: ApiClient | null, scope: ReadScope | nul
   const read = useMemo(() => client ? (signal: AbortSignal) => client.version({ params: { id }, query: {}, body: {} }, { signal }) : null, [client, id]);
   return useScopedRead(scope, read);
 }
-export function useVersionHistory(client: ApiClient | null, scope: ReadScope | null, artifactId: string, open: boolean) {
+export function useVersionHistory(client: ApiClient | null, scope: ReadScope | null, artifactId: string, open: boolean, revisionKey?: string) {
   const active = !!scope && open;
   const binding = useMemo(() => {
     if (!client || !active) return null;
@@ -22,7 +22,7 @@ export function useVersionHistory(client: ApiClient | null, scope: ReadScope | n
       return result;
     });
     return { pages, newest: () => newest };
-  }, [client, active, scope?.accountId, scope?.conversationId, artifactId]);
+  }, [client, active, scope?.accountId, scope?.conversationId, artifactId, revisionKey]);
   const pages = binding?.pages;
   const snapshot = useSyncExternalStore(pages?.subscribe ?? subscribeIdle, pages?.getSnapshot ?? getIdle);
   useEffect(() => { if (!pages) return; void pages.start(); return pages.dispose; }, [pages]);

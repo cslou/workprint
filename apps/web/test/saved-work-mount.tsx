@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import { Shell } from '../src/shell/shell.js';
 import { createBrowserClient, type BrowserClient } from '../src/api/client.js';
+import { Storyboard } from '../src/storyboard/storyboard.js';
 import { MaterialPanel } from '../src/materials/panel.js';
 import { useWorkspace } from '../src/shell/workspace.js';
 import { WorkspaceReadPlaceholder } from '../src/shell/workspace-placeholder.js';
@@ -11,7 +12,7 @@ import '../src/ui/foundations.css';
 function PersistedPanel({ connection, scope }: { connection: BrowserClient; scope: ReadScope }) {
   const read = useWorkspace(connection, scope);
   const workspace = read.kind === 'settled' && read.result.ok ? read.result.value : null;
-  return <MaterialPanel connection={connection} scope={scope} workspace={workspace} {...(workspace ? {} : { placeholder: <WorkspaceReadPlaceholder state={read.failure ?? 'loading'} /> })} />;
+  return <MaterialPanel connection={connection} scope={scope} workspace={workspace} onSaved={read.onSaved} {...(workspace ? { additionalContent: { storyboard: <Storyboard connection={connection} scope={scope} workspace={workspace} onSaved={read.onSaved} /> } } : {})} {...(workspace ? {} : { placeholder: <WorkspaceReadPlaceholder state={read.failure ?? 'loading'} /> })} />;
 }
 
 const node = document.getElementById('root');
