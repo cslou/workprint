@@ -10,7 +10,7 @@ const directory = await mkdtemp(join(tmpdir(), 'workprint-auth-evidence-'));
 const sentinel = `private-control-${randomBytes(32).toString('hex')}`;
 const name = `auth-evidence-control-${randomUUID()}.spec.ts`;
 const sourceFile = join('scripts/browser/tests', name);
-const source = `import { test } from '../material-network.js';
+const source = `import { test, expect } from '../material-network.js';
 import { fixture, account, privateFill, origin } from '../account-fixture.js';
 test.use({ screenshot: 'off', trace: 'off', video: 'off' });
 test('deliberate private evidence failure', async ({ page }) => {
@@ -21,6 +21,18 @@ test('deliberate private evidence failure', async ({ page }) => {
     if (!value) throw new Error('Missing private control');
     await privateFill(page.getByLabel('Password', { exact: true }), value);
     throw new Error('Deliberate private-artifact control failure');
+  } finally { await f.close(); }
+});
+test('proxy failure cannot log a private recovery URI', async ({ page }) => {
+  test.setTimeout(90000); const f = await fixture(page);
+  try {
+    const value = process.env.WORKPRINT_EVIDENCE_PRIVATE_VALUE;
+    if (!value) throw new Error('Missing private control');
+    await f.auth.pauseAuthUpstream();
+    const response = await fetch(f.auth.url + '/auth/v1/verify?token=' + encodeURIComponent(value) + '&type=recovery', { signal: AbortSignal.timeout(5000) });
+    expect([502, 503, 504]).toContain(response.status); await response.arrayBuffer();
+    expect(await f.auth.proxyLogsContain(value), 'Proxy must not retain recovery URI/token').toBe(false);
+    console.log('Proxy private failure-path qualification PASS');
   } finally { await f.close(); }
 });
 `;
@@ -61,10 +73,10 @@ try {
       await writeFile(file, bytes.toString().replaceAll(sentinel, '[private control]'));
     }
   }
-  const result = { deliberateFailureObserved: exit === 1 && output.includes('Deliberate private-artifact control failure'), privateInputRetained: unsafe };
+  const result = { deliberateFailureObserved: exit === 1 && /^\s+Error: Deliberate private-artifact control failure\r?$/m.test(output), privateInputRetained: unsafe, proxyFailureSafe: /(?:^|\n)Proxy private failure-path qualification PASS\r?(?:\n|$)/.test(output) && /\b1 failed\b/.test(output) && /\b1 passed\b/.test(output) };
   await writeFile(join(directory, 'result.json'), JSON.stringify(result, null, 2), { mode: 0o600 });
-  if (!result.deliberateFailureObserved || unsafe) throw new Error(`Auth evidence qualification failed; sanitized evidence: ${directory}`);
-  console.log(`Auth evidence qualification PASS: expected child failure, no private input retained. Evidence: ${directory}`);
+  if (!result.deliberateFailureObserved || !result.proxyFailureSafe || unsafe) throw new Error(`Auth evidence qualification failed; sanitized evidence: ${directory}`);
+  console.log(`Auth evidence qualification PASS: expected child failure, private proxy failure path safe, no private input retained. Evidence: ${directory}`);
 } catch (error) { failure = error; }
 finally {
   clearTimeout(timer);

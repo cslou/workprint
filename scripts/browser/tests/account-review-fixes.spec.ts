@@ -7,7 +7,7 @@ test('a credential-free logout retry cannot confirm an earlier uncertain revocat
   test.setTimeout(90000); const f = await fixture(page);
   try {
     const user = await f.auth.createAccount(); await page.goto(origin); await account(page);
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 });
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
     await signIn(page, user.email, user.password); await expect(page.getByRole('dialog')).toBeHidden();
     await account(page, user.email);
     await page.route(f.auth.url + '/auth/v1/logout*', route => route.fulfill({ status: 503, json: { message: 'Controlled Auth outage' } }));
@@ -25,7 +25,7 @@ test('same-account recovery in another tab preserves valid scope and drafts duri
   test.setTimeout(90000); const f = await fixture(page);
   try {
     const user = await f.auth.createAccount(); await page.goto(origin); await account(page);
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 });
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
     await signIn(page, user.email, user.password); await expect(page.getByRole('dialog')).toBeHidden();
     await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Keep this valid-account draft');
     await page.route(f.auth.url + '/auth/v1/user', route => route.fulfill({ status: 503, json: { message: 'Controlled revalidation outage' } }));
@@ -43,7 +43,7 @@ test('terminal real refresh rejection fences a still-unexpired account immediate
   try {
     const user = await f.auth.createAccount(); await f.application!.saveNative(user.id); const saved = await f.application!.snapshot();
     await page.clock.install({ time: Date.now() }); await page.goto(origin); await account(page);
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 });
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
     await signIn(page, user.email, user.password); await expect(page.getByRole('dialog')).toBeHidden();
     await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Clear on terminal rejection');
     expect((await f.auth.request('admin/users/' + user.id, undefined, f.auth.serviceKey, 'DELETE')).status).toBe(200);
@@ -66,7 +66,7 @@ test('retryable refresh outage preserves valid scope and drafts through supporte
   let release: (() => void) | undefined;
   try {
     const user = await f.auth.createAccount(); await page.clock.install({ time: Date.now() }); await page.goto(origin); await account(page);
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 });
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
     await signIn(page, user.email, user.password); await expect(page.getByRole('dialog')).toBeHidden();
     await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Preserve across transient refresh outage');
     let calls = 0; const gate = new Promise<void>(resolve => { release = resolve; });
@@ -90,7 +90,7 @@ test('actual presentation expiry clears scope and ignores a held late refresh re
   let release: (() => void) | undefined;
   try {
     const user = await f.auth.createAccount(); await page.clock.install({ time: Date.now() }); await page.goto(origin); await account(page);
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 });
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
     await signIn(page, user.email, user.password); await expect(page.getByRole('dialog')).toBeHidden();
     await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Clear at expiry');
     let held = false; const gate = new Promise<void>(resolve => { release = resolve; });
@@ -117,7 +117,7 @@ test('access-fence quota failure still clears account/drafts and performs SDK si
   test.setTimeout(90000); const f = await fixture(page);
   try {
     const user = await f.auth.createAccount(); await page.goto(origin); await account(page);
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 });
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
     await signIn(page, user.email, user.password); await expect(page.getByRole('dialog')).toBeHidden();
     await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Clear despite quota'); await account(page, user.email);
     await page.evaluate(() => {

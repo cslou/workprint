@@ -58,7 +58,7 @@ test('real password policy rejection and uncertain successful mutation have dist
     await expect(page.getByRole('button', { name: 'Back to sign in', exact: true })).toBeEnabled();
     await page.unroute(f.auth.url + '/auth/v1/user');
     await page.getByRole('button', { name: 'Back to sign in', exact: true }).click();
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 });
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
     await signIn(page, user.email, user.nextPassword); await expect(page.getByRole('dialog')).toBeHidden();
   } finally { await f.close(); }
 });
@@ -70,7 +70,7 @@ test('closing pending sign-in dismisses rather than replays it; Switch account f
     await page.goto(origin); await account(page);
     let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
     await page.route(f.auth.url + '/auth/v1/token?grant_type=password', async route => { await gate; await route.continue(); });
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 });
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
     await signIn(page, first.email, first.password);
     await expect(page.getByRole('button', { name: 'Signing in…', exact: true })).toBeDisabled();
     expect(await page.getByLabel('Password', { exact: true }).inputValue() === '', 'Submitted password remained in pending DOM').toBe(true);
@@ -82,7 +82,7 @@ test('closing pending sign-in dismisses rather than replays it; Switch account f
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/logout', query: { scope: 'local' }, count: 1 });
     await page.getByRole('button', { name: 'Switch account', exact: true }).focus(); await page.keyboard.press('Space');
     await expect(page.getByLabel('Email', { exact: true })).toBeEnabled();
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 });
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
     await signIn(page, second.email, second.password);
     await expect(page.getByRole('button', { name: second.email, exact: true })).toBeVisible();
     await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('');
@@ -126,7 +126,7 @@ test('built production account entry uses the qualified SDK and validated public
   try {
     const user = await f.auth.createAccount();
     await page.goto(origin); await account(page);
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 });
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
     await signIn(page, user.email, user.password);
     await expect(page.getByRole('button', { name: user.email, exact: true })).toBeVisible();
     await account(page, user.email);

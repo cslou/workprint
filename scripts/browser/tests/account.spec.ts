@@ -39,7 +39,7 @@ test('real delivered email completes PKCE recovery, quarantines access and requi
     await expect(page.getByRole('dialog')).toContainText('Password updated.');
     await expect(page.getByRole('button', { name: 'Back to sign in', exact: true })).toBeEnabled();
     await page.getByRole('button', { name: 'Back to sign in', exact: true }).click();
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 2 });
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 2 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
     await signIn(page, user.email, user.password);
     await expect(page.getByRole('status')).toHaveText('Email or password is incorrect. Check both and try again.');
     await signIn(page, user.email, user.nextPassword);
@@ -63,7 +63,7 @@ test('unconfirmed sign-out immediately fences presentation and drafts across rel
   try {
     const user = await f.auth.createAccount();
     await page.goto(origin); await account(page);
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 });
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
     await signIn(page, user.email, user.password);
     await expect(page.getByRole('dialog')).toBeHidden();
     await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Must not return');
@@ -96,7 +96,7 @@ test('real refresh preserves the same-account draft; revoked refresh fences it w
     const saved = await f.application!.snapshot();
     await page.clock.install({ time: Date.now() });
     await page.goto(origin); await account(page);
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 });
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
     await signIn(page, user.email, user.password);
     await expect(page.getByRole('dialog')).toBeHidden();
     await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Keep on successful refresh');
@@ -192,7 +192,7 @@ test('real standard account sign-in, persistence and local sign-out fence drafts
     await account(page);
     // First red is a real old UI failure here, before entering any private data.
     await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 });
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
     await signIn(page, user.email, user.password);
     await expect(page.getByRole('dialog')).toBeHidden();
     await account(page, user.email);

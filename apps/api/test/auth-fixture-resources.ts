@@ -83,6 +83,22 @@ export class AuthFixtureResources {
     }
     return found.id;
   }
+  async pauseOwned(id: string) {
+    if (!this.containerIds.includes(id)) throw new Error('Refusing unregistered service stop');
+    const found = await this.inspect('container', id);
+    if (!found) throw new Error('Missing isolated Auth service');
+    this.owned(found, id);
+    await docker('pause', id);
+  }
+  async logsContain(id: string, privateValue: string): Promise<boolean> {
+    if (!this.containerIds.includes(id)) throw new Error('Refusing unregistered service logs');
+    const found = await this.inspect('container', id);
+    if (!found) throw new Error('Missing isolated Auth service');
+    this.owned(found, id);
+    const result = await exec('docker', ['logs', id], { timeout: 10000 });
+    // Raw logs and the supplied value stay private in memory; never return/log a URI.
+    return result.stdout.includes(privateValue) || result.stderr.includes(privateValue);
+  }
   async port(id: string, port: number) {
     const found = await this.inspect('container', id);
     if (!found) throw new Error('Missing isolated Auth service');
@@ -100,6 +116,7 @@ export class AuthFixtureResources {
         this.owned(found, target.id);
         target.id = found.id;
         try {
+          if (found.state === 'paused') await docker('unpause', found.id);
           if (found.state === 'created' || found.state === 'exited') await docker('rm', '--volumes', found.id);
           else if (found.state !== 'removing') {
             await docker('stop', '--time', '5', found.id);

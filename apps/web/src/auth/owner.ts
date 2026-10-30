@@ -1,5 +1,6 @@
 import { AuthClient, type Session, type AuthChangeEvent } from '@supabase/auth-js';
 import { terminalRefreshRejection } from './refresh.js';
+import { authChange, exchangePassword } from './sign-in.js';
 import type { PublicAuthConfig } from './public-config.js';
 type AccountIdentity = { accountId: string; name: string };
 
@@ -21,8 +22,13 @@ export class AccountOwner {
   private revocationUnconfirmed = false;
   private expiry: ReturnType<typeof setTimeout> | undefined;
   private unsubscribe: (() => void) | undefined;
-  private readonly onStorage = (event: StorageEvent) => { if (event.key === fenceKey && event.newValue) this.fence('expired', false); };
-  constructor(config: PublicAuthConfig) {
+  private passwordAttempt: AbortController | undefined;
+  private readonly onStorage = (event: StorageEvent) => {
+    if (event.key !== fenceKey || !event.newValue) return;
+    try { if (localStorage.getItem(fenceKey) !== event.newValue) return; } catch { /* Fence on unavailable storage. */ }
+    this.fence('expired', false);
+  };
+  constructor(private readonly config: PublicAuthConfig) {
     this.recovery = location.pathname === '/auth/callback';
     const callbackCode = this.recovery ? new URL(location.href).searchParams.get('code') : null;
     // Capture only the standard PKCE code, then scrub before SDK/network work or error evidence.
@@ -41,7 +47,7 @@ export class AccountOwner {
       fetch: async (input, init) => {
         const epoch = this.epoch;
         const refresh = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url).searchParams.get('grant_type') === 'refresh_token';
-        if (refresh && this.blocked) throw new DOMException('Account access is fenced', 'AbortError');
+        if (refresh && this.blocked && !this.operation) throw new DOMException('Account access is fenced', 'AbortError');
         if (refresh && this.state.account && !this.blocked) this.set({ screen: 'refreshing', busy: true });
         try {
           const response = await fetch(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(5000)]) : AbortSignal.timeout(5000) });
@@ -59,9 +65,9 @@ export class AccountOwner {
     window.addEventListener('storage', this.onStorage);
     if (this.recovery) {
       if (!callbackCode || callbackCode.length > 4096) this.set({ screen: 'invalid-link' });
-      else void this.client.exchangeCodeForSession(callbackCode).then(({ error }) => {
+      else void authChange(() => this.client!.exchangeCodeForSession(callbackCode)).then(({ error }) => {
         if (this.recovery && error) this.set({ screen: 'invalid-link', busy: false });
-      });
+      }).catch(() => { if (this.recovery) this.set({ screen: 'invalid-link', busy: false }); });
     }
   }
   getSnapshot = () => this.state;
@@ -114,7 +120,7 @@ export class AccountOwner {
     this.set({ account: { accountId: session.user.id, name: session.user.email ?? 'Account' }, screen: 'account', busy: false, message: '' });
   }
   private fence(screen: AccountScreen, persist = true) {
-    ++this.epoch; this.blocked = true; clearTimeout(this.expiry); this.client?.stopAutoRefresh();
+    ++this.epoch; this.passwordAttempt?.abort(); this.blocked = true; clearTimeout(this.expiry); this.client?.stopAutoRefresh();
     this.set({ account: null, screen, busy: false, message: '', open: this.state.open || screen === 'expired' || screen === 'refresh-failed' });
     if (persist) {
       try { localStorage.setItem(fenceKey, crypto.randomUUID()); }
@@ -126,52 +132,84 @@ export class AccountOwner {
   close = () => this.set({ open: false });
   navigate = async (screen: 'sign-in' | 'reset') => {
     if (this.operation) return;
-    if (this.recovery) { this.fence(screen); this.operation = true; try { await this.client?.signOut({ scope: 'local' }); } finally { this.operation = false; this.recovery = false; } }
+    if (this.recovery) {
+      this.fence(screen); this.operation = true;
+      try { await authChange(() => this.client!.signOut({ scope: 'local' })); }
+      catch { this.set({ screen: 'signout-unconfirmed', busy: false }); return; }
+      finally { this.operation = false; this.recovery = false; }
+    }
     this.set({ screen: this.client ? screen : 'unconfigured', message: '', busy: false });
   };
   validation = (message: string) => this.set({ message });
   signIn = async (email: string, password: string) => {
-    if (!this.client || this.operation) return;
-    if (!this.fence('sign-in')) { this.set({ screen: 'unconfigured', message: 'Account access requires browser storage. Allow storage and reload.' }); return; }
-    const epoch = this.epoch; this.operation = true; this.set({ busy: true, message: '' });
+    const client = this.client, config = this.config;
+    if (!client || this.operation || config.kind !== 'configured') return;
+    this.fence('sign-in', false);
+    const epoch = this.epoch, attempt = new AbortController(); this.passwordAttempt = attempt;
+    this.operation = true; this.set({ busy: true, message: '' });
     try {
-      const { data, error } = await this.client.signInWithPassword({ email, password });
+      const intent = await authChange(async () => {
+        if (epoch !== this.epoch) return null;
+        const nonce = crypto.randomUUID();
+        try { localStorage.setItem(fenceKey, nonce); }
+        catch { this.set({ screen: 'unconfigured', busy: false, message: 'Account access requires browser storage. Allow storage and reload.' }); return null; }
+        return nonce;
+      });
+      if (!intent || epoch !== this.epoch) return;
+      const { data, error } = await exchangePassword(config, email, password, attempt.signal);
       if (epoch !== this.epoch) return;
       if (error || !data.session) { this.set({ busy: false, message: error?.code === 'invalid_credentials' ? 'Email or password is incorrect. Check both and try again.' : 'We couldn’t complete sign-in. Check your connection and try again.' }); return; }
-      this.revocationUnconfirmed = false;
-      this.recovery = false; this.blocked = false; localStorage.removeItem(fenceKey); this.client.startAutoRefresh(); this.present(data.session); this.set({ open: false });
-    } finally { this.operation = false; }
+      const session = data.session;
+      await authChange(async () => {
+        if (epoch !== this.epoch) return;
+        if (localStorage.getItem(fenceKey) !== intent) { this.fence('expired', false); return; }
+        // The supported SDK validates identity and publishes while newer explicit mutations wait.
+        const published = await client.setSession({ access_token: session.access_token, refresh_token: session.refresh_token });
+        if (epoch !== this.epoch) return;
+        if (localStorage.getItem(fenceKey) !== intent) { this.fence('expired', false); return; }
+        if (published.error || !published.data.session) { this.set({ busy: false, message: 'We couldn’t complete sign-in. Check your connection and try again.' }); return; }
+        this.revocationUnconfirmed = false;
+        this.recovery = false; this.blocked = false; localStorage.removeItem(fenceKey); client.startAutoRefresh(); this.present(published.data.session); this.set({ open: false });
+      });
+    } catch {
+      if (epoch === this.epoch) this.set({ busy: false, message: 'We couldn’t complete sign-in. Check your connection and try again.' });
+    } finally { if (this.passwordAttempt === attempt) this.passwordAttempt = undefined; this.operation = false; }
   };
   signOut = async (switchAccount = false) => {
     if (!this.client || this.operation) return;
     this.fence(switchAccount ? 'switching' : 'signed-out'); this.operation = true; this.set({ open: true, busy: true });
     try {
-      const { error } = await this.client.signOut({ scope: 'local' });
+      const { error } = await authChange(() => this.client!.signOut({ scope: 'local' }));
       // SDK 2.118 clears local credentials even on logout failure. A later no-op is not revocation proof.
       this.revocationUnconfirmed ||= error !== null;
       this.set({ screen: this.revocationUnconfirmed ? 'signout-unconfirmed' : switchAccount ? 'sign-in' : 'signed-out', busy: false, message: '' });
-    } finally { this.operation = false; }
+    } catch { this.revocationUnconfirmed = true; this.set({ screen: 'signout-unconfirmed', busy: false, message: '' }); }
+    finally { this.operation = false; }
   };
   reset = async (email: string) => {
     if (!this.client || this.operation) return;
     this.operation = true; this.set({ busy: true, message: '' });
     try {
-      const { error } = await this.client.resetPasswordForEmail(email, { redirectTo: `${location.origin}/auth/callback` });
+      const { error } = await authChange(() => this.client!.resetPasswordForEmail(email, { redirectTo: `${location.origin}/auth/callback` }));
       this.set(error ? { busy: false, message: 'We couldn’t confirm the reset email. Check your inbox, or try again.' } : { screen: 'reset-sent', busy: false });
-    } finally { this.operation = false; }
+    } catch { this.set({ busy: false, message: 'We couldn’t confirm the reset email. Check your inbox, or try again.' }); }
+    finally { this.operation = false; }
   };
   updatePassword = async (password: string) => {
     if (!this.client || this.operation || !this.recovery || !['password', 'password-rejected'].includes(this.state.screen)) return;
     this.operation = true; this.set({ busy: true, message: '' });
     try {
-      const { error } = await this.client.updateUser({ password });
+      await authChange(async () => {
+      const { error } = await this.client!.updateUser({ password });
       if (error && (error.code === 'weak_password' || error.code === 'same_password')) { this.set({ screen: 'password-rejected', busy: false, message: 'The password wasn’t accepted. Choose a different password and try again.' }); return; }
       this.fence(error ? error.status && error.status >= 400 && error.status < 500 ? 'invalid-link' : 'update-unconfirmed' : 'password-updated');
       this.set({ busy: true });
-      const signedOut = await this.client.signOut({ scope: 'local' });
+      const signedOut = await this.client!.signOut({ scope: 'local' });
       this.recovery = false;
       this.set({ busy: false, ...(signedOut.error ? { message: 'We couldn’t confirm session revocation. Sign in again to continue.' } : {}) });
-    } finally { this.operation = false; }
+      });
+    } catch { this.fence('update-unconfirmed'); this.recovery = false; this.set({ busy: false, message: 'We couldn’t confirm session revocation. Sign in again to continue.' }); }
+    finally { this.operation = false; }
   };
   getAccessToken = async (): Promise<string | null> => {
     const epoch = this.epoch, account = this.state.account;
@@ -181,5 +219,5 @@ export class AccountOwner {
     if (error || !data.session || data.session.user.id !== account.accountId || (data.session.expires_at ?? 0) * 1000 <= Date.now()) { this.fence('expired'); return null; }
     return data.session.access_token;
   };
-  dispose() { ++this.epoch; clearTimeout(this.expiry); this.unsubscribe?.(); this.client?.stopAutoRefresh(); window.removeEventListener('storage', this.onStorage); this.listeners.clear(); }
+  dispose() { ++this.epoch; this.passwordAttempt?.abort(); clearTimeout(this.expiry); this.unsubscribe?.(); this.client?.stopAutoRefresh(); window.removeEventListener('storage', this.onStorage); this.listeners.clear(); }
 }

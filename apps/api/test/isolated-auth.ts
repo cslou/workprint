@@ -73,7 +73,7 @@ export async function isolatedAuth(options: { lifetimeMs?: number; jwtExpirySeco
     const secret = randomBytes(48).toString('hex');
     const anonKey = jwt('anon', secret), serviceKey = jwt('service_role', secret);
     const gateway = {
-      _format_version: '2.1', services: [{ name: 'auth', url: 'http://auth:9999/', routes: [{ name: 'auth', paths: ['/auth/v1/'], strip_path: true }] }],
+      _format_version: '2.1', services: [{ name: 'auth', url: 'http://auth:9999/', retries: 0, connect_timeout: 1000, read_timeout: 1000, write_timeout: 1000, routes: [{ name: 'auth', paths: ['/auth/v1/'], strip_path: true }] }],
       plugins: [{ name: 'cors', config: { origins: ['http://127.0.0.1:4179', 'http://127.0.0.1:4180'], methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], headers: ['Authorization', 'Content-Type', 'apikey', 'X-Client-Info', 'X-Supabase-Api-Version'], credentials: false } }],
     };
     await savePrivate(configFile, gateway);
@@ -91,7 +91,7 @@ export async function isolatedAuth(options: { lifetimeMs?: number; jwtExpirySeco
       GOTRUE_MAILER_URLPATHS_CONFIRMATION: '/auth/v1/verify', GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: '/auth/v1/verify', GOTRUE_MAILER_URLPATHS_INVITE: '/auth/v1/verify',
     });
     const gatewayId = await resources.run('gateway', authFixtureImages.gateway, ['--user', '0:0', '--publish', `127.0.0.1:${port}:8000`, '--mount', `type=bind,source=${configFile},target=/tmp/gateway.json,readonly`], {
-      KONG_DATABASE: 'off', KONG_DECLARATIVE_CONFIG: '/tmp/gateway.json', KONG_PROXY_LISTEN: '0.0.0.0:8000', KONG_ADMIN_LISTEN: 'off', KONG_NGINX_WORKER_PROCESSES: '1', KONG_PROXY_ACCESS_LOG: '/dev/null', KONG_PROXY_ERROR_LOG: '/dev/stderr',
+      KONG_DATABASE: 'off', KONG_DECLARATIVE_CONFIG: '/tmp/gateway.json', KONG_PROXY_LISTEN: '0.0.0.0:8000', KONG_ADMIN_LISTEN: 'off', KONG_NGINX_WORKER_PROCESSES: '1', KONG_PROXY_ACCESS_LOG: '/dev/null', KONG_PROXY_ERROR_LOG: '/dev/null',
     });
     await resources.port(gatewayId, 8000);
     await savePrivate(privateFile, { owner: resources.owner, url, anonKey, serviceKey, mailUrl, signingSecret: secret, hostPid: process.pid, networkId: resources.networkId, edgeNetworkId: resources.edgeNetworkId, database: { containerId: database.containerId, owner: database.owner }, containers: resources.containerIds });
@@ -125,7 +125,7 @@ export async function isolatedAuth(options: { lifetimeMs?: number; jwtExpirySeco
       if (!accounts.has(recipient)) throw new Error('Refusing mail access for an account not created by this fixture');
       return capturedRecoveryLink(mailUrl, url, recipient, seenMessages);
     };
-    return { url, anonKey, serviceKey, mailUrl, privateFile, containerIds: [...resources.containerIds, database.containerId], networkId: resources.networkId, networkIds: [resources.networkId, resources.edgeNetworkId], request, createAccount, recoveryLink, close };
+    return { url, anonKey, serviceKey, mailUrl, privateFile, containerIds: [...resources.containerIds, database.containerId], networkId: resources.networkId, networkIds: [resources.networkId, resources.edgeNetworkId], pauseAuthUpstream: () => resources.pauseOwned(auth), proxyLogsContain: (privateValue: string) => resources.logsContain(gatewayId, privateValue), request, createAccount, recoveryLink, close };
   } catch (error) {
     try { await close(); } catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Isolated Auth acquisition and cleanup failed', { cause: cleanupError }); }
     throw error;
