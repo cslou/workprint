@@ -1,6 +1,8 @@
 import { test, expect } from '../material-network.js';
 import { fixture, account, signIn, privateFill, privateNavigate, origin } from '../account-fixture.js';
 import type { Page } from '@playwright/test';
+import { createServer } from 'node:http';
+import { execFileSync } from 'node:child_process';
 import type { MaterialNetwork } from '../material-network.js';
 
 test.use({ screenshot: 'off', trace: 'off', video: 'off' });
@@ -85,6 +87,38 @@ test('closing pending sign-in dismisses rather than replays it; Switch account f
     await expect(page.getByRole('button', { name: second.email, exact: true })).toBeVisible();
     await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('');
   } finally { await f.close(); }
+});
+
+test('occupied frontend port is refused before borrowing another listener', async ({ page }) => {
+  test.setTimeout(90000);
+  const occupied = createServer((_request, response) => response.end('Owned occupied-port control'));
+  await new Promise<void>(resolve => occupied.listen(4180, '127.0.0.1', resolve));
+  let acquired: Awaited<ReturnType<typeof fixture>> | undefined;
+  let refused = false;
+  try { acquired = await fixture(page); } catch (error) { refused = error instanceof Error && error.message.includes('4180'); }
+  finally { try { await acquired?.close(); } finally { await new Promise<void>(resolve => occupied.close(() => resolve())); } }
+  expect(refused, 'Frontend attached to a listener it did not start').toBe(true);
+});
+
+test('browser resource cleanup continues after a context-close error and reports it', async ({ page }) => {
+  test.setTimeout(90000); const f = await fixture(page);
+  const context = page.context(), original = context.close.bind(context);
+  let failure: unknown;
+  context.close = async () => { throw new Error('Controlled browser context close failure'); };
+  try {
+    try { await f.close(); } catch (error) { failure = error; }
+    const port = createServer();
+    let vacant = false;
+    try { await new Promise<void>((resolve, reject) => { port.once('error', reject); port.listen(4180, '127.0.0.1', resolve); }); vacant = true; } catch { vacant = false; }
+    finally { if (port.listening) await new Promise<void>(resolve => port.close(() => resolve())); }
+    const containersRemoved = f.auth.containerIds.every(id => execFileSync('docker', ['ps', '--all', '--quiet', '--filter', 'id=' + id]).length === 0);
+    expect(failure instanceof AggregateError && failure.errors.length === 1 && failure.errors[0] instanceof Error && failure.errors[0].message === 'Controlled browser context close failure', 'Context failure was not preserved with cleanup context').toBe(true);
+    expect(vacant, 'Owned frontend remained after context-close failure').toBe(true);
+    expect(containersRemoved, 'Owned Auth service remained after context-close failure').toBe(true);
+  } finally {
+    context.close = original; await original();
+    await f.close().catch(error => { if (!(error instanceof AggregateError)) throw error; });
+  }
 });
 
 test('built production account entry uses the qualified SDK and validated public configuration', async ({ page, materialNetwork }) => {

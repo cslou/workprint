@@ -125,8 +125,10 @@ test('default dev and production build expose no interchangeable test compositio
         await expect(page.getByRole('tabpanel')).toHaveText('Your script will appear here once you describe your video.');
         expect(await page.evaluate(() => Object.keys(window).filter(key => /Test$/.test(key)))).toEqual([]);
         await page.getByRole('button', { name: 'Account', exact: true }).press('Enter');
-        await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeDisabled();
-        await expect(page.getByRole('dialog')).toContainText('Sign-in is not available yet.');
+        await expect(page.getByRole('dialog')).toContainText('Sign-in is not configured for this build.');
+        await expect(page.getByLabel('Email', { exact: true })).toHaveCount(0);
+        await expect(page.getByLabel('Password', { exact: true })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toHaveCount(0);
         await page.keyboard.press('Escape');
       }
     } finally { try { await page.goto('about:blank'); } finally { await server.stop(); } }

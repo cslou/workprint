@@ -94,7 +94,7 @@ export async function isolatedAuth(options: { lifetimeMs?: number; jwtExpirySeco
       KONG_DATABASE: 'off', KONG_DECLARATIVE_CONFIG: '/tmp/gateway.json', KONG_PROXY_LISTEN: '0.0.0.0:8000', KONG_ADMIN_LISTEN: 'off', KONG_NGINX_WORKER_PROCESSES: '1', KONG_PROXY_ACCESS_LOG: '/dev/null', KONG_PROXY_ERROR_LOG: '/dev/stderr',
     });
     await resources.port(gatewayId, 8000);
-    await savePrivate(privateFile, { owner: resources.owner, url, anonKey, serviceKey, mailUrl, signingSecret: secret, networkId: resources.networkId, containers: resources.containerIds });
+    await savePrivate(privateFile, { owner: resources.owner, url, anonKey, serviceKey, mailUrl, signingSecret: secret, hostPid: process.pid, networkId: resources.networkId, edgeNetworkId: resources.edgeNetworkId, database: { containerId: database.containerId, owner: database.owner }, containers: resources.containerIds });
     const deadline = Date.now() + 45000;
     for (;;) {
       let ready = false;
