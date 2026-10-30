@@ -53,7 +53,7 @@ Keyboard/focus/full labels and long-title containment run at all four main width
 
 ## Navigation presentation corrections
 
-Recents row activation explicitly dismisses the narrow Navigation surface even when the selected native ID is unchanged; read completion then restores heading focus without resetting the same-conversation draft. Earlier-history insertion uses a React precommit scroll snapshot, so user scrolling while the response is pending is retained on desktop and narrow document scrolling. An unchanged viewport also retains the original anchor across the loading-control height change. Neither path creates or sends native work or introduces automatic focus movement during pagination.
+Recents row activation explicitly dismisses the narrow Navigation surface even when the selected native ID is unchanged; read completion then restores heading focus without resetting the same-conversation draft. Earlier-history insertion uses a React precommit scroll snapshot, so user scrolling while the response is pending is retained on desktop and narrow document scrolling. An uninterrupted viewport also retains the original anchor across the loading-control height change. Intervening scroller/document scroll or viewport resize discards that cached baseline even when the final coordinates return to their starting values; those listeners are removed when history unmounts. Neither path creates or sends native work or introduces automatic focus movement during pagination.
 
 ## Verification and remaining delivery
 
