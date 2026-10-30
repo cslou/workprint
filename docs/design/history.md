@@ -1,5 +1,9 @@
 # Workprint — Application Design History
 
+## Bounded saved-work navigation — 2026-10-30
+
+**Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Option B adds a loaded-window range and Back to first page after bounded eviction, preserving exact Library choices and keeping navigation inside the scrolling rows. This replaces the inaccessible 1,000-item ceiling without silent loss of back-navigation. [Binding details](design.md#bounded-saved-work-navigation) refine the prior append-only description. Desktop/narrow inert Library/history previews were inspected; runtime and visual parity remain to be verified.
+
 ## Owned saved-work reads — 2026-10-29
 
 **Provisionally approved by the orchestrator on 2026-10-29 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff.**
