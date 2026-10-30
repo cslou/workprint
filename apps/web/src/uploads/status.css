@@ -1,0 +1,8 @@
+.wp-upload-status { width: min(640px, 100%); margin: 0 auto 24px; padding: 16px; border: 1px solid var(--color-border-default); border-radius: var(--radius-xl); background: var(--color-bg-surface); }
+.wp-upload-status h3 { font-size: 14px; margin: 0 0 4px; overflow-wrap: anywhere; }
+.wp-upload-status p { margin: 8px 0; font-size: 13px; color: var(--color-text-secondary); }
+.wp-upload-meta { font-size: 12px; color: var(--color-text-subtle); overflow-wrap: anywhere; }
+.wp-upload-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.wp-upload-media { width: min(480px, 100%); }
+.wp-upload-image { display: block; width: 100%; aspect-ratio: 3 / 2; object-fit: contain; background: var(--color-bg-sunken); border-radius: var(--radius-lg); margin: 12px 0; }
+.wp-upload-well { display: grid; place-content: center; min-height: 200px; border-radius: var(--radius-lg); background: var(--color-bg-sunken); color: var(--color-text-subtle); margin: 12px 0; padding: 24px; text-align: center; }

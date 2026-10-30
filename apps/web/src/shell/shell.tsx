@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Button as AriaButton, Dialog, Heading, Modal, ModalOverlay } from 'react-aria-components';
-import { nativeConversations } from '@workprint/api-client';
+import { createUploadSession, nativeConversations, type UploadSession } from '@workprint/api-client';
 import type { OperationResponse } from '@workprint/contracts';
 import type { BrowserClient } from '../api/client.js';
 import { Button } from '../ui/controls.js';
@@ -28,9 +28,11 @@ const nativeCopy = { new: ['New video is not available yet.', 'No conversation w
 
 /** Session is supplied by its qualified owner; this shell never creates or persists one. */
 export function Shell(props: ShellProps) {
-  return <ScopedShell key={JSON.stringify([props.session?.accountId ?? null, props.conversationId ?? null])} {...props} />;
+  const [uploadSession] = useState(() => createUploadSession());
+  useLayoutEffect(() => () => uploadSession.dispose(), [uploadSession]);
+  return <ScopedShell uploadSession={uploadSession} key={JSON.stringify([props.session?.accountId ?? null, props.conversationId ?? null])} {...props} />;
 }
-function ScopedShell({ connection, session, conversationId, workspaceContent, materialPrerequisites, storyboardPrerequisites, videoPrerequisites, libraryPrerequisites }: ShellProps) {
+function ScopedShell({ connection, session, conversationId, workspaceContent, materialPrerequisites, storyboardPrerequisites, videoPrerequisites, libraryPrerequisites, uploadSession }: ShellProps & { uploadSession: UploadSession }) {
   const [surface, setSurface] = useState<Surface>(null);
   const [tab, setTab] = useState<WorkspaceTab>('script');
   const [composerText, setComposerText] = useState('');
@@ -65,7 +67,7 @@ function ScopedShell({ connection, session, conversationId, workspaceContent, ma
       </nav>
       <main className="wp-main" aria-label="New video" aria-busy={workspace.kind === 'loading'}>
         <div className="wp-thread"><div className="wp-welcome"><h1>What would you like to make?</h1><p className="wp-lead">Describe the moment you want to see. Rough is fine; I'll ask about anything I need.</p><div className="wp-hints" aria-label="Things that help">{["Who's in it", 'Where it happens', 'What happens', 'Anything they say', 'Look or mood'].map((hint) => <span key={hint}>{hint}</span>)}</div><p className="wp-aside-note">Have photos of the people or places? You can attach them now or later.</p></div></div>
-        {workspace.kind === 'settled' && workspace.result.ok && workspace.result.value.pendingQuestion ? <QuestionReview connection={connection} scope={scope} question={workspace.result.value.pendingQuestion} workspace={workspace.result.value} draft={draft} /> : <Composer native={native} draft={draft} connection={connection} scope={scope} />}
+        {workspace.kind === 'settled' && workspace.result.ok && workspace.result.value.pendingQuestion ? <QuestionReview uploadSession={uploadSession} onUploaded={workspace.onUploaded} connection={connection} scope={scope} question={workspace.result.value.pendingQuestion} workspace={workspace.result.value} draft={draft} /> : <Composer uploadSession={uploadSession} onUploaded={workspace.onUploaded} native={native} draft={draft} connection={connection} scope={scope} />}
       </main>
       <aside className="wp-workspace" aria-label="This video"><MaterialPanel connection={connection} scope={scope} workspace={projection} onSaved={workspace.onSaved} {...(projection ? { additionalContent: { storyboard: <Storyboard connection={connection} scope={scope} workspace={projection} onSaved={workspace.onSaved} {...(storyboardPrerequisites ? { prerequisites: storyboardPrerequisites } : {})} />, videos: <WorkspaceVideos connection={connection} scope={scope} workspace={projection} {...(videoPrerequisites ? { videoPrerequisites } : {})} /> } } : {})} {...(materialPrerequisites ? { prerequisites: materialPrerequisites } : {})} placeholder={placeholder} selectedKey={tab} onSelectionChange={(key) => setTab(key as WorkspaceTab)} {...(content === undefined ? {} : { contentOverride: content })} /></aside>
     </div>

@@ -1,26 +1,11 @@
 # Upload consumer boundary
 
-`initiateUpload` still sends metadata only; it never transfers or confirms a
-selected file. A grant/PUT is not a version. Existing composer appearance and
-feedback remain unchanged; unknown native contexts now receive nondisclosing
-404, not an obsolete unavailable-operation response.
+The production Composer uses the framework-free `createUploadSession` single-file lifecycle: captured File and immutable authorization/confirmation identities, explicit recovery, no queue or automatic mutation replay. `transferUpload` is separately credential-free, bounded to100MiB/two active/no queue/30seconds; no PUT acknowledgement is usable work. Stop/close/scope changes stop observation, never revoke signed access or undo committed work.
 
-The framework-free `transferUpload` in `@workprint/api-client` is a separate
-bounded mechanical PUT capability: captured Blob, exact supplied grant, 100 MiB
-maximum, two active transfers/no queue, at most 30 seconds, explicit cancellation,
-no automatic retry/reacquisition/confirmation. It has no token provider and sends
-only Content-Type with credentials omitted, no referrer and no redirects. A PUT
-acknowledgement is not media verification or publication. Failed/cancelled
-observation cannot promise server rollback or absence of stored bytes.
+The approved96a states are rendered by `status.tsx` and independent sources/state links live in `docs/design/verified-uploads-r1/`. The Shell retains the UI session across keyed scope teardown only to emit a generic cleared notice; old file/grant/result identity is forgotten. Successful confirmation displays its exact human Draft version, not approval or Shot choice. Workspace refresh is read-only and does not reapply an old confirmation over later decisions.
 
-The isolated test composition exercises actual API authorization, private PUT
-and no-verifier confirmation, plus scope teardown, without adding a product
-control or working-upload success state. Its exact consumable observer matches
-signed requests in memory while redacting signature/credential query values and
-never retaining private transfer bodies; traces/video are disabled. API bearer
-and cookie absence is checked at the actual browser storage request.
+Owned preview access is a separate exact-version read. `readPrivateImage` fetches image/poster bytes with credentials omitted, no referrer/redirect,10MiB/10second/two-active bounds, and no automatic reacquisition. The component uses a local Blob URL, checks decoded dimensions and revokes/disposes old sources. Video displays only a poster, never a playback control. Recovery reads the same version without another upload.
 
-The built backend now supports explicit qualified local verification and owned
-image/poster reads; absent media configuration still explicitly fails confirmation.
-The chooser-to-verified-success UI remains pending under its approved Story4 scope;
-existing consumer controls above are not yet that completed workflow. Emulator transport is not R2 qualification.
+Actual browser/Auth/built backend/owned PG/S3 tests prove image/poster success, positive cookie-jar exclusion of cookies/API bearer on PUT/GET, response-loss confirmation retry, stopped observation recovery and committed response arriving after account/conversation change. Exact consumable network allowances retain redacted metadata only; traces/video are disabled. Source promotion is not visual qualification: matched fixture substitutions, paired comparisons, keyboard/geometry checks and reload/exact-version existing-work integration remain pending.
+
+The legacy `initiateUpload`/`confirmUpload` exports support retained isolated denial controls; they are not the production pipeline. Missing backend media configuration still fails closed. No R2, playback, production distribution or completed filmmaking workflow is qualified here.

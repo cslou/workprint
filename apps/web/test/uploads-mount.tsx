@@ -1,5 +1,5 @@
 import { createRoot } from 'react-dom/client';
-import { nativeConversations, transferUpload } from '@workprint/api-client';
+import { createUploadSession, nativeConversations, transferUpload } from '@workprint/api-client';
 import type { OperationResponse } from '@workprint/contracts';
 import type { ReadScope } from '../src/api/use-scoped-read.js';
 import { createBrowserClient } from '../src/api/client.js';
@@ -17,10 +17,11 @@ let connection: BrowserClient = { kind: 'missing' };
 let scope: ReadScope | null = null;
 let accessToken: string | null = null;
 let confirmation = '';
+const uiUploadSession = createUploadSession();
 let mountGeneration = 0;
 let pending: AbortController | null = null;
 let prepared: { file: File; grant: OperationResponse<'requestUpload'>; confirmOperation: string } | null = null;
-const render = () => root.render(<div style={{ width: 'min(720px, 100%)' }}><Composer key={JSON.stringify([scope?.accountId ?? null, scope?.conversationId ?? null])} native={nativeConversations} connection={connection} scope={scope} /><p className={confirmation ? 'wp-chat-feedback' : undefined} data-confirm role="status">{confirmation}</p></div>);
+const render = () => root.render(<div style={{ width: 'min(720px, 100%)' }}><Composer uploadSession={uiUploadSession} key={JSON.stringify([scope?.accountId ?? null, scope?.conversationId ?? null])} native={nativeConversations} connection={connection} scope={scope} /><p className={confirmation ? 'wp-chat-feedback' : undefined} data-confirm role="status">{confirmation}</p></div>);
 (window as unknown as { uploadsTest: unknown }).uploadsTest = {
   configure({ apiOrigin, token = null, accountId, conversationId }: { apiOrigin?: string; token?: string | null; accountId: string; conversationId?: string }) {
     mountGeneration += 1; pending?.abort(); prepared = null;
