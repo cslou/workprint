@@ -10,7 +10,7 @@ import { boundedPage } from './paging.js';
 import { publishVersion } from './publication.js';
 
 type OwnershipCheck = (account: string, conversation: string) => Promise<{ kind: 'owned' | 'not_found' } | { kind: 'unavailable'; reason: 'native_storage' }>;
-type Kind = 'script' | 'reference' | 'storyboard';
+type Kind = Version['kind'];
 type Row = { owner_id: string; version_id: string; artifact_id: string; kind: Kind; revision: number; content: unknown; created_by: 'human' | 'assistant'; created_at: Date; origin_conversation_id: string; dependencies: string[]; sort_time: string };
 const columns = `v.*,to_char(v.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS sort_time,
   COALESCE((SELECT array_agg(d.dependency_id ORDER BY d.position) FROM artifacts.version_dependencies d WHERE d.owner_id=v.owner_id AND d.version_id=v.version_id),ARRAY[]::text[]) AS dependencies`;
@@ -36,7 +36,7 @@ export function createArtifactStore(pool: Pool, checkOwnedConversation: Ownershi
   const project = (row: Row): Version => {
     try {
       return versionSchema.parse({ id: row.version_id, artifactId: row.artifact_id, kind: row.kind, revision: row.revision,
-        content: parseContent(row.kind, row.content), createdBy: row.created_by, createdAt: row.created_at.toISOString(), dependencies: row.dependencies });
+        ...(row.kind === 'image' || row.kind === 'video' ? { media: z.strictObject({ schemaVersion: z.literal(1), media: z.unknown() }).parse(row.content).media } : { content: parseContent(row.kind, row.content) }), createdBy: row.created_by, createdAt: row.created_at.toISOString(), dependencies: row.dependencies });
     } catch { throw new ArtifactError('integration_failure'); }
   };
   const rowFor = async (account: string, id: string) => {

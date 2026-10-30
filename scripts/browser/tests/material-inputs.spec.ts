@@ -87,8 +87,8 @@ test('the actual file input initiates the exact metadata and never transfers or 
       const chooser = page.waitForEvent('filechooser');
       await page.getByRole('button', { name: 'Attach a file', exact: true }).press('Enter');
       await (await chooser).setFiles({ name: 'vale portrait.png', mimeType: 'image/png', buffer: image });
-      expect((await response).status()).toBe(501);
-      await expect(page.locator('.wp-chat-feedback')).toHaveText('Uploading files is not available yet. The file was not sent.');
+      const denied = await response; expect(denied.status()).toBe(404); expect(await denied.json()).toEqual({ error: { code: 'not_found', message: 'Saved work not found' } });
+      await expect(page.locator('.wp-chat-feedback')).toHaveText('The file was not uploaded. Nothing was changed.');
       materialNetwork.assertSafe();
       expect(seen).toHaveLength(1);
       expect(seen[0]).toMatchObject({ method: 'POST', path: '/v1/conversations/conversation-a/uploads' });
@@ -100,7 +100,7 @@ test('the actual file input initiates the exact metadata and never transfers or 
       const video = await readFile('apps/web/test/fixtures/clip.webm');
       const videoResponse = page.waitForResponse((value) => new URL(value.url()).pathname === '/v1/conversations/conversation-a/uploads');
       await input.setInputFiles({ name: 'clip.webm', mimeType: 'video/webm', buffer: video });
-      expect((await videoResponse).status()).toBe(501);
+      const deniedVideo = await videoResponse; expect(deniedVideo.status()).toBe(404); expect(await deniedVideo.json()).toEqual({ error: { code: 'not_found', message: 'Saved work not found' } });
       expect(seen[1]!.body).toMatchObject({ kind: 'video', filename: 'clip.webm', contentType: 'video/webm', byteSize: video.byteLength });
       expect(seen.every((entry) => entry.path === '/v1/conversations/conversation-a/uploads' && entry.method === 'POST')).toBe(true);
       expect(seen.some((entry) => /\/confirm$/.test(entry.path))).toBe(false);
@@ -155,7 +155,7 @@ test('upload transport failure, unsupported type and no conversation send nothin
   await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.unmount());
 });
 
-test('the isolated confirmation consumer calls the real route and exposes no version on 401/501', async ({ page, materialNetwork }, info) => {
+test('the isolated confirmation consumer calls the real route and exposes no version on 401/404', async ({ page, materialNetwork }, info) => {
   test.setTimeout(120000);
   await info.attach('prerequisite', { body: 'Read-only synthetic upload identity supplied by the isolated mount. No transfer, initiation success or product control is fabricated.', contentType: 'text/plain' });
   const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
@@ -169,9 +169,10 @@ test('the isolated confirmation consumer calls the real route and exposes no ver
       materialNetwork.expectOperations({ origin, method: 'POST', path: '/v1/uploads/read-only-upload-identity/confirm', count: 2, query: {} });
       const seen: { method: string; path: string; body: unknown }[] = [];
       await page.route('**/v1/**', async (route) => { seen.push({ method: route.request().method(), path: new URL(route.request().url()).pathname, body: JSON.parse(route.request().postData() ?? '{}') }); await route.fallback(); });
+      const rejected = page.waitForResponse(response => new URL(response.url()).pathname.endsWith('/confirm'));
       const outcome = await page.evaluate(() => (window as unknown as UploadsHarness).uploadsTest.confirm('read-only-upload-identity'));
-      expect(outcome).toBe('unavailable');
-      await expect(page.locator('[data-confirm]')).toHaveText('Confirming this upload is not available yet. No version was created.');
+      expect(outcome).toBe('error'); const denied = await rejected; expect(denied.status()).toBe(404); expect(await denied.json()).toEqual({ error: { code: 'not_found', message: 'Saved work not found' } });
+      await expect(page.locator('[data-confirm]')).toHaveText('This upload was not confirmed. No version was created.');
       expect(seen).toHaveLength(1);
       expect(seen[0]).toMatchObject({ method: 'POST', path: '/v1/uploads/read-only-upload-identity/confirm' });
       expect(typeof (seen[0]!.body as Record<string, unknown>).operationId).toBe('string');

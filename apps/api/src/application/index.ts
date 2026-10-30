@@ -49,5 +49,6 @@ export function createApplication(collaborators: ApplicationCollaborators) {
   return { operations: unavailableApplication, checkOwnedConversation: collaborators.checkOwnedConversation };
 }
 export type Application = ReturnType<typeof createApplication>;
+export { withUploads, type UploadApplication } from './uploads.js';
 export { withManualSaves, type ManualSaveApplication } from './manual-saves.js';
 export { withSavedWork, type SavedWorkApplication, type SavedWorkReads } from './saved-reads.js';

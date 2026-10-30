@@ -3,8 +3,9 @@ import { registerApiRoute, type ApiRoute } from '@mastra/core/server';
 import { PostgresStore } from '@mastra/pg';
 import { Pool } from 'pg';
 import { createOwnedConversationCheck } from '../agent/index.js';
-import { createApplication, withSavedWork, withManualSaves } from '../application/index.js';
-import { createArtifactStore, createArtifactWriters } from '../artifacts/index.js';
+import { createApplication, withSavedWork, withManualSaves, withUploads } from '../application/index.js';
+import { createArtifactStore, createArtifactWriters, createUploadCoordinator } from '../artifacts/index.js';
+import { configuredObjectStorage } from '../storage/index.js';
 import { assertRestrictedRole } from '../db/index.js';
 import { loadServerConfig } from './config.js';
 import { verifyAccount } from './auth.js';
@@ -13,6 +14,7 @@ import { applicationRoutes } from './application-routes.js';
 /** One backend: cataloged application routes plus explicit test-composition additions. */
 export async function createBackend(routes: ApiRoute[] = []) {
   const config = loadServerConfig(process.env);
+  const objects = configuredObjectStorage(process.env);
   const pool = new Pool({
     connectionString: config.connectionString, max: 4, connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 5000, statement_timeout: 10000,
@@ -28,14 +30,15 @@ export async function createBackend(routes: ApiRoute[] = []) {
       requiredSchemas: ['mastra', 'public'], errorMessage: 'Privileged serving connection',
     });
   } catch {
-    await pool.end();
+    objects?.close(); await pool.end();
     throw new Error('Serving storage unavailable or privileged; prepare storage separately and use restricted DATABASE_URL');
   }
   const storage = new PostgresStore({ id: 'workprint-native', schemaName: 'mastra', disableInit: true, pool });
   const application = createApplication({ checkOwnedConversation: createOwnedConversationCheck(storage) });
   const savedApplication = withSavedWork(application, createArtifactStore(pool, application.checkOwnedConversation));
   const manualApplication = withManualSaves(savedApplication, createArtifactWriters(pool, application.checkOwnedConversation).human.save);
-  const protectedRoutes = [...applicationRoutes(manualApplication), ...routes];
+  const uploadApplication = withUploads(manualApplication, createUploadCoordinator(pool, application.checkOwnedConversation, objects ? { storage: objects } : {}));
+  const protectedRoutes = [...applicationRoutes(uploadApplication), ...routes];
   const matchesRoute = (path: string, method: string) => protectedRoutes.some((route) => {
     const template = route.path.split('/');
     const segments = path.split('/');
