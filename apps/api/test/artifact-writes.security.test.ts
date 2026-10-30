@@ -13,6 +13,45 @@ import { applyArtifactMigrations } from './artifact-database.js';
 type Command = OperationRequest<'saveVersion'>['body'];
 const script = (action: string) => ({ schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'Station', time: 'morning' }, characters: ['Ada'], script: [{ action }] }] });
 
+test('human reference save moves only the exact role/conversation use and journals its identity', { timeout: 120000 }, async () => {
+  const db = await isolatedPostgres();
+  const pool = new Pool({ connectionString: db.servingUrl, max: 4, connectionTimeoutMillis: 1000, statement_timeout: 2000 });
+  const native = new PostgresStore({ id: 'distinct-reference-bindings', connectionString: db.setupUrl, schemaName: 'mastra' });
+  const serving = new PostgresStore({ id: 'distinct-reference-serving', schemaName: 'mastra', disableInit: true, pool });
+  try {
+    await native.init(); await db.grantServing(); await applyArtifactMigrations(db.setupUrl);
+    const account = 'distinct-binding-owner', firstConversation = await createNativeConversation(native, account), secondConversation = await createNativeConversation(native, account);
+    const check = createOwnedConversationCheck(serving), store = createArtifactStore(pool, check), writer = createArtifactWriters(pool, check).human;
+    const content = { schemaVersion: 1, subject: { id: 'ada', kind: 'character', name: 'Ada reference', description: 'A traveller.', continuityNotes: ['Keep the green coat.'] }, references: [] };
+    const first = await store.insert({ accountId: account, conversationId: firstConversation.id, kind: 'reference', createdBy: 'human', content, dependencies: [], use: { binding: { purpose: 'reference', role: 'lead' }, state: 'draft' } });
+    await store.insert({ accountId: account, conversationId: firstConversation.id, artifactId: first.artifactId, kind: 'reference', createdBy: 'human', content, dependencies: [], use: { binding: { purpose: 'reference', role: 'support' }, state: 'approved' } });
+    const base = await store.insert({ accountId: account, conversationId: secondConversation.id, artifactId: first.artifactId, kind: 'reference', createdBy: 'human', content, dependencies: [], use: { binding: { purpose: 'reference', role: 'lead' }, state: 'approved' } });
+    await store.insert({ accountId: account, conversationId: firstConversation.id, kind: 'reference', createdBy: 'human', content, dependencies: [], use: { binding: { purpose: 'reference', role: 'lead' }, state: 'approved' } });
+    type UseRow = { owner_id: string; conversation_id: string; use_id: string; version_id: string; binding: { purpose: 'reference'; role: string }; purpose: string; state: string; created_at: string };
+    const uses = async () => (await pool.query<UseRow>('SELECT owner_id,conversation_id,use_id,version_id,binding,purpose,state,created_at::text FROM artifacts.conversation_uses ORDER BY use_id')).rows;
+    const before = await uses();
+    assert.equal(before.length, 4);
+    const intended = before.find(row => row.conversation_id === firstConversation.id && row.version_id === first.id && row.binding.role === 'lead');
+    assert.ok(intended); assert.equal(intended.state, 'draft');
+    const operationId = randomUUID(), binding = { purpose: 'reference' as const, role: 'lead' };
+    const command: Command = { operationId, artifactId: first.artifactId, baseVersionId: base.id, kind: 'reference', content: { ...content, subject: { ...content.subject, description: 'A traveller carrying a small case.' } }, dependencies: [], intendedUse: binding };
+    const saved = await writer.save(account, firstConversation.id, command);
+    assert.deepEqual(saved.use, { id: intended.use_id, versionId: saved.version.id, binding, state: 'approved' });
+    const after = await uses();
+    assert.deepEqual(after, before.map(row => row.use_id === intended.use_id ? { ...row, version_id: saved.version.id, state: 'approved' } : row), 'Every other role, conversation and artifact use remains byte-for-byte unchanged');
+    assert.deepEqual((await pool.query('SELECT owner_id,conversation_id,operation_id,command_kind,previous_version_id,previous_use_version_id,version_id,use_id FROM artifacts.manual_changes')).rows, [{
+      owner_id: account, conversation_id: firstConversation.id, operation_id: operationId, command_kind: 'manual_save', previous_version_id: base.id, previous_use_version_id: first.id, version_id: saved.version.id, use_id: intended.use_id,
+    }], 'The journal links the exact moved use, edited base and prior pinned version');
+    assert.deepEqual(await writer.save(account, firstConversation.id, command), saved);
+    assert.deepEqual(await uses(), after);
+    for (const [conversation, role] of [[firstConversation.id, 'missing'], [secondConversation.id, 'support']]) {
+      await assert.rejects(writer.save(account, conversation!, { ...command, operationId: randomUUID(), baseVersionId: saved.version.id, intendedUse: { purpose: 'reference', role: role! } }), { code: 'not_found' }, 'A different/missing scoped role must not fall back to an existing use');
+    }
+    assert.deepEqual(await uses(), after);
+    assert.deepEqual((await pool.query('SELECT (SELECT count(*)::int FROM artifacts.versions) AS versions,(SELECT count(*)::int FROM artifacts.commands) AS commands,(SELECT count(*)::int FROM artifacts.manual_changes) AS changes')).rows, [{ versions: 5, commands: 1, changes: 1 }], 'Retry and negative controls create no extra effects');
+  } finally { await native.close(); await serving.close(); if (!pool.ended) await pool.end(); await db.close(); }
+});
+
 test('transactional writers enforce separate producer capabilities, immutable command identity and rollback of every effect', { timeout: 120000 }, async () => {
   const db = await isolatedPostgres();
   const pool = new Pool({ connectionString: db.servingUrl, max: 4, connectionTimeoutMillis: 1000, statement_timeout: 2000, application_name: 'artifact-command-qualification' });
