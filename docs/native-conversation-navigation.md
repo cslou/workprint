@@ -43,6 +43,14 @@ The test-only `apps/web/test/navigation-reference/` freezes all 29 independently
 
 Two explicit compositions reconcile exploratory artifacts with the binding guide: Session states preserve the earlier approved Auth notice colour/action inset rather than changing Auth to a generic modal; desktop long-title grid tracks are constrained so the required ellipsis works (the unconstrained exploratory track was about 691px inside a 235px sidebar). Frozen files remain unchanged. These are guide-based reference corrections, not masks, weakened assertions or acceptance of current screenshots. Original failures remain recorded. Human ratification and independent review remain separate.
 
+## Completion qualification details
+
+The obsolete isolated Open conversation action and four visual cases are retired, not the workspace/Library admission or unavailable Send checks. Replacement coverage exercises actual owned native navigation/history and the 70 independent reference pairs above.
+
+Additional isolated checks cover built-browser creation, successful SDK refresh/reconnect without native replay, revoked refresh clearing native presentation, and held actual create/list/history responses across standard account switches. Native history exceeding the response cap fails safely. A real system-only fixture exposed native normalization returning no messages with total 1; incomplete native pages now fail closed instead of claiming empty history or a complete boundary. No private system content is projected.
+
+Keyboard/focus/full labels and long-title containment run at all four main widths with reduced motion. Reflow qualification uses half-width effective CSS viewports and an additional 200% CSS zoom at 390. CSS zoom alone does not update media queries: an initial 821px experiment overflowed the unchanged desktop columns and remains recorded as a non-pass, not browser-zoom evidence. Native browser zoom and comprehensive assistive-technology certification are not claimed. The narrow experiment independently exposed and corrected intrinsic grid overflow in Navigation without changing normal-width reference output.
+
 ## Verification and remaining delivery
 
 Automated production-entry checks use isolated Auth/Postgres and the supported `createNativeConversation` helper for preexisting messages. They cover real native create/pagination, exact message identity/text/order, two-account/forged-scope denial, foreign/absent equivalence, no-effect reads and closed generic mutations. Browser checks drive the actual app and native client with exact network allowances, more than one page of explicit creates, keyboard/page focus, reload, earlier-history anchoring, honest empty/error/unknown outcomes, and held real success/failure responses across newer selections/accounts. Public-factory delegation observes promise settlement without exporting credentials or adding production test hooks.

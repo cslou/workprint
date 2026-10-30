@@ -25,7 +25,7 @@ export async function accountBrowserFixture(options: Parameters<typeof isolatedA
     const server = await startAuthServer(entry, env.env, { url: auth.url, anonKey: auth.anonKey, servingUrl: db.servingUrl, accounts: [] }, join(env.logs, 'account-api.log'), { env: { WORKPRINT_BROWSER_ORIGIN: 'http://127.0.0.1:4180' } });
     cleanups.push(server.server.stop); cleanups.push(env.noNetwork);
     return { auth, apiOrigin: server.origin, close,
-      saveNative: async (accountId: string, messages: readonly { role: 'user' | 'assistant'; text: string }[] = [{ role: 'user', text: 'Synthetic saved work' }], title?: string) => {
+      saveNative: async (accountId: string, messages: Parameters<typeof createNativeConversation>[2] = [{ role: 'user', text: 'Synthetic saved work' }], title?: string) => {
         return createNativeConversation(store, accountId, messages, title);
       },
       readNative: async (accountId: string, threadId: string) => {

@@ -1,5 +1,5 @@
 .wp-owned-shell .wp-nav-label { display: inline-flex; align-items: center; min-height: var(--size-control-md); }
-.wp-owned-navigation { display: grid; gap: var(--space-12); }
+.wp-owned-navigation { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-12); }
 .wp-owned-navigation h3 { margin: 0; font-size: var(--font-size-13); font-weight: var(--font-weight-regular); color: var(--color-text-subtle); }
 .wp-navigation-dialog.wp-owned-navigation-links { display: grid; gap: var(--space-2); }
 .wp-owned-navigation-account { border-top: var(--border-width-default) solid var(--color-border-default); padding-top: var(--space-8); }
@@ -12,7 +12,7 @@
 .wp-recent-compact .wp-recent-row { min-height: calc(2 * var(--space-18)); align-items: center; }
 .wp-recent-compact .wp-recent-row > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wp-recent-row[data-disabled] { opacity: .45; }
-.wp-native-recents, .wp-native-feedback { display: grid; gap: var(--space-12); color: var(--color-text-secondary); font-size: var(--font-size-13); overflow-wrap: anywhere; }
+.wp-native-recents, .wp-native-feedback { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-12); color: var(--color-text-secondary); font-size: var(--font-size-13); overflow-wrap: anywhere; }
 .wp-native-recents p, .wp-native-feedback p { margin: 0; }
 .wp-native-actions { display: flex; flex-wrap: wrap; gap: var(--space-8); }
 .wp-native-recents .wp-button-secondary, .wp-native-feedback .wp-button-secondary, .wp-native-history .wp-button-secondary { height: var(--size-control-lg); border-color: var(--color-border-strong); background: var(--color-bg-surface); color: var(--color-text-primary); }
@@ -20,6 +20,7 @@
 .wp-native-range, .wp-history-more { font-size: var(--font-size-12); color: var(--color-text-subtle); }
 .wp-native-range:focus { outline: none; }
 .wp-native-dialog { max-height: calc(100dvh - 2 * var(--space-24)); overflow: auto; }
+.wp-native-dialog .wp-dialog-head h2 { min-width: 0; overflow-wrap: anywhere; }
 .wp-history-head { padding: var(--space-18) var(--space-24) var(--space-12); border-bottom: var(--border-width-default) solid var(--color-border-default); display: grid; gap: var(--space-4); }
 .wp-history-head h1 { font: var(--font-weight-semibold) var(--font-size-14)/var(--font-line-height-1-5) var(--font-family-sans); margin: 0; overflow-wrap: anywhere; outline: none; }
 .wp-history-head p { font-size: var(--font-size-12); color: var(--color-text-subtle); }

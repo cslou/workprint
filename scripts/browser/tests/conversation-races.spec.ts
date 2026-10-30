@@ -41,21 +41,29 @@ test('a real late committed create cannot steal a newer conversation or its draf
   } finally { held?.release(); await f.close(); }
 });
 
-test('a held real owned list cannot cross a standard account switch', async ({ page, materialNetwork }) => {
+for (const operation of ['create', 'list', 'history'] as const) test(`a held real owned ${operation} cannot cross a standard account switch`, async ({ page, materialNetwork }) => {
   test.setTimeout(120000); const f = await fixture(page, true); let held: Awaited<ReturnType<typeof holdRealResponse>> | undefined;
   try {
     const first = await f.auth.createAccount(), second = await f.auth.createAccount();
-    await f.application!.saveNative(first.id, [], 'Old account private title');
-    await observeNavigation(page); await enter(page, materialNetwork, f, first);
-    held = await holdRealResponse(page, '**/memory/threads?*'); allowList(materialNetwork, f.application!.apiOrigin, first.id);
-    await page.getByRole('button', { name: 'Recents', exact: true }).click(); expect(await held.seen).toBe(200);
-    await page.getByRole('button', { name: 'Close', exact: true }).click(); await account(page, first.email);
+    const old = await f.application!.saveNative(first.id, [{ role: 'user', text: 'Old account private text' }], 'Old account private title');
+    await observeNavigation(page);
+    held = await holdRealResponse(page, operation === 'create' ? '**/memory/threads' : operation === 'list' ? '**/memory/threads?*' : `**/memory/threads/${old.id}/messages?*`);
+    if (operation === 'history') allowHistory(materialNetwork, f.application!.apiOrigin, first.id, old.id, 1, false);
+    await enter(page, materialNetwork, f, first, operation === 'history' ? old.id : undefined);
+    if (operation === 'create') materialNetwork.expectOperations({ origin: f.application!.apiOrigin, method: 'POST', path: '/memory/threads', query: {}, count: 1 });
+    if (operation === 'list') allowList(materialNetwork, f.application!.apiOrigin, first.id);
+    if (operation !== 'history') await page.getByRole('button', { name: operation === 'create' ? 'New video' : 'Recents', exact: true }).click();
+    expect(await held.seen).toBe(200); const saved = await f.application!.snapshot();
+    if (operation !== 'history') await page.getByRole('button', { name: 'Close', exact: true }).click();
+    await account(page, first.email);
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/logout', query: { scope: 'local' }, count: 1 });
     await page.getByRole('button', { name: 'Switch account', exact: true }).click(); allowSignIn(materialNetwork, f.auth.url); await signIn(page, second.email, second.password);
     await expect(page.getByRole('dialog')).not.toBeVisible(); const draft = page.getByRole('textbox', { name: 'Message', exact: true }); await draft.fill('New account draft');
     expect(held.held()).toBe(true); await expect(page.getByRole('button', { name: second.email, exact: true })).toBeVisible(); await expect(page.getByText('Old account private title', { exact: true })).not.toBeVisible();
-    held.release(); await held.done; await expect.poll(() => navigationSettled(page, 'listConversations')).toBe(1); await settledFrames(page);
+    held.release(); await held.done; await expect.poll(() => navigationSettled(page, operation === 'create' ? 'createConversation' : operation === 'list' ? 'listConversations' : 'loadMessages')).toBe(1); await settledFrames(page);
     await expect(draft).toHaveValue('New account draft'); await expect(page.getByText('Old account private title', { exact: true })).not.toBeVisible();
+    await expect(page.getByText('Old account private text', { exact: true })).not.toBeVisible();
+    expect(await f.application!.snapshot()).toBe(saved);
     expect(new URL(page.url()).searchParams.get('conversation')).toBeNull();
   } finally { held?.release(); await f.close(); }
 });

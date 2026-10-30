@@ -66,6 +66,14 @@ test('owned native create/list/history is bounded, account-exact and read-only o
     for (const body of [{ resourceId: users[1]!.id }, { accountId: users[1]!.id }, { threadId: history.id }, { title: 'forged' }, { metadata: {} }]) assert.equal((await request('', 'POST', body)).status, 400);
     assert.equal(await fixture.snapshot(), before);
   });
+  for (const kind of ['oversized', 'system'] as const) await t.test(`${kind} native history fails safely without projecting private content`, async () => {
+    const saved = await fixture.saveNative(users[0]!.id, [{ role: kind === 'system' ? 'system' : 'user', text: 'Private unsupported history '.repeat(kind === 'oversized' ? 45000 : 1) }]);
+    const before = await fixture.snapshot(); const response = await request(`/${saved.id}/messages?page=0&perPage=20`);
+    if (kind === 'system') t.diagnostic(`System-only native observation: ${JSON.stringify(response)}`);
+    assert.equal(response.status, 503);
+    assert.deepEqual(response.value, { error: { code: 'integration_failure', message: 'Native storage unavailable' } });
+    assert.ok(JSON.stringify(response.value).length < 256); assert.equal(await fixture.snapshot(), before);
+  });
   await t.test('generic mutation/admin/send routes remain closed for either account', async () => {
     const before = await fixture.snapshot();
     for (const who of [0, 1]) for (const [path, method] of [[`/${history.id}`, 'PATCH'], [`/${history.id}`, 'DELETE'], [`/${history.id}/clone`, 'POST'], [`/${history.id}/transfer`, 'POST'], ['/memory/save-messages', 'POST'], ['/api/memory/save-messages', 'POST']] as const) assert.equal((await request(path, method, {}, who)).status, 404);

@@ -6,7 +6,7 @@ import type { MastraDBMessage } from '@mastra/core/agent';
 export async function createNativeConversation(
   store: Pick<MastraCompositeStore, 'getStore'>,
   accountId: string,
-  messages: readonly { role: 'user' | 'assistant'; text: string }[] = [],
+  messages: readonly { role: MastraDBMessage['role']; text: string }[] = [],
   title = 'Synthetic test conversation',
 ) {
   const memory = await store.getStore('memory');

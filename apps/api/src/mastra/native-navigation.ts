@@ -78,6 +78,10 @@ export function nativeNavigationRoutes(storage: Pick<MastraCompositeStore, 'getS
       const page = pagination(context, 20, accountId); if (!page) return invalid(context);
       const id = await owned(context, accountId); if (typeof id !== 'string') return id;
       const result = await memory.listMessages({ ...page, threadId: id, resourceId: accountId, orderBy: { field: 'createdAt', direction: 'DESC' } });
+      // Native normalization can omit unsupported stored roles while retaining the count.
+      // Do not present that incomplete page as empty history or a complete boundary.
+      const expected = Math.min(page.perPage, Math.max(0, result.total - page.page * page.perPage));
+      if (result.messages.length !== expected) return unavailable(context);
       // Never expose private metadata, system instructions or tool payloads as browser state.
       const messages = result.messages.map(message => {
         const parts = message.content.parts;

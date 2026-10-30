@@ -25,8 +25,8 @@ import './shell.css';
 
 export type SessionPresentation = { accountId: string; name: string };
 export type ShellProps = { navigation?: NativeNavigationState; onAccountOpen?: () => void; connection: BrowserClient; session: SessionPresentation | null; conversationId?: string; workspaceContent?: (workspace: OperationResponse<'workspace'>) => Partial<Record<WorkspaceTab, ReactNode>>; materialPrerequisites?: MaterialPrerequisites; storyboardPrerequisites?: StoryboardPrerequisites; videoPrerequisites?: VideoPrerequisites; libraryPrerequisites?: LibraryPrerequisites };
-type Surface = 'account' | 'account-unavailable' | 'navigation' | 'library' | 'new' | 'recents' | 'load' | null;
-const nativeCopy = { new: ['New video is not available yet.', 'No conversation was created.'], recents: ['Recents are not available yet.', 'No conversation list was loaded.'], load: ['Conversation loading is not available yet.', 'The current workspace is unchanged.'] } as const;
+type Surface = 'account' | 'account-unavailable' | 'navigation' | 'library' | 'new' | 'recents' | null;
+const nativeCopy = { new: ['New video is not available yet.', 'No conversation was created.'], recents: ['Recents are not available yet.', 'No conversation list was loaded.'] } as const;
 
 /** Session is supplied by its qualified owner; this shell never creates or persists one. */
 export function Shell(props: ShellProps) {
@@ -45,10 +45,10 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
   const scope = session ? { accountId: session.accountId, ...(qualifiedId === undefined ? {} : { conversationId: qualifiedId }) } : null;
   const workspace = useWorkspace(connection, scope);
   const native = connection.kind === 'configured' ? connection.client.native : nativeConversations;
-  const runNative = async (action: 'new' | 'recents' | 'load') => {
+  const runNative = async (action: 'new' | 'recents') => {
     if (!session && onAccountOpen && connection.kind === 'configured') { onAccountOpen(); return; }
     if (navigation) { setSurface(null); if (action === 'new') await navigation.create(); else navigation.openRecents(); return; }
-    const method = { new: 'createConversation', recents: 'listConversations', load: 'loadConversation' } as const;
+    const method = { new: 'createConversation', recents: 'listConversations' } as const;
     await native[method[action]]();
     setSurface(action);
   };
@@ -59,12 +59,12 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
     <AriaButton className="wp-nav-item wp-library-nav" onPress={() => setSurface('library')}><svg className="wp-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="4" height="16" rx="1" /><rect x="9" y="4" width="4" height="16" rx="1" /><path d="m15.5 5.2 3.8-1 3 15.6-3.8.9Z" /></svg>Library</AriaButton>
   </>;
   const quick = navigation?.quick ?? (navigation?.history?.thread ? [navigation.history.thread] : []);
-  const recent = <><AriaButton className="wp-nav-label" onPress={() => void runNative('recents')}>Recents</AriaButton>{navigation && session ? <>{quick.length > 0 && <RecentRows threads={quick} navigation={navigation} compact />}{navigation.recents.pending && !quick.length && <p className="wp-recents-empty">Loading Recents…</p>}{navigation.recents.failed && !navigation.recents.value && <p className="wp-recents-empty">Recents couldn’t be loaded.</p>}{navigation.recents.value && !quick.length && <p className="wp-recents-empty">No videos yet.</p>}</> : <><p className="wp-recents-empty">No videos yet.</p>{!navigation && conversationId && <AriaButton className="wp-nav-item" onPress={() => void runNative('load')}>Open conversation</AriaButton>}</>}</>;
+  const recent = <><AriaButton className="wp-nav-label" onPress={() => void runNative('recents')}>Recents</AriaButton>{navigation && session ? <>{quick.length > 0 && <RecentRows threads={quick} navigation={navigation} compact />}{navigation.recents.pending && !quick.length && <p className="wp-recents-empty">Loading Recents…</p>}{navigation.recents.failed && !navigation.recents.value && <p className="wp-recents-empty">Recents couldn’t be loaded.</p>}{navigation.recents.value && !quick.length && <p className="wp-recents-empty">No videos yet.</p>}</> : <p className="wp-recents-empty">No videos yet.</p>}</>;
   const account = <AriaButton className="wp-account" onPress={() => { if (onAccountOpen) { setSurface(null); onAccountOpen(); } else setSurface('account'); }}><span className="wp-avatar" aria-hidden="true">{session ? session.name.slice(0, 1).toUpperCase() : ''}</span><span>{accountName}</span></AriaButton>;
   const projection = workspace.kind === 'settled' && workspace.result.ok ? workspace.result.value : null;
   const content = projection ? workspaceContent?.(projection) : undefined;
   const placeholder = workspace.kind === 'loading' ? <WorkspaceReadPlaceholder state="loading" /> : workspace.failure ? <WorkspaceReadPlaceholder state={workspace.failure} /> : undefined;
-  const title = shown === 'navigation' ? 'Navigation' : shown === 'library' ? 'Library' : shown === 'new' ? 'New video' : shown === 'recents' ? 'Recents' : shown === 'load' ? 'Open conversation' : 'Account';
+  const title = shown === 'navigation' ? 'Navigation' : shown === 'library' ? 'Library' : shown === 'new' ? 'New video' : shown === 'recents' ? 'Recents' : 'Account';
   return <>
     <div className={`wp-shell${navigation ? ' wp-owned-shell' : ''}`}>
       <nav className="wp-sidebar" aria-label="Workprint">
@@ -84,7 +84,7 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
       {navigation?.dialog === 'new' && <CreateFeedback navigation={navigation} />}
       {surface === 'account' && <div className="wp-session-content"><p><b>{session?.name ?? 'Not signed in'}</b></p>{session ? <div className="wp-session-actions"><Button variant="secondary" onPress={() => setSurface('account-unavailable')}>Sign out</Button><Button variant="secondary" onPress={() => setSurface('account-unavailable')}>Switch account</Button></div> : <><p>Sign-in is not available yet.</p><div className="wp-session-actions"><Button isDisabled size="choose">Sign in</Button></div></>}</div>}
       {surface === 'account-unavailable' && <p className="wp-session-message" role="status">Account actions are not available yet. Nothing about your session has changed.</p>}
-      {!navigation && (surface === 'new' || surface === 'recents' || surface === 'load') && <div className="wp-session-content" role="status">{nativeCopy[surface].map((line) => <p key={line}>{line}</p>)}</div>}
+      {!navigation && (surface === 'new' || surface === 'recents') && <div className="wp-session-content" role="status">{nativeCopy[surface].map((line) => <p key={line}>{line}</p>)}</div>}
       {surface === 'library' && <Library connection={connection} scope={scope}>{(library) => <LibraryPicker connection={connection} scope={scope} library={library} {...(libraryPrerequisites === undefined ? {} : { prerequisites: libraryPrerequisites })} />}</Library>}
     </Dialog></Modal></ModalOverlay>
   </>;
