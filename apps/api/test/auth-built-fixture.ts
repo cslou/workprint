@@ -15,7 +15,7 @@ import { applyArtifactMigrations } from './artifact-database.js';
 // Shared by current-scope checks and the separately invoked B-001 qualification.
 // Private fixture input is never inherited by serving. Accounts already exist.
 export type BuiltAdmissionTarget = { origin: string; accessToken: string; accessTokens: readonly string[]; logs: string };
-export type SavedWorkSetup = { accountIds: readonly string[]; native: PostgresStore; servingUrl: string };
+export type SavedWorkSetup = { accountIds: readonly string[]; native: PostgresStore; servingUrl: string; setupUrl?: string };
 type FixtureContext = { diagnostic(message: string): void; after(cleanup: () => void | Promise<void>): void };
 export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (server: BuiltAdmissionTarget) => Promise<void>, options: { browserOrigin?: string; prepareSavedWork?: (setup: SavedWorkSetup) => Promise<void>; verifySavedEffects?: (servingUrl: string) => Promise<void> } = {}) {
   const file = process.env.WORKPRINT_AUTH_FIXTURE;
@@ -80,7 +80,7 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
   const setup = new PostgresStore({ id: 'admission-native-setup', connectionString: database.setupUrl, schemaName: 'mastra' });
   try {
     await setup.init(); await database.grantServing(); await applyArtifactMigrations(database.setupUrl);
-    await options.prepareSavedWork?.({ accountIds: identities.map(identity => identity.user.id), native: setup, servingUrl: database.servingUrl });
+    await options.prepareSavedWork?.({ accountIds: identities.map(identity => identity.user.id), native: setup, servingUrl: database.servingUrl, setupUrl: database.setupUrl });
   } finally { await setup.close(); }
   const port = await unusedPort();
   const env = { ...fixture.env, DATABASE_URL: database.servingUrl, SUPABASE_URL: config.url,

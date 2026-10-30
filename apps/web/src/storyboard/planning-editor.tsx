@@ -1,20 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { orderedStoryboard } from '../workspace/projection.js';
-import type { OperationResponse } from '@workprint/contracts';
+import { savedStoryboardContentSchema, type OperationResponse } from '@workprint/contracts';
 import type { BrowserClient } from '../api/client.js';
 import type { ReadScope } from '../api/use-scoped-read.js';
 import { WorkspaceEmpty } from '../ui/panel.js';
+import { ManualVersionEditor } from '../versions/manual-editor.js';
 import { VersionTextSection, saveFeedback } from '../versions/text-section.js';
 
 type Workspace = OperationResponse<'workspace'>;
 export type PlanningTarget = { kind: 'shot'; shotId: string } | { kind: 'panel'; shotId: string; panelId: string };
 export type PlanningDraft = { editing: boolean; text: string; feedback: string | null; pending: boolean };
 export const emptyPlanningDraft: PlanningDraft = { editing: false, text: '', feedback: null, pending: false };
-type Props = { connection: BrowserClient; scope: ReadScope | null; workspace: Workspace; target: PlanningTarget; draft?: { value: PlanningDraft; onChange: Dispatch<SetStateAction<PlanningDraft>> }; onEdited(result: OperationResponse<'editStoryboard'>): void | Promise<void> };
+type Props = { connection: BrowserClient; scope: ReadScope | null; workspace: Workspace; target: PlanningTarget; onSaved?: (result: OperationResponse<'saveVersion'>) => void; draft?: { value: PlanningDraft; onChange: Dispatch<SetStateAction<PlanningDraft>> }; onEdited(result: OperationResponse<'editStoryboard'>): void | Promise<void> };
 /** Typed planning only. Opaque version content, camera/lens and media are never interpreted. */
 export function PlanningEditor(props: Props) {
   const version = props.workspace.storyboard.work?.version;
+  if (version?.kind === 'storyboard' && savedStoryboardContentSchema.safeParse(version.content).success) return <ManualVersionEditor connection={props.connection} scope={props.scope} version={version} target={props.target} label={props.target.kind === 'shot' ? 'Shot intent' : 'Panel description'} pencilPadding="native" currentUse={props.workspace.storyboard.work?.use ?? null} {...(props.onSaved ? { onSaved: props.onSaved } : {})} />;
   return <BoundPlanningEditor key={JSON.stringify([props.scope?.accountId, props.scope?.conversationId, version?.id, version?.revision, props.target])} {...props} />;
 }
 function BoundPlanningEditor({ connection, scope, workspace, target, draft, onEdited }: Props) {

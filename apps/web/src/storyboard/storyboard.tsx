@@ -16,11 +16,11 @@ import './storyboard.css';
 
 type Workspace = OperationResponse<'workspace'>;
 const newer = (a: Workspace, b: Workspace) => a.selectionRevision > b.selectionRevision || (a.selectionRevision === b.selectionRevision && (a.storyboard.work?.version.revision ?? -1) > (b.storyboard.work?.version.revision ?? -1));
-export type StoryboardProps = { connection: BrowserClient; scope: ReadScope | null; workspace: Workspace; prerequisites?: StoryboardPrerequisites };
+export type StoryboardProps = { connection: BrowserClient; scope: ReadScope | null; workspace: Workspace; prerequisites?: StoryboardPrerequisites; onSaved?: (result: OperationResponse<'saveVersion'>) => void };
 export function Storyboard(props: StoryboardProps) {
   return <ScopedStoryboard key={JSON.stringify([props.scope?.accountId, props.scope?.conversationId, props.workspace.storyboard.work?.version.artifactId])} {...props} />;
 }
-function ScopedStoryboard({ connection, scope, workspace, prerequisites }: StoryboardProps) {
+function ScopedStoryboard({ connection, scope, workspace, prerequisites, onSaved }: StoryboardProps) {
   const [refreshed, setRefreshed] = useState<Workspace | null>(null);
   const [drafts, setDrafts] = useState(new Map<string, PlanningDraft>());
   const [uses, setUses] = useState(new Map<string, OperationResponse<'useVersion'>>());
@@ -41,7 +41,7 @@ function ScopedStoryboard({ connection, scope, workspace, prerequisites }: Story
     setRefreshed(previous => previous && !newer(value, previous) ? previous : value);
   };
   if (!rows?.length) return <WorkspaceEmpty tab="storyboard" />;
-  const common = { connection, scope, workspace: current };
+  const common = { connection, scope, workspace: current, ...(onSaved ? { onSaved } : {}) };
   const draftFor = (target: PlanningTarget) => {
     const key = JSON.stringify([base?.id, base?.revision, target]);
     return { value: drafts.get(key) ?? emptyPlanningDraft, onChange: (action: SetStateAction<PlanningDraft>) => setDrafts(previous => { const next = new Map(previous); next.set(key, typeof action === 'function' ? action(previous.get(key) ?? emptyPlanningDraft) : action); return next; }) };

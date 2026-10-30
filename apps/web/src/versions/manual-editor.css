@@ -1,0 +1,4 @@
+.wp-manual-recovery { margin-top: var(--space-6); }
+.wp-manual-latest { border-top: var(--border-width-default) solid var(--color-border-default); margin-top: var(--space-12); padding-top: var(--space-12); }
+.wp-manual-latest > p:not(.wp-version-feedback) { margin: 0; font-size: var(--font-size-14); line-height: var(--font-line-height-1-5); white-space: pre-wrap; }
+.wp-manual-latest .wp-panel-label { margin-bottom: var(--space-8); }
