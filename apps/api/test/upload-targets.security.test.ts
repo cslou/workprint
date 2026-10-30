@@ -67,5 +67,20 @@ test('exact upload targets, expired processing leases and cleanup exclusion neve
     await atCapacity; await assert.rejects(limited.confirm(account, simultaneous[2]!.uploadId, randomUUID()), { code: 'integration_failure' });
     assert.equal(entered, 2, 'The third inspection is rejected, not queued'); finish(); await complete;
     assert.deepEqual((await pool.query("SELECT count(*)::int AS media FROM artifacts.versions WHERE kind IN ('image','video')")).rows, [{ media: 3 }]);
+    const changing = await next(); let sawChange!: () => void, finishChange!: () => void;
+    const sawInspection = new Promise<void>(resolve => { sawChange = resolve; }), changedGate = new Promise<void>(resolve => { finishChange = resolve; });
+    const changingTarget = createUploadCoordinator(pool, check, { storage: objects, verifyMedia: async input => { sawChange(); await changedGate; return inspect(input); } });
+    const staleCompletion = changingTarget.confirm(account, changing.uploadId, randomUUID()); await sawInspection;
+    await createArtifactWriters(pool, check).human.save(account, primary.id, { operationId: randomUUID(), artifactId: board.artifactId, baseVersionId: edited.version.id, kind: 'storyboard', content: { ...plan, shots: [{ ...plan.shots[0]!, intent: 'Ada walks away.' }] }, dependencies: [script.id], intendedUse: { purpose: 'storyboard' } });
+    finishChange(); await assert.rejects(staleCompletion, { code: 'stale_revision' }, 'A target changed during inspection must also fail final publication');
+    assert.equal((await pool.query('SELECT count(*)::int AS protected FROM artifacts.upload_objects WHERE upload_id=$1 AND protected_version_id IS NOT NULL', [changing.uploadId])).rows[0]?.protected, 0);
+    const replaced = await next(); let sawToken!: () => void, finishToken!: () => void;
+    const tokenInspection = new Promise<void>(resolve => { sawToken = resolve; }), tokenGate = new Promise<void>(resolve => { finishToken = resolve; });
+    const oldWorker = createUploadCoordinator(pool, check, { storage: objects, verifyMedia: async input => { sawToken(); await tokenGate; return inspect(input); } });
+    const obsolete = oldWorker.confirm(account, replaced.uploadId, randomUUID()); await tokenInspection;
+    const replacement = randomUUID(); await setup.query('UPDATE artifacts.uploads SET lease_token=$2 WHERE upload_id=$1', [replaced.uploadId, replacement]);
+    finishToken(); await assert.rejects(obsolete, { code: 'integration_failure' });
+    assert.deepEqual((await pool.query('SELECT lease_token,state FROM artifacts.uploads WHERE upload_id=$1', [replaced.uploadId])).rows, [{ lease_token: replacement, state: 'processing' }], 'A fenced old worker cannot release a newer token');
+    assert.deepEqual((await pool.query("SELECT count(*)::int AS media FROM artifacts.versions WHERE kind IN ('image','video')")).rows, [{ media: 3 }]);
   } finally { objects.close(); await native.close(); await setup.end(); await serving.close(); if (!pool.ended) await pool.end(); }
 });

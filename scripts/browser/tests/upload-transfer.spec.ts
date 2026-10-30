@@ -23,6 +23,8 @@ test('real browser sends private bytes without API credentials and cannot publis
   try {
     await verifyBuiltAdmission({ diagnostic() {}, after(fn) { cleanup.push(fn); } }, async target => {
       materialNetwork.expectOperations({ origin: target.origin, method: 'POST', path: `/v1/conversations/${conversation}/uploads`, query: {}, count: 1 });
+      await context.addCookies([{ name: 'storage-cookie-control', value: 'owned-synthetic-cookie', url: storage.endpoint }]);
+      expect((await context.cookies(storage.endpoint)).some(cookie => cookie.name === 'storage-cookie-control')).toBe(true);
       await page.goto('/uploads.html'); await page.waitForFunction(() => !!(window as unknown as Harness).uploadsTest);
       await page.evaluate(input => (window as unknown as Harness).uploadsTest.configure(input), { apiOrigin: target.origin, token: target.accessTokens[0]!, accountId: account, conversationId: conversation });
       const grant = await page.evaluate(() => (window as unknown as Harness).uploadsTest.authorize({ name: 'unverified.png', type: 'image/png', bytes: [137, 80, 78, 71, 13, 10, 26, 10] }));

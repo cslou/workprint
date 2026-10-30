@@ -19,9 +19,9 @@ test('CLI application migration and reapply preserve native schema and restrict 
     await migrate(db.setupUrl);
     assert.deepEqual((await query(db.setupUrl, nativeCatalog)).rows, before);
     const tables = (await query(db.setupUrl, "SELECT tablename FROM pg_tables WHERE schemaname='artifacts' ORDER BY tablename")).rows;
-    assert.deepEqual(tables.map(row => row.tablename), ['artifacts', 'commands', 'conversation_uses', 'manual_changes', 'publication_counters', 'version_dependencies', 'versions']);
+    assert.deepEqual(tables.map(row => row.tablename), ['artifacts', 'commands', 'conversation_uses', 'manual_changes', 'media_objects', 'publication_counters', 'upload_confirmations', 'upload_objects', 'uploads', 'version_dependencies', 'versions']);
     const history = (await query(db.setupUrl, 'SELECT version FROM supabase_migrations.schema_migrations ORDER BY version')).rows;
-    assert.equal(history.length, 3);
+    assert.deepEqual(history.map(row => row.version), ['20261029000000', '20261029180000', '20261030000000', '20261031000000']);
     await migrate(db.setupUrl);
     assert.deepEqual((await query(db.setupUrl, 'SELECT version FROM supabase_migrations.schema_migrations ORDER BY version')).rows, history);
     assert.deepEqual((await query(db.setupUrl, nativeCatalog)).rows, before);
@@ -30,6 +30,10 @@ test('CLI application migration and reapply preserve native schema and restrict 
       'CREATE TABLE artifacts.forbidden(id int)', 'CREATE SCHEMA forbidden',
       'ALTER TABLE artifacts.versions ADD COLUMN forbidden int',
       'UPDATE artifacts.versions SET revision=2', 'DELETE FROM artifacts.versions',
+      'UPDATE artifacts.uploads SET byte_size=1', 'DELETE FROM artifacts.uploads',
+      'UPDATE artifacts.upload_confirmations SET operation_id=operation_id', 'DELETE FROM artifacts.upload_confirmations',
+      'UPDATE artifacts.upload_objects SET object_key=object_key', 'DELETE FROM artifacts.upload_objects',
+      'UPDATE artifacts.media_objects SET object_key=object_key', 'DELETE FROM artifacts.media_objects',
       'TRUNCATE artifacts.versions CASCADE', 'SET ROLE wp_setup', 'SET ROLE postgres',
       'SELECT * FROM supabase_migrations.schema_migrations',
     ]) await assert.rejects(query(db.servingUrl, sql), /./, 'Serving must reject schema setup, immutable mutation and privilege escalation');
