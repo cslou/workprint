@@ -56,7 +56,6 @@ function BoundManualEditor({ connection, scope, version, target, label, currentU
   };
   const finish = async () => {
     if (!controller) return;
-    if (root.current?.contains(document.activeElement)) root.current.querySelector('textarea')?.focus({ preventScroll: true });
     const result = await (state?.phase === 'unknown' ? controller.retry() : controller.submit());
     if (!active.current || !result) return;
     setSaved(result.version); setController(null); onSaved?.(result);

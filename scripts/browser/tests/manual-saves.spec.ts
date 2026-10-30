@@ -217,7 +217,10 @@ test('a delayed Shot save preserves focus in a subsequently edited Panel', async
       const reached = new Promise<void>(done => { held = done; }), gate = new Promise<void>(done => { release = done; }), completed = new Promise<void>(done => { settled = done; });
       await page.route(url => url.pathname === path, async route => { const response = await route.fetch(); expect(response.status()).toBe(200); held(); await gate; await route.fulfill({ response }); settled(); }, { times: 1 });
       allow('POST', path);
-      await page.getByRole('button', { name: 'Save', exact: true }).click(); await reached;
+      const saveButton = page.getByRole('button', { name: 'Save', exact: true });
+      await saveButton.click(); await reached;
+      await expect(saveButton).toBeDisabled(); await expect(saveButton).toBeFocused();
+      await page.keyboard.press('Enter');
       await page.getByRole('button', { name: 'Edit Panel description', exact: true }).click();
       const panel = page.getByRole('textbox', { name: 'Panel description', exact: true });
       await panel.fill('Keep my new Panel draft here.'); await expect(panel).toBeFocused();
