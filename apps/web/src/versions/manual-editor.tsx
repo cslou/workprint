@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createManualSave, type ManualSave, type ManualSaveState } from '@workprint/api-client';
 import type { OperationResponse, Version } from '@workprint/contracts';
 import type { BrowserClient } from '../api/client.js';
@@ -20,14 +20,26 @@ function BoundManualEditor({ connection, scope, version, target, label, currentU
   const mapping = useMemo(() => savedTextTarget(target), [target]);
   const [controller, setController] = useState<ManualSave | null>(null);
   const [saved, setSaved] = useState<Version | null>(null);
-  const state = useSyncExternalStore<ManualSaveState | null>(controller?.subscribe ?? subscribeIdle, controller?.getSnapshot ?? idle);
-  const active = useRef(true), root = useRef<HTMLDivElement>(null), wasEditing = useRef(false);
+  const active = useRef(true), root = useRef<HTMLDivElement>(null), wasEditing = useRef(false), restoreOwnedFocus = useRef(false);
+  const subscribe = useCallback((notify: () => void) => {
+    if (!controller) return subscribeIdle();
+    return controller.subscribe(() => {
+      // Capture ownership before notifying React, while the completing field still exists.
+      if (!controller.getSnapshot().editing) restoreOwnedFocus.current = !!root.current?.contains(document.activeElement);
+      notify();
+    });
+  }, [controller]);
+  const state = useSyncExternalStore<ManualSaveState | null>(subscribe, controller?.getSnapshot ?? idle);
   const editing = state?.editing ?? false;
   useLayoutEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
   useEffect(() => () => controller?.dispose(), [controller]);
   useLayoutEffect(() => {
     if (editing === wasEditing.current) return;
     wasEditing.current = editing;
+    if (!editing) {
+      const owned = restoreOwnedFocus.current; restoreOwnedFocus.current = false;
+      if (!owned || (document.activeElement !== document.body && !root.current?.contains(document.activeElement))) return;
+    }
     const node = root.current?.querySelector<HTMLElement>(editing ? 'textarea' : '.wp-version-pencil button');
     if (node && !node.closest('[hidden],[inert]')) node.focus({ preventScroll: true });
   }, [editing]);
@@ -44,6 +56,7 @@ function BoundManualEditor({ connection, scope, version, target, label, currentU
   };
   const finish = async () => {
     if (!controller) return;
+    if (root.current?.contains(document.activeElement)) root.current.querySelector('textarea')?.focus({ preventScroll: true });
     const result = await (state?.phase === 'unknown' ? controller.retry() : controller.submit());
     if (!active.current || !result) return;
     setSaved(result.version); setController(null); onSaved?.(result);

@@ -194,3 +194,45 @@ for (const width of [1440, 390]) test(`manual Script edit saves and reloads exac
     });
   } finally { for (const fn of cleanup.reverse()) await fn(); }
 });
+
+test('a delayed Shot save preserves focus in a subsequently edited Panel', async ({ page, materialNetwork }) => {
+  test.setTimeout(120000);
+  const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
+  const { prepareManualSavedWork } = await import(pathToFileURL(resolve('apps/api/.test-build/test/manual-saved-work.js')).href) as { prepareManualSavedWork: typeof PrepareManualSavedWork };
+  const { query } = await import(pathToFileURL(resolve('apps/api/.test-build/test/postgres.js')).href) as { query: typeof Query };
+  const cleanup: (() => void | Promise<void>)[] = [];
+  let saved: ManualSavedWork | undefined, release = () => {};
+  try {
+    await verifyBuiltAdmission({ diagnostic() {}, after(fn) { cleanup.push(fn); } }, async target => {
+      if (!saved) throw new Error('Existing planning prerequisites missing');
+      const allow = (method: string, path: string) => materialNetwork.expectOperations({ origin: target.origin, method, path, query: {}, count: 1 });
+      allow('GET', `/v1/conversations/${saved.conversationId}/workspace`); allow('GET', `/v1/versions/${saved.script.id}`);
+      await page.goto('/saved-work.html'); await page.waitForFunction(() => !!(window as unknown as { savedWorkTest?: unknown }).savedWorkTest);
+      await page.evaluate(input => (window as unknown as { savedWorkTest: { configure(input: unknown): void } }).savedWorkTest.configure(input), { apiOrigin: target.origin, token: target.accessTokens[0]!, accountId: saved.accountId, conversationId: saved.conversationId, panelOnly: true });
+      await page.getByRole('tab', { name: 'Storyboard', exact: true }).click(); await page.getByRole('button', { name: 'View storyboard', exact: true }).click();
+      await page.getByRole('button', { name: 'Edit Shot intent', exact: true }).click();
+      await page.getByRole('textbox', { name: 'Shot intent', exact: true }).fill('Ada watches the train arrive.');
+      const path = `/v1/conversations/${saved.conversationId}/versions`;
+      let held!: () => void, settled!: () => void;
+      const reached = new Promise<void>(done => { held = done; }), gate = new Promise<void>(done => { release = done; }), completed = new Promise<void>(done => { settled = done; });
+      await page.route(url => url.pathname === path, async route => { const response = await route.fetch(); expect(response.status()).toBe(200); held(); await gate; await route.fulfill({ response }); settled(); }, { times: 1 });
+      allow('POST', path);
+      await page.getByRole('button', { name: 'Save', exact: true }).click(); await reached;
+      await page.getByRole('button', { name: 'Edit Panel description', exact: true }).click();
+      const panel = page.getByRole('textbox', { name: 'Panel description', exact: true });
+      await panel.fill('Keep my new Panel draft here.'); await expect(panel).toBeFocused();
+      release(); await completed;
+      await expect(page.getByRole('textbox', { name: 'Shot intent', exact: true })).toHaveCount(0);
+      await page.evaluate(() => new Promise<void>(done => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+      await expect(panel).toHaveValue('Keep my new Panel draft here.'); await expect(panel).toBeFocused();
+      await page.keyboard.insertText(' Still typing.'); await expect(panel).toHaveValue('Keep my new Panel draft here. Still typing.');
+      await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+      materialNetwork.assertSafe();
+    }, {
+      browserOrigin, prepareSavedWork: async setup => { saved = await prepareManualSavedWork(setup); },
+      verifySavedEffects: async servingUrl => {
+        expect((await query(servingUrl, 'SELECT (SELECT count(*)::int FROM artifacts.versions) AS versions,(SELECT count(*)::int FROM artifacts.commands) AS commands,(SELECT count(*)::int FROM artifacts.manual_changes) AS changes')).rows).toEqual([{ versions: 4, commands: 1, changes: 1 }]);
+      },
+    });
+  } finally { release(); for (const fn of cleanup.reverse()) await fn(); }
+});
