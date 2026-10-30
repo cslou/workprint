@@ -3,10 +3,11 @@ import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod';
 import { workspaceResponseBytes, idSchema, operations, savedStoryboardContentSchema, useBindingSchema, useSchema, versionSchema, type OperationRequest, type OperationResponse, type Version } from '@workprint/contracts';
 import { transaction } from '../db/index.js';
-import { parseContent } from './content.js';
+import { parseContent, assertContentDependencies } from './content.js';
 import { createCursors } from './cursor.js';
 import { ArtifactError } from './errors.js';
 import { boundedPage } from './paging.js';
+import { publishVersion } from './publication.js';
 
 type OwnershipCheck = (account: string, conversation: string) => Promise<{ kind: 'owned' | 'not_found' } | { kind: 'unavailable'; reason: 'native_storage' }>;
 type Kind = 'script' | 'reference' | 'storyboard';
@@ -22,7 +23,7 @@ const insertSchema = z.strictObject({
 });
 export type InsertVersion = z.infer<typeof insertSchema>;
 
-/** Narrow in-process persistence and reads. No HTTP seed/save route or producer is registered. */
+/** Owned reads and controlled in-process prerequisite insertion; never an HTTP seed. */
 export function createArtifactStore(pool: Pool, checkOwnedConversation: OwnershipCheck) {
   const cursors = createCursors();
   const owned = async (account: string, conversation: string) => {
@@ -114,32 +115,17 @@ export function createArtifactStore(pool: Pool, checkOwnedConversation: Ownershi
     if (input.use && (input.use.binding.purpose !== input.kind || (input.createdBy === 'assistant' && input.use.state === 'approved'))) throw new ArtifactError('invalid_input');
     const dependencies = new Map<string, Row>();
     for (const id of input.dependencies) dependencies.set(id, await rowFor(input.accountId, id));
-    const referenced = 'sourceScriptVersionId' in content ? [content.sourceScriptVersionId, ...content.shots.flatMap(shot => shot.panels.flatMap(panel => panel.references))]
-      : 'references' in content ? content.references.map(reference => reference.versionId) : [];
-    if (referenced.some(id => !dependencies.has(id))) throw new ArtifactError('invalid_input');
-    if ('sourceScriptVersionId' in content && dependencies.get(content.sourceScriptVersionId)?.kind !== 'script') throw new ArtifactError('invalid_input');
-    // Media references cannot be published by this text-only boundary.
-    if ('subject' in content && content.references.length > 0) throw new ArtifactError('invalid_input');
+    assertContentDependencies(content, dependencies);
     if (input.artifactId) {
       const latest = (await pool.query<Row>(`SELECT ${columns} FROM artifacts.versions v WHERE v.owner_id=$1 AND v.artifact_id=$2 ORDER BY v.revision DESC LIMIT 1`, [input.accountId, input.artifactId])).rows[0];
       if (!latest) throw new ArtifactError('not_found');
       await authorize(input.accountId, [latest]);
     }
-    const artifact = input.artifactId ?? randomUUID();
-    const id = randomUUID();
-    await transaction(pool, async client => {
-      const publication = (await client.query<{ revision: string }>('INSERT INTO artifacts.publication_counters(owner_id,revision) VALUES($1,1) ON CONFLICT(owner_id) DO UPDATE SET revision=publication_counters.revision+1 RETURNING revision::text', [input.accountId])).rows[0]!.revision;
-      if (!input.artifactId) await client.query('INSERT INTO artifacts.artifacts(owner_id,artifact_id,kind) VALUES($1,$2,$3)', [input.accountId, artifact, input.kind]);
-      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify([input.accountId, artifact])]);
-      const locked = await client.query<{ kind: string }>('SELECT kind FROM artifacts.artifacts WHERE owner_id=$1 AND artifact_id=$2', [input.accountId, artifact]);
-      if (locked.rows[0]?.kind !== input.kind) throw new ArtifactError('invalid_input');
-      const revision = (await client.query<{ revision: number }>('SELECT COALESCE(max(revision),0)+1 AS revision FROM artifacts.versions WHERE owner_id=$1 AND artifact_id=$2', [input.accountId, artifact])).rows[0]!.revision;
-      await client.query(`INSERT INTO artifacts.versions(owner_id,version_id,artifact_id,kind,revision,schema_version,content,origin_conversation_id,created_by,provenance,publication_revision)
-        VALUES($1,$2,$3,$4,$5,1,$6,$7,$8,$9,$10)`, [input.accountId, id, artifact, input.kind, revision, content, input.conversationId, input.createdBy, input.createdBy === 'assistant' ? 'assistant' : 'manual', publication]);
-      for (const [position, dependency] of input.dependencies.entries()) await client.query('INSERT INTO artifacts.version_dependencies(owner_id,version_id,dependency_id,position) VALUES($1,$2,$3,$4)', [input.accountId, id, dependency, position]);
-      if (input.use) await client.query('INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state) VALUES($1,$2,$3,$4,$5,$6,$7)', [input.accountId, input.conversationId, randomUUID(), id, input.use.binding, input.use.binding.purpose, input.use.state]);
+    return transaction(pool, async client => {
+      const saved = await publishVersion(client, { ...input, content });
+      if (input.use) await client.query('INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state) VALUES($1,$2,$3,$4,$5,$6,$7)', [input.accountId, input.conversationId, randomUUID(), saved.id, input.use.binding, input.use.binding.purpose, input.use.state]);
+      return saved;
     });
-    return version(input.accountId, id);
   };
   return { version, history, library, workspace, insert };
 }
