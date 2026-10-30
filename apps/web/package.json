@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@supabase/auth-js": "2.118.0",
     "@workprint/api-client": "workspace:*",
     "@workprint/contracts": "workspace:*",
     "@workprint/player": "workspace:*",

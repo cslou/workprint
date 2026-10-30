@@ -8,6 +8,22 @@
 
 **Human reference:** [Brand book](brand-book.html) (home; pages under `brand-book/`) · **Values:** this file ([tokens](#color)) · **Approved screens:** [Generate flows](generate-flows.html) · **Interaction decisions:** [App user flows](user-flows.md) · **History:** [earlier studies and Editor alternatives](history.md)
 
+## Phase 3 account and session flows
+
+**Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Scope: Sprint 004 Story 2 only, not signup, account administration or generation.
+
+The 30 account/sign-in/reset/password/session states in ignored `outputs/verification/sprint-004/story-2-previews/r1/review.md` were inspected through all five narrow inspection sheets and representative full desktop/narrow captures. Reuse tracked `flow2-step1-r73.html`, `flow1-step4-r85.html#look-a`, `app-r11.css` and approved system fonts. Dialogs are 560px wide or 342px at 390px; Auth fields have visible labels, 44px minimum height, 8px radius and existing subtle-text-color borders. Text inputs retain no blue focus ring; buttons/links retain keyboard focus. Neutral inline feedback adds no palette or global token.
+
+Binding behavior decisions: non-enumerating sign-in/reset feedback; invalid/expired/reused reset links share safe actionable copy; distinguish known password rejection from an uncertain update without automatic mutation replay. Recovery access remains quarantined and ends through the standard SDK before fresh sign-in. Sign-out/switch intent immediately fences token access, account presentation and drafts without deleting saved work; unconfirmed revocation is not claimed as success. Successful same-account refresh is silent and preserves drafts; actual expiry/failure clears old scope, while an application 503 alone does not imply expiry. Closing a pending dialog dismisses it without promising to undo the operation. Missing public configuration exposes no credential form. No signup/admin UI or automatic provider work.
+
+Preview measurements report 60 captures, no overflow and no external loads; this is design evidence, not functional verification or human acceptance. Implementation must qualify real Auth, keyboard/focus/announcements, 200% reflow and main surfaces at 1440/390/820/821. Visual comparisons use tracked references plus these approved substitutions, never ignored preview inputs.
+
+### Account failure clarification
+
+**Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Five additional inert states were inspected at narrow width and a representative full desktop view in ignored `outputs/verification/sprint-004/pr37-cycle2-previews/r1/`: initial session-check failure, unsaved local account lock, and pending/confirmed/unconfirmed sign-out with unsaved lock. These extend, rather than retroactively claim coverage from, the original 30-state inventory.
+
+Initial validation failure says `Your session couldn’t be checked.` / `Check your connection and sign in again to continue.` with Sign in; same-account transient revalidation instead preserves verified scope/drafts. Unsaved-lock feedback explicitly says access is locked only in this tab and asks the person to close other Workprint tabs, allow browser storage and try again; saved work is unchanged. Pending sign-out still proceeds through the SDK despite failed local persistence. Confirmed sign-out wording requires actual authenticated successful revocation for the bound identity/intent, not a credential-free no-op. Unconfirmed wording persists until genuine confirmation, but a later real authenticated success may clear it. Try again retries only the incomplete local fence; Try sign-out again retries safely bound SDK/local steps. Neither may replay password updates, commands or affect a newer account. No reload shortcut or automatic tab closure. Existing modal, neutral copy and control styles remain unchanged; runtime, privacy and tracked-reference comparisons are still required.
+
 ## Overview
 
 **Section 01** · **Status:** Approved

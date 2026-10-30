@@ -52,7 +52,7 @@ test('default dev and production build expose no interchangeable test compositio
     }] });
   `], { cwd: web, env, log: join(fixture.logs, 'web-build.log') });
   const testRoot = await realpath(join(web, 'test'));
-  const serverHelpers = await Promise.all(['native-conversations.ts', 'built-server.ts', 'server-entry.test.ts', 'auth-built-fixture.ts', 'auth-server.ts', 'request-intake.test.ts'].map(file => realpath(resolve('apps/api/test', file))));
+  const serverHelpers = await Promise.all(['native-conversations.ts', 'built-server.ts', 'server-entry.test.ts', 'auth-built-fixture.ts', 'auth-server.ts', 'request-intake.test.ts', 'isolated-auth.ts', 'auth-fixture-resources.ts', 'auth-mail.ts', 'isolated-auth.security.test.ts', 'account-browser-fixture.ts'].map(file => realpath(resolve('apps/api/test', file))));
   const graph = JSON.parse(await readFile(inputsFile, 'utf8')) as { inputs: string[]; inlineLimit: number | null };
   expect(graph.inputs.length).toBeGreaterThan(0);
   for (const input of new Set(graph.inputs)) {
@@ -125,8 +125,10 @@ test('default dev and production build expose no interchangeable test compositio
         await expect(page.getByRole('tabpanel')).toHaveText('Your script will appear here once you describe your video.');
         expect(await page.evaluate(() => Object.keys(window).filter(key => /Test$/.test(key)))).toEqual([]);
         await page.getByRole('button', { name: 'Account', exact: true }).press('Enter');
-        await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeDisabled();
-        await expect(page.getByRole('dialog')).toContainText('Sign-in is not available yet.');
+        await expect(page.getByRole('dialog')).toContainText('Sign-in is not configured for this build.');
+        await expect(page.getByLabel('Email', { exact: true })).toHaveCount(0);
+        await expect(page.getByLabel('Password', { exact: true })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toHaveCount(0);
         await page.keyboard.press('Escape');
       }
     } finally { try { await page.goto('about:blank'); } finally { await server.stop(); } }

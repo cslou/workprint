@@ -22,7 +22,7 @@ import { WorkspaceReadPlaceholder } from './workspace-placeholder.js';
 import './shell.css';
 
 export type SessionPresentation = { accountId: string; name: string };
-export type ShellProps = { connection: BrowserClient; session: SessionPresentation | null; conversationId?: string; workspaceContent?: (workspace: OperationResponse<'workspace'>) => Partial<Record<WorkspaceTab, ReactNode>>; materialPrerequisites?: MaterialPrerequisites; storyboardPrerequisites?: StoryboardPrerequisites; videoPrerequisites?: VideoPrerequisites; libraryPrerequisites?: LibraryPrerequisites };
+export type ShellProps = { onAccountOpen?: () => void; connection: BrowserClient; session: SessionPresentation | null; conversationId?: string; workspaceContent?: (workspace: OperationResponse<'workspace'>) => Partial<Record<WorkspaceTab, ReactNode>>; materialPrerequisites?: MaterialPrerequisites; storyboardPrerequisites?: StoryboardPrerequisites; videoPrerequisites?: VideoPrerequisites; libraryPrerequisites?: LibraryPrerequisites };
 type Surface = 'account' | 'account-unavailable' | 'navigation' | 'library' | 'new' | 'recents' | 'load' | null;
 const nativeCopy = { new: ['New video is not available yet.', 'No conversation was created.'], recents: ['Recents are not available yet.', 'No conversation list was loaded.'], load: ['Conversation loading is not available yet.', 'The current workspace is unchanged.'] } as const;
 
@@ -30,7 +30,7 @@ const nativeCopy = { new: ['New video is not available yet.', 'No conversation w
 export function Shell(props: ShellProps) {
   return <ScopedShell key={JSON.stringify([props.session?.accountId ?? null, props.conversationId ?? null])} {...props} />;
 }
-function ScopedShell({ connection, session, conversationId, workspaceContent, materialPrerequisites, storyboardPrerequisites, videoPrerequisites, libraryPrerequisites }: ShellProps) {
+function ScopedShell({ onAccountOpen, connection, session, conversationId, workspaceContent, materialPrerequisites, storyboardPrerequisites, videoPrerequisites, libraryPrerequisites }: ShellProps) {
   const [surface, setSurface] = useState<Surface>(null);
   const [tab, setTab] = useState<WorkspaceTab>('script');
   const [composerText, setComposerText] = useState('');
@@ -51,7 +51,7 @@ function ScopedShell({ connection, session, conversationId, workspaceContent, ma
     <AriaButton className="wp-nav-item wp-library-nav" onPress={() => setSurface('library')}><svg className="wp-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="4" height="16" rx="1" /><rect x="9" y="4" width="4" height="16" rx="1" /><path d="m15.5 5.2 3.8-1 3 15.6-3.8.9Z" /></svg>Library</AriaButton>
   </>;
   const recent = <><AriaButton className="wp-nav-label" onPress={() => void runNative('recents')}>Recents</AriaButton><p className="wp-recents-empty">No videos yet.</p>{conversationId && <AriaButton className="wp-nav-item" onPress={() => void runNative('load')}>Open conversation</AriaButton>}</>;
-  const account = <AriaButton className="wp-account" onPress={() => setSurface('account')}><span className="wp-avatar" aria-hidden="true">{session ? session.name.slice(0, 1) : ''}</span><span>{accountName}</span></AriaButton>;
+  const account = <AriaButton className="wp-account" onPress={() => { if (onAccountOpen) { setSurface(null); onAccountOpen(); } else setSurface('account'); }}><span className="wp-avatar" aria-hidden="true">{session ? session.name.slice(0, 1).toUpperCase() : ''}</span><span>{accountName}</span></AriaButton>;
   const projection = workspace.kind === 'settled' && workspace.result.ok ? workspace.result.value : null;
   const content = projection ? workspaceContent?.(projection) : undefined;
   const placeholder = workspace.kind === 'loading' ? <WorkspaceReadPlaceholder state="loading" /> : workspace.failure ? <WorkspaceReadPlaceholder state={workspace.failure} /> : undefined;

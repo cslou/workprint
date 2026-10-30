@@ -14,7 +14,7 @@ test('built backend rejects unsafe config, separates setup privileges and exclud
   await command('pnpm', ['build'], { cwd: root, env: fixture.env, log: join(fixture.logs, 'build.log') });
   const inputs = join(fixture.logs, 'production-inputs.log');
   await command('pnpm', ['exec', 'tsc', '-p', 'apps/api/tsconfig.build.json', '--listFilesOnly'], { cwd: root, env: fixture.env, log: inputs });
-  const helpers = await Promise.all(['native-conversations.ts', 'built-server.ts', 'server-entry.test.ts', 'auth-built-fixture.ts', 'auth-server.ts', 'request-intake.test.ts'].map((file) => realpath(join(root, 'apps/api/test', file))));
+  const helpers = await Promise.all(['native-conversations.ts', 'built-server.ts', 'server-entry.test.ts', 'auth-built-fixture.ts', 'auth-server.ts', 'request-intake.test.ts', 'isolated-auth.ts', 'auth-fixture-resources.ts', 'auth-mail.ts', 'isolated-auth.security.test.ts', 'account-browser-fixture.ts'].map((file) => realpath(join(root, 'apps/api/test', file))));
   const compilerInputs = (await readFile(inputs, 'utf8')).split(/\r?\n/);
   for (const helper of helpers) assert.ok(!compilerInputs.includes(helper), 'Test composition is not a production compiler input');
   const sources = await Promise.all(helpers.map((helper) => readFile(helper)));

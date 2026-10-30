@@ -19,7 +19,7 @@ export async function query(url: string, sql: string) {
   }
 }
 
-export async function isolatedPostgres() {
+export async function isolatedPostgres(options: { network?: { name: string; owner: string } } = {}) {
   const owner = randomUUID();
   const password = randomBytes(24).toString('hex');
   const setupPassword = randomBytes(24).toString('hex');
@@ -68,9 +68,14 @@ export async function isolatedPostgres() {
     }
   };
   try {
+    if (options.network) {
+      const actual = await docker('network', 'inspect', '--format', '{{index .Labels "workprint.fixture"}}', options.network.name);
+      if (actual !== options.network.owner || !/^[0-9a-f-]{36}$/.test(actual)) throw new Error('Refusing unowned fixture network');
+    }
     const { stdout } = await exec('docker', [
       'run', '--detach', '--rm', '--name', name,
       '--label', `workprint.fixture=${owner}`, '--publish', '127.0.0.1::5432',
+      ...(options.network ? ['--network', options.network.name, '--network-alias', 'database', '--memory', '256m', '--cpus', '1', '--pids-limit', '128'] : []),
       '--env', 'POSTGRES_PASSWORD', '--tmpfs', '/var/lib/postgresql/data', postgresImage,
     ], { env: { ...process.env, POSTGRES_PASSWORD: password }, timeout: 60000 });
     const acquired = await inspect(name);
@@ -97,7 +102,7 @@ export async function isolatedPostgres() {
     const setupUrl = `postgresql://wp_setup:${setupPassword}@127.0.0.1:${port}/workprint`;
     const servingUrl = `postgresql://wp_serving:${servingPassword}@127.0.0.1:${port}/workprint`;
     return {
-      setupUrl, servingUrl, adminUrl: adminDatabase, close,
+      setupUrl, servingUrl, adminUrl: adminDatabase, containerId: id, owner, close,
       async terminateServingConnection(pid: number) {
         if (!Number.isInteger(pid) || pid < 1) throw new Error('Invalid fixture backend PID');
         const result = await query(adminDatabase, `SELECT pg_terminate_backend(pid) AS terminated FROM pg_stat_activity WHERE pid = ${pid} AND datname = current_database() AND usename = 'wp_serving' AND state = 'idle'`);
