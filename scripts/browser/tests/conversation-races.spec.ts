@@ -1,23 +1,6 @@
-import type { Page } from '@playwright/test';
 import { test, expect } from '../material-network.js';
-import { account, fixture, privateForward, privateFulfill, signIn } from '../account-fixture.js';
-import { allowHistory, allowList, allowSignIn, enter, navigationSettled, observeNavigation, settledFrames } from '../navigation-fixture.js';
-
-async function holdRealResponse(page: Page, pattern: string) {
-  let release!: () => void, observed!: (status: number) => void, finished!: () => void;
-  let held = false, released = false;
-  const gate = new Promise<void>(resolve => { release = resolve; });
-  const seen = new Promise<number>(resolve => { observed = resolve; });
-  const done = new Promise<void>(resolve => { finished = resolve; });
-  await page.route(pattern, async route => {
-    try {
-      const response = await privateForward(route); await response.body();
-      held = true; observed(response.status()); await gate;
-      await privateFulfill(route, { response });
-    } finally { held = false; finished(); }
-  });
-  return { seen, done, held: () => held && !released, release() { released = true; release(); } };
-}
+import { account, fixture, signIn } from '../account-fixture.js';
+import { allowHistory, allowList, allowSignIn, enter, navigationSettled, observeNavigation, settledFrames, holdRealResponse } from '../navigation-fixture.js';
 
 test('a real late committed create cannot steal a newer conversation or its draft', async ({ page, materialNetwork }) => {
   test.setTimeout(120000); const f = await fixture(page, true); let held: Awaited<ReturnType<typeof holdRealResponse>> | undefined;

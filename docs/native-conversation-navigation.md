@@ -51,6 +51,10 @@ Additional isolated checks cover built-browser creation, successful SDK refresh/
 
 Keyboard/focus/full labels and long-title containment run at all four main widths with reduced motion. Reflow qualification uses half-width effective CSS viewports and an additional 200% CSS zoom at 390. CSS zoom alone does not update media queries: an initial 821px experiment overflowed the unchanged desktop columns and remains recorded as a non-pass, not browser-zoom evidence. Native browser zoom and comprehensive assistive-technology certification are not claimed. The narrow experiment independently exposed and corrected intrinsic grid overflow in Navigation without changing normal-width reference output.
 
+## Navigation presentation corrections
+
+Recents row activation explicitly dismisses the narrow Navigation surface even when the selected native ID is unchanged; read completion then restores heading focus without resetting the same-conversation draft. Earlier-history insertion uses a React precommit scroll snapshot, so user scrolling while the response is pending is retained on desktop and narrow document scrolling. An unchanged viewport also retains the original anchor across the loading-control height change. Neither path creates or sends native work or introduces automatic focus movement during pagination.
+
 ## Verification and remaining delivery
 
 Automated production-entry checks use isolated Auth/Postgres and the supported `createNativeConversation` helper for preexisting messages. They cover real native create/pagination, exact message identity/text/order, two-account/forged-scope denial, foreign/absent equivalence, no-effect reads and closed generic mutations. Browser checks drive the actual app and native client with exact network allowances, more than one page of explicit creates, keyboard/page focus, reload, earlier-history anchoring, honest empty/error/unknown outcomes, and held real success/failure responses across newer selections/accounts. Public-factory delegation observes promise settlement without exporting credentials or adding production test hooks.

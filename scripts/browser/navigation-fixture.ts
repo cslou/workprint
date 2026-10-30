@@ -5,6 +5,22 @@ import { account, signIn, origin, privateForward, privateFulfill } from './accou
 import type { fixture } from './account-fixture.js';
 
 type Fixture = Awaited<ReturnType<typeof fixture>>;
+export async function holdRealResponse(page: Page, pattern: string) {
+  let release!: () => void, observed!: (status: number) => void, finished!: () => void;
+  let held = false, released = false;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const seen = new Promise<number>(resolve => { observed = resolve; });
+  const done = new Promise<void>(resolve => { finished = resolve; });
+  await page.route(pattern, async route => {
+    try {
+      const response = await privateForward(route); await response.body();
+      held = true; observed(response.status()); await gate;
+      await privateFulfill(route, { response });
+    } finally { held = false; finished(); }
+  });
+  return { seen, done, held: () => held && !released, release() { released = true; release(); } };
+}
+
 export function allowSignIn(network: MaterialNetwork, authOrigin: string) {
   network.expectOperations({ origin: authOrigin, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: authOrigin, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
 }
