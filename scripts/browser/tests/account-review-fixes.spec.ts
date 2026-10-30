@@ -1,5 +1,5 @@
 import { test, expect } from '../material-network.js';
-import { privateContinue, privateForward, privateFulfill, fixture, account, signIn, origin } from '../account-fixture.js';
+import { observeAccountToken, accountTokenAvailable, privateContinue, privateForward, privateFulfill, fixture, account, signIn, origin } from '../account-fixture.js';
 
 test.use({ screenshot: 'off', trace: 'off', video: 'off' });
 
@@ -86,34 +86,47 @@ test('retryable refresh outage preserves valid scope and drafts through supporte
 });
 
 test('unavailable SDK expiry check locks this tab and ignores a held late refresh result', async ({ page, materialNetwork }) => {
-  test.setTimeout(30000); const f = await fixture(page, false, { jwtExpirySeconds: 180 });
+  test.setTimeout(30000); const f = await fixture(page, true, { jwtExpirySeconds: 180 });
   let release: (() => void) | undefined;
   try {
-    const user = await f.auth.createAccount(); await page.clock.install({ time: Date.now() }); await page.goto(origin); await account(page);
+    const user = await f.auth.createAccount(); await f.application!.saveNative(user.id); const saved = await f.application!.snapshot();
+    await observeAccountToken(page); await page.clock.install({ time: Date.now() }); await page.goto(origin); await account(page);
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
     await signIn(page, user.email, user.password); await expect(page.getByRole('dialog')).toBeHidden();
+    expect(await accountTokenAvailable(page)).toBe(true);
+    materialNetwork.expectOperations({ origin: f.application!.apiOrigin, method: 'GET', path: '/v1/library', query: {}, count: 1 });
+    await page.getByRole('button', { name: 'Library', exact: true }).click(); await expect(page.getByRole('status')).toContainText('Library not available yet'); await page.getByRole('button', { name: 'Close', exact: true }).click();
     await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Clear at expiry');
-    let held = false, failed = false; const gate = new Promise<void>(resolve => { release = resolve; });
+    let held = false, failed = false, released = false, handlerFinished = false; const gate = new Promise<void>(resolve => { release = resolve; });
     page.on('requestfailed', request => { if (new URL(request.url()).searchParams.get('grant_type') === 'refresh_token') failed = true; });
     let finished!: () => void; const settled = new Promise<void>(resolve => { finished = resolve; });
     await page.route(f.auth.url + '/auth/v1/token?grant_type=refresh_token', async route => {
       try {
         const response = await privateForward(route); held = true; await gate;
         if (!route.request().failure()) await privateFulfill(route, { response });
-      } finally { finished(); }
+      } finally { handlerFinished = true; finished(); }
     });
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'refresh_token' }, count: 1 });
     await page.clock.fastForward(60000); await expect.poll(() => held).toBe(true);
     const intent = await page.evaluate(() => localStorage.getItem('workprint.auth-intent'));
     await page.clock.fastForward(130000);
-    // Advancing past the native request deadline makes this an SDK read failure, not
-    // authoritative proof of shared-session expiry. Release every intercepted response.
-    release!(); await settled; await expect.poll(() => failed).toBe(true);
+    // Prove fencing after the SDK failure while the actual response is still held.
+    await expect.poll(() => failed).toBe(true); expect(held && !released && !handlerFinished).toBe(true);
     await expect(page.getByRole('dialog')).toContainText('Your session couldn’t be refreshed.');
-    expect(await page.evaluate(() => localStorage.getItem('workprint.auth-intent')) === intent).toBe(true);
-    await expect(page.locator('.wp-main textarea')).toHaveValue('');
     await expect(page.getByRole('button', { name: user.email, exact: true, includeHidden: true })).toHaveCount(0);
-    await expect(page.locator('.wp-main textarea')).toHaveValue('');
+    await expect(page.locator('.wp-main textarea')).toHaveValue(''); expect(await accountTokenAvailable(page)).toBe(false);
+    expect(await page.evaluate(() => localStorage.getItem('workprint.auth-intent')) === intent).toBe(true);
+    await page.getByRole('button', { name: 'Close', exact: true }).click(); await page.getByRole('button', { name: 'Library', exact: true }).click();
+    await expect(page.getByRole('dialog')).not.toContainText('Library not available yet'); materialNetwork.assertSafe();
+    expect(await f.application!.snapshot() === saved).toBe(true); expect(held && !released && !handlerFinished).toBe(true);
+    released = true; release!(); await settled;
+    // The handler and SDK failure have settled; explicitly render two frames on the test clock.
+    const rendered = page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    await page.clock.runFor(50); await rendered; expect(handlerFinished).toBe(true);
+    await expect(page.getByRole('button', { name: user.email, exact: true, includeHidden: true })).toHaveCount(0);
+    await expect(page.locator('.wp-main textarea')).toHaveValue(''); expect(await accountTokenAvailable(page)).toBe(false);
+    await expect(page.getByRole('dialog')).not.toContainText('Library not available yet'); materialNetwork.assertSafe();
+    expect(await f.application!.snapshot() === saved).toBe(true);
   } finally { release?.(); await f.close(); }
 });
 

@@ -1,5 +1,5 @@
 import { test, expect, type MaterialNetwork } from '../material-network.js';
-import { fixture, account, signIn, privateFill, privateNavigate, privateForward, privateFulfill, privateAbort, origin } from '../account-fixture.js';
+import { observeAccountToken, accountTokenAvailable, fixture, account, signIn, privateFill, privateNavigate, privateForward, privateFulfill, privateAbort, origin } from '../account-fixture.js';
 import type { Page } from '@playwright/test';
 
 test.use({ screenshot: 'off', trace: 'off', video: 'off' });
@@ -87,6 +87,61 @@ test('queued same-purpose expiry checks the SDK after native refresh advanced ex
     expect(await other.evaluate(() => localStorage.getItem('workprint.auth-intent')) === revision).toBe(true);
     await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('Keep the original draft'); await expect(page.getByRole('button', { name: user.email, exact: true })).toBeVisible();
   } finally { if (frozen) await cdp.send('Page.setWebLifecycleState', { state: 'active' }); await cdp.detach(); await f.close(); }
+});
+
+for (const local of [false, true]) test(`expiry awaiting the real SDK respects ${local ? 'a newer local storage fence' : 'a peer account published during the await'}`, async ({ page, context, materialNetwork }) => {
+  test.setTimeout(45000); const f = await fixture(page, false, { jwtExpirySeconds: 180 }); let pending: Promise<unknown> | undefined;
+  try {
+    const old = await f.auth.createAccount(), newer = local ? null : await f.auth.createAccount();
+    await page.clock.install({ time: Date.now() }); await page.clock.pauseAt(Date.now()); await captureExpiry(page, true); await observeAccountToken(page);
+    await page.goto(origin); await account(page); login(materialNetwork, f.auth.url); await signIn(page, old.email, old.password); await expect(page.getByRole('dialog')).toBeHidden();
+    await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Invalidate the old draft'); await account(page, old.email);
+    const other = local ? null : await context.newPage();
+    if (other) { materialNetwork.expectOperations({ origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 }); await other.goto(origin); await account(other, old.email); }
+    await page.evaluate(() => {
+      const original = window.fetch.bind(window); let release!: () => void;
+      const gate = new Promise<void>(resolve => { release = resolve; });
+      const state = { waiting: false, release: () => release() }; (window as unknown as { expiryIO: typeof state }).expiryIO = state;
+      window.fetch = async (input, init) => {
+        const response = await original(input, init);
+        const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
+        if (url.searchParams.get('grant_type') !== 'refresh_token' || state.waiting) return response;
+        // Hold processing after real I/O completed, as in a suspended renderer. Preserve bytes;
+        // no SDK replacement, credential inspection or race against the transport deadline.
+        const bytes = await response.arrayBuffer();
+        const buffered = new Response(bytes, { status: response.status, statusText: response.statusText, headers: response.headers });
+        state.waiting = true; await gate; return buffered;
+      };
+    });
+    const deadline = await page.evaluate(() => (window as unknown as Jobs).expiryJobs[0]!.deadline);
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'refresh_token' }, count: 1 });
+    await page.clock.setSystemTime(deadline - 20000);
+    pending = page.evaluate(async () => { await (window as unknown as Jobs).expiryJobs[0]!.run(); }); void pending.catch(() => {});
+    await expect.poll(() => page.evaluate(() => (window as unknown as { expiryIO: { waiting: boolean } }).expiryIO.waiting)).toBe(true);
+    await expect(page.locator('form.wp-auth-content')).toHaveAttribute('aria-busy', 'true');
+    await page.clock.setSystemTime(Date.now());
+    if (local) {
+      await readFailure(page); expect(await accountTokenAvailable(page)).toBe(false);
+      await expect(page.getByRole('dialog')).toContainText('Account access is locked in this tab.');
+      await page.evaluate(() => (window as unknown as { repairRead: () => void }).repairRead());
+    } else {
+      materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/logout', query: { scope: 'local' }, count: 1 });
+      await other!.getByRole('button', { name: 'Switch account', exact: true }).click(); await expect(other!.getByLabel('Email', { exact: true })).toBeVisible();
+      login(materialNetwork, f.auth.url); await signIn(other!, newer!.email, newer!.password); await expect(other!.getByRole('button', { name: newer!.email, exact: true })).toBeVisible(); await other!.getByRole('textbox', { name: 'Message', exact: true }).fill('Keep the peer draft');
+    }
+    const intent = await page.evaluate(() => localStorage.getItem('workprint.auth-intent'));
+    await page.evaluate(() => (window as unknown as { expiryIO: { release: () => void } }).expiryIO.release());
+    await pending; // Includes the actual SDK result and the original owner's expiry settlement.
+    expect(await page.evaluate(() => localStorage.getItem('workprint.auth-intent')) === intent).toBe(true);
+    await expect(page.getByRole('button', { name: old.email, exact: true, includeHidden: true })).toHaveCount(0);
+    await expect(page.locator('.wp-main textarea')).toHaveValue(''); await expect(page.locator('form.wp-auth-content')).toHaveAttribute('aria-busy', 'false');
+    expect(await accountTokenAvailable(page)).toBe(false);
+    await expect(page.getByRole('dialog')).toContainText(local ? 'Account access is locked in this tab.' : 'Your session has ended.');
+    if (other) { await expect(other.getByRole('button', { name: newer!.email, exact: true })).toBeVisible(); await expect(other.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('Keep the peer draft'); }
+  } finally {
+    try { if (!page.isClosed()) await page.evaluate(() => (window as unknown as { expiryIO?: { release: () => void } }).expiryIO?.release()); if (pending) await pending.catch(() => {}); }
+    finally { await f.close(); }
+  }
 });
 
 test('authenticated logout acknowledgement survives SDK cleanup failure and local retry', async ({ page, materialNetwork }) => {

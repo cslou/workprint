@@ -10,6 +10,21 @@ import type * as Auth from '../../apps/api/test/isolated-auth.js';
 import type * as Processes from '../../apps/api/test/process.js';
 import type * as AccountFixture from '../../apps/api/test/account-browser-fixture.js';
 
+/** Observe the supplied public token callback without exporting an owner or returning credentials. */
+export async function observeAccountToken(page: Page) {
+  await page.route('**/src/api/runtime.ts', route => privateFulfill(route, {
+    contentType: 'text/javascript',
+    body: `import { createConfiguredBrowserClient as original } from '/src/api/runtime.ts?account-token-probe-original';
+export function createConfiguredBrowserClient(provider) {
+  window.accountTokenAvailable = async () => (await provider()) !== null;
+  return original(provider);
+}`,
+  }));
+}
+export async function accountTokenAvailable(page: Page): Promise<boolean> {
+  return page.evaluate(() => (window as unknown as { accountTokenAvailable: () => Promise<boolean> }).accountTokenAvailable());
+}
+
 export async function privateNavigate(page: Page, url: string) {
   try {
     await page.goto(url);

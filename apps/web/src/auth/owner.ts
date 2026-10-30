@@ -206,18 +206,25 @@ export class AccountOwner {
     if (status === 'superseded') { this.invalidate('expired'); return; }
     if (status === 'unavailable') { this.storageUnavailable(); return; }
     this.expiryCheck = scope;
+    const settleCurrent = () => {
+      if (scope.epoch !== this.epoch || this.blocked) return false;
+      const settled = this.status(scope);
+      if (settled === 'superseded') { this.invalidate('expired'); return false; }
+      if (settled === 'unavailable') { this.storageUnavailable(); return false; }
+      return true;
+    };
     try {
       // Like the token seam, this uses the SDK's guarded refresh, not destructive getUser.
       // Do not hold publication behind a potentially pending native refresh.
       const result = await this.client!.getSession();
-      if (!this.current(scope) || this.blocked) return;
+      if (!settleCurrent()) return;
       const session = result.data.session;
       if (session && session.user.id !== accountId) { this.invalidate('expired'); return; }
       if (session && (session.expires_at ?? 0) * 1000 > Date.now()) { this.present(session); return; }
       // An unavailable SDK read is not proof that every tab's current session expired.
       // Shared expiry belongs to the SDK; a presentation deadline can only close this tab.
       this.fence(result.error ? 'refresh-failed' : 'expired', false);
-    } catch { if (this.current(scope)) this.storageUnavailable(); }
+    } catch { if (settleCurrent()) this.storageUnavailable(); }
     finally { if (this.expiryCheck === scope) this.expiryCheck = undefined; }
   }
   private fence(screen: AccountScreen, persist = true) {
