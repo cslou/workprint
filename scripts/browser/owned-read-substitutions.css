@@ -1,0 +1,53 @@
+/* Independent adapters for the tracked r74/r82/r92 markup.
+   Geometry/type values come from brand-book/book.css and design.md's saved-read record.
+   No application stylesheet or ignored proposal is a comparison input. */
+:root { --font-sans: system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --font-display: Georgia,"Times New Roman",serif; }
+b,strong { font-weight:600; }
+.preview-note { margin:0;padding:12px 20px;font-size:12px;line-height:1.4;color:var(--fg-muted);background:var(--bg);border-bottom:1px solid var(--border); }
+.preview-note p { margin:4px 0 0; }
+.preview-stage { padding:24px;display:flex;justify-content:center; }
+.preview-panel { flex:none;width:380px;border:1px solid var(--border);display:flex;flex-direction:column; }
+.preview-panel > .ptabs,.preview-panel > .pbody { background:var(--raised); }
+.preview-panel .ptabs a[data-selected] { background:var(--fg);color:var(--bg); }
+.preview-panel .pv { display:block; }
+.preview-panel .take-hist summary,.preview-panel .ref-version { min-height:28px; }
+.ref-version { justify-self:start;font:inherit;font-weight:600;color:var(--fg);background:transparent;border:0;border-radius:0;padding:0; }
+.th-row { grid-template-columns:1fr auto; }
+.wp-version-use { display:contents; }
+.ref-secondary { height:32px;padding:0 14px;border:1px solid var(--border);border-radius:9999px;background:transparent;color:var(--fg-muted);font:400 13px/1.5 var(--font-sans); }
+.ref-quiet { min-height:32px;padding:0;border:0;background:transparent;color:var(--fg-muted);font:400 13px/1.45 var(--font-sans); }
+button:disabled { opacity:.45;cursor:default; }
+.preview-page-actions { display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px; }
+.preview-page-controls { display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding-top:10px; }
+.preview-page-controls p,.preview-history-feedback { margin:0;font-size:13px;color:var(--fg-subtle); }
+.preview-history-feedback { padding-top:10px; }
+.preview-reading { display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;margin-bottom:12px;font-size:12px;color:var(--fg-subtle); }
+.preview-empty-thumb { display:grid;place-items:center;width:56px;height:56px;border:1px dashed var(--border-strong);border-radius:8px;color:var(--fg-subtle);font-size:11px;background:var(--bg-dark); }
+.preview-modal-stage { background:#1b1913b3;height:100vh;padding:24px;display:flex;align-items:center;justify-content:center; }
+.preview-reference.lb-panel { width:min(1120px,100%);display:flex;flex-direction:column;max-height:calc(100vh - 48px); }
+.preview-reference .take-hist { margin-top:12px; }
+.preview-reference p { overflow-wrap:anywhere; }
+.preview-library.lp-panel { height:min(760px,100%);width:min(1040px,100%); }
+.wp-dialog,.wp-picker { display:flex;flex:1;min-height:0;flex-direction:column; }
+.preview-library .lp-head { justify-content:space-between;margin:0; }
+.preview-library .lp-head h2 { font-size:15px; }
+.preview-library .lp-body { min-height:0; }
+.preview-library .lp-tile { font:revert;font-family:var(--font-sans);line-height:1.5; }
+.preview-library .lp-media.empty { border-style:dashed;border-color:var(--border-strong); }
+.preview-library .lp-tray { flex-wrap:wrap; }
+.preview-library .wp-picker-bar { display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:12px 16px 4px; }
+.preview-library .lp-search { display:flex;margin-left:auto; }
+.preview-library .lp-search input { width:100%;border:0;padding:0;background:transparent;font:13px/1.5 var(--font-sans);color:var(--fg);outline:none; }
+.preview-library .lp-check { background:var(--raised); }
+.preview-library-controls { padding-top:10px; }
+.preview-library-controls .preview-page-controls { padding:0; }
+.preview-library-controls p { margin:0;font-size:13px;color:var(--fg-subtle); }
+.preview-modal-stage:has(.ref-empty) { padding:24px; }
+.ref-empty { display:grid;place-items:center;align-content:center;gap:4px;text-align:center;min-height:240px;color:var(--fg-subtle);font-size:13px; }
+.ref-empty b { color:var(--fg);font-size:15px;font-weight:600; }
+@media(max-width:820px) {
+ .preview-stage { padding:16px 4px; }.preview-panel { width:100%; }
+ .preview-modal-stage { padding:0; }.preview-reference.lb-panel { width:100%;height:100%;max-height:none;border-radius:0;overflow:auto; }
+ .preview-reference .lb-scroll { max-height:none; }
+ .preview-library.lp-panel { width:100%;height:100%;border-radius:0; }
+}

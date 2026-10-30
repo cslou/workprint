@@ -1,0 +1,29 @@
+# Application-owned migrations only. Do not start or link a stack from this checkout.
+project_id = "workprint-isolated-migrations"
+
+[api]
+enabled = false
+schemas = ["artifacts"]
+extra_search_path = []
+
+[db]
+major_version = 17
+
+[db.migrations]
+enabled = true
+schema_paths = []
+
+[db.seed]
+enabled = false
+
+[studio]
+enabled = false
+
+[inbucket]
+enabled = false
+
+[storage]
+enabled = false
+
+[auth]
+enabled = false

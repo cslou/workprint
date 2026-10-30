@@ -3,7 +3,9 @@ import { registerApiRoute, type ApiRoute } from '@mastra/core/server';
 import { PostgresStore } from '@mastra/pg';
 import { Pool } from 'pg';
 import { createOwnedConversationCheck } from '../agent/index.js';
-import { createApplication } from '../application/index.js';
+import { createApplication, withSavedWork } from '../application/index.js';
+import { createArtifactStore } from '../artifacts/index.js';
+import { assertRestrictedRole } from '../db/index.js';
 import { loadServerConfig } from './config.js';
 import { verifyAccount } from './auth.js';
 import { applicationRoutes } from './application-routes.js';
@@ -21,32 +23,18 @@ export async function createBackend(routes: ApiRoute[] = []) {
     console.error('Native storage idle connection lost', { code });
   });
   try {
-    const result = await pool.query<{ privileged: boolean }>(`WITH native_schema AS (
-      SELECT oid, nspowner FROM pg_namespace WHERE nspname = 'mastra'
-    ), native_owners AS (
-      SELECT nspowner AS owner FROM native_schema
-      UNION SELECT relowner FROM pg_class WHERE relnamespace IN (SELECT oid FROM native_schema)
-      UNION SELECT proowner FROM pg_proc WHERE pronamespace IN (SELECT oid FROM native_schema)
-      UNION SELECT typowner FROM pg_type WHERE typnamespace IN (SELECT oid FROM native_schema)
-    ) SELECT
-      has_database_privilege(current_database(), 'CREATE') OR
-      has_schema_privilege('mastra', 'CREATE') OR
-      has_schema_privilege('public', 'CREATE') OR
-      (SELECT rolsuper OR rolcreaterole OR rolcreatedb FROM pg_roles WHERE rolname = current_user) OR
-      EXISTS (
-        SELECT 1 FROM pg_roles reachable CROSS JOIN native_owners
-        WHERE pg_has_role(current_user, reachable.oid, 'SET')
-          AND pg_has_role(reachable.oid, native_owners.owner, 'USAGE')
-      )
-      AS privileged`);
-    if (result.rows[0]?.privileged !== false) throw new Error('Privileged serving connection');
+    await assertRestrictedRole(pool, {
+      createSchemas: ['artifacts', 'mastra', 'public'], ownershipSchemas: ['artifacts', 'mastra'],
+      requiredSchemas: ['mastra', 'public'], errorMessage: 'Privileged serving connection',
+    });
   } catch {
     await pool.end();
     throw new Error('Serving storage unavailable or privileged; prepare storage separately and use restricted DATABASE_URL');
   }
   const storage = new PostgresStore({ id: 'workprint-native', schemaName: 'mastra', disableInit: true, pool });
   const application = createApplication({ checkOwnedConversation: createOwnedConversationCheck(storage) });
-  const protectedRoutes = [...applicationRoutes(application), ...routes];
+  const savedApplication = withSavedWork(application, createArtifactStore(pool, application.checkOwnedConversation));
+  const protectedRoutes = [...applicationRoutes(savedApplication), ...routes];
   const matchesRoute = (path: string, method: string) => protectedRoutes.some((route) => {
     const template = route.path.split('/');
     const segments = path.split('/');

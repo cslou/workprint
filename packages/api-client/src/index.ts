@@ -1,7 +1,8 @@
-import { applicationError, errorEnvelopeSchema, errorStatus, operations, type ErrorEnvelope, type OperationName, type OperationRequest, type OperationResponse } from '@workprint/contracts';
+import { applicationResponseBytes, workspaceResponseBytes, applicationError, errorEnvelopeSchema, errorStatus, operations, type OperationName, type OperationRequest, type OperationResponse } from '@workprint/contracts';
 
-export type ClientError = ErrorEnvelope['error'] | { code: 'transport_failure' | 'timed_out' | 'cancelled' | 'invalid_response'; message: string };
-export type ClientResult<T> = { ok: true; value: T } | { ok: false; error: ClientError };
+import type { ClientError, ClientResult } from './result.js';
+export type { ClientError, ClientResult } from './result.js';
+export { createPageRead, type PageRead, type PageReadState, type ReadPage } from './paged-read.js';
 export type CallOptions = { signal?: AbortSignal };
 type ApplicationMethods = { [N in OperationName]: (input: OperationRequest<N>, options?: CallOptions) => Promise<ClientResult<OperationResponse<N>>> };
 const nativeNames = ['createConversation', 'listConversations', 'loadConversation', 'sendText', 'subscribe', 'stop'] as const;
@@ -45,6 +46,7 @@ export function createApiClient(config: { baseUrl: string; getAccessToken: () =>
         });
         const reader = response.body?.getReader();
         if (!reader) return fail('invalid_response', 'Invalid API response');
+        const responseLimit = name === 'workspace' && response.ok ? workspaceResponseBytes : applicationResponseBytes;
         let size = 0;
         const chunks: Uint8Array[] = [];
         try {
@@ -52,7 +54,7 @@ export function createApiClient(config: { baseUrl: string; getAccessToken: () =>
             const { done, value } = await reader.read();
             if (done) break;
             size += value.byteLength;
-            if (size > 1024 * 1024) { await reader.cancel(); return fail('invalid_response', 'API response too large'); }
+            if (size > responseLimit) { await reader.cancel(); return fail('invalid_response', 'API response too large'); }
             chunks.push(value);
           }
         } finally { reader.releaseLock(); }

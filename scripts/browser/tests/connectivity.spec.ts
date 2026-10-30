@@ -1,5 +1,5 @@
 import { browserOrigin, previewOrigin, previewPort } from '../origin.js';
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../material-network.js';
 import type { Page } from '@playwright/test';
 import { pathToFileURL } from 'node:url';
 import { resolve, join } from 'node:path';
@@ -13,7 +13,7 @@ async function configure(page: Page, input: { apiOrigin?: string; token: string 
   await page.evaluate((value) => (window as unknown as { libraryTest: { configure(input: unknown): void } }).libraryTest.configure(value), input);
 }
 
-for (const mode of ['development', 'built'] as const) test(`${mode} Library consumer qualifies real admission, CORS denial and secret isolation`, async ({ page }, info) => {
+for (const mode of ['development', 'built'] as const) test(`${mode} Library consumer qualifies real admission, CORS denial and secret isolation`, async ({ page, browser, materialNetwork }, info) => {
   test.setTimeout(120000);
   const fixture = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
   const processes = await import(pathToFileURL(resolve('apps/api/.test-build/test/process.js')).href) as typeof Processes;
@@ -56,13 +56,27 @@ for (const mode of ['development', 'built'] as const) test(`${mode} Library cons
       });
       await page.goto(`${frontend}/library.html`);
       await page.waitForFunction(() => typeof (window as unknown as { libraryTest?: { configure?: unknown } }).libraryTest?.configure === 'function');
-      expect(await page.evaluate(async () => { try { await fetch('https://example.invalid/egress-control'); return true; } catch { return false; } })).toBe(false);
+      // Challenge the abort-only boundary in a blank, credential-free context; all product requests stay observed.
+      const control = await browser.newContext();
+      try {
+        await control.route('**/*', async route => {
+          const request = route.request();
+          expect(request.url()).toBe('https://example.invalid/egress-control');
+          expect(request.method()).toBe('GET');
+          expect(!request.headers()['authorization'] && !request.headers()['cookie'] && request.postData() === null, 'Negative control carries no credentials or body').toBe(true);
+          blocked.push(new URL(request.url()).origin);
+          await route.abort('blockedbyclient');
+        });
+        const probe = await control.newPage();
+        expect(await probe.evaluate(async () => { try { await fetch('https://example.invalid/egress-control'); return true; } catch { return false; } })).toBe(false);
+      } finally { await control.close(); }
       expect(blocked).toEqual(['https://example.invalid']);
+      materialNetwork.expectOperations({ origin, method: 'GET', path: '/v1/library', query: {}, count: 4 });
       const requests: string[] = [];
       const statuses: number[] = [];
       page.on('request', (request) => { if (new URL(request.url()).origin === origin) requests.push(`${request.method()} ${new URL(request.url()).pathname}`); });
       page.on('response', (response) => { if (new URL(response.url()).origin === origin) statuses.push(response.status()); });
-      const identities = [[accessTokens[0]!, 'Library not available yet'], [accessTokens[1]!, 'Library not available yet'], [null, 'Sign-in required'], ['malformed', 'Sign-in required']] as const;
+      const identities = [[accessTokens[0]!, 'Nothing saved yet'], [accessTokens[1]!, 'Nothing saved yet'], [null, 'Sign-in required'], ['malformed', 'Sign-in required']] as const;
       for (const [index, [token, title]] of identities.entries()) {
         await configure(page, { ...(mode === 'built' ? {} : { apiOrigin: origin }), token, accountId: `synthetic-scope-${index}` });
         try { await expect.poll(() => statuses.length).toBe(index + 1); }
@@ -74,7 +88,7 @@ for (const mode of ['development', 'built'] as const) test(`${mode} Library cons
         await expect(page.getByRole('status')).toContainText(title);
       }
       expect(requests).toEqual(Array(4).fill('GET /v1/library'));
-      expect(statuses).toEqual([501, 501, 401, 401]);
+      expect(statuses).toEqual([200, 200, 401, 401]);
       for (const token of accessTokens) {
         expect((await page.content()).includes(token)).toBe(false);
         expect(consoleText.some((line) => line.includes(token))).toBe(false);
@@ -91,7 +105,8 @@ for (const mode of ['development', 'built'] as const) test(`${mode} Library cons
   } finally { for (const fn of cleanup.reverse()) await fn(); }
 });
 
-test('Library reactivation starts loading before passive effects, never resurrecting settled feedback', async ({ page }, info) => {
+test('Library reactivation starts loading before passive effects, never resurrecting settled feedback', async ({ page, materialNetwork }, info) => {
+  materialNetwork.expectOperations({ origin: browserOrigin, method: 'GET', path: '/v1/library', query: {}, count: 2 });
   await page.goto('/library.html');
   let requests = 0;
   await page.route('**/v1/library', async (route) => {
@@ -115,7 +130,8 @@ test('Library reactivation starts loading before passive effects, never resurrec
   await expect(page.getByRole('status')).toContainText('Library not available yet');
 });
 
-for (const change of ['account', 'conversation'] as const) test(`Library ${change} invalidation, unmount and timeout never replay mutations`, async ({ page }) => {
+for (const change of ['account', 'conversation'] as const) test(`Library ${change} invalidation, unmount and timeout never replay mutations`, async ({ page, materialNetwork }) => {
+  materialNetwork.expectOperations({ origin: browserOrigin, method: 'GET', path: '/v1/library', query: {}, count: 4 });
   await page.goto('/library.html');
   let release: (() => void) | undefined;
   let completed = false;

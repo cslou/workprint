@@ -8,6 +8,12 @@
 
 **Human reference:** [Brand book](brand-book.html) (home; pages under `brand-book/`) · **Values:** this file ([tokens](#color)) · **Approved screens:** [Generate flows](generate-flows.html) · **Interaction decisions:** [App user flows](user-flows.md) · **History:** [earlier studies and Editor alternatives](history.md)
 
+## Bounded saved-work navigation
+
+**Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** This narrowly revises [saved-work reads](#phase-3-saved-work-reads): append loaded pages while within the bounded window; after eviction, show `Showing loaded items N–M` and `Back to first page` alongside the existing Load more/Load earlier versions control. Approve Option B, not silent rolling eviction or close/reopen as the recovery path. First-page return preserves exact Library choices and provides access to earlier items without an unbounded cache or automatic fetch. Search covers the currently loaded window, not unseen or evicted items; range feedback makes this limitation visible. Scope/filter changes still invalidate stale reads and choices under existing rules.
+
+The controls remain after the final row inside the scroll region, not above the selection tray. Keyboard focus and announcements settle across page append, eviction, terminal pages and return. Ordinary small collections retain their approved appearance; window feedback is needed when the displayed range is displaced. Inert Option B Library/history captures at 1440×900 and 390×844 were inspected in ignored `outputs/verification/sprint-005/design-proposals/pagination-window-r1/`; those previews are inspection evidence only. Tests derive comparisons from tracked references plus these substitutions and prove access beyond 1,000 items, bounded retained content, preserved exact choices and stale-response isolation. No new approval/selection authority, server search or wire contract is granted.
+
 ## Overview
 
 **Section 01** · **Status:** Approved

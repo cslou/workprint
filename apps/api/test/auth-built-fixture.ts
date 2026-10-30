@@ -8,13 +8,16 @@ import { command, start, unusedPort } from './process.js';
 import { createApiClient } from '@workprint/api-client';
 import { operations, type OperationName, type OperationRequest } from '@workprint/contracts';
 import { applicationRequests } from './application-requests.js';
-import { query } from './postgres.js';
+import { query, isolatedPostgres } from './postgres.js';
+import { PostgresStore } from '@mastra/pg';
+import { applyArtifactMigrations } from './artifact-database.js';
 
 // Shared by current-scope checks and the separately invoked B-001 qualification.
 // Private fixture input is never inherited by serving. Accounts already exist.
 export type BuiltAdmissionTarget = { origin: string; accessToken: string; accessTokens: readonly string[]; logs: string };
+export type SavedWorkSetup = { accountIds: readonly string[]; native: PostgresStore; servingUrl: string };
 type FixtureContext = { diagnostic(message: string): void; after(cleanup: () => void | Promise<void>): void };
-export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (server: BuiltAdmissionTarget) => Promise<void>, options: { browserOrigin?: string } = {}) {
+export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (server: BuiltAdmissionTarget) => Promise<void>, options: { browserOrigin?: string; prepareSavedWork?: (setup: SavedWorkSetup) => Promise<void> } = {}) {
   const file = process.env.WORKPRINT_AUTH_FIXTURE;
   assert.ok(file, 'Supply WORKPRINT_AUTH_FIXTURE with authorized Supabase URL, anonKey, servingUrl and two accounts');
   const fixture = await environment();
@@ -71,8 +74,16 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
     return await response.json() as { access_token: string; user: { id: string } };
   }));
   assert.notEqual(identities[0]!.user.id, identities[1]!.user.id);
+  // Application tests own their data database; Auth alone uses the authorized shared stack.
+  const database = await isolatedPostgres();
+  t.after(database.close);
+  const setup = new PostgresStore({ id: 'admission-native-setup', connectionString: database.setupUrl, schemaName: 'mastra' });
+  try {
+    await setup.init(); await database.grantServing(); await applyArtifactMigrations(database.setupUrl);
+    await options.prepareSavedWork?.({ accountIds: identities.map(identity => identity.user.id), native: setup, servingUrl: database.servingUrl });
+  } finally { await setup.close(); }
   const port = await unusedPort();
-  const env = { ...fixture.env, DATABASE_URL: config.servingUrl, SUPABASE_URL: config.url,
+  const env = { ...fixture.env, DATABASE_URL: database.servingUrl, SUPABASE_URL: config.url,
     SUPABASE_PUBLISHABLE_KEY: config.anonKey, PORT: String(port),
     ...(options.browserOrigin ? { WORKPRINT_BROWSER_ORIGIN: options.browserOrigin } : {}) };
   const probe = await start(process.execPath, [probeEntry], {
@@ -146,12 +157,18 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
   await production.response(`${origin}/health`);
   // The same built production artifact/admission fixture proves all application routes.
   const snapshot = async () => {
-    const tables = await query(config.servingUrl, "SELECT tablename FROM pg_tables WHERE schemaname = 'mastra' ORDER BY tablename");
+    const tables = await query(database.servingUrl, "SELECT tablename FROM pg_tables WHERE schemaname = 'mastra' ORDER BY tablename");
     const fingerprints: unknown[] = [];
     for (const row of tables.rows as { tablename: string }[]) {
       const table = row.tablename.replaceAll('"', '""');
-      const result = await query(config.servingUrl, `SELECT md5(COALESCE(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text)::text, '[]')) AS digest FROM mastra."${table}" t`);
+      const result = await query(database.servingUrl, `SELECT md5(COALESCE(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text)::text, '[]')) AS digest FROM mastra."${table}" t`);
       fingerprints.push([row.tablename, result.rows[0]]);
+    }
+    const applicationTables = await query(database.servingUrl, "SELECT tablename FROM pg_tables WHERE schemaname='artifacts' ORDER BY tablename");
+    for (const row of applicationTables.rows as { tablename: string }[]) {
+      const table = row.tablename.replaceAll('"', '""');
+      const result = await query(database.servingUrl, `SELECT md5(COALESCE(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text)::text, '[]')) AS digest FROM artifacts."${table}" t`);
+      fingerprints.push([`artifacts.${row.tablename}`, result.rows[0]]);
     }
     return fingerprints;
   };
@@ -162,7 +179,13 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
     const invoke = <N extends OperationName>(name: N) => (client[name] as (input: OperationRequest<N>) => Promise<unknown>)(applicationRequests[name]);
     for (const name of Object.keys(operations) as OperationName[]) {
       const result = await invoke(name);
-      assert.deepEqual(result, { ok: false, error: { code: 'not_implemented', message: 'This operation is not implemented' } }, name);
+      if (name === 'library') {
+        const settled = result as { ok: boolean; value: unknown };
+        assert.equal(settled.ok, true, 'Owned Library read settles successfully');
+        assert.ok(operations.library.response.safeParse(settled.value).success);
+      } else if (name === 'workspace' || name === 'artifactVersions' || name === 'version') {
+        assert.deepEqual(result, { ok: false, error: { code: 'not_found', message: 'Saved work not found' } }, 'Unknown and foreign reads share their denial');
+      } else assert.deepEqual(result, { ok: false, error: { code: 'not_implemented', message: 'This operation is not implemented' } }, name);
     }
   }
   const raw = async (path: string, method: string, body: string | undefined, token = identities[0]!.access_token) => {
@@ -205,8 +228,8 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
   for (const [path, method] of [['/v1/conversations/c/workspace/extra', 'GET'], ['/v1/conversations//workspace', 'GET'], ['/v1/conversations/c/workspace', 'POST'], ['/v1/library/', 'GET']] as const) {
     assert.equal((await raw(path, method, undefined)).status, 404, 'Only exact catalog paths/methods are admitted');
   }
-  // No product resources exist; these arbitrary IDs prove no ownership semantics.
-  assert.deepEqual(await snapshot(), beforeRequests, 'Unavailable matrix creates/changes no native records');
+  // Reads and unavailable commands preserve both native and application records.
+  assert.deepEqual(await snapshot(), beforeRequests, 'Read and unavailable-command matrix creates/changes no native or application records');
   const exposure: { path: string; bearer: boolean; status: number }[] = [];
   for (const path of ['/api/auth/capabilities', '/api/auth/me', '/__auth_probe', '/api/agents', '/api/memory/threads', '/api/workflows', '/api/tools', '/api/telemetry', '/swagger-ui', '/openapi.json', '/health/', '/__qualification', '/__qualification/release', '/test/shell.html', '/fixtures/clip.webm', '/studio', '/assets/index.js', '/api/tools/test/execute']) {
     for (const bearer of [false, true]) {

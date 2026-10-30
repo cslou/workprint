@@ -5,6 +5,7 @@ import { PanelSection, WorkspaceEmpty } from '../ui/panel.js';
 import { VersionEditor } from '../versions/editor.js';
 import { VersionReview } from '../versions/review.js';
 import type { MaterialPrerequisites, MaterialPresentation } from './presentation.js';
+import { savedMaterialPresentation } from './content.js';
 import './script.css';
 
 type Workspace = OperationResponse<'workspace'>;
@@ -27,7 +28,7 @@ export function Script({ connection, scope, workspace, prerequisites }: ScriptPr
   const work = workspace.script;
   if (!work || work.version.kind !== 'script') return <ScriptBody connection={connection} scope={scope} workspace={workspace} version={null} />;
   return <VersionReview connection={connection} scope={scope} version={work.version} currentUse={work.use} selectionRevision={workspace.selectionRevision} binding={{ purpose: 'script' }} {...(prerequisites?.history ? { historyPrerequisite: prerequisites.history } : {})}>{(version, editable) => {
-    const facts = prerequisites?.presentations.find((item) => item.versionId === version.id && item.revision === version.revision);
+    const facts = prerequisites?.presentations.find((item) => item.versionId === version.id && item.revision === version.revision) ?? savedMaterialPresentation(version);
     return <ScriptBody connection={connection} scope={scope} workspace={workspace} version={version} readOnly={!editable} {...(facts ? { facts } : {})} />;
   }}</VersionReview>;
 }
