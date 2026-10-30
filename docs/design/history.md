@@ -1,5 +1,9 @@
 # Workprint — Application Design History
 
+## Verified upload feedback — 2026-10-31
+
+**Provisionally approved by the orchestrator under Lou’s delegation; pending Lou’s Phase 3 ratification.** Sixteen inert states retain existing tokens and distinguish authorization/transfer/verification from saved exact versions. Explicit same-upload recovery, observer-only stop and scope clearing avoid replay or rollback claims. Saved image/video remains Draft; video has a poster, not playback or Shot selection. Main inspected the complete narrow contact sheet and representative desktop/narrow full captures. See [binding decisions and verification limits](design.md#verified-upload-feedback). Synthetic preview assets are not verified media; no runtime acceptance is claimed.
+
 ## Manual save recovery — 2026-10-30
 
 **Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Existing text editors retain input through conflicts and uncertain outcomes. Explicit same-command retry is distinct from a new save; reviewed-base continuation is local only and blocks changed targets. Reference descriptions and stable planning text reuse these controls without granting later-story structure or selection authority. See [binding recovery decisions](design.md#manual-save-recovery). Inspection of 13 inert states does not claim runtime behavior or human ratification.
