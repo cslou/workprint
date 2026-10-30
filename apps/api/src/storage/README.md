@@ -16,7 +16,7 @@ configuration without another adapter. It exposes staging-only `presignPut`,
 private `read`, conditional immutable `publish`, mechanical `remove`, and `close`.
 It does not load browser configuration or expose credentials.
 
-Hard caps are 64 MiB per object, two active operations and ten seconds per
+Hard caps are 100 MiB per object, two active operations and ten seconds per
 operation (including streamed response bodies); callers may lower, never raise,
 these bounds. Excess concurrency is rejected, not queued. SDK automatic retries
 are disabled. HEAD and GET metadata/ETag and actual streamed length must agree;

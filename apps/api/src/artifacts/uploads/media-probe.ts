@@ -16,7 +16,7 @@ export function measureMediaProbe(probe:ReturnType<typeof parseMediaProbe>,kind:
   if(probe.format.format_name!=='mov,mp4,m4a,3gp,3g2,mj2' || v.codec_name!=='h264' || v.codec_tag_string!=='avc1' || v.profile!=='Constrained Baseline' || v.pix_fmt!=='yuv420p' || v.sample_aspect_ratio!=='1:1' || v.field_order!=='progressive' || (v.color_space!==undefined && v.color_space!=='unknown') || v.width>1920 || v.height>1080 || audio.length>1)throw new UploadError('unsupported');
   const fps=rate(v.avg_frame_rate),r=rate(v.r_frame_rate),duration=decimal(v.duration),container=decimal(probe.format.duration),frames=decimal(v.nb_frames);
   if(fps<=0 || fps>60 || fps!==r || duration>120 || container>120 || !Number.isSafeInteger(frames) || frames>7200 || Math.abs(frames/fps-duration)>1/fps || Math.abs(container-duration)>1/fps)throw new UploadError('unsupported');
-  const a=audio[0];if(a && (a.codec_name!=='aac' || a.profile!=='LC' || a.sample_rate!=='48000' || a.channels!==2 || Math.abs(decimal(a.duration)-duration)>1/fps))throw new UploadError('unsupported');
+  const a=audio[0];if(a && (a.codec_name!=='aac' || a.profile!=='LC' || !['8000','11025','12000','16000','22050','24000','32000','44100','48000'].includes(a.sample_rate??'') || ![1,2].includes(a.channels??0) || Math.abs(decimal(a.duration)-duration)>1/fps))throw new UploadError('unsupported');
   return{width:v.width,height:v.height,frames,durationMs:Math.round(duration*1000),hasAudio:!!a};
 }
 /** Final counters are observed decoder output, not trusted container declarations. */

@@ -6,7 +6,7 @@ feedback remain unchanged; unknown native contexts now receive nondisclosing
 404, not an obsolete unavailable-operation response.
 
 The framework-free `transferUpload` in `@workprint/api-client` is a separate
-bounded mechanical PUT capability: captured Blob, exact supplied grant, 64 MiB
+bounded mechanical PUT capability: captured Blob, exact supplied grant, 100 MiB
 maximum, two active transfers/no queue, at most 30 seconds, explicit cancellation,
 no automatic retry/reacquisition/confirmation. It has no token provider and sends
 only Content-Type with credentials omitted, no referrer and no redirects. A PUT

@@ -21,7 +21,7 @@ test('CLI application migration and reapply preserve native schema and restrict 
     const tables = (await query(db.setupUrl, "SELECT tablename FROM pg_tables WHERE schemaname='artifacts' ORDER BY tablename")).rows;
     assert.deepEqual(tables.map(row => row.tablename), ['artifacts', 'commands', 'conversation_uses', 'manual_changes', 'media_objects', 'publication_counters', 'upload_confirmations', 'upload_objects', 'uploads', 'version_dependencies', 'versions']);
     const history = (await query(db.setupUrl, 'SELECT version FROM supabase_migrations.schema_migrations ORDER BY version')).rows;
-    assert.deepEqual(history.map(row => row.version), ['20261029000000', '20261029180000', '20261030000000', '20261031000000']);
+    assert.deepEqual(history.map(row => row.version), ['20261029000000', '20261029180000', '20261030000000', '20261031000000', '20261101000000']);
     await migrate(db.setupUrl);
     assert.deepEqual((await query(db.setupUrl, 'SELECT version FROM supabase_migrations.schema_migrations ORDER BY version')).rows, history);
     assert.deepEqual((await query(db.setupUrl, nativeCatalog)).rows, before);

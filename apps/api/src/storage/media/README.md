@@ -67,22 +67,29 @@ The artifacts-owned `uploads/media-verifier.ts` applies a closed initial allowli
 noninterlaced 8-bit RGB/RGBA PNG (IHDR/IDAT/IEND/pHYs only), baseline 8-bit
 three-component yuvj420p JPEG without EXIF/ICC, and nonfragmented isom MP4 with
 Constrained Baseline H264 yuv420p, square pixels, progressive constant frame rate,
-optionally AAC-LC stereo at48kHz. Other variants are explicitly unqualified, not
-implicitly supported. Limits are10MiB/4096square for images and100MiB/1920x1080,
-60fps/120s for video. These are inspection limits; production upload caps are
-still64MiB pending coordinated changes. Full decode must match declared frame
+optionally AAC-LC mono/stereo at8/11.025/12/16/22.05/24/32/44.1/48kHz.
+All18 audio combinations and no audio have actual positive decode/poster proof.
+Other variants are explicitly unqualified, not implicitly supported. Limits are
+10MiB/4096square for images and100MiB/1920x1080,60fps/120s for video.
+Shared byte constants coordinate transport/storage/policy/inspection; the additive
+application-only SQL migration admits100MiB while retaining the10MiB image guard. Full decode must match declared frame
 count and duration; generated PNG posters are separately probed, fully decoded,
 CRC/structure/dimension checked and captured. No conversion service is exposed.
 
 Positive actual synthetic PNG/JPEG/H264+AAC/poster tests and spoof/truncation,
 CRC, oversized dimensions, damaged H264, snapshot-mutation, unsupported metadata
-and decoder-count negatives exercise the real pinned tools. Mono/lower-rate AAC,
-additional H264/image profiles and boundary fixtures remain to qualify before
+and decoder-count negatives exercise the real pinned tools. Additional H264/image
+profiles and dimension/fps/duration boundary fixtures remain to qualify before
 expanding this allowlist. Production composition still supplies no verifier.
 
-Next publication verification must use owned PG/S3 and the real verifier: retain
-the existing501 baseline, then prove exact captured media/poster hashes, one
-human draft version/use, unchanged approval/selection, original-result replay,
-staging replacement, rollback, owner-first manual-save contention and final
-post-write lease/target fences. No external inspection/storage waits may move
-inside SQL. These API/publication/browser and full-suite checks are still unrun.
+Owned PG/S3 publication tests now use the actual verifier and native ownership:
+missing-capability501 baseline, exact captured media/poster hashes, human draft
+Panel/Shot uses, unchanged approval/selection, replay, staging replacement during
+inspection, verifier-buffer mutation, atomic SQL rollback and final replaced-lease
+rejection after actual reserved storage writes. An exact100MiB MP4 (valid free-box
+padding) crosses client transfer, SQL, S3, full native decode/poster and immutable
+publication/readback; one-byte-over transport/policy/storage and unchanged image
+bounds have separate regressions. No external inspection/storage waits hold SQL.
+Prior owner-first manual-save/lease tests remain required regressions. Built API
+composition, browser/UI, further boundary fixtures and full-suite qualification
+remain pending; core proof does not qualify those layers or production deployment.

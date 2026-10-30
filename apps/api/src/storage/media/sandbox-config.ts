@@ -1,6 +1,7 @@
 import { MEDIA_IMAGE } from './pins.js';
+import { MAX_UPLOAD_VIDEO_BYTES } from '@workprint/contracts';
 
-export const MEDIA_JOB_BYTES = 100 * 1024 * 1024;
+export const MEDIA_JOB_BYTES = MAX_UPLOAD_VIDEO_BYTES;
 export const MEDIA_POSTER_BYTES = 8 * 1024 * 1024;
 export const MEDIA_JOB_MS = 30000;
 export const MEDIA_LABEL = 'workprint.media';

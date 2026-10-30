@@ -1,4 +1,5 @@
 import { crc32 } from 'node:zlib';
+import { MAX_UPLOAD_IMAGE_BYTES, MAX_UPLOAD_VIDEO_BYTES } from '@workprint/contracts';
 import { UploadError } from './errors.js';
 
 const invalid = () => new UploadError('invalid_input');
@@ -6,7 +7,7 @@ const unsupported = () => new UploadError('unsupported');
 /** Closed positively-qualified container/image variants, not MIME or filename inference. */
 export function inspectMediaBytes(bytes: Uint8Array, kind: 'image' | 'video', contentType: string): { width?: number; height?: number } {
   const b=Buffer.from(bytes.buffer,bytes.byteOffset,bytes.byteLength);
-  if (!b.length || b.length>(kind==='image'?10:100)*1024**2) throw unsupported();
+  if (!b.length || b.length>(kind==='image'?MAX_UPLOAD_IMAGE_BYTES:MAX_UPLOAD_VIDEO_BYTES)) throw unsupported();
   if(kind==='image' && contentType==='image/png') {
     if(b.length<33 || !b.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))throw invalid();
     let p=8,count=0,seenData=false,ended=false,width=0,height=0;

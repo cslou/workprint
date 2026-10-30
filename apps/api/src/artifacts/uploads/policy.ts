@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg';
-import { idSchema, operations } from '@workprint/contracts';
+import { idSchema, MAX_UPLOAD_IMAGE_BYTES, MAX_UPLOAD_VIDEO_BYTES, operations } from '@workprint/contracts';
 import { createArtifactStore } from '../store.js';
 import { UploadError } from './errors.js';
 import type { OwnedCheck, UploadRequest, UploadRow } from './types.js';
@@ -16,7 +16,7 @@ export function parseUploadRequest(conversation: string, body: UploadRequest): U
   const parsed = operations.requestUpload.request.safeParse({ params: { id: conversation }, query: {}, body });
   if (!parsed.success) throw new UploadError('invalid_input');
   const input = parsed.data.body;
-  if ((input.kind === 'image' && (!['image/png', 'image/jpeg'].includes(input.contentType) || input.byteSize > 10 * 1024 * 1024)) || (input.kind === 'video' && (input.contentType !== 'video/mp4' || input.byteSize > 64 * 1024 * 1024))) throw new UploadError('unsupported');
+  if ((input.kind === 'image' && (!['image/png', 'image/jpeg'].includes(input.contentType) || input.byteSize > MAX_UPLOAD_IMAGE_BYTES)) || (input.kind === 'video' && (input.contentType !== 'video/mp4' || input.byteSize > MAX_UPLOAD_VIDEO_BYTES))) throw new UploadError('unsupported');
   const purpose = input.intendedUse?.purpose;
   if (purpose === 'script' || purpose === 'storyboard' || (purpose === 'panel_image' && input.kind !== 'image') || (purpose === 'shot_video' && input.kind !== 'video')) throw new UploadError('invalid_input');
   return input;

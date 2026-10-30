@@ -1,14 +1,13 @@
-import { operations, type OperationResponse } from '@workprint/contracts';
+import { MAX_UPLOAD_VIDEO_BYTES, operations, type OperationResponse } from '@workprint/contracts';
 import type { ClientResult } from './result.js';
 
-const MAX_BYTES = 64 * 1024 * 1024;
 let active = 0;
 type Grant = OperationResponse<'requestUpload'>;
 const fail = (code: 'invalid_input' | 'not_found' | 'integration_failure' | 'cancelled' | 'timed_out' | 'transport_failure', message: string): ClientResult<never> => ({ ok: false, error: { code, message } });
 
 /** A PUT acknowledgement is not verification/publication. No Auth provider, retry or confirmation. */
 export async function transferUpload(grant: Grant, body: Blob, options: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<ClientResult<{ acknowledged: true }>> {
-  if (!operations.requestUpload.response.safeParse(grant).success || !body.size || body.size > MAX_BYTES || body.size > grant.maxBytes || !/^(image\/(png|jpeg)|video\/mp4)$/.test(body.type)) return fail('invalid_input', 'Invalid private transfer');
+  if (!operations.requestUpload.response.safeParse(grant).success || !body.size || body.size > MAX_UPLOAD_VIDEO_BYTES || body.size > grant.maxBytes || !/^(image\/(png|jpeg)|video\/mp4)$/.test(body.type)) return fail('invalid_input', 'Invalid private transfer');
   let url: URL;
   try { url = new URL(grant.url); } catch { return fail('invalid_input', 'Invalid private transfer'); }
   if (url.username || url.password || url.hash || (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname))) || !url.searchParams.has('X-Amz-Signature')) return fail('invalid_input', 'Invalid private transfer');

@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto';
+import { MAX_UPLOAD_VIDEO_BYTES } from '@workprint/contracts';
 import { Readable } from 'node:stream';
 import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { StorageError, storageError } from './errors.js';
 
-export const MAX_OBJECT_BYTES = 64 * 1024 * 1024;
+export const MAX_OBJECT_BYTES = MAX_UPLOAD_VIDEO_BYTES;
 export const MAX_STORAGE_CONCURRENCY = 2;
 export const MAX_STORAGE_MS = 10000;
 export const MAX_UPLOAD_URL_SECONDS = 300;
