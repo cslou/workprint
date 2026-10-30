@@ -12,6 +12,7 @@ if (publicConfig.kind === 'invalid') throw new Error('Invalid public API origin'
 // Dedicated test composition. Production Vite never loads this plugin or test root.
 export default defineConfig({
   root: resolve(web, 'test'),
+  cacheDir: '../node_modules/.vite/test-composition',
   envDir: false,
   envPrefix: [],
   define: { __WORKPRINT_PUBLIC_API_ORIGIN__: JSON.stringify(publicConfig.kind === 'configured' ? publicConfig.apiOrigin : null), __WORKPRINT_PUBLIC_AUTH__: JSON.stringify({ kind: 'missing' }) },

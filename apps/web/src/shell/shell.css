@@ -14,7 +14,7 @@ html, body, #root { min-height: 100%; }
 .wp-recents-empty { margin: 0; font-size: var(--font-size-12); color: var(--color-text-subtle); padding: var(--space-6) var(--space-10); }
 .wp-sidebar-spacer { flex: 1; }
 .wp-account { display: flex; align-items: center; gap: var(--space-10); padding: var(--space-12) var(--space-10) var(--space-8); border-top: var(--border-width-default) solid var(--color-border-default); color: var(--color-text-secondary); font-size: var(--font-size-13); }
-.wp-account > span:last-child { overflow-wrap: anywhere; min-width: 0; }
+.wp-account > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .wp-avatar { width: var(--size-control-icon); height: var(--size-control-icon); flex: none; border-radius: 50%; background: var(--color-status-ready-bg); border: var(--border-width-default) solid var(--color-status-ready-border); color: var(--color-status-ready-text); display: grid; place-items: center; font-size: var(--font-size-12); font-weight: var(--font-weight-semibold); }
 .wp-menu { display: none; }
 .wp-menu .wp-button-secondary, .wp-session-actions .wp-button-secondary { height: var(--size-control-lg); border-color: var(--color-border-strong); background: var(--color-bg-surface); color: var(--color-text-primary); }

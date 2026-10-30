@@ -10,6 +10,7 @@ const authConfig = parsePublicAuthConfig(process.env.WORKPRINT_PUBLIC_SUPABASE_U
 if (authConfig.kind === 'invalid') throw new Error('Invalid public Auth configuration');
 
 export default defineConfig({
+  cacheDir: 'node_modules/.vite/application',
   envDir: false,
   envPrefix: [],
   define: { __WORKPRINT_PUBLIC_API_ORIGIN__: JSON.stringify(publicConfig.kind === 'configured' ? publicConfig.apiOrigin : null), __WORKPRINT_PUBLIC_AUTH__: JSON.stringify(authConfig) },

@@ -13,9 +13,10 @@ const env = {
 };
 const serving = { ...env };
 delete serving.MIGRATION_DATABASE_URL;
-delete serving.WORKPRINT_PUBLIC_API_ORIGIN;
-// Only this explicit public origin may cross into Vite; never backend settings.
-const webEnv = Object.fromEntries(['PATH', 'HOME', 'TMPDIR', 'SYSTEMROOT', 'NODE_OPTIONS', 'WORKPRINT_PUBLIC_API_ORIGIN'].filter((key) => env[key]).map((key) => [key, env[key]]));
+const publicSettings = ['WORKPRINT_PUBLIC_API_ORIGIN', 'WORKPRINT_PUBLIC_SUPABASE_URL', 'WORKPRINT_PUBLIC_SUPABASE_PUBLISHABLE_KEY'];
+for (const key of publicSettings) delete serving[key];
+// Only these explicit public settings may cross into Vite; never backend settings.
+const webEnv = Object.fromEntries(['PATH', 'HOME', 'TMPDIR', 'SYSTEMROOT', 'NODE_OPTIONS', ...publicSettings].filter((key) => env[key]).map((key) => [key, env[key]]));
 const children = new Set();
 let stopping = false;
 function stop(signal = 'SIGTERM') {

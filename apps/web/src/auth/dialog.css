@@ -4,10 +4,12 @@
 .wp-auth-field { display: grid; gap: var(--space-6); }
 .wp-auth-field > span { font-size: var(--font-size-12); font-weight: var(--font-weight-semibold); }
 .wp-auth-field .wp-input { min-height: calc(var(--size-control-lg) + var(--space-10)); height: auto; padding: var(--space-10) var(--space-12); border-color: var(--color-text-subtle); border-radius: var(--radius-md); font-size: var(--font-size-14); line-height: var(--font-line-height-1-5); }
-.wp-auth-field:has(:disabled) { opacity: var(--opacity-disabled); }
+.wp-auth-field:has(:disabled) { opacity: var(--opacity-disabled-choose); }
+.wp-auth-content .wp-auth-detail { color: var(--color-text-primary); }
+.wp-auth-content .wp-auth-help { color: var(--color-text-subtle); font-size: var(--font-size-12); }
 .wp-auth-identity { font-weight: var(--font-weight-semibold); color: var(--color-text-primary); overflow-wrap: anywhere; }
 .wp-auth-content [role=status] { color: var(--color-text-primary); }
-.wp-auth-content [role=status]:empty { display: none; }
 .wp-auth-actions { display: flex; gap: var(--space-8); flex-wrap: wrap; align-items: center; margin-top: var(--space-4); }
+.wp-auth-actions .wp-button-secondary { border-color: var(--color-border-strong); background: var(--color-bg-surface); color: var(--color-text-primary); }
 .wp-auth-actions:empty { display: none; }
 .wp-auth-actions .wp-button-quiet { color: var(--color-text-link); text-decoration: underline; text-underline-offset: var(--space-2); }

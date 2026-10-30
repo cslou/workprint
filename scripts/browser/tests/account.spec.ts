@@ -1,29 +1,15 @@
 import { test, expect } from '../material-network.js';
 import { parsePublicAuthConfig } from '../../../apps/web/src/auth/public-config.js';
-import type { Page, Locator } from '@playwright/test';
-import { pathToFileURL } from 'node:url';
-import { resolve, join } from 'node:path';
-import { mkdtemp } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import type * as Auth from '../../../apps/api/test/isolated-auth.js';
-import type * as Processes from '../../../apps/api/test/process.js';
-import type * as AccountFixture from '../../../apps/api/test/account-browser-fixture.js';
+import { fixture, account, signIn, privateFill, privateNavigate, origin } from '../account-fixture.js';
+import { settleCapture } from '../capture.js';
 
 test.use({ screenshot: 'off', trace: 'off', video: 'off' });
 
 // No traces/HAR/storageState or credential-bearing navigation/error attachments.
 
-async function privateNavigate(page: Page, url: string) {
-  try { await page.goto(url); } catch {
-    // A failed navigation must not leave a raw reset URL in Playwright error context.
-    await page.goto('about:blank');
-    throw new Error('Private recovery navigation did not complete');
-  }
-}
-
 test('real delivered email completes PKCE recovery, quarantines access and requires fresh sign-in', async ({ page, materialNetwork }) => {
   test.setTimeout(90000);
-  const f = await fixture();
+  const f = await fixture(page);
   try {
     const user = await f.auth.createAccount();
     await page.goto(origin); await account(page);
@@ -73,7 +59,7 @@ test('real delivered email completes PKCE recovery, quarantines access and requi
 
 test('unconfirmed sign-out immediately fences presentation and drafts across reload without replay', async ({ page, materialNetwork }) => {
   test.setTimeout(90000);
-  const f = await fixture();
+  const f = await fixture(page);
   try {
     const user = await f.auth.createAccount();
     await page.goto(origin); await account(page);
@@ -89,7 +75,8 @@ test('unconfirmed sign-out immediately fences presentation and drafts across rel
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     await expect(page.locator('.wp-sidebar .wp-account')).toHaveText('Account');
     release();
-    await expect(page.getByRole('status')).toContainText('We couldn’t confirm session revocation');
+    await expect(page.getByRole('dialog')).toContainText('We couldn’t confirm sign-out.');
+    await expect(page.getByRole('button', { name: 'Try sign-out again', exact: true })).toBeEnabled();
     await page.keyboard.press('Escape');
     await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('');
     await page.reload();
@@ -102,7 +89,7 @@ test('unconfirmed sign-out immediately fences presentation and drafts across rel
 
 test('real refresh preserves the same-account draft; revoked refresh fences it without changing saved native work', async ({ page, materialNetwork }) => {
   test.setTimeout(90000);
-  const f = await fixture(true, { jwtExpirySeconds: 180 });
+  const f = await fixture(page, true, { jwtExpirySeconds: 180 });
   try {
     const user = await f.auth.createAccount();
     await f.application!.saveNative(user.id);
@@ -133,7 +120,7 @@ test('real refresh preserves the same-account draft; revoked refresh fences it w
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'refresh_token' }, count: 1 });
     await page.clock.setSystemTime(Date.now() + 240000);
     await page.clock.runFor(30000);
-    await expect(page.getByRole('dialog')).toContainText('Your session has ended.');
+    await expect(page.getByRole('dialog')).toContainText('Sign in again to continue. Local drafts were cleared; saved work is unchanged.');
     await page.keyboard.press('Escape');
     await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('');
     expect(await f.application!.snapshot() === saved, 'Refresh/expiry changed saved native records').toBe(true);
@@ -142,7 +129,7 @@ test('real refresh preserves the same-account draft; revoked refresh fences it w
 
 test('account form geometry, keyboard focus, local validation and reflow at approved main widths', async ({ page }, info) => {
   test.setTimeout(90000);
-  const f = await fixture();
+  const f = await fixture(page);
   try {
     for (const width of [1440, 390, 820, 821]) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
@@ -158,6 +145,7 @@ test('account form geometry, keyboard focus, local validation and reflow at appr
       await expect(page.getByLabel('Email', { exact: true })).toHaveCSS('height', '44px');
       await expect(page.getByLabel('Email', { exact: true })).toHaveCSS('border-radius', '8px');
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await settleCapture(page);
       await page.screenshot({ path: info.outputPath('sign-in-' + width + '.png'), fullPage: true });
       await page.getByLabel('Email', { exact: true }).fill('alex');
       await page.getByRole('button', { name: 'Sign in', exact: true }).click();
@@ -173,6 +161,21 @@ test('account form geometry, keyboard focus, local validation and reflow at appr
   } finally { await f.close(); }
 });
 
+test('an invalid recovery callback in another tab stays actionable without storage-event feedback', async ({ page, context, materialNetwork }) => {
+  test.setTimeout(90000);
+  const f = await fixture(page);
+  try {
+    await page.goto(origin); await account(page);
+    await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
+    const recovery = await context.newPage();
+    materialNetwork.expectOperations({ origin, method: 'GET', path: '/auth/callback', query: {}, count: 1 });
+    await recovery.goto(origin + '/auth/callback');
+    await recovery.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    await expect(recovery.getByRole('dialog')).toContainText('This reset link can’t be used.');
+    await expect(page.locator('.wp-sidebar .wp-account')).toHaveText('Account');
+  } finally { await f.close(); }
+});
+
 test('public Auth configuration admits only complete public key/origin pairs', () => {
   expect(parsePublicAuthConfig(undefined, undefined)).toEqual({ kind: 'missing' });
   const key = 'sb_publishable_' + 'a'.repeat(24);
@@ -184,39 +187,9 @@ test('public Auth configuration admits only complete public key/origin pairs', (
   expect(parsePublicAuthConfig('https://example.com', key)).toEqual({ kind: 'configured', url: 'https://example.com', publishableKey: key });
 });
 
-async function privateFill(field: Locator, value: string) {
-  try { await field.fill(value); } catch { throw new Error('Private account field could not be filled'); }
-}
-const origin = 'http://127.0.0.1:4180';
-async function fixture(backend = false, options: Parameters<typeof Auth.isolatedAuth>[0] = {}) {
-  const authModule = await import(pathToFileURL(resolve('apps/api/.test-build/test/isolated-auth.js')).href) as typeof Auth;
-  const processes = await import(pathToFileURL(resolve('apps/api/.test-build/test/process.js')).href) as typeof Processes;
-  const application = backend ? await (await import(pathToFileURL(resolve('apps/api/.test-build/test/account-browser-fixture.js')).href) as typeof AccountFixture).accountBrowserFixture(options) : undefined;
-  const auth = application?.auth ?? await authModule.isolatedAuth(options);
-  let frontend: Awaited<ReturnType<typeof processes.start>> | undefined;
-  try {
-    const logs = await mkdtemp(join(tmpdir(), 'workprint-account-browser-'));
-    frontend = await processes.start('pnpm', ['--filter', '@workprint/web', 'exec', 'vite', '--config', 'vite.config.ts', '--host', '127.0.0.1', '--port', '4180', '--strictPort'], {
-      cwd: process.cwd(), env: { PATH: process.env.PATH, HOME: process.env.HOME, WORKPRINT_PUBLIC_SUPABASE_URL: auth.url, WORKPRINT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: auth.anonKey, ...(application ? { WORKPRINT_PUBLIC_API_ORIGIN: application.apiOrigin } : {}) }, log: join(logs, 'frontend.log'),
-    });
-    await frontend.response(origin);
-    return { auth, application, close: async () => { try { await frontend?.stop(); } finally { await (application?.close() ?? auth.close()); } } };
-  } catch (error) { try { await frontend?.stop(); } finally { await (application?.close() ?? auth.close()); } throw error; }
-}
-async function account(page: Page, name = 'Account') {
-  if (page.viewportSize()!.width <= 820) await page.getByRole('button', { name: 'Menu', exact: true }).click();
-  await page.getByRole('button', { name, exact: true }).click();
-}
-async function signIn(page: Page, email: string, password: string) {
-  await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
-  await privateFill(page.getByLabel('Email', { exact: true }), email);
-  await privateFill(page.getByLabel('Password', { exact: true }), password);
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-}
-
 test('real standard account sign-in, persistence and local sign-out fence drafts', async ({ page, materialNetwork }) => {
   test.setTimeout(90000);
-  const f = await fixture(true);
+  const f = await fixture(page, true);
   try {
     const user = await f.auth.createAccount();
     await f.application!.saveNative(user.id);
