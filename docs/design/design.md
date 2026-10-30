@@ -14,6 +14,16 @@
 
 The controls remain after the final row inside the scroll region, not above the selection tray. Keyboard focus and announcements settle across page append, eviction, terminal pages and return. Ordinary small collections retain their approved appearance; window feedback is needed when the displayed range is displaced. Inert Option B Library/history captures at 1440×900 and 390×844 were inspected in ignored `outputs/verification/sprint-005/design-proposals/pagination-window-r1/`; those previews are inspection evidence only. Tests derive comparisons from tracked references plus these substitutions and prove access beyond 1,000 items, bounded retained content, preserved exact choices and stale-response isolation. No new approval/selection authority, server search or wire contract is granted.
 
+## Manual save recovery
+
+**Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Scope: Sprint 005 Story 2, existing Script/reference/planning text targets only. Thirteen inert states in ignored `outputs/verification/sprint-005/design-proposals/manual-version-saves-r1/` were inspected through the narrow contact sheet and representative full conflict-review, uncertain-save and reference captures. Reuse tracked r74/r82 editor primitives: six rows, 14px/21px, 8px/12px padding, 10px radius, Cancel then Save, plain subtle feedback; no new palette, modal, success toast or authoring screen.
+
+Failed/stale saves retain typed text and original base. Pending and unknown-outcome text remains selectable/read-only; explicit Retry save repeats the original immutable command and payload, never a new identity or automatic mutation. Cancel closes the edit and does not undo a committed save. Conflict review reads the latest exact version without saving or approving it. Continue with my text changes only the local base after explicit review and only when the same text target is demonstrably preserved; a later explicit Save is a fresh command and rechecks latest. Structural mismatch blocks continuation rather than guessing an index, flattening a Script or replacing dependencies silently. Latest-read failure retains input with explicit retry.
+
+Reference description placement and existing stable Shot/Panel text editing use the same recovery treatment. Preserve all unedited structured fields, stable identities, order and exact dependencies. No reference attachment, new entry navigation, builder/reorder, selection authority or later-story storyboard-edit bypass is authorized. Human Save on currently used work atomically approves only its exact intended use and records the manual change; assistant drafts cannot claim that authority. Success reuses the actual saved-version display/history, without a turn or fabricated chat response. No promise of draft persistence after cancel, reload or scope switch.
+
+Preview inspection is not runtime proof or human ratification. Use tracked approved references plus these substitutions for independent comparisons, never ignored previews. Verify real concurrent conflicts, rollback, lost-response idempotency, safe reviewed-base continuation, scope/focus races and zero-drift representative states before delivery.
+
 ## Overview
 
 **Section 01** · **Status:** Approved
