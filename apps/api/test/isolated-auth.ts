@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { AuthFixtureResources } from './auth-fixture-resources.js';
 import { isolatedPostgres, query } from './postgres.js';
-import { unusedPort } from './process.js';
 import { capturedRecoveryLink } from './auth-mail.js';
 
 // Installed official Supabase CLI images, pinned by observed immutable RepoDigest.
@@ -68,8 +67,6 @@ export async function isolatedAuth(options: { lifetimeMs?: number; jwtExpirySeco
     // GoTrue owns every table/migration; standalone deployment supplies its empty namespace.
     await query(database.adminUrl, 'CREATE SCHEMA auth AUTHORIZATION postgres');
     const dbUrl = new URL(database.adminUrl); dbUrl.hostname = 'database'; dbUrl.port = '5432'; dbUrl.searchParams.set('search_path', 'auth');
-    const port = await unusedPort();
-    const url = `http://127.0.0.1:${port}`;
     const secret = randomBytes(48).toString('hex');
     const anonKey = jwt('anon', secret), serviceKey = jwt('service_role', secret);
     const gateway = {
@@ -81,6 +78,11 @@ export async function isolatedAuth(options: { lifetimeMs?: number; jwtExpirySeco
       MP_SMTP_BIND_ADDR: '0.0.0.0:1025', MP_UI_BIND_ADDR: '0.0.0.0:8025', MP_DATABASE: '/tmp/mailpit.db', MP_MAX_MESSAGES: '100',
     });
     const mailUrl = `http://127.0.0.1:${await resources.port(mail, 8025)}`;
+    // Docker allocates/binds the loopback port atomically before Auth needs its external URL.
+    const gatewayId = await resources.run('gateway', authFixtureImages.gateway, ['--user', '0:0', '--publish', '127.0.0.1::8000', '--mount', `type=bind,source=${configFile},target=/tmp/gateway.json,readonly`], {
+      KONG_DATABASE: 'off', KONG_DECLARATIVE_CONFIG: '/tmp/gateway.json', KONG_PROXY_LISTEN: '0.0.0.0:8000', KONG_ADMIN_LISTEN: 'off', KONG_NGINX_WORKER_PROCESSES: '1', KONG_PROXY_ACCESS_LOG: '/dev/null', KONG_PROXY_ERROR_LOG: '/dev/null',
+    });
+    const url = `http://127.0.0.1:${await resources.port(gatewayId, 8000)}`;
     const auth = await resources.run('auth', authFixtureImages.auth, [], {
       API_EXTERNAL_URL: url, GOTRUE_API_HOST: '0.0.0.0', GOTRUE_API_PORT: '9999', GOTRUE_DB_DRIVER: 'postgres', GOTRUE_DB_DATABASE_URL: dbUrl.href,
       GOTRUE_SITE_URL: 'http://127.0.0.1:4179', GOTRUE_URI_ALLOW_LIST: 'http://127.0.0.1:4179/auth/callback,http://127.0.0.1:4180/auth/callback',
@@ -90,10 +92,6 @@ export async function isolatedAuth(options: { lifetimeMs?: number; jwtExpirySeco
       GOTRUE_MAILER_OTP_EXP: String(options.otpExpirySeconds ?? 300), GOTRUE_RATE_LIMIT_EMAIL_SENT: '100', GOTRUE_MAILER_URLPATHS_RECOVERY: '/auth/v1/verify',
       GOTRUE_MAILER_URLPATHS_CONFIRMATION: '/auth/v1/verify', GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: '/auth/v1/verify', GOTRUE_MAILER_URLPATHS_INVITE: '/auth/v1/verify',
     });
-    const gatewayId = await resources.run('gateway', authFixtureImages.gateway, ['--user', '0:0', '--publish', `127.0.0.1:${port}:8000`, '--mount', `type=bind,source=${configFile},target=/tmp/gateway.json,readonly`], {
-      KONG_DATABASE: 'off', KONG_DECLARATIVE_CONFIG: '/tmp/gateway.json', KONG_PROXY_LISTEN: '0.0.0.0:8000', KONG_ADMIN_LISTEN: 'off', KONG_NGINX_WORKER_PROCESSES: '1', KONG_PROXY_ACCESS_LOG: '/dev/null', KONG_PROXY_ERROR_LOG: '/dev/null',
-    });
-    await resources.port(gatewayId, 8000);
     await savePrivate(privateFile, { owner: resources.owner, url, anonKey, serviceKey, mailUrl, signingSecret: secret, hostPid: process.pid, networkId: resources.networkId, edgeNetworkId: resources.edgeNetworkId, database: { containerId: database.containerId, owner: database.owner }, containers: resources.containerIds });
     const deadline = Date.now() + 45000;
     for (;;) {
@@ -125,7 +123,7 @@ export async function isolatedAuth(options: { lifetimeMs?: number; jwtExpirySeco
       if (!accounts.has(recipient)) throw new Error('Refusing mail access for an account not created by this fixture');
       return capturedRecoveryLink(mailUrl, url, recipient, seenMessages);
     };
-    return { url, anonKey, serviceKey, mailUrl, privateFile, containerIds: [...resources.containerIds, database.containerId], networkId: resources.networkId, networkIds: [resources.networkId, resources.edgeNetworkId], pauseAuthUpstream: () => resources.pauseOwned(auth), proxyLogsContain: (privateValue: string) => resources.logsContain(gatewayId, privateValue), request, createAccount, recoveryLink, close };
+    return { url, anonKey, serviceKey, mailUrl, privateFile, containerIds: [...resources.containerIds, database.containerId], networkId: resources.networkId, networkIds: [resources.networkId, resources.edgeNetworkId], pauseAuthUpstream: () => resources.pauseOwned(auth), resumeAuthUpstream: () => resources.resumeOwned(auth), proxyLogsContain: (privateValue: string) => resources.logsContain(gatewayId, privateValue), request, createAccount, recoveryLink, close };
   } catch (error) {
     try { await close(); } catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Isolated Auth acquisition and cleanup failed', { cause: cleanupError }); }
     throw error;

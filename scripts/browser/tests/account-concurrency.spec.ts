@@ -1,5 +1,5 @@
 import { test, expect } from '../material-network.js';
-import { fixture, account, signIn, origin } from '../account-fixture.js';
+import { privateForward, privateFulfill, fixture, account, signIn, origin } from '../account-fixture.js';
 
 test.use({ screenshot: 'off', trace: 'off', video: 'off' });
 
@@ -14,8 +14,8 @@ test('a superseded real sign-in cannot replace the newer account in persistent S
     const gate = new Promise<void>(resolve => { release = resolve; }), settled = new Promise<void>(resolve => { finished = resolve; });
     await page.route(f.auth.url + '/auth/v1/token?grant_type=password', async route => {
       try {
-        const response = await route.fetch(); held = true; await gate;
-        if (!route.request().failure()) await route.fulfill({ response });
+        const response = await privateForward(route); held = true; await gate;
+        if (!route.request().failure()) await privateFulfill(route, { response });
       } finally { finished(); }
     });
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 2 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
@@ -48,7 +48,7 @@ test('late real SDK restoration after another-tab sign-out cannot restore identi
     const waiting = await context.newPage(); let held = false; let finished!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; }), settled = new Promise<void>(resolve => { finished = resolve; });
     await waiting.route(f.auth.url + '/auth/v1/user', async route => {
-      try { const response = await route.fetch(); held = true; await gate; if (!route.request().failure()) await route.fulfill({ response }); }
+      try { const response = await privateForward(route); held = true; await gate; if (!route.request().failure()) await privateFulfill(route, { response }); }
       finally { finished(); }
     });
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
@@ -85,15 +85,16 @@ test('late real SDK token refresh after another-tab sign-out cannot dispatch an 
     let held = false; let finished!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; }), settled = new Promise<void>(resolve => { finished = resolve; });
     await page.route(f.auth.url + '/auth/v1/token?grant_type=refresh_token', async route => {
-      try { const response = await route.fetch(); held = true; await gate; if (!route.request().failure()) await route.fulfill({ response }); }
+      try { const response = await privateForward(route); held = true; await gate; if (!route.request().failure()) await privateFulfill(route, { response }); }
       finally { finished(); }
     });
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'refresh_token' }, count: 1 });
-    // Both tabs share the browser clock; SDK logout may also refresh its near-expiry session.
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'refresh_token' }, count: 1 });
     await page.clock.setSystemTime(Date.now() + 140000);
     await page.getByRole('button', { name: 'Library', exact: true }).click();
     await expect.poll(() => held).toBe(true);
+    // Hold only the old token resolution; restore wall time before the peer logout so its
+    // new server-issued tokens are not artificially kept inside the SDK refresh margin.
+    await page.clock.setSystemTime(Date.now());
     await account(other, user.email);
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/logout', query: { scope: 'local' }, count: 1 });
     await other.getByRole('button', { name: 'Sign out', exact: true }).click();

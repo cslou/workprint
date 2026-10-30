@@ -1,5 +1,5 @@
 import { test, expect } from '../material-network.js';
-import { fixture, account, signIn, origin } from '../account-fixture.js';
+import { privateContinue, privateForward, privateFulfill, fixture, account, signIn, origin } from '../account-fixture.js';
 
 test.use({ screenshot: 'off', trace: 'off', video: 'off' });
 
@@ -72,7 +72,7 @@ test('retryable refresh outage preserves valid scope and drafts through supporte
     let calls = 0; const gate = new Promise<void>(resolve => { release = resolve; });
     await page.route(f.auth.url + '/auth/v1/token?grant_type=refresh_token', async route => {
       if (++calls === 1) await route.fulfill({ status: 503, json: { message: 'Controlled retryable Auth outage' } });
-      else { await gate; if (!route.request().failure()) await route.continue(); }
+      else { await gate; if (!route.request().failure()) await privateContinue(route); }
     });
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'refresh_token' }, count: 2 });
     await page.clock.fastForward(60000);
@@ -97,8 +97,8 @@ test('actual presentation expiry clears scope and ignores a held late refresh re
     let finished!: () => void; const settled = new Promise<void>(resolve => { finished = resolve; });
     await page.route(f.auth.url + '/auth/v1/token?grant_type=refresh_token', async route => {
       try {
-        const response = await route.fetch(); held = true; await gate;
-        if (!route.request().failure()) await route.fulfill({ response });
+        const response = await privateForward(route); held = true; await gate;
+        if (!route.request().failure()) await privateFulfill(route, { response });
       } finally { finished(); }
     });
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'refresh_token' }, count: 1 });
@@ -122,12 +122,19 @@ test('access-fence quota failure still clears account/drafts and performs SDK si
     await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Clear despite quota'); await account(page, user.email);
     await page.evaluate(() => {
       const original = Storage.prototype.setItem;
+      (window as unknown as { restoreFenceStorage: () => void }).restoreFenceStorage = () => { Storage.prototype.setItem = original; };
       Storage.prototype.setItem = function(key, value) { if (key === 'workprint.auth-access-fenced') throw new DOMException('Controlled access-fence quota', 'QuotaExceededError'); return original.call(this, key, value); };
     });
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/logout', query: { scope: 'local' }, count: 1 });
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     await expect(page.getByRole('button', { name: user.email, exact: true, includeHidden: true })).toHaveCount(0);
     await expect(page.locator('.wp-main textarea')).toHaveValue('');
+    await expect(page.getByRole('dialog')).toContainText('Signed out, but the browser lock couldn’t be saved.');
+    await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeEnabled();
+    await page.evaluate(() => (window as unknown as { restoreFenceStorage: () => void }).restoreFenceStorage());
+    await page.getByRole('button', { name: 'Try again', exact: true }).click();
+    await expect(page.getByRole('dialog')).toContainText('Signed out.');
     await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeEnabled();
+    // The exact one-logout allowance proves local fence retry did not replay revocation.
   } finally { await f.close(); }
 });

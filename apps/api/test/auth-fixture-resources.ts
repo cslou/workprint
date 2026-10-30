@@ -90,6 +90,13 @@ export class AuthFixtureResources {
     this.owned(found, id);
     await docker('pause', id);
   }
+  async resumeOwned(id: string) {
+    if (!this.containerIds.includes(id)) throw new Error('Refusing unregistered service resume');
+    const found = await this.inspect('container', id);
+    if (!found) throw new Error('Missing isolated Auth service');
+    this.owned(found, id);
+    await docker('unpause', id);
+  }
   async logsContain(id: string, privateValue: string): Promise<boolean> {
     if (!this.containerIds.includes(id)) throw new Error('Refusing unregistered service logs');
     const found = await this.inspect('container', id);

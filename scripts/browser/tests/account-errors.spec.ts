@@ -1,5 +1,5 @@
 import { test, expect } from '../material-network.js';
-import { fixture, account, signIn, privateFill, privateNavigate, origin } from '../account-fixture.js';
+import { privateAbort, privateContinue, privateForward, fixture, account, signIn, privateFill, privateNavigate, origin } from '../account-fixture.js';
 import type { Page } from '@playwright/test';
 import { createServer } from 'node:http';
 import { execFileSync } from 'node:child_process';
@@ -16,7 +16,7 @@ async function reset(page: Page, network: MaterialNetwork, f: Awaited<ReturnType
 function consume(network: MaterialNetwork, authOrigin: string, valid: boolean, fragment = false) {
   network.expectOperations({ origin: authOrigin, method: 'GET', path: '/auth/v1/verify', query: { token: '[private]', type: 'recovery', redirect_to: origin + '/auth/callback' }, count: 1 },
     { origin, method: 'GET', path: '/auth/callback', query: valid ? { code: '[private]' } : fragment ? {} : { error: '[private]', error_code: '[private]', error_description: '[private]' }, count: 1 });
-  if (valid) network.expectOperations({ origin: authOrigin, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'pkce' }, count: 1 });
+  if (valid) network.expectOperations({ origin: authOrigin, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'pkce' }, count: 1 }, { origin: authOrigin, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
 }
 
 test('reset delivery uncertainty remains non-enumerating even when real email was sent', async ({ page, materialNetwork }) => {
@@ -24,8 +24,8 @@ test('reset delivery uncertainty remains non-enumerating even when real email wa
   try {
     const user = await f.auth.createAccount();
     await page.route(f.auth.url + '/auth/v1/recover*', async route => {
-      let response; try { response = await route.fetch(); } catch { throw new Error('Private reset forwarding failed'); }
-      expect(response.status()).toBe(200); await route.abort('failed');
+      let response; try { response = await privateForward(route); } catch { throw new Error('Private reset forwarding failed'); }
+      expect(response.status()).toBe(200); await privateAbort(route);
     });
     await reset(page, materialNetwork, f, user.email);
     await expect(page.getByRole('status')).toHaveText('We couldn’t confirm the reset email. Check your inbox, or try again.');
@@ -43,15 +43,16 @@ test('real password policy rejection and uncertain successful mutation have dist
     await privateFill(page.getByLabel('New password', { exact: true }), 'x'); await privateFill(page.getByLabel('Confirm password', { exact: true }), 'y');
     await page.getByRole('button', { name: 'Update password', exact: true }).click();
     await expect(page.getByRole('status')).toHaveText('Passwords don’t match. Re-enter the new password.');
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'PUT', path: '/auth/v1/user', query: {}, count: 1 });
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'PUT', path: '/auth/v1/user', query: {}, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
     await privateFill(page.getByLabel('New password', { exact: true }), 'x'); await privateFill(page.getByLabel('Confirm password', { exact: true }), 'x');
     await page.getByRole('button', { name: 'Update password', exact: true }).click();
     await expect(page.getByRole('status')).toHaveText('The password wasn’t accepted. Choose a different password and try again.');
     await page.route(f.auth.url + '/auth/v1/user', async route => {
-      let response; try { response = await route.fetch(); } catch { throw new Error('Private password forwarding failed'); }
-      expect(response.status()).toBe(200); await route.abort('failed');
+      if (route.request().method() === 'GET') { await privateContinue(route); return; }
+      let response; try { response = await privateForward(route); } catch { throw new Error('Private password forwarding failed'); }
+      expect(response.status()).toBe(200); await privateAbort(route);
     });
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'PUT', path: '/auth/v1/user', query: {}, count: 1 }, { origin: f.auth.url, method: 'POST', path: '/auth/v1/logout', query: { scope: 'local' }, count: 1 });
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'PUT', path: '/auth/v1/user', query: {}, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 }, { origin: f.auth.url, method: 'POST', path: '/auth/v1/logout', query: { scope: 'local' }, count: 1 });
     await privateFill(page.getByLabel('New password', { exact: true }), user.nextPassword); await privateFill(page.getByLabel('Confirm password', { exact: true }), user.nextPassword);
     await page.getByRole('button', { name: 'Update password', exact: true }).click();
     await expect(page.getByRole('dialog')).toContainText('We couldn’t confirm the password update.');
@@ -69,7 +70,7 @@ test('closing pending sign-in dismisses rather than replays it; Switch account f
     const first = await f.auth.createAccount(), second = await f.auth.createAccount();
     await page.goto(origin); await account(page);
     let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
-    await page.route(f.auth.url + '/auth/v1/token?grant_type=password', async route => { await gate; await route.continue(); });
+    await page.route(f.auth.url + '/auth/v1/token?grant_type=password', async route => { await gate; await privateContinue(route); });
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
     await signIn(page, first.email, first.password);
     await expect(page.getByRole('button', { name: 'Signing in…', exact: true })).toBeDisabled();

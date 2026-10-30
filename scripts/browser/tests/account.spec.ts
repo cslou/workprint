@@ -23,6 +23,7 @@ test('real delivered email completes PKCE recovery, quarantines access and requi
       { origin: f.auth.url, method: 'GET', path: '/auth/v1/verify', query: { token: '[private]', type: 'recovery', redirect_to: origin + '/auth/callback' }, count: 1 },
       { origin, method: 'GET', path: '/auth/callback', query: { code: '[private]' }, count: 1 },
       { origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'pkce' }, count: 1 },
+      { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 },
     );
     await privateNavigate(page, link);
     await expect(page.getByRole('heading', { name: 'Set new password', exact: true })).toBeVisible();
@@ -33,6 +34,7 @@ test('real delivered email completes PKCE recovery, quarantines access and requi
     await privateFill(page.getByLabel('Confirm password', { exact: true }), user.nextPassword);
     materialNetwork.expectOperations(
       { origin: f.auth.url, method: 'PUT', path: '/auth/v1/user', query: {}, count: 1 },
+      { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 },
       { origin: f.auth.url, method: 'POST', path: '/auth/v1/logout', query: { scope: 'local' }, count: 1 },
     );
     await page.getByRole('button', { name: 'Update password', exact: true }).click();

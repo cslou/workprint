@@ -11,7 +11,7 @@ const sentinel = `private-control-${randomBytes(32).toString('hex')}`;
 const name = `auth-evidence-control-${randomUUID()}.spec.ts`;
 const sourceFile = join('scripts/browser/tests', name);
 const source = `import { test, expect } from '../material-network.js';
-import { fixture, account, privateFill, origin } from '../account-fixture.js';
+import { fixture, account, privateFill, privateForward, privateAbort, origin } from '../account-fixture.js';
 test.use({ screenshot: 'off', trace: 'off', video: 'off' });
 test('deliberate private evidence failure', async ({ page }) => {
   test.setTimeout(90000); const f = await fixture(page);
@@ -33,6 +33,25 @@ test('proxy failure cannot log a private recovery URI', async ({ page }) => {
     expect([502, 503, 504]).toContain(response.status); await response.arrayBuffer();
     expect(await f.auth.proxyLogsContain(value), 'Proxy must not retain recovery URI/token').toBe(false);
     console.log('Proxy private failure-path qualification PASS');
+  } finally { await f.close(); }
+});
+test('real private forwarding failure is sanitized', async ({ page, materialNetwork }) => {
+  test.setTimeout(60000); const f = await fixture(page);
+  try {
+    const value = process.env.WORKPRINT_EVIDENCE_PRIVATE_VALUE;
+    if (!value) throw new Error('Missing private control');
+    await page.goto(origin); await f.auth.pauseAuthUpstream();
+    let failed!: (error: Error) => void;
+    const forwarded = new Promise<Error>(resolve => { failed = resolve; });
+    await page.route(f.auth.url + '/auth/v1/user', async route => {
+      try { await privateForward(route, { timeout: 50, maxRetries: 0 }); failed(new Error('Forwarding control unexpectedly succeeded')); }
+      catch (error) { failed(error instanceof Error ? error : new Error('Unqualified forwarding failure')); }
+      finally { await privateAbort(route); }
+    });
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
+    try { await page.evaluate(async args => { try { await fetch(args.url, { headers: { Authorization: 'Bearer ' + args.value, apikey: args.value } }); } catch {} }, { url: f.auth.url + '/auth/v1/user', value }); }
+    catch { throw new Error('Private forwarding invocation failed'); }
+    throw await forwarded;
   } finally { await f.close(); }
 });
 `;
@@ -73,9 +92,9 @@ try {
       await writeFile(file, bytes.toString().replaceAll(sentinel, '[private control]'));
     }
   }
-  const result = { deliberateFailureObserved: exit === 1 && /^\s+Error: Deliberate private-artifact control failure\r?$/m.test(output), privateInputRetained: unsafe, proxyFailureSafe: /(?:^|\n)Proxy private failure-path qualification PASS\r?(?:\n|$)/.test(output) && /\b1 failed\b/.test(output) && /\b1 passed\b/.test(output) };
+  const result = { deliberateFailureObserved: exit === 1 && /^\s+Error: Deliberate private-artifact control failure\r?$/m.test(output), privateInputRetained: unsafe, forwardFailureSafe: /^\s+Error: Private Auth forwarding failed; request details withheld\r?$/m.test(output), proxyFailureSafe: /(?:^|\n)Proxy private failure-path qualification PASS\r?(?:\n|$)/.test(output) && /\b2 failed\b/.test(output) && /\b1 passed\b/.test(output) };
   await writeFile(join(directory, 'result.json'), JSON.stringify(result, null, 2), { mode: 0o600 });
-  if (!result.deliberateFailureObserved || !result.proxyFailureSafe || unsafe) throw new Error(`Auth evidence qualification failed; sanitized evidence: ${directory}`);
+  if (!result.deliberateFailureObserved || !result.proxyFailureSafe || !result.forwardFailureSafe || unsafe) throw new Error(`Auth evidence qualification failed; sanitized evidence: ${directory}`);
   console.log(`Auth evidence qualification PASS: expected child failure, private proxy failure path safe, no private input retained. Evidence: ${directory}`);
 } catch (error) { failure = error; }
 finally {

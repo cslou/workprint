@@ -1,4 +1,4 @@
-import type { Page, Locator } from '@playwright/test';
+import type { Page, Locator, Route } from '@playwright/test';
 import { expect } from './material-network.js';
 import { pathToFileURL } from 'node:url';
 import { resolve, join } from 'node:path';
@@ -21,6 +21,22 @@ export async function privateNavigate(page: Page, url: string) {
   }
 }
 
+export async function privateForward(route: Route, options?: Parameters<Route['fetch']>[0]) {
+  try { return await route.fetch(options); }
+  catch { throw new Error('Private Auth forwarding failed; request details withheld'); }
+}
+export async function privateContinue(route: Route) {
+  try { if (!route.request().failure()) await route.continue(); }
+  catch { throw new Error('Private Auth continuation failed; request details withheld'); }
+}
+export async function privateAbort(route: Route) {
+  try { if (!route.request().failure()) await route.abort('failed'); }
+  catch { throw new Error('Private Auth cancellation failed; request details withheld'); }
+}
+export async function privateFulfill(route: Route, options: Parameters<Route['fulfill']>[0]) {
+  try { if (!route.request().failure()) await route.fulfill(options); }
+  catch { throw new Error('Private Auth delivery failed; request details withheld'); }
+}
 export async function privateFill(field: Locator, value: string) {
   try { await field.fill(value); } catch { throw new Error('Private account field could not be filled'); }
 }

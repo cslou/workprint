@@ -12,6 +12,7 @@ const screens: Record<string, AccountScreen> = {
   'account-signed-in': 'account', 'account-long-identity': 'account', 'sign-out-pending': 'signed-out', 'sign-out-failed': 'signout-unconfirmed', 'signed-out': 'signed-out', 'account-switching': 'switching',
   'reset-request': 'reset', 'reset-pending': 'reset', 'reset-failed': 'reset', 'reset-sent': 'reset-sent', 'reset-link-checking': 'checking-link', 'reset-link-invalid': 'invalid-link', 'reset-link-expired': 'invalid-link', 'reset-link-reused': 'invalid-link',
   'password-update': 'password', 'password-mismatch': 'password', 'password-update-pending': 'password', 'password-update-rejected': 'password-rejected', 'password-update-unconfirmed': 'update-unconfirmed', 'password-updated': 'password-updated',
+  'session-check-failed': 'startup-failed', 'account-lock-not-saved': 'account-lock-not-saved', 'signout-pending-lock-not-saved': 'signout-pending-lock-not-saved', 'signout-confirmed-lock-not-saved': 'signout-confirmed-lock-not-saved', 'signout-unconfirmed-lock-not-saved': 'signout-unconfirmed-lock-not-saved',
   'session-checking': 'checking', 'session-refreshing': 'refreshing', 'session-refresh-failed': 'refresh-failed', 'session-expired': 'expired',
 };
 const messages = new Set(['sign-in-validation', 'sign-in-incorrect', 'sign-in-failed', 'reset-failed', 'password-mismatch', 'password-update-rejected']);
