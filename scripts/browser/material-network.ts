@@ -16,9 +16,18 @@ export const test = base.extend<{ materialNetwork: MaterialNetwork }>({
     const record = (request: Request) => {
       let body: unknown = null;
       if (request.postData()) { try { body = request.postDataJSON(); } catch { body = 'non-JSON transfer'; } }
-      const entry = { method: request.method(), url: new URL(request.url()), body };
+      const url = new URL(request.url());
+      const auth = url.pathname.startsWith('/auth/v1/') || url.pathname === '/auth/callback';
+      if (auth) {
+        // Auth payloads/URLs are secret-bearing. Redact before retaining any evidence.
+        body = body && typeof body === 'object' ? Object.fromEntries(Object.keys(body).map(key => [key, '[private]'])) : null;
+        const publicValues: Record<string, readonly string[]> = { grant_type: ['password', 'refresh_token', 'pkce'], type: ['recovery'], scope: ['local', 'global', 'others'], redirect_to: ['http://127.0.0.1:4179/auth/callback', 'http://127.0.0.1:4180/auth/callback'] };
+        for (const [key, value] of [...url.searchParams.entries()]) if (!publicValues[key]?.includes(value)) url.searchParams.set(key, '[private]');
+        url.hash = '';
+      }
+      const entry = { method: request.method(), url, body };
       entries.push(entry);
-      if (entry.url.pathname.startsWith('/v1/') || !['GET', 'HEAD', 'OPTIONS'].includes(entry.method)) {
+      if (entry.url.pathname.startsWith('/v1/') || auth && entry.method !== 'OPTIONS' || !['GET', 'HEAD', 'OPTIONS'].includes(entry.method)) {
         const allowance = allowances.find(value => !value.consumed && value.method === entry.method && value.origin === entry.url.origin && value.path === entry.url.pathname && value.query === queryKey(entry.url.searchParams.entries()));
         if (allowance) {
           allowance.consumed = true;

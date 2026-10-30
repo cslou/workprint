@@ -14,7 +14,7 @@ export default defineConfig({
   root: resolve(web, 'test'),
   envDir: false,
   envPrefix: [],
-  define: { __WORKPRINT_PUBLIC_API_ORIGIN__: JSON.stringify(publicConfig.kind === 'configured' ? publicConfig.apiOrigin : null) },
+  define: { __WORKPRINT_PUBLIC_API_ORIGIN__: JSON.stringify(publicConfig.kind === 'configured' ? publicConfig.apiOrigin : null), __WORKPRINT_PUBLIC_AUTH__: JSON.stringify({ kind: 'missing' }) },
   // Eagerly prepare both fixture entrypoints; late dependency discovery reloads
   // would otherwise replace an in-flight scoped consumer during verification.
   optimizeDeps: { force: true, noDiscovery: true, include: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime', 'react/jsx-dev-runtime', 'react-aria-components', '@workprint/api-client', '@workprint/contracts', '@workprint/player'] },
