@@ -9,6 +9,12 @@ test('private image transport omits credentials/referrer and validates actual le
   let requests=0;const fixture=await peer((request,response)=>{requests++;assert.equal(request.headers.authorization,undefined);assert.equal(request.headers.cookie,undefined);assert.equal(request.headers.referer,undefined);if(request.url?.includes('redirect')){response.writeHead(302,{Location:'/image?X-Amz-Signature=synthetic-control'});response.end();}else{response.writeHead(200,{'Content-Type':'image/png','Content-Length':3});response.end('abc');}});
   try{const result=await readPrivateImage(fixture.url,new AbortController().signal);assert.ok(result.ok);assert.equal(await result.value.text(),'abc');assert.equal(result.value.type,'image/png');const redirected=await readPrivateImage(fixture.url+'&redirect=true',new AbortController().signal);assert.ok(!redirected.ok);assert.equal(requests,2,'Redirect and failure must not introduce a second request');}finally{await fixture.close();}
 });
+test('a completed private image response is not aborted after fully reading EOF',async t=>{
+  const fixture=await peer((_request,response)=>{response.writeHead(200,{'Content-Type':'image/jpeg','Content-Length':3});response.end('abc');});
+  const actual=globalThis.fetch;let signal:AbortSignal|null|undefined;
+  t.mock.method(globalThis,'fetch',(input:Parameters<typeof fetch>[0],options:Parameters<typeof fetch>[1])=>{signal=options?.signal;return actual(input,options);});
+  try{const result=await readPrivateImage(fixture.url,new AbortController().signal);assert.ok(result.ok);assert.equal(await result.value.text(),'abc');assert.equal(signal?.aborted,false,'Successful EOF must not emit a late transport cancellation');}finally{await fixture.close();}
+});
 test('private image rejects unqualified content and oversized declarations before exposing bytes',async()=>{
   for(const headers of [{'Content-Type':'image/svg+xml','Content-Length':3},{'Content-Type':'image/png','Content-Length':10*1024**2+1}]){const fixture=await peer((_request,response)=>{response.writeHead(200,headers);response.end('abc');});try{assert.ok(!(await readPrivateImage(fixture.url,new AbortController().signal)).ok);}finally{await fixture.close();}}
 });
