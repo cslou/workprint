@@ -9,14 +9,14 @@ import type { OperationResponse } from '../../../packages/contracts/src/index.js
 
 type Harness = { mediaTest: { configure(input: unknown): void; source(id: string, input?: Record<string, unknown>): OperationResponse<'media'>; release(index: number, result: unknown): void; pending(): string[]; requested(): string[]; commands(): string[]; switchScope(account: string): void; unmount(): void } };
 
-observedTest('exact-version media reaches the built backend and renders 501/401 without loading or selecting', async ({ page, materialNetwork }, info) => {
+observedTest('exact-version media denies nonexistent 404 and unauthenticated 401 without loading or selecting', async ({ page, materialNetwork }, info) => {
   observedTest.setTimeout(120000);
   await info.attach('prerequisite', { body: 'Read-only public workspace and version projections; the viewer media read and all other application requests use the built loopback backend.', contentType: 'text/plain' });
   const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
   const cleanup: (() => void | Promise<void>)[] = [];
   try {
     await verifyBuiltAdmission({ diagnostic(message) { console.log(message); }, after(fn) { cleanup.push(fn); } }, async ({ origin, accessTokens }) => {
-      for (const [token, status, copy] of [[accessTokens[0], 501, 'Loading this video is not available yet.'], [null, 401, 'Sign-in required to load this video.']] as const) {
+      for (const [token, status, copy] of [[accessTokens[0], 404, 'This video could not be loaded. Nothing was changed.'], [null, 401, 'Sign-in required to load this video.']] as const) {
         await page.goto('/media.html');
         await page.waitForFunction(() => !!(window as unknown as { mediaTest?: unknown }).mediaTest);
         materialNetwork.expectOperations(
@@ -36,15 +36,17 @@ observedTest('exact-version media reaches the built backend and renders 501/401 
         await page.evaluate((input) => (window as unknown as Harness).mediaTest.configure(input), { apiOrigin: origin, token });
         const before = await page.locator('.wp-video-row').evaluateAll((nodes) => nodes.map((node) => node.querySelector('[data-current-version-id]')?.getAttribute('data-current-version-id') ?? null));
         const response = page.waitForResponse((value) => value.url() === `${origin}/v1/versions/video-v2/media`);
-        await activate(page.getByRole('button', { name: 'View Shot 1 version 2', exact: true }), status === 501);
-        expect((await response).status()).toBe(status);
+        await activate(page.getByRole('button', { name: 'View Shot 1 version 2', exact: true }), status === 404);
+        const result = await response;
+        expect(result.status()).toBe(status);
+        expect(await result.json()).toMatchObject({ error: { code: status === 404 ? 'not_found' : 'unauthenticated' } });
         await expect(page.locator('.wp-clip-note')).toHaveText(copy);
         await expect(page.locator('.wp-clip-surface')).toHaveCount(1);
         await expect(page.locator('.wp-clip-media')).toHaveCount(0);
         await expect(page.locator('.wp-clip-time')).toHaveCount(0);
         expect(requests.filter((request) => request.method !== 'GET')).toEqual([]);
         expect(requests.filter((request) => request.path === '/v1/versions/video-v2/media')).toEqual([{ method: 'GET', path: '/v1/versions/video-v2/media' }]);
-        await activate(page.getByRole('button', { name: 'Close', exact: true }), status === 501);
+        await activate(page.getByRole('button', { name: 'Close', exact: true }), status === 404);
         await expect(page.locator('.wp-clip-surface')).toHaveCount(0);
         const after = await page.locator('.wp-video-row').evaluateAll((nodes) => nodes.map((node) => node.querySelector('[data-current-version-id]')?.getAttribute('data-current-version-id') ?? null));
         expect(after).toEqual(before);
