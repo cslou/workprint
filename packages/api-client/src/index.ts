@@ -2,15 +2,17 @@ import { applicationError, operations, type OperationName, type OperationRequest
 import { readJsonResponse } from './response.js';
 import { createNativeNavigation, type NativeNavigation } from './native.js';
 import { createNativeTurns, type NativeTurnMethods } from './native-turns.js';
+import { createNativeControl, type NativeTurnControls } from './native-control.js';
+export type { NativeStopInput, NativeStopReceipt, NativeRunInput, NativeRunObservation } from './native-control.js';
 export type { NativeThread, NativeThreads, NativeMessages, NativeNavigation } from './native.js';
 export { nativeTransportLimits } from './native-turns.js';
-export type { NativeTurnScope, NativeTextInput, NativeSendReceipt, NativeObservedFinish, NativeTextDelta, NativeObservation } from './native-turns.js';
+export type { NativeTurnScope, NativeTextInput, NativeSendReceipt, NativeObservedFinish, NativeObservedTurn, NativeTextDelta, NativeObservation } from './native-turns.js';
 
 import type { ClientError, ClientResult, CallOptions } from './types.js';
 export type { ClientError, ClientResult, CallOptions } from './types.js';
 type ApplicationMethods = { [N in OperationName]: (input: OperationRequest<N>, options?: CallOptions) => Promise<ClientResult<OperationResponse<N>>> };
-const nativeNames = ['createConversation', 'listConversations', 'loadConversation', 'loadMessages', 'sendText', 'subscribe', 'stop'] as const;
-type NativeMethods = NativeNavigation & NativeTurnMethods & Record<'stop', () => Promise<ClientResult<never>>>;
+const nativeNames = ['createConversation', 'listConversations', 'loadConversation', 'loadMessages', 'sendText', 'subscribe', 'stop', 'queueText', 'observeTurn'] as const;
+type NativeMethods = NativeNavigation & NativeTurnMethods & NativeTurnControls;
 export type ApiClient = ApplicationMethods & { native: NativeMethods };
 const fail = (code: ClientError['code'], message: string): ClientResult<never> => ({ ok: false, error: { code, message } });
 // Native availability is independent of an application HTTP origin or session.
@@ -61,5 +63,5 @@ export function createApiClient(config: { baseUrl: string; getAccessToken: () =>
     finally { if (timer !== undefined) clearTimeout(timer); options.signal?.removeEventListener('abort', onAbort); }
   }
   const methods = Object.fromEntries((Object.keys(operations) as OperationName[]).map((name) => [name, (input: OperationRequest<typeof name>, options?: CallOptions) => call(name, input, options)])) as ApplicationMethods;
-  return { ...methods, native: { ...nativeConversations, ...createNativeNavigation(config), ...createNativeTurns(config) } };
+  return { ...methods, native: { ...nativeConversations, ...createNativeNavigation(config), ...createNativeTurns(config), ...createNativeControl(config) } };
 }
