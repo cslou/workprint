@@ -21,11 +21,16 @@ const jwt = (role: string, secret: string) => {
 };
 
 /** Real isolated services only: no shared fixtures/configuration, generated links or identity bypass. */
-export async function isolatedAuth(options: { lifetimeMs?: number; jwtExpirySeconds?: number; otpExpirySeconds?: number } = {}) {
+export async function isolatedAuth(options: { lifetimeMs?: number; jwtExpirySeconds?: number; otpExpirySeconds?: number; browserOrigins?: readonly string[] } = {}) {
   for (const value of [options.lifetimeMs ?? 900000, options.jwtExpirySeconds ?? 300, options.otpExpirySeconds ?? 300]) {
     if (!Number.isInteger(value) || value < 1) throw new Error('Fixture bounds must be positive integers');
   }
   if ((options.lifetimeMs ?? 900000) > 900000 || (options.jwtExpirySeconds ?? 300) > 3600 || (options.otpExpirySeconds ?? 300) > 3600) throw new Error('Fixture bounds exceed supported test lifetime');
+  const browserOrigins = [...new Set(options.browserOrigins ?? ['http://127.0.0.1:4179', 'http://127.0.0.1:4180'])];
+  if (!browserOrigins.length || browserOrigins.some(value => {
+    try { const url = new URL(value); return url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.origin !== value; }
+    catch { return true; }
+  })) throw new Error('Auth fixture browser origins must be exact loopback HTTP origins');
   const resources = new AuthFixtureResources();
   const parent = join(process.cwd(), 'outputs', 'fixtures', 'auth');
   await mkdir(parent, { recursive: true, mode: 0o700 });
@@ -71,7 +76,7 @@ export async function isolatedAuth(options: { lifetimeMs?: number; jwtExpirySeco
     const anonKey = jwt('anon', secret), serviceKey = jwt('service_role', secret);
     const gateway = {
       _format_version: '2.1', services: [{ name: 'auth', url: 'http://auth:9999/', retries: 0, connect_timeout: 1000, read_timeout: 1000, write_timeout: 1000, routes: [{ name: 'auth', paths: ['/auth/v1/'], strip_path: true }] }],
-      plugins: [{ name: 'cors', config: { origins: ['http://127.0.0.1:4179', 'http://127.0.0.1:4180'], methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], headers: ['Authorization', 'Content-Type', 'apikey', 'X-Client-Info', 'X-Supabase-Api-Version'], credentials: false } }],
+      plugins: [{ name: 'cors', config: { origins: browserOrigins, methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], headers: ['Authorization', 'Content-Type', 'apikey', 'X-Client-Info', 'X-Supabase-Api-Version'], credentials: false } }],
     };
     await savePrivate(configFile, gateway);
     const mail = await resources.run('mail', authFixtureImages.mail, ['--publish', '127.0.0.1::8025', '--tmpfs', '/tmp:rw,nosuid,size=67108864'], {
@@ -85,7 +90,7 @@ export async function isolatedAuth(options: { lifetimeMs?: number; jwtExpirySeco
     const url = `http://127.0.0.1:${await resources.port(gatewayId, 8000)}`;
     const auth = await resources.run('auth', authFixtureImages.auth, [], {
       API_EXTERNAL_URL: url, GOTRUE_API_HOST: '0.0.0.0', GOTRUE_API_PORT: '9999', GOTRUE_DB_DRIVER: 'postgres', GOTRUE_DB_DATABASE_URL: dbUrl.href,
-      GOTRUE_SITE_URL: 'http://127.0.0.1:4179', GOTRUE_URI_ALLOW_LIST: 'http://127.0.0.1:4179/auth/callback,http://127.0.0.1:4180/auth/callback',
+      GOTRUE_SITE_URL: browserOrigins[0]!, GOTRUE_URI_ALLOW_LIST: browserOrigins.map(origin => origin + '/auth/callback').join(','),
       GOTRUE_DISABLE_SIGNUP: 'true', GOTRUE_EXTERNAL_EMAIL_ENABLED: 'true', GOTRUE_EXTERNAL_PHONE_ENABLED: 'false', GOTRUE_MAILER_AUTOCONFIRM: 'false',
       GOTRUE_JWT_SECRET: secret, GOTRUE_JWT_ADMIN_ROLES: 'service_role', GOTRUE_JWT_AUD: 'authenticated', GOTRUE_JWT_DEFAULT_GROUP_NAME: 'authenticated', GOTRUE_JWT_EXP: String(options.jwtExpirySeconds ?? 300),
       GOTRUE_SMTP_HOST: 'mail', GOTRUE_SMTP_PORT: '1025', GOTRUE_SMTP_ADMIN_EMAIL: 'auth@fixture.invalid', GOTRUE_SMTP_SENDER_NAME: 'Isolated Workprint fixture', GOTRUE_SMTP_MAX_FREQUENCY: '1s',

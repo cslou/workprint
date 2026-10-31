@@ -16,6 +16,12 @@ const absent = async (kind: 'container' | 'network', id: string) => {
   }
 };
 
+test('isolated Auth rejects non-loopback and non-exact browser origins before acquiring resources', async () => {
+  for (const browserOrigins of [[], ['https://example.com'], ['http://localhost:4480'], ['http://127.0.0.1:4480/'], ['http://127.0.0.1:4480/auth/callback'], ['http://127.0.0.1:*'], ['http://127.0.0.1:4480#fragment'], ['http://user:pass@127.0.0.1:4480']]) {
+    await assert.rejects(isolatedAuth({ browserOrigins }), /exact loopback HTTP origins/);
+  }
+});
+
 test('isolated real Auth delivers captured recovery mail and removes only owned fixture resources', { timeout: 180000 }, async (t) => {
   const fixture = await isolatedAuth();
   t.after(fixture.close);

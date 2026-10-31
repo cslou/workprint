@@ -1,5 +1,6 @@
 import { expect, test as base, type Request } from '@playwright/test';
 import type { OperationRequest } from '../../packages/contracts/src/index.js';
+import { browserOrigin, previewOrigin } from './origin.js';
 
 type Entry = { method: string; url: URL; body: unknown };
 type Operation = Readonly<{ origin: string; method: string; path: string; count: number; query: Readonly<Record<string, string>>; purpose?: OperationRequest<'useVersion'>['body']['purpose'] }>;
@@ -21,7 +22,7 @@ export const test = base.extend<{ materialNetwork: MaterialNetwork }>({
       if (auth) {
         // Auth payloads/URLs are secret-bearing. Redact before retaining any evidence.
         body = body && typeof body === 'object' ? Object.fromEntries(Object.keys(body).map(key => [key, '[private]'])) : null;
-        const publicValues: Record<string, readonly string[]> = { grant_type: ['password', 'refresh_token', 'pkce'], type: ['recovery'], scope: ['local', 'global', 'others'], redirect_to: ['http://127.0.0.1:4179/auth/callback', 'http://127.0.0.1:4180/auth/callback'] };
+        const publicValues: Record<string, readonly string[]> = { grant_type: ['password', 'refresh_token', 'pkce'], type: ['recovery'], scope: ['local', 'global', 'others'], redirect_to: [browserOrigin + '/auth/callback', previewOrigin + '/auth/callback'] };
         for (const [key, value] of [...url.searchParams.entries()]) if (!publicValues[key]?.includes(value)) url.searchParams.set(key, '[private]');
         url.hash = '';
       }

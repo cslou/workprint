@@ -8,7 +8,7 @@ import { startAuthServer } from './auth-server.js';
 import { createNativeConversation } from './native-conversations.js';
 
 /** Test-only real backend + isolated Auth. Native data uses existing supported fixture, no new route. */
-export async function accountBrowserFixture(options: Parameters<typeof isolatedAuth>[0] = {}) {
+export async function accountBrowserFixture(options: Parameters<typeof isolatedAuth>[0] = {}, browserOrigin = 'http://127.0.0.1:4180') {
   const auth = await isolatedAuth(options);
   const cleanups: (() => Promise<unknown>)[] = [auth.close];
   const close = async () => {
@@ -22,7 +22,7 @@ export async function accountBrowserFixture(options: Parameters<typeof isolatedA
     await store.init(); await db.grantServing();
     const env = await environment();
     const entry = await buildServerComposition(env.logs, 'account-browser', undefined, env.env);
-    const server = await startAuthServer(entry, env.env, { url: auth.url, anonKey: auth.anonKey, servingUrl: db.servingUrl, accounts: [] }, join(env.logs, 'account-api.log'), { env: { WORKPRINT_BROWSER_ORIGIN: 'http://127.0.0.1:4180' } });
+    const server = await startAuthServer(entry, env.env, { url: auth.url, anonKey: auth.anonKey, servingUrl: db.servingUrl, accounts: [] }, join(env.logs, 'account-api.log'), { env: { WORKPRINT_BROWSER_ORIGIN: browserOrigin } });
     cleanups.push(server.server.stop); cleanups.push(env.noNetwork);
     return { auth, apiOrigin: server.origin, close,
       saveNative: async (accountId: string, messages: Parameters<typeof createNativeConversation>[2] = [{ role: 'user', text: 'Synthetic saved work' }], title?: string) => {

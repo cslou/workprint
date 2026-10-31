@@ -177,6 +177,12 @@ export class AccountOwner {
     } catch { if (this.current(scope) && !this.state.account) this.set({ screen: 'startup-failed', busy: false }); }
     finally { this.restoring = false; }
   }
+  /** Revalidate a failed cold restore through this owner, without replacing a confirmed scope. */
+  retryRestore = async () => {
+    if (!this.client || this.initializing || this.restoring || this.operation || this.blocked || this.recoveryWanted || this.state.account || this.state.screen !== 'startup-failed') return;
+    this.set({ screen: 'checking', busy: true, message: '' });
+    await this.restore(this.scope());
+  };
   private async consume(code: string, scope: Scope) {
     this.operation = true;
     try {

@@ -2,6 +2,7 @@ import { test, expect } from '../material-network.js';
 import { privateAbort, privateContinue, privateForward, fixture, account, signIn, privateFill, privateNavigate, origin } from '../account-fixture.js';
 import type { Page } from '@playwright/test';
 import { createServer } from 'node:http';
+import { previewPort } from '../origin.js';
 import { execFileSync } from 'node:child_process';
 import type { MaterialNetwork } from '../material-network.js';
 
@@ -93,10 +94,10 @@ test('closing pending sign-in dismisses rather than replays it; Switch account f
 test('occupied frontend port is refused before borrowing another listener', async ({ page }) => {
   test.setTimeout(90000);
   const occupied = createServer((_request, response) => response.end('Owned occupied-port control'));
-  await new Promise<void>(resolve => occupied.listen(4180, '127.0.0.1', resolve));
+  await new Promise<void>(resolve => occupied.listen(previewPort, '127.0.0.1', resolve));
   let acquired: Awaited<ReturnType<typeof fixture>> | undefined;
   let refused = false;
-  try { acquired = await fixture(page); } catch (error) { refused = error instanceof Error && error.message.includes('4180'); }
+  try { acquired = await fixture(page); } catch (error) { refused = error instanceof Error && error.message.includes(String(previewPort)); }
   finally { try { await acquired?.close(); } finally { await new Promise<void>(resolve => occupied.close(() => resolve())); } }
   expect(refused, 'Frontend attached to a listener it did not start').toBe(true);
 });
@@ -110,7 +111,7 @@ test('browser resource cleanup continues after a context-close error and reports
     try { await f.close(); } catch (error) { failure = error; }
     const port = createServer();
     let vacant = false;
-    try { await new Promise<void>((resolve, reject) => { port.once('error', reject); port.listen(4180, '127.0.0.1', resolve); }); vacant = true; } catch { vacant = false; }
+    try { await new Promise<void>((resolve, reject) => { port.once('error', reject); port.listen(previewPort, '127.0.0.1', resolve); }); vacant = true; } catch { vacant = false; }
     finally { if (port.listening) await new Promise<void>(resolve => port.close(() => resolve())); }
     const containersRemoved = f.auth.containerIds.every(id => execFileSync('docker', ['ps', '--all', '--quiet', '--filter', 'id=' + id]).length === 0);
     expect(failure instanceof AggregateError && failure.errors.length === 1 && failure.errors[0] instanceof Error && failure.errors[0].message === 'Controlled browser context close failure', 'Context failure was not preserved with cleanup context').toBe(true);
