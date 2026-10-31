@@ -2,6 +2,7 @@ import { browserOrigin } from '../origin.js';
 import { expect, test } from '@playwright/test';
 import { compare } from '../compare.js';
 import { settleCapture } from '../capture.js';
+import { imageOnlyReference } from '../image-only-reference.js';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 
@@ -40,6 +41,7 @@ for (const width of [1440, 390, 820, 821]) for (const view of ['question', 'prop
       }
       if (view === 'answer') document.querySelector('.qopts')!.insertAdjacentHTML('afterend', '<p class="approved-feedback">The answer was not submitted. The question stays pending.</p>');
     }, view);
+    const guidanceSourceHashes = await imageOnlyReference(page, view === 'send' ? '.composer' : '.dock-input');
     await settleCapture(page);
     const measure = () => page.evaluate((view) => {
       const selectors = [
@@ -81,7 +83,7 @@ for (const width of [1440, 390, 820, 821]) for (const view of ['question', 'prop
     const changed = await compare(expected, actual, info.outputPath('comparison'));
     const source = await readFile(`docs/design/${reference}`);
     const referenceCss = await readFile('docs/design/app-r11.css');
-    await writeFile(info.outputPath('result.json'), JSON.stringify({ view, width, reference, sourceSha256: createHash('sha256').update(source).digest('hex'), referenceCssSha256: createHash('sha256').update(referenceCss).digest('hex'), approval: 'docs/design/design.md#shell-and-remaining-phase-2-feedback', changedPixels: changed, tolerance: 0, revision: info.config.metadata, browser: context.browser()?.version(), scope: 'Actual review component in inert tracked reference surroundings; the inert rounded Storyboard trigger paints its existing raised surround to avoid translucent-border rounding, identically on both sides. Read-only prerequisites are not saved work.' }, null, 2));
+    await writeFile(info.outputPath('result.json'), JSON.stringify({ view, width, reference, sourceSha256: createHash('sha256').update(source).digest('hex'), referenceCssSha256: createHash('sha256').update(referenceCss).digest('hex'), approval: 'docs/design/design.md#shell-and-remaining-phase-2-feedback', imageOnlyApproval: 'docs/design/design.md#image-only-upload-restriction', guidanceSourceHashes, changedPixels: changed, tolerance: 0, revision: info.config.metadata, browser: context.browser()?.version(), scope: 'Actual review component in inert tracked reference surroundings; the inert rounded Storyboard trigger paints its existing raised surround to avoid translucent-border rounding, identically on both sides. Read-only prerequisites are not saved work.' }, null, 2));
     expect(changed).toBe(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
