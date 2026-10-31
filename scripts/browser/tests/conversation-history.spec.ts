@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '../material-network.js';
 import { fixture, privateForward, privateFulfill, privateAbort } from '../account-fixture.js';
-import { allowHistory, allowList, enter, settledFrames } from '../navigation-fixture.js';
+import { allowHistory, allowList, enter, holdRealResponse, settledFrames } from '../navigation-fixture.js';
 
 for (const reference of ['foreign', 'absent'] as const) test(`safe ${reference} native history does not expose identity or initiate workspace reads`, async ({ page, materialNetwork }) => {
   test.setTimeout(120000); const f = await fixture(page, true);
@@ -43,6 +43,53 @@ for (const width of [1440, 390]) test(`native history identities/text/order and 
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect(materialNetwork.entries.filter(entry => entry.method !== 'GET' && entry.url.pathname.startsWith('/memory/'))).toEqual([]);
   } finally { await f.close(); }
+});
+
+for (const width of [1440, 390]) for (const phase of ['before', 'during', 'after'] as const) test(`workspace reflow ${phase} earlier history preserves its anchor at ${width}`, async ({ page, materialNetwork }, info) => {
+  test.setTimeout(120000); await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+  const f = await fixture(page, true);
+  let workspace: Awaited<ReturnType<typeof holdRealResponse>> | undefined, history: Awaited<ReturnType<typeof holdRealResponse>> | undefined;
+  try {
+    const user = await f.auth.createAccount();
+    const text = (index: number) => `Exact saved message ${index}: <script>not executable</script> ${'unbroken_'.repeat(index === 10 ? 30 : 2)}`;
+    const saved = await f.application!.saveNative(user.id, Array.from({ length: 25 }, (_, index) => ({ role: index % 2 ? 'assistant' as const : 'user' as const, text: text(index) })), 'Independent workspace reflow');
+    const persisted = await f.application!.snapshot();
+    workspace = await holdRealResponse(page, `**/v1/conversations/${saved.id}/workspace`);
+    allowHistory(materialNetwork, f.application!.apiOrigin, user.id, saved.id);
+    await enter(page, materialNetwork, f, user, saved.id);
+    await expect(page.getByRole('heading', { name: saved.title!, exact: true })).toBeFocused();
+    const messages = page.getByRole('list', { name: 'Saved messages' }); await expect(messages.locator('li')).toHaveCount(20);
+    expect(await workspace.seen).toBe(501);
+    const id = await messages.locator('li').first().getAttribute('data-message-id');
+    const layout = () => page.evaluate(id => {
+      const history = document.querySelector('.wp-native-history')!, aside = document.querySelector('.wp-workspace')!;
+      return { scrollY, documentHeight: document.documentElement.scrollHeight, historyHeight: history.scrollHeight, asideHeight: aside.getBoundingClientRect().height, anchorY: document.querySelector(`[data-message-id="${id}"]`)!.getBoundingClientRect().top };
+    }, id);
+    const releaseWorkspace = async () => {
+      workspace!.release(); await workspace!.done;
+      await expect(page.getByText('Loading this video is not available yet.', { exact: true })).toBeAttached(); await settledFrames(page);
+    };
+    if (phase === 'before') await releaseWorkspace();
+    await settledFrames(page); const before = await layout();
+    history = await holdRealResponse(page, `**/memory/threads/${saved.id}/messages?*`);
+    materialNetwork.expectOperations({ origin: f.application!.apiOrigin, method: 'GET', path: `/memory/threads/${saved.id}/messages`, query: { resourceId: user.id, page: '1', perPage: '20' }, count: 1 });
+    await page.getByRole('button', { name: 'Load earlier messages', exact: true }).click(); expect(await history.seen).toBe(200);
+    await expect(page.getByText('Loading earlier messages…', { exact: true })).toBeVisible(); await settledFrames(page);
+    const pending = await layout();
+    if (phase === 'during') {
+      await releaseWorkspace(); const settled = await layout();
+      expect(settled.historyHeight).toBe(pending.historyHeight); expect(settled.anchorY).toBe(pending.anchorY);
+      if (width === 390) expect(Math.abs(settled.documentHeight - pending.documentHeight)).toBeGreaterThan(1);
+      await info.attach('independent-workspace-layout', { body: JSON.stringify({ pending, settled }), contentType: 'application/json' });
+    }
+    history.release(); await history.done; await expect(messages.locator('li')).toHaveCount(25); await settledFrames(page);
+    const after = await layout();
+    await info.attach('history-prepend-layout', { body: JSON.stringify({ before, after }), contentType: 'application/json' });
+    expect(Math.abs(after.anchorY - before.anchorY)).toBeLessThanOrEqual(1);
+    if (phase === 'after') { await releaseWorkspace(); expect(Math.abs((await layout()).anchorY - after.anchorY)).toBeLessThanOrEqual(1); }
+    expect(await messages.locator('li').allTextContents()).toEqual(Array.from({ length: 25 }, (_, index) => text(index)));
+    expect(await f.application!.snapshot()).toBe(persisted);
+  } finally { workspace?.release(); history?.release(); await f.close(); }
 });
 
 test('empty and failed Recents settle and read retries never create a conversation', async ({ page, materialNetwork }) => {

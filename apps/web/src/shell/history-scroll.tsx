@@ -2,7 +2,7 @@ import { Component } from 'react';
 import type { ReactNode, RefObject } from 'react';
 
 type Props = { rows: readonly { id: string }[]; loading: boolean; scroller: RefObject<HTMLDivElement | null>; children: ReactNode };
-type Snapshot = { element: HTMLDivElement; top: number; height: number; width: number; viewportHeight: number; document: { top: number; height: number } | null };
+type Snapshot = { element: HTMLDivElement; top: number; height: number; width: number; viewportHeight: number; document: { top: number } | null };
 
 /** Snapshot at the DOM commit boundary, not when the asynchronous read starts. */
 export class HistoryScroll extends Component<Props, Record<string, never>, Snapshot | null> {
@@ -30,7 +30,7 @@ export class HistoryScroll extends Component<Props, Record<string, never>, Snaps
     const { rows, scroller } = this.props, offset = rows.length - previous.rows.length;
     const element = scroller.current;
     if (!element) return null;
-    const live = { element, top: element.scrollTop, height: element.scrollHeight, width: innerWidth, viewportHeight: innerHeight, document: innerWidth <= 820 ? { top: scrollY, height: document.documentElement.scrollHeight } : null };
+    const live = { element, top: element.scrollTop, height: element.scrollHeight, width: innerWidth, viewportHeight: innerHeight, document: innerWidth <= 820 ? { top: scrollY } : null };
     if (this.props.loading && !previous.loading) this.pending = live;
     if (!previous.rows.length || offset <= 0 || !previous.rows.every((row, index) => rows[index + offset]?.id === row.id)) return null;
     // Only an uninterrupted viewport may reuse the loading-control baseline.
@@ -38,7 +38,6 @@ export class HistoryScroll extends Component<Props, Record<string, never>, Snaps
     const pending = this.pending;
     if (pending && live.top === pending.top && live.document?.top === pending.document?.top && live.width === pending.width && live.viewportHeight === pending.viewportHeight) {
       live.height = pending.height;
-      if (live.document && pending.document) live.document.height = pending.document.height;
     }
     return live;
   }
@@ -46,8 +45,10 @@ export class HistoryScroll extends Component<Props, Record<string, never>, Snaps
     this.watchScroller(this.props.scroller.current);
     if (!this.props.loading) this.pending = null;
     if (!snapshot) return;
-    snapshot.element.scrollTop = snapshot.top + snapshot.element.scrollHeight - snapshot.height;
-    if (snapshot.document) window.scrollTo(0, snapshot.document.top + document.documentElement.scrollHeight - snapshot.document.height);
+    // Other mobile panels may reflow below history; compensate only this history's growth.
+    const delta = snapshot.element.scrollHeight - snapshot.height;
+    snapshot.element.scrollTop = snapshot.top + delta;
+    if (snapshot.document) window.scrollTo(0, snapshot.document.top + delta);
   }
   override render() { return this.props.children; }
 }
