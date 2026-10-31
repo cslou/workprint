@@ -35,6 +35,19 @@ test('preflight rejection has zero network effects and expired access requires e
   await session.select(file());assert.equal(session.getSnapshot().phase,'expired');assert.equal(transfers,0);await session.retry();assert.equal(calls,1);await session.authorizeAgain();assert.equal(session.getSnapshot().phase,'saved');assert.notEqual(operations[0],operations[1]);assert.equal(transfers,1);session.dispose();
 });
 
+test('video selection is refused locally and cannot replay authorization, transfer or confirmation',async()=>{
+  let authorizations=0,transfers=0,confirmations=0;
+  const session=createUploadSession(async()=>{transfers++;return{ok:true,value:{acknowledged:true}};});
+  session.configure({accountId:'owner',conversationId:'conversation'},{requestUpload:async()=>{authorizations++;return{ok:true,value:grant};},confirmUpload:async()=>{confirmations++;return{ok:true,value:saved};}});
+  for(const type of ['video/mp4','video/webm']){
+    await session.select(new File(['abc'],'ordinary-clip.mp4',{type}));
+    assert.equal(session.getSnapshot().phase,'rejected-format');assert.equal(session.getSnapshot().file?.kind,'video');
+    await session.retry();await session.authorizeAgain();
+    assert.deepEqual({authorizations,transfers,confirmations},{authorizations:0,transfers:0,confirmations:0});
+  }
+  session.dispose();
+});
+
 test('confirmation failure never claims bytes were not sent or that prior unknown work was rolled back',async()=>{
   const build=(code:'not_implemented'|'unauthenticated',grantFailure=false)=>{
     const client:Pick<ApiClient,'requestUpload'|'confirmUpload'>={requestUpload:async()=>grantFailure?{ok:false,error:{code,message:'Controlled grant rejection'}}:{ok:true,value:grant},confirmUpload:async()=>({ok:false,error:{code,message:'Controlled confirmation rejection'}})};

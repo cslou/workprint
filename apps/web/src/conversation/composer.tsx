@@ -41,8 +41,9 @@ export function Composer({ native, working = false, docked = false, placeholder 
   return <>
     <form className={`wp-opening-composer${docked ? ' wp-chat-docked' : ''}`} onSubmit={(event) => { event.preventDefault(); void send(); }}>
       <textarea className="wp-opening-field wp-chat-input" aria-label="Message" placeholder={placeholder} value={text} onChange={(event) => setText(event.target.value)} />
-      <div className="wp-opening-bar"><button type="button" className="wp-opening-attach" aria-label="Attach a file" disabled={uploading} onClick={() => fileInput.current?.click()}><span aria-hidden="true">+</span>{docked ? 'Attach' : 'Attach photos'}</button><input ref={fileInput} className="wp-sr-only" type="file" accept="image/png,image/jpeg,video/mp4" aria-label="Choose an image or video" onChange={(event) => void upload(event)} /><div className="wp-chat-actions">{working && <Button variant="secondary" onPress={() => void stop()}>Stop</Button>}<Button type="submit" isDisabled={pending || !text.trim()}>Send</Button></div></div>
+      <div className="wp-opening-bar"><button type="button" className="wp-opening-attach" aria-label="Attach a file" disabled={uploading} onClick={() => fileInput.current?.click()}><span aria-hidden="true">+</span>{docked ? 'Attach' : 'Attach photos'}</button><input ref={fileInput} className="wp-sr-only" type="file" accept="image/png,image/jpeg" aria-label="Choose a JPEG or PNG image" onChange={(event) => void upload(event)} /><div className="wp-chat-actions">{working && <Button variant="secondary" onPress={() => void stop()}>Stop</Button>}<Button type="submit" isDisabled={pending || !text.trim()}>Send</Button></div></div>
     </form>
+    <p className="wp-upload-guidance">JPEG or PNG only · Up to 10 MiB · 4096 × 4096 pixels. Video uploads are temporarily unavailable.</p>
     <UploadStatus state={uploadState.state} session={uploadState.session} connection={connection} choose={() => fileInput.current?.click()} close={closeUpload} {...(onUploaded ? { onSaved: onUploaded } : {})} />
     {(feedback || blocked) && <p className="wp-chat-feedback" role="status">{feedback ?? blocked}</p>}
   </>;

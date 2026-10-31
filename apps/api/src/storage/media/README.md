@@ -104,9 +104,10 @@ bounded input rather than re-reading aliased chunks. Parameter NALs are capped
 at65535bytes, matching the avcC length field. Process,
 output, memory, temp and absolute lifetime bounds are unchanged. JPEG inspection
 continues through the actual EOI, handling stuffed entropy/restart markers and
-rejecting EXIF/ICC APP1/APP2 even after a completed scan. Real late-SPS and post-scan
-APP1 regressions fail with zero publication/use/approval effects; repeated fixed
-parameters and real JPEG restart/stuffed-entropy controls pass. Generated PNG
+rejecting EXIF/ICC APP1/APP2 even after a completed scan. Retained JPEG post-scan
+APP1/APP2 regressions fail with zero publication/use/approval effects; real JPEG
+restart/stuffed-entropy controls pass. Prior video adversarial publication claims
+are not current qualification and are not resumed as a parser correction. Generated PNG
 posters are separately probed, fully decoded, CRC/structure/dimension checked and captured. No conversion service is exposed.
 
 Positive actual synthetic PNG/JPEG/H264+AAC/poster tests and spoof/truncation,
@@ -117,16 +118,15 @@ profiles remain to qualify before expanding this allowlist. Actual encoded
 61fps and121seconds reject under the same bounded tools.
 
 Owned PG/S3 publication tests now use the actual verifier and native ownership:
-missing-capability501 baseline, exact captured media/poster hashes, human draft
-Panel/Shot uses, unchanged approval/selection, replay, staging replacement during
+missing-capability501 baseline, exact captured image hashes, human draft
+Panel-image uses, unchanged approval/selection, replay, staging replacement during
 inspection, verifier-buffer mutation, atomic SQL rollback and final replaced-lease
-rejection after actual reserved storage writes. An exact100MiB MP4 (valid free-box
-padding) crosses client transfer, SQL, S3, full native decode/poster and immutable
-publication/readback; one-byte-over transport/policy/storage and unchanged image
-bounds have separate regressions. No external inspection/storage waits hold SQL.
+rejection after actual reserved storage writes. Historical100MiB video-upload publication evidence is superseded by the current
+image-only restriction. The isolated100MiB mechanical transport/storage ceiling
+and one-byte-over controls remain; neither authorizes user video uploads. No external inspection/storage waits hold SQL.
 Prior owner-first manual-save/lease tests remain required regressions. Built API
-composition now has actual Auth/PG/S3 image/video success, replay, foreign-owner
-denial, exact source bytes and measured poster access proof. Native shutdown of
+composition now has actual Auth/PG/S3 JPEG/PNG success, video refusal, replay, foreign-owner
+denial and exact JPEG/PNG source-byte readback. Native shutdown of
 active work, missing configuration, cleanup failure and actual signed GET expiry
 also have controls. Browser/UI and full-suite qualification remain pending;
 these proofs do not qualify production distribution, playback or R2.

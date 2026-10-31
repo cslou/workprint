@@ -10,13 +10,13 @@ export async function verifyUploadRecovery(page:Page,info:TestInfo,network:Mater
   const capture = async (state:Parameters<typeof captureVerifiedUploadPair>[2],name:string,size:number) => { if(visual)await captureVerifiedUploadPair(page,info,state,{name,size,...(state==='expired'?{condition:'controlled-clock-skew' as const}:state==='interrupted'?{condition:'controlled-transport-loss' as const}:{})}); };
   const choose = async (name:string,type:string,buffer:Buffer,request=false) => {
     if(request)network.expectOperations({origin,method:'POST',path:`/v1/conversations/${conversation}/uploads`,query:{},count:1});
-    await page.getByLabel('Choose an image or video').setInputFiles({name,mimeType:type,buffer});
+    await page.getByLabel('Choose a JPEG or PNG image').setInputFiles({name,mimeType:type,buffer});
   };
   const dismiss = async () => { await page.getByRole('button',{name:'Choose another file',exact:true}).click(); };
   const before=network.entries.filter(entry=>!['GET','HEAD','OPTIONS'].includes(entry.method)).length;
-  await choose('unsupported.webm','video/webm',Buffer.from([1,2,3]));
-  await expect(page.getByRole('heading',{name:'This video is not supported'})).toBeVisible();
-  await capture('rejected-format','unsupported.webm',3); await dismiss();
+  await choose('unsupported.svg','image/svg+xml',Buffer.from([1,2,3]));
+  await expect(page.getByRole('heading',{name:'This image is not supported'})).toBeVisible();
+  await capture('rejected-format','unsupported.svg',3); await dismiss();
   const large=Buffer.alloc(10*1024*1024+1);
   await choose('large.png','image/png',large);
   await expect(page.getByRole('heading',{name:'This image is too large'})).toBeVisible();

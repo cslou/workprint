@@ -6,7 +6,7 @@ import { parseUploadRequest } from '../src/artifacts/uploads/policy.js';
 import { createPrivateObjectStorage, MAX_OBJECT_BYTES } from '../src/storage/index.js';
 
 const VIDEO=100*1024**2,IMAGE=10*1024**2;
-test('exact100MiB video crosses the real transfer boundary; one byte over initiates nothing',{timeout:15000},async()=>{
+test('isolated100MiB transport ceiling is not video upload authorization; one byte over initiates nothing',{timeout:15000},async()=>{
   let requests=0,received=0;
   const server=createServer(async(request,response)=>{requests++;assert.equal(request.headers.authorization,undefined);assert.equal(request.headers.cookie,undefined);for await(const chunk of request)received+=(chunk as Buffer).length;response.writeHead(200);response.end();});
   await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));const address=server.address();assert.ok(address && typeof address!=='string');
@@ -17,9 +17,9 @@ test('exact100MiB video crosses the real transfer boundary; one byte over initia
   }finally{server.closeAllConnections();await new Promise<void>((resolve,reject)=>server.close(error=>error?reject(error):resolve()));}
 });
 
-test('policy and mechanical storage agree on exact video/image caps without widening image allowance',async()=>{
+test('image-only policy retains10MiB while isolated mechanical storage stays bounded to100MiB',async()=>{
   const body={operationId:'size-control',kind:'video' as const,filename:'synthetic.mp4',contentType:'video/mp4',byteSize:VIDEO};
-  assert.equal(parseUploadRequest('owned-conversation',body).byteSize,VIDEO);assert.equal(MAX_OBJECT_BYTES,VIDEO);
+  assert.throws(()=>parseUploadRequest('owned-conversation',body),{code:'unsupported'});assert.equal(MAX_OBJECT_BYTES,VIDEO);
   assert.throws(()=>parseUploadRequest('owned-conversation',{...body,byteSize:VIDEO+1}),{code:'unsupported'});
   assert.equal(parseUploadRequest('owned-conversation',{...body,kind:'image',filename:'synthetic.png',contentType:'image/png',byteSize:IMAGE}).byteSize,IMAGE);
   assert.throws(()=>parseUploadRequest('owned-conversation',{...body,kind:'image',contentType:'image/png',byteSize:IMAGE+1}),{code:'unsupported'});

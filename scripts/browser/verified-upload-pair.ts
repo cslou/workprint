@@ -5,7 +5,7 @@ import { expect, type Page, type TestInfo } from '@playwright/test';
 import { capturePairSide } from './capture-pair.js';
 import { compare } from './compare.js';
 
-const states = ['authorizing','uploading','verifying','image-saved','poster-saved','expired','interrupted','confirmation-unknown','stopped','rejected-format','rejected-size','rejected-damaged','image-loading','image-error','poster-expired','scope-cleared'] as const;
+const states = ['image-only-ready','video-unavailable','authorizing','uploading','verifying','image-saved','expired','interrupted','confirmation-unknown','stopped','rejected-format','rejected-size','rejected-damaged','image-loading','image-error','image-expired','scope-cleared'] as const;
 export type VerifiedUploadState = typeof states[number];
 type Facts = { name?: string; size?: number; image?: Buffer; video?: boolean; condition?: 'controlled-transport-loss'|'controlled-clock-skew-and-transport-loss'|'controlled-clock-skew' };
 /** Independently authored tracked cards in the frozen shell, never rendered-application baselines. */
@@ -18,6 +18,7 @@ export async function captureVerifiedUploadPair(actual: Page, info: TestInfo, st
     const content = await readFile(path,'utf8'); hashes[relative] = createHash('sha256').update(content).digest('hex'); return content;
   };
   const source = await load(`docs/design/verified-uploads-r1/${persisted ? `persisted-${facts.video ? 'poster' : 'image'}` : state}.html`);
+  const guidance = await load('docs/design/verified-uploads-r1/image-only-guidance.html');
   const surroundings = await load('docs/design/verified-uploads-r1/persisted-context.html');
   await load('docs/design/flow2-step1-r73.html'); await load('docs/design/app-r11.css'); await load('docs/design/brand-book/book.css');
   const styles = await Promise.all(['assets/tokens.css','assets/foundations.css','preview.css','frame.css'].map(path=>load(`docs/design/verified-uploads-r1/${path}`)));
@@ -30,7 +31,7 @@ export async function captureVerifiedUploadPair(actual: Page, info: TestInfo, st
       await reference.goto('/references/flow2-step1-r73.html');
       for (const content of styles) await reference.addStyleTag({content});
       await reference.addStyleTag({content:':root{--font-sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-display:Georgia,"Times New Roman",serif}'});
-      await reference.evaluate(({source,surroundings,facts,state,persisted})=>{
+      await reference.evaluate(({source,surroundings,guidance,facts,state,persisted})=>{
         document.querySelector('.section')!.insertAdjacentHTML('beforeend','<span class="navitem">Open conversation</span>');
         if (persisted) {
           const context = new DOMParser().parseFromString(surroundings,'text/html');
@@ -39,6 +40,9 @@ export async function captureVerifiedUploadPair(actual: Page, info: TestInfo, st
           document.querySelector('#p-assets')!.classList.add('default'); document.querySelector('.ptabs a[href="#p-assets"]')!.classList.add('default');
         }
         const doc = new DOMParser().parseFromString(source,'text/html');
+        const note = new DOMParser().parseFromString(guidance,'text/html').querySelector('.preview-guidance')!;
+        document.querySelector('.composer')!.after(note);
+        if(state==='image-only-ready')return;
         if (['authorizing','uploading','verifying'].includes(state)) document.querySelector('.composer .attach')!.setAttribute('aria-disabled','true');
         const node = doc.querySelector(persisted ? '.wp-modal-overlay' : '.preview-upload');
         if (!node) throw new Error('Missing tracked upload placement');
@@ -51,12 +55,13 @@ export async function captureVerifiedUploadPair(actual: Page, info: TestInfo, st
         if (image) { image.setAttribute('src','/__verified_reference_fixture'); image.setAttribute('alt',facts.video?'Synthetic native poster fixture':'Synthetic PNG fixture'); }
         const measured = card.querySelector('.wp-status + .preview-meta');
         if (measured) measured.textContent = facts.video ? ' · 320 × 180 · 0:01 · AAC audio' : ' · 240 × 240 · PNG';
-        if (persisted) document.body.append(node); else document.querySelector('.composer')!.after(node);
-      },{source,surroundings,facts:{name:facts.name,size:facts.size,video:facts.video},state,persisted});
+        if (persisted) document.body.append(node); else note.after(node);
+      },{source,surroundings,guidance,facts:{name:facts.name,size:facts.size,video:facts.video},state,persisted});
       const label = `${persisted?'persisted':'main'}-${state}-${width}`, folder=info.outputPath(label); await mkdir(folder,{recursive:true});
       const nested = {...info,outputPath:(...parts:string[])=>join(folder,...parts)} as TestInfo;
-      const refSelectors = persisted?['.wp-modal','.preview-upload']:['.main','.composer','.preview-upload'];
-      const actualSelectors = persisted?['.wp-modal','.wp-upload-status']:['.wp-main','.wp-opening-composer','.wp-upload-status'];
+      const refCard=state==='image-only-ready'?'.preview-guidance':'.preview-upload',actualCard=state==='image-only-ready'?'.wp-upload-guidance':'.wp-upload-status';
+      const refSelectors = persisted?['.wp-modal','.preview-upload']:['.main','.composer',refCard];
+      const actualSelectors = persisted?['.wp-modal','.wp-upload-status']:['.wp-main','.wp-opening-composer',actualCard];
       // Mobile Shell is the existing naturally scrolling page, not a fixed-height card stage.
       // Prove every receipt control is reachable, and neither page nor card overflows horizontally.
       const reachability = async (page:Page,selector:string) => {
@@ -68,7 +73,7 @@ export async function captureVerifiedUploadPair(actual: Page, info: TestInfo, st
           expect(box!.y).toBeGreaterThanOrEqual(0); expect(box!.y+box!.height).toBeLessThanOrEqual(viewport.height);
         }
       };
-      await reachability(reference,'.preview-upload'); await reachability(actual,'.wp-upload-status');
+      await reachability(reference,refCard); await reachability(actual,actualCard);
       const expected = await capturePairSide(reference,nested,refSelectors,'reference',persisted?'.wp-modal':'.main',persisted?'.wp-modal':undefined);
       const observed = await capturePairSide(actual,nested,actualSelectors,'actual',persisted?'.wp-modal':'.wp-main',persisted?'.wp-modal':undefined);
       const changedPixels = await compare(expected.image,observed.image,join(folder,'comparison'));

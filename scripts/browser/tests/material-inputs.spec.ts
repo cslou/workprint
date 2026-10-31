@@ -72,7 +72,7 @@ test('denied file metadata never transfers or confirms; unqualified video stays 
       await page.waitForFunction(() => !!(window as unknown as UploadsHarness).uploadsTest);
       await page.evaluate((input) => (window as unknown as UploadsHarness).uploadsTest.configure(input), { apiOrigin: origin, token, accountId: 'account-a', conversationId: 'conversation-a' });
       materialNetwork.expectOperations({ origin, method: 'POST', path: '/v1/conversations/conversation-a/uploads', count: 2, query: {} });
-      const input = page.getByLabel('Choose an image or video', { exact: true });
+      const input = page.getByLabel('Choose a JPEG or PNG image', { exact: true });
       const text = page.getByRole('textbox', { name: 'Message', exact: true });
       await text.fill('A quiet moment in the gallery.');
       const seen: { method: string; path: string; body: Record<string, unknown> }[] = [];
@@ -99,7 +99,7 @@ test('denied file metadata never transfers or confirms; unqualified video stays 
       await expect(text).toHaveValue('A quiet moment in the gallery.');
       const video = await readFile('apps/web/test/fixtures/clip.webm');
       await input.setInputFiles({ name: 'clip.webm', mimeType: 'video/webm', buffer: video });
-      await expect(page.getByRole('heading', { name: 'This video is not supported' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Video uploads are temporarily unavailable' })).toBeVisible();
       expect(seen, 'Unqualified video must not reach authorization or storage').toHaveLength(1);
       expect(seen.every((entry) => entry.path === '/v1/conversations/conversation-a/uploads' && entry.method === 'POST')).toBe(true);
       expect(seen.some((entry) => /\/confirm$/.test(entry.path))).toBe(false);
@@ -125,7 +125,7 @@ test('upload transport failure, unsupported type and no conversation send nothin
   materialNetwork.expectOperations({ origin: browserOrigin, method: 'POST', path: '/v1/conversations/conversation-a/uploads', count: 2, query: {} });
   await page.goto('/uploads.html');
   await page.waitForFunction(() => !!(window as unknown as UploadsHarness).uploadsTest);
-  const input = page.getByLabel('Choose an image or video', { exact: true });
+  const input = page.getByLabel('Choose a JPEG or PNG image', { exact: true });
   const text = page.getByRole('textbox', { name: 'Message', exact: true });
   const seen: { method: string; path: string }[] = [];
   const image = await readFile('apps/web/test/fixtures/library-tile.png');
