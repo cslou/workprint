@@ -1,11 +1,11 @@
-import { Mastra } from '@mastra/core';
+import { ResourceMastra } from './resources.js';
 import { registerApiRoute, type ApiRoute } from '@mastra/core/server';
 import { PostgresStore } from '@mastra/pg';
 import { Pool } from 'pg';
 import { createOwnedConversationCheck } from '../agent/index.js';
 import { createApplication, withSavedWork, withManualSaves, withUploads } from '../application/index.js';
-import { createArtifactStore, createArtifactWriters, createUploadCoordinator } from '../artifacts/index.js';
-import { configuredObjectStorage } from '../storage/index.js';
+import { createArtifactStore, createArtifactWriters, createMediaVerifier, createUploadCoordinator } from '../artifacts/index.js';
+import { configuredMediaSandbox, configuredObjectStorage } from '../storage/index.js';
 import { assertRestrictedRole } from '../db/index.js';
 import { loadServerConfig } from './config.js';
 import { verifyAccount } from './auth.js';
@@ -15,6 +15,7 @@ import { applicationRoutes } from './application-routes.js';
 export async function createBackend(routes: ApiRoute[] = []) {
   const config = loadServerConfig(process.env);
   const objects = configuredObjectStorage(process.env);
+  const media = await configuredMediaSandbox(process.env).catch(error => { objects?.close(); throw error; });
   const pool = new Pool({
     connectionString: config.connectionString, max: 4, connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 5000, statement_timeout: 10000,
@@ -30,14 +31,14 @@ export async function createBackend(routes: ApiRoute[] = []) {
       requiredSchemas: ['mastra', 'public'], errorMessage: 'Privileged serving connection',
     });
   } catch {
-    objects?.close(); await pool.end();
+    objects?.close(); await media?.close(); await pool.end();
     throw new Error('Serving storage unavailable or privileged; prepare storage separately and use restricted DATABASE_URL');
   }
   const storage = new PostgresStore({ id: 'workprint-native', schemaName: 'mastra', disableInit: true, pool });
   const application = createApplication({ checkOwnedConversation: createOwnedConversationCheck(storage) });
   const savedApplication = withSavedWork(application, createArtifactStore(pool, application.checkOwnedConversation));
   const manualApplication = withManualSaves(savedApplication, createArtifactWriters(pool, application.checkOwnedConversation).human.save);
-  const uploadApplication = withUploads(manualApplication, createUploadCoordinator(pool, application.checkOwnedConversation, objects ? { storage: objects } : {}));
+  const uploadApplication = withUploads(manualApplication, createUploadCoordinator(pool, application.checkOwnedConversation, { ...(objects ? { storage: objects } : {}), ...(media ? { verifyMedia: createMediaVerifier(media) } : {}) }));
   const protectedRoutes = [...applicationRoutes(uploadApplication), ...routes];
   const matchesRoute = (path: string, method: string) => protectedRoutes.some((route) => {
     const template = route.path.split('/');
@@ -45,7 +46,7 @@ export async function createBackend(routes: ApiRoute[] = []) {
     return route.method === method && template.length === segments.length &&
       template.every((part, index) => /^:[A-Za-z][A-Za-z0-9_]*$/.test(part) ? Boolean(segments[index]) : part === segments[index]);
   });
-  return new Mastra({
+  return new ResourceMastra({
     storage,
     server: {
       host: '127.0.0.1', port: config.port,
@@ -99,5 +100,5 @@ export async function createBackend(routes: ApiRoute[] = []) {
         return context.res;
       }],
     },
-  });
+  }, { before: async () => { try { await media?.close(); } finally { objects?.close(); } }, after: async () => { if (!pool.ended) await pool.end(); } });
 }

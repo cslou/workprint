@@ -59,5 +59,12 @@ test('private digest-pinned S3 service enforces scoped signatures, CORS, expiry 
     await assert.rejects(objects.publish('published/adapter-snapshot', changed, snapshot.contentType), { code: 'conflict' });
     assert.deepEqual((await objects.read('published/adapter-snapshot')).bytes, bytes);
     await objects.remove(grant.key); await assert.rejects(objects.read(grant.key), { code: 'not_found' });
+    const readIssued = new Date(Math.floor(Date.now() / 1000) * 1000), readExpires = new Date(readIssued.getTime() + 1000);
+    const readGrant = { key: published, issuedAt: readIssued, expiresAt: readExpires };
+    await assert.rejects(objects.presignRead({ ...readGrant, key: staging }), { code: 'invalid_object' });
+    await assert.rejects(objects.presignRead({ ...readGrant, expiresAt: new Date(readIssued.getTime() + 301000) }), { code: 'invalid_object' });
+    const signedRead = await objects.presignRead(readGrant); assert.equal(signedRead, await objects.presignRead(readGrant));
+    const actualRead = await fetch(signedRead, { credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(2000) }); assert.equal(actualRead.status, 200); assert.deepEqual(Buffer.from(await actualRead.arrayBuffer()), bytes);
+    await new Promise(resolve => setTimeout(resolve, 2200)); const expiredRead = await fetch(signedRead, { signal: AbortSignal.timeout(2000) }); assert.equal(expiredRead.status, 403); await expiredRead.body?.cancel();
   } finally { objects.close(); await storage.close(); }
 });

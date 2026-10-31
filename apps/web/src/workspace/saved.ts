@@ -5,7 +5,14 @@ type Work = NonNullable<Workspace['script']>;
 /** Apply a confirmed exact-use command result, never an inferred approval or selection. */
 export function applySavedVersion(workspace: Workspace, result: Saved): Workspace {
   const use = result.use;
-  if (!use || use.state !== 'approved' || use.versionId !== result.version.id) return workspace;
+  if (!use || use.versionId !== result.version.id) return workspace;
+  // A confirmed Composer import adds only its exact Draft reference. Keep every
+  // existing editor/question projection and approval/selection untouched.
+  if (result.version.kind === 'image' && result.version.createdBy === 'human' && use.state === 'draft' && use.binding.purpose === 'reference') {
+    if (workspace.assets.some(work => work.use?.id === use.id || work.version.id === result.version.id)) return workspace;
+    return { ...workspace, assets: [...workspace.assets, { version: result.version, use, state: 'Draft' }] };
+  }
+  if (use.state !== 'approved') return workspace;
   const replace = (work: Work | null): Work | null => {
     if (!work?.use || work.use.id !== use.id || work.version.artifactId !== result.version.artifactId || work.version.kind !== result.version.kind || result.version.revision <= work.version.revision || JSON.stringify(work.use.binding) !== JSON.stringify(use.binding)) return work;
     return { version: result.version, use, state: 'Ready' };

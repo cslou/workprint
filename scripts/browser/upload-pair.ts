@@ -4,6 +4,7 @@ import { writeFile } from 'node:fs/promises';
 import { compare } from './compare.js';
 import { settleCapture } from './capture.js';
 import { capturePairSide } from './capture-pair.js';
+import { imageOnlyReference } from './image-only-reference.js';
 
 const fonts = ':root{--font-sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-display:Georgia,"Times New Roman",serif}';
 const lineStyle = '.rf-line{width:min(680px,calc(100% - 32px));margin:-14px auto 24px;color:#656155;font-size:13px;line-height:1.5;font-family:var(--font-sans)}';
@@ -33,6 +34,7 @@ export async function captureUploadPair(page: Page, info: TestInfo, width: numbe
     if (!composer) throw new Error('Missing reference composer');
     composer.insertAdjacentHTML('afterend', `<p class="rf-line">${text}</p>`);
   }, copy[kind]);
+  const guidanceSourceHashes = await imageOnlyReference(page);
   await settleCapture(page);
   const referenceComposer = await box(page, '.composer');
   const referenceLine = await box(page, '.rf-line');
@@ -73,6 +75,6 @@ export async function captureUploadPair(page: Page, info: TestInfo, width: numbe
   expect(actualUnion.height).toEqual(referenceUnion.height);
   const actual = await capturePairSide(page, info, [], 'actual', actualClip, kind === 'upload' ? '.wp-chat-feedback' : '[data-confirm]');
   const changed = await compare(reference.image, actual.image, info.outputPath('comparison'));
-  await writeFile(info.outputPath('result.json'), JSON.stringify({ kind, width, changedPixels: changed, tolerance: 0, reference: 'docs/design/flow2-step1-r73.html composer plus the approved feedback line', substitutions: 'The 501 response is the built backend code and shape, routed in the visual mount; the file is the wordless /fixtures/library-tile.png', note: 'Full-context evidence and two-sided viewport checks accompany the unchanged region comparison; full-page background parity is covered separately by shell/send pairs. Absolute page placement is N/A for the isolated confirmation consumer.', revision: info.config.metadata, context: { reference: reference.context, actual: actual.context }, geometry: { reference: [referenceComposer, referenceLine], actual: [actualComposer, actualLine] } }, null, 2));
+  await writeFile(info.outputPath('result.json'), JSON.stringify({ kind, width, imageOnlyApproval: 'docs/design/design.md#image-only-upload-restriction', guidanceSourceHashes, changedPixels: changed, tolerance: 0, reference: 'docs/design/flow2-step1-r73.html composer plus the approved feedback line', substitutions: 'The 501 response is the built backend code and shape, routed in the visual mount; the file is the wordless /fixtures/library-tile.png', note: 'Full-context evidence and two-sided viewport checks accompany the unchanged region comparison; full-page background parity is covered separately by shell/send pairs. Absolute page placement is N/A for the isolated confirmation consumer.', revision: info.config.metadata, context: { reference: reference.context, actual: actual.context }, geometry: { reference: [referenceComposer, referenceLine], actual: [actualComposer, actualLine] } }, null, 2));
   expect(changed).toBe(0);
 }

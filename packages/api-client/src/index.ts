@@ -4,6 +4,8 @@ import type { ClientError, ClientResult } from './result.js';
 export type { ClientError, ClientResult } from './result.js';
 export { createPageRead, type PageRead, type PageReadState, type ReadPage } from './paged-read.js';
 export { transferUpload } from './upload-transfer.js';
+export { createUploadSession, type UploadSession, type UploadState, type UploadScope } from './upload-session.js';
+export { readPrivateImage } from './private-image.js';
 export { createManualSave, type ManualSave, type ManualSaveState, type ManualTextTarget } from './manual-save.js';
 export type CallOptions = { signal?: AbortSignal };
 type ApplicationMethods = { [N in OperationName]: (input: OperationRequest<N>, options?: CallOptions) => Promise<ClientResult<OperationResponse<N>>> };

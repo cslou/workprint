@@ -3,11 +3,12 @@ import type { Pool } from 'pg';
 import { idSchema, operations, versionSchema } from '@workprint/contracts';
 import { createArtifactStore } from '../store.js';
 import { MAX_OBJECT_BYTES } from '../../storage/index.js';
-import { authorizeUpload, parseUploadRequest, uploadTarget } from './policy.js';
+import { authorizeUpload, parseUploadRequest, requireImageUpload, uploadTarget } from './policy.js';
 import { UploadError, uploadError } from './errors.js';
 import { uploadRecords } from './records.js';
 import { completeUpload } from './completion.js';
 import { cleanupUpload } from './cleanup.js';
+import { createMediaAccess } from './access.js';
 import type { MediaVersion, OwnedCheck, UploadCollaborators, UploadRequest, UploadRow, VerifiedMedia } from './types.js';
 
 const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
@@ -18,7 +19,7 @@ function measured(row: UploadRow, verified: VerifiedMedia): MediaVersion['media'
   if (!parsed.success || !('media' in parsed.data)) throw new UploadError('invalid_input'); return parsed.data.media;
 }
 
-/** One request owns its work. Optional trusted verifier is deliberately absent in production. */
+/** One request owns its work; only backend composition may supply a real verifier. */
 export function createUploadCoordinator(pool: Pool, checkOwnedConversation: OwnedCheck, collaborators: UploadCollaborators = {}) {
   const records = uploadRecords(pool), reads = createArtifactStore(pool, checkOwnedConversation);
   let active = 0;
@@ -29,6 +30,7 @@ export function createUploadCoordinator(pool: Pool, checkOwnedConversation: Owne
     return row;
   };
   return Object.freeze({
+    media: createMediaAccess(pool, reads, collaborators.storage),
     request: async (account: string, conversation: string, body: UploadRequest) => {
       try {
         await authorizeUpload(checkOwnedConversation, account, conversation);
@@ -43,6 +45,7 @@ export function createUploadCoordinator(pool: Pool, checkOwnedConversation: Owne
     confirm: async (account: string, id: string, operation: string) => {
       if (!idSchema.safeParse(operation).success) throw new UploadError('invalid_input');
       const admitted = await ownedUpload(account, id);
+      requireImageUpload(admitted.kind);
       const claimed = await records.claim(admitted, operation);
       if (claimed.result) return claimed.result;
       const { row, token } = claimed;

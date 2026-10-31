@@ -1,25 +1,11 @@
 # Upload consumer boundary
 
-`initiateUpload` still sends metadata only; it never transfers or confirms a
-selected file. A grant/PUT is not a version. Existing composer appearance and
-feedback remain unchanged; unknown native contexts now receive nondisclosing
-404, not an obsolete unavailable-operation response.
+The production Composer uses the framework-free `createUploadSession` single-file lifecycle: immutable File and authorization/confirmation identities, explicit recovery, no queue or automatic replay. Admission is currently JPEG/PNG only, at most10MiB; actual verification enforces4096square. Native chooser accept and accessible messaging match those limits. Video selection is rejected locally with no request, transfer or confirmation; Choose an image does not retry a prior transfer or claim rollback. The server independently rejects new video requests and previously stored video confirmations before storage/inspection, plus an atomic publication fence. There is no enable flag. The MP4 validation defect remains deferred, not fixed.
 
-The framework-free `transferUpload` in `@workprint/api-client` is a separate
-bounded mechanical PUT capability: captured Blob, exact supplied grant, 64 MiB
-maximum, two active transfers/no queue, at most 30 seconds, explicit cancellation,
-no automatic retry/reacquisition/confirmation. It has no token provider and sends
-only Content-Type with credentials omitted, no referrer and no redirects. A PUT
-acknowledgement is not media verification or publication. Failed/cancelled
-observation cannot promise server rollback or absence of stored bytes.
+The approved59478dc restriction and retained96a image/recovery primitives are independently represented in `docs/design/verified-uploads-r1/`. The guidance and refusal are new approved copy, not new Send availability or save authority. Saved images remain exact-version human Draft, never approval or Shot selection. Scope teardown clears local file/grant/result identity; stop/close are observation changes, not revocation of replayable signed grants or saved work. Unknown confirmation retries the original identity; interrupted PUT reuses captured bytes and an unexpired grant; expiry needs explicit new authorization.
 
-The isolated test composition exercises actual API authorization, private PUT
-and no-verifier confirmation, plus scope teardown, without adding a product
-control or working-upload success state. Its exact consumable observer matches
-signed requests in memory while redacting signature/credential query values and
-never retaining private transfer bodies; traces/video are disabled. API bearer
-and cookie absence is checked at the actual browser storage request.
+Successful Composer confirmation merges only the exact Draft image/reference receipt into the existing scope-bound workspace overlay. It does not clear confirmed manual saves or refetch/replace the whole projection: mounted unsaved/conflicted/unknown-save editors, original bases/retry identities, Question state and composer focus remain intact. Account/conversation teardown and upload-session stale-result fences still discard inactive local state; no mutation is replayed automatically.
 
-Production has no media verifier: confirmation explicitly fails and creates no
-usable version/use. Completed chooser-to-verified-success UI and decoding belong
-to their separately approved owner. Emulator transport is not R2 qualification.
+Receipt presentation is shared `ui/media-receipt.tsx`, exact-version access shared `api/use-owned-image.ts`; Materials/Uploads do not import the Media feature. Dependency rules and genuine forbidden-import controls protect the boundaries. `readPrivateImage` omits credentials/referrer/redirects, bounds10MiB/10seconds/two-active work, validates decoded dimensions and disposes Blob URLs. No automatic source reacquisition. Existing owned-video presentation remains separate from upload authorization; current end-to-end upload proof uses only actual JPEG/PNG publications, not seeded video verdicts.
+
+The integrated browser case retains real Auth/built API/owned PG/S3 publication, private cookie-jar exclusion, response-loss recovery, observer stop and late scope changes, plus exact persisted Assets image reads.17 main states at1440/390/820/821 and the existing image viewer at all four widths provide72 zero-tolerance pairs, with independent tracked source hashes, geometry/pixels, reachability and natural mobile scroll. Six human Draft image versions/pointers/uses and zero approvals are expected; no video upload success is claimed. The lower-level100MiB `transferUpload` ceiling is isolated mechanical capacity, not video admission. Missing backend media configuration still fails closed. No R2, playback, distribution or completed filmmaking workflow is qualified.

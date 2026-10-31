@@ -30,5 +30,5 @@ export function useWorkspace(connection: BrowserClient, scope: ReadScope | null)
     });
   }, [key]);
   const visible = state.kind === 'settled' && state.result.ok && confirmed.key === key ? { ...state, result: { ok: true as const, value: [...confirmed.effects.values()].reduce(applySavedVersion, state.result.value) } } : state;
-  return { ...visible, onSaved, failure: state.kind === 'settled' && !state.result.ok ? classifyWorkspaceFailure(state.result.error.code) : null };
+  return { ...visible, onSaved, onUploaded: onSaved, failure: state.kind === 'settled' && !state.result.ok ? classifyWorkspaceFailure(state.result.error.code) : null };
 }

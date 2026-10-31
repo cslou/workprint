@@ -18,10 +18,13 @@ function PersistedPanel({ connection, scope }: { connection: BrowserClient; scop
 const node = document.getElementById('root');
 if (!node) throw new Error('Missing saved-work verification root');
 const root = createRoot(node);
+let accessToken: string | null = null;
 (window as unknown as { savedWorkTest: unknown }).savedWorkTest = {
   configure(input: { apiOrigin: string; token: string | null; accountId: string; conversationId: string; panelOnly?: boolean }) {
-    const connection = createBrowserClient(input.apiOrigin, async () => input.token);
+    accessToken = input.token;
+    const connection = createBrowserClient(input.apiOrigin, async () => accessToken);
     root.render(input.panelOnly ? <PersistedPanel connection={connection} scope={{ accountId: input.accountId, conversationId: input.conversationId }} /> : <Shell connection={connection} session={{ accountId: input.accountId, name: 'Synthetic creator' }} conversationId={input.conversationId} />);
   },
+  rotateToken(token: string) { accessToken = token; },
   unmount() { root.render(null); },
 };

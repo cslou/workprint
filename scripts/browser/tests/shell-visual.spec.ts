@@ -2,6 +2,7 @@ import { browserOrigin } from '../origin.js';
 import { expect, test } from '@playwright/test';
 import { compare } from '../compare.js';
 import { settleCapture } from '../capture.js';
+import { imageOnlyReference } from '../image-only-reference.js';
 import { writeFile } from 'node:fs/promises';
 
 // Independent approved substitutions into the tracked opening/dialog references.
@@ -37,6 +38,7 @@ for (const width of [1440, 390, 820, 821]) for (const state of states) {
       if (state === 'new' || state === 'recents' || state === 'load') { const value = copy[state]; title = value[0]!; body = `<div class="approved-rows"><p>${value[1]}</p><p>${value[2]}</p></div>`; }
       document.body.insertAdjacentHTML('beforeend', `<div class="lightbox" style="display:flex"><div class="lb-panel"><div class="lb-head"><h2>${title}</h2><span class="qclose">×</span></div>${body}</div></div>`);
     }, { state });
+    const guidanceSourceHashes = await imageOnlyReference(page);
     await settleCapture(page);
     const reference = await page.screenshot({ path: info.outputPath('reference-full.png'), fullPage: true, animations: 'disabled' });
     await page.goto('/shell.html');
@@ -68,7 +70,7 @@ for (const width of [1440, 390, 820, 821]) for (const state of states) {
     await settleCapture(page);
     const actual = await page.screenshot({ path: info.outputPath('actual-full.png'), fullPage: true, animations: 'disabled' });
     const changed = await compare(reference, actual, info.outputPath('comparison'));
-    await writeFile(info.outputPath('result.json'), JSON.stringify({ state, width, reference: 'docs/design/flow2-step1-r73.html + flow1-step4-r85.html#look-a dialog geometry', approval: 'docs/design/design.md#shell-and-remaining-phase-2-feedback', revision: info.config.metadata, changedPixels: changed, tolerance: 0 }, null, 2));
+    await writeFile(info.outputPath('result.json'), JSON.stringify({ state, width, reference: 'docs/design/flow2-step1-r73.html + flow1-step4-r85.html#look-a dialog geometry', approval: 'docs/design/design.md#shell-and-remaining-phase-2-feedback', imageOnlyApproval: 'docs/design/design.md#image-only-upload-restriction', guidanceSourceHashes, revision: info.config.metadata, changedPixels: changed, tolerance: 0 }, null, 2));
     expect(changed).toBe(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });

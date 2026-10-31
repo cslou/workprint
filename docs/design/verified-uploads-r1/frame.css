@@ -1,0 +1,6 @@
+.preview-guidance { width: min(var(--size-layout-chat), calc(100% - 2 * var(--space-16))); margin: calc(-1 * var(--space-14)) auto var(--space-24); color: var(--color-text-subtle); font-size: var(--font-size-13); }
+.dock-input + .preview-guidance { margin: var(--space-8) var(--space-14) var(--space-12); width: auto; }
+/* Frozen r73 surroundings with the approved upload composer's disabled attachment state. */
+.composer .attach[aria-disabled="true"] { opacity: var(--opacity-disabled); }
+/* Existing asset-row/key-placeholder primitives, with matched synthetic public version facts. */
+.receipt-key { display: grid; place-items: center; width: 56px; height: 56px; border: var(--border-dashed); border-radius: var(--radius-md); color: var(--color-text-subtle); font-size: 11px; background: var(--color-bg-sunken); }
