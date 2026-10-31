@@ -8,6 +8,12 @@
 
 **Human reference:** [Brand book](brand-book.html) (home; pages under `brand-book/`) · **Values:** this file ([tokens](#color)) · **Approved screens:** [Generate flows](generate-flows.html) · **Interaction decisions:** [App user flows](user-flows.md) · **History:** [earlier studies and Editor alternatives](history.md)
 
+## Image-only upload restriction
+
+**Provisionally approved by the orchestrator on 2026-10-31 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Implements Lou’s explicit temporary video-upload restriction. Main inspected all six wide/narrow captures of `image-only-uploads-r1`: entry, video unavailable and saved image. Existing composer, receipt, tokens and image-recovery states remain. State that uploads accept JPEG/PNG up to 10 MiB and 4096 × 4096 pixels, and that video uploads are temporarily unavailable. Refusal offers “Choose an image” without replaying a prior transfer or claiming that saved work was undone. Saved images remain Draft, not approved references. Send availability is unchanged by this restriction.
+
+This supersedes the video-upload entry/success promises below for the current delivery; existing owned-video presentation is not new upload authorization. Ignored previews at `outputs/verification/sprint-005/design-proposals/image-only-uploads-r1/` are inspection evidence only. Use tracked independent references/substitutions for runtime comparisons, with required main widths and representative states. Captures show legible, unclipped content; this model-assisted inspection is not runtime, accessibility or human acceptance. Product behavior and source/geometry checks remain required.
+
 ## Verified upload feedback
 
 **Provisionally approved by the orchestrator on 2026-10-31 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Scope: Sprint 005 Story 4. The 16-state inert revision `verified-media-uploads-r1` was inspected through its complete narrow contact sheet and full desktop image-success and narrow confirmation-unknown/poster-success captures. Existing tokens and composer primitives remain unchanged. Approve textual preparing/uploading/verifying feedback, exact-version image/poster success, expiry/interruption/unknown confirmation, stopped observation, definitive format/size/damage rejection, exact-version source loading/failure/expiry and generic scope-cleared feedback. No fabricated percentages, usable pre-verification thumbnail, new modal or toast.

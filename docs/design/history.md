@@ -1,5 +1,9 @@
 # Workprint — Application Design History
 
+## Image-only upload restriction — 2026-10-31
+
+**Provisionally approved by the orchestrator under Lou’s delegation; pending Lou’s Phase 3 ratification.** Following Lou’s explicit scope decision, entry and refusal feedback now state JPEG/PNG-only upload limits and temporary video unavailability. Main inspected all six `image-only-uploads-r1` desktop/narrow captures; image success remains Draft without reference approval. See [binding scope and evidence limits](design.md#image-only-upload-restriction). This supersedes video-upload entry/success promises for this delivery, not existing owned-media presentation. Runtime verification and human ratification remain separate.
+
 ## Verified upload feedback — 2026-10-31
 
 **Provisionally approved by the orchestrator under Lou’s delegation; pending Lou’s Phase 3 ratification.** Sixteen inert states retain existing tokens and distinguish authorization/transfer/verification from saved exact versions. Explicit same-upload recovery, observer-only stop and scope clearing avoid replay or rollback claims. Saved image/video remains Draft; video has a poster, not playback or Shot selection. Main inspected the complete narrow contact sheet and representative desktop/narrow full captures. See [binding decisions and verification limits](design.md#verified-upload-feedback). Synthetic preview assets are not verified media; no runtime acceptance is claimed.
