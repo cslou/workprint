@@ -43,7 +43,7 @@ export function createVersionUses(pool: Pool, checkOwnedConversation: Parameters
         const retried = await replay(client);
         if (retried) return retried;
         await lockPublicationOwner(client, account);
-        const matches = (await client.query<{ use_id: string }>(`SELECT u.use_id FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.owner_id AND v.version_id=u.version_id
+        const matches = (await client.query<{ use_id: string }>(`SELECT u.use_id FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.version_owner_id AND v.version_id=u.version_id
           WHERE u.owner_id=$1 AND u.conversation_id=$2 AND u.binding=$3::jsonb AND ($4::boolean OR v.artifact_id=$5) LIMIT 2 FOR UPDATE OF u`, [account, conversation, binding, body.purpose !== 'reference', version.artifactId])).rows;
         if (matches.length > 1) throw new ArtifactError('invalid_input');
         const id = matches[0]?.use_id ?? randomUUID();

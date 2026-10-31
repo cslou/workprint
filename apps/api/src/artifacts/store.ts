@@ -8,14 +8,17 @@ import { createCursors } from './cursor.js';
 import { ArtifactError } from './errors.js';
 import { boundedPage } from './paging.js';
 import { publishVersion } from './publication.js';
+import { requireReferenceMedia } from './references.js';
 
 type OwnershipCheck = (account: string, conversation: string) => Promise<{ kind: 'owned' | 'not_found' } | { kind: 'unavailable'; reason: 'native_storage' }>;
 type Kind = Version['kind'];
-type Row = { owner_id: string; version_id: string; artifact_id: string; kind: Kind; revision: number; content: unknown; created_by: 'human' | 'assistant'; created_at: Date; origin_conversation_id: string; dependencies: string[]; sort_time: string };
-const columns = `v.*,to_char(v.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS sort_time,
+export const BUILT_IN_OWNER = 'workprint-built-in';
+const visibleVersion = `(v.owner_id=$1 OR (v.owner_id='${BUILT_IN_OWNER}' AND EXISTS(SELECT 1 FROM artifacts.artifacts a WHERE a.owner_id=v.owner_id AND a.artifact_id=v.artifact_id AND a.built_in)))`;
+type Row = { built_in: boolean; owner_id: string; version_id: string; artifact_id: string; kind: Kind; revision: number; content: unknown; created_by: 'human' | 'assistant'; created_at: Date; origin_conversation_id: string; dependencies: string[]; sort_time: string };
+const columns = `v.*,(SELECT a.built_in FROM artifacts.artifacts a WHERE a.owner_id=v.owner_id AND a.artifact_id=v.artifact_id) AS built_in,to_char(v.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS sort_time,
   COALESCE((SELECT array_agg(d.dependency_id ORDER BY d.position) FROM artifacts.version_dependencies d WHERE d.owner_id=v.owner_id AND d.version_id=v.version_id),ARRAY[]::text[]) AS dependencies`;
 const historyCursor = z.strictObject({ max: z.number().int().positive(), after: z.number().int().positive() });
-const libraryCursor = z.strictObject({ snapshot: z.string().regex(/^[0-9]{1,19}$/), afterTime: z.iso.datetime(), afterId: idSchema });
+const libraryCursor = z.strictObject({ snapshot: z.string().regex(/^[0-9]{1,19}$/), builtInSnapshot: z.string().regex(/^[0-9]{1,19}$/), afterTime: z.iso.datetime(), afterId: idSchema });
 const insertSchema = z.strictObject({
   accountId: idSchema, conversationId: idSchema, artifactId: idSchema.optional(), kind: z.enum(['script', 'reference', 'storyboard']),
   content: z.unknown(), dependencies: z.array(idSchema).max(100).refine(ids => new Set(ids).size === ids.length), createdBy: z.enum(['human', 'assistant']),
@@ -31,19 +34,20 @@ export function createArtifactStore(pool: Pool, checkOwnedConversation: Ownershi
     if (result.kind !== 'owned') throw new ArtifactError(result.kind === 'not_found' ? 'not_found' : 'integration_failure');
   };
   const authorize = async (account: string, rows: readonly Row[]) => {
-    for (const conversation of new Set(rows.map(row => row.origin_conversation_id))) await owned(account, conversation);
+    if (rows.some(row => row.built_in ? row.owner_id !== BUILT_IN_OWNER : row.owner_id !== account)) throw new ArtifactError('not_found');
+    for (const conversation of new Set(rows.filter(row => !row.built_in).map(row => row.origin_conversation_id))) await owned(account, conversation);
   };
   const project = (row: Row): Version => {
     try {
-      return versionSchema.parse({ id: row.version_id, artifactId: row.artifact_id, kind: row.kind, revision: row.revision,
+      return versionSchema.parse({ id: row.version_id, artifactId: row.artifact_id, ...(row.built_in ? { builtIn: true } : {}), kind: row.kind, revision: row.revision,
         ...(row.kind === 'image' || row.kind === 'video' ? { media: z.strictObject({ schemaVersion: z.literal(1), media: z.unknown() }).parse(row.content).media } : { content: parseContent(row.kind, row.content) }), createdBy: row.created_by, createdAt: row.created_at.toISOString(), dependencies: row.dependencies });
     } catch { throw new ArtifactError('integration_failure'); }
   };
   const rowFor = async (account: string, id: string) => {
-    const result = await pool.query<Row>(`SELECT ${columns} FROM artifacts.versions v WHERE v.owner_id=$1 AND v.version_id=$2`, [account, id]);
+    const result = await pool.query<Row>(`SELECT ${columns} FROM artifacts.versions v WHERE ${visibleVersion} AND v.version_id=$2`, [account, id]);
     const row = result.rows[0];
     if (!row) throw new ArtifactError('not_found');
-    await owned(account, row.origin_conversation_id);
+    await authorize(account, [row]);
     return row;
   };
   const version = async (account: string, id: string) => project(await rowFor(account, id));
@@ -52,14 +56,14 @@ export function createArtifactStore(pool: Pool, checkOwnedConversation: Ownershi
     if (!parsed.success) throw new ArtifactError('invalid_input');
     const limit = query.limit ?? 20;
     const scope = JSON.stringify([account, 'history', artifact, limit]);
-    const latest = await pool.query<Row>(`SELECT ${columns} FROM artifacts.versions v WHERE v.owner_id=$1 AND v.artifact_id=$2 ORDER BY v.revision DESC LIMIT 1`, [account, artifact]);
+    const latest = await pool.query<Row>(`SELECT ${columns} FROM artifacts.versions v WHERE ${visibleVersion} AND v.artifact_id=$2 ORDER BY v.revision DESC LIMIT 1`, [account, artifact]);
     if (!latest.rows[0]) throw new ArtifactError('not_found');
     await authorize(account, latest.rows);
     const cursor = query.cursor ? historyCursor.safeParse(cursors.decode(scope, query.cursor)) : null;
     if (cursor && !cursor.success) throw new ArtifactError('invalid_input');
     const max = cursor?.data?.max ?? latest.rows[0].revision;
     const after = cursor?.data?.after ?? max + 1;
-    const rows = (await pool.query<Row>(`SELECT ${columns} FROM artifacts.versions v WHERE v.owner_id=$1 AND v.artifact_id=$2 AND v.revision<=$3 AND v.revision<$4 ORDER BY v.revision DESC LIMIT $5`, [account, artifact, max, after, limit + 1])).rows;
+    const rows = (await pool.query<Row>(`SELECT ${columns} FROM artifacts.versions v WHERE ${visibleVersion} AND v.artifact_id=$2 AND v.revision<=$3 AND v.revision<$4 ORDER BY v.revision DESC LIMIT $5`, [account, artifact, max, after, limit + 1])).rows;
     await authorize(account, rows);
     return boundedPage(rows, limit, project, last => cursors.encode(scope, { max, after: last.revision }));
   };
@@ -70,25 +74,28 @@ export function createArtifactStore(pool: Pool, checkOwnedConversation: Ownershi
     const scope = JSON.stringify([account, 'library', query.kind ?? null, limit]);
     const cursor = query.cursor ? libraryCursor.safeParse(cursors.decode(scope, query.cursor)) : null;
     if (cursor && !cursor.success) throw new ArtifactError('invalid_input');
-    const queryRows = async (client: Pick<PoolClient, 'query'>, snapshot: string) => (await client.query<Row>(`WITH latest AS (
+    const queryRows = async (client: Pick<PoolClient, 'query'>, snapshot: string, builtInSnapshot: string) => (await client.query<Row>(`WITH latest AS (
       SELECT DISTINCT ON (v.artifact_id) ${columns} FROM artifacts.versions v
-      WHERE v.owner_id=$1 AND v.publication_revision<=$2::bigint AND ($3::text IS NULL OR v.kind=$3)
+      WHERE ((v.owner_id=$1 AND v.publication_revision<=$2::bigint) OR (v.owner_id=$7 AND v.publication_revision<=$8::bigint AND EXISTS(
+        SELECT 1 FROM artifacts.artifacts a WHERE a.owner_id=v.owner_id AND a.artifact_id=v.artifact_id AND a.built_in AND a.built_in_revision<=$8::bigint)))
+        AND ($3::text IS NULL OR v.kind=$3)
       ORDER BY v.artifact_id,v.revision DESC
     ) SELECT * FROM latest WHERE ($4::timestamptz IS NULL OR (created_at,version_id)<($4::timestamptz,$5::text))
-      ORDER BY created_at DESC,version_id DESC LIMIT $6`, [account, snapshot, query.kind ?? null, cursor?.data?.afterTime ?? null, cursor?.data?.afterId ?? null, limit + 1])).rows;
-    const { snapshot, rows } = cursor?.data ? { snapshot: cursor.data.snapshot, rows: await queryRows(pool, cursor.data.snapshot) } : await transaction(pool, async client => {
-      // A committed owner counter and its versions become visible atomically.
-      // FOR SHARE waits for an in-flight publisher, then fences later writers.
-      const snapshot = (await client.query<{ snapshot: string }>('SELECT revision::text AS snapshot FROM artifacts.publication_counters WHERE owner_id=$1 FOR SHARE', [account])).rows[0]?.snapshot ?? '0';
-      return { snapshot, rows: await queryRows(client, snapshot) };
+      ORDER BY created_at DESC,version_id DESC LIMIT $6`, [account, snapshot, query.kind ?? null, cursor?.data?.afterTime ?? null, cursor?.data?.afterId ?? null, limit + 1, BUILT_IN_OWNER, builtInSnapshot])).rows;
+    const { snapshot, builtInSnapshot, rows } = cursor?.data ? { ...cursor.data, rows: await queryRows(pool, cursor.data.snapshot, cursor.data.builtInSnapshot) } : await transaction(pool, async client => {
+      // Both publication namespaces freeze under the same bounded read transaction.
+      const counters = (await client.query<{ owner_id: string; snapshot: string }>('SELECT owner_id,revision::text AS snapshot FROM artifacts.publication_counters WHERE owner_id=ANY($1::text[]) ORDER BY owner_id FOR SHARE', [[account, BUILT_IN_OWNER]])).rows;
+      const snapshot = counters.find(row => row.owner_id === account)?.snapshot ?? '0';
+      const builtInSnapshot = counters.find(row => row.owner_id === BUILT_IN_OWNER)?.snapshot ?? '0';
+      return { snapshot, builtInSnapshot, rows: await queryRows(client, snapshot, builtInSnapshot) };
     });
     await authorize(account, rows);
-    return boundedPage(rows, limit, row => ({ id: row.artifact_id, kind: row.kind, builtIn: false, latestVersion: project(row) }), last => cursors.encode(scope, { snapshot, afterTime: last.sort_time, afterId: last.version_id }));
+    return boundedPage(rows, limit, row => ({ id: row.artifact_id, kind: row.kind, builtIn: row.built_in, latestVersion: project(row) }), last => cursors.encode(scope, { snapshot, builtInSnapshot, afterTime: last.sort_time, afterId: last.version_id }));
   };
   const workspace = async (account: string, conversation: string): Promise<OperationResponse<'workspace'>> => {
     await owned(account, conversation);
     const rows = (await pool.query<Row & { use_id: string; binding: unknown; state: string }>(`SELECT ${columns},u.use_id,u.binding,u.state
-      FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.owner_id AND v.version_id=u.version_id
+      FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.version_owner_id AND v.version_id=u.version_id
       WHERE u.owner_id=$1 AND u.conversation_id=$2 ORDER BY u.created_at,u.use_id LIMIT 101`, [account, conversation])).rows;
     if (rows.length > 100) throw new ArtifactError('integration_failure');
     await authorize(account, rows);
@@ -116,9 +123,11 @@ export function createArtifactStore(pool: Pool, checkOwnedConversation: Ownershi
     const dependencies = new Map<string, Row>();
     for (const id of input.dependencies) dependencies.set(id, await rowFor(input.accountId, id));
     assertContentDependencies(content, dependencies);
+    await requireReferenceMedia(pool, content);
     if (input.artifactId) {
       const latest = (await pool.query<Row>(`SELECT ${columns} FROM artifacts.versions v WHERE v.owner_id=$1 AND v.artifact_id=$2 ORDER BY v.revision DESC LIMIT 1`, [input.accountId, input.artifactId])).rows[0];
       if (!latest) throw new ArtifactError('not_found');
+      if (latest.built_in) throw new ArtifactError('invalid_input');
       await authorize(input.accountId, [latest]);
     }
     return transaction(pool, async client => {

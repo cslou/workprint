@@ -15,7 +15,7 @@ export const useBindingSchema = z.discriminatedUnion('purpose', [
 ]);
 export const intendedUseSchema = useBindingSchema;
 export const useSchema = z.strictObject({ id: idSchema, versionId: idSchema, binding: useBindingSchema, state: z.enum(['draft', 'approved']) });
-const versionBase = { id: idSchema, artifactId: idSchema, revision: revisionSchema, createdBy: z.enum(['human', 'assistant']), createdAt: z.iso.datetime(), dependencies: z.array(idSchema) };
+const versionBase = { id: idSchema, artifactId: idSchema, builtIn: z.boolean().optional(), revision: revisionSchema, createdBy: z.enum(['human', 'assistant']), createdAt: z.iso.datetime(), dependencies: z.array(idSchema) };
 const media = z.strictObject({ contentType: z.string().min(1), byteSize: z.number().int().positive(), width: z.number().int().positive(), height: z.number().int().positive(), durationMs: z.number().nonnegative().optional(), hasAudio: z.boolean().optional() });
 export const versionSchema = z.discriminatedUnion('kind', [
   z.strictObject({ ...versionBase, kind: z.enum(['script', 'reference', 'storyboard']), content: contentSchema }),

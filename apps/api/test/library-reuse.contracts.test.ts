@@ -2,14 +2,15 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { createApiClient } from '@workprint/api-client';
-import type { OperationRequest } from '@workprint/contracts';
+import type { OperationRequest, Version } from '@workprint/contracts';
 import { verifyBuiltAdmission } from './auth-built-fixture.js';
 import { prepareManualSavedWork, type ManualSavedWork } from './manual-saved-work.js';
 import { createNativeConversation } from './native-conversations.js';
 import { query } from './postgres.js';
+import { prepareBuiltInScript } from './built-in-work.js';
 
 test('built Library reuse pins exact independent uses without copies, implicit latest or replayed decisions', { timeout: 180000 }, async t => {
-  let saved: ManualSavedWork | undefined, foreignConversation = '';
+  let saved: ManualSavedWork | undefined, builtin: Version | undefined, foreignConversation = '';
   await verifyBuiltAdmission(t, async target => {
     assert.ok(saved);
     const client = createApiClient({ baseUrl: target.origin, getAccessToken: async () => target.accessTokens[0]! });
@@ -73,10 +74,20 @@ test('built Library reuse pins exact independent uses without copies, implicit l
     assert.ok(after.ok); assert.equal(after.value.script?.version.id, newer.value.version.id);
     const untouched = await client.workspace({ params: { id: saved.otherConversationId }, query: {}, body: {} });
     assert.ok(untouched.ok); assert.equal(untouched.value.script?.version.id, saved.script.id);
+    assert.ok(builtin);
+    for (const [reader, conversation] of [[client, saved.conversationId], [foreign, foreignConversation]] as const) {
+      const example = await reader.version({ params: { id: builtin.id }, query: {}, body: {} });
+      assert.ok(example.ok); assert.equal(example.value.builtIn, true, 'Stored source immutability is projected through the real authenticated backend');
+      const reuse = await reader.useVersion(command(conversation, builtin.id, { purpose: 'script' })); assert.ok(reuse.ok);
+      const reopened = await reader.workspace({ params: { id: conversation }, query: {}, body: {} });
+      assert.ok(reopened.ok); assert.equal(reopened.value.script?.version.builtIn, true); assert.equal(reopened.value.script.version.id, builtin.id);
+      const denied = await reader.saveVersion({ params: { id: conversation }, query: {}, body: { operationId: randomUUID(), artifactId: builtin.artifactId, baseVersionId: builtin.id, kind: 'script', content, dependencies: [] } });
+      assert.ok(!denied.ok); assert.equal(denied.error.code, 'invalid_input');
+    }
   }, {
-    prepareSavedWork: async setup => { saved = await prepareManualSavedWork(setup); foreignConversation = (await createNativeConversation(setup.native, saved.foreignAccountId)).id; },
+    prepareSavedWork: async setup => { saved = await prepareManualSavedWork(setup); foreignConversation = (await createNativeConversation(setup.native, saved.foreignAccountId)).id; builtin = await prepareBuiltInScript(setup); },
     verifySavedEffects: async servingUrl => {
-      assert.deepEqual((await query(servingUrl, "SELECT (SELECT count(*)::int FROM artifacts.artifacts) AS artifacts,(SELECT count(*)::int FROM artifacts.versions) AS versions,(SELECT count(*)::int FROM artifacts.commands WHERE command_kind='use_version') AS approvals,(SELECT count(*)::int FROM artifacts.commands WHERE command_kind='manual_save') AS saves,(SELECT count(*)::int FROM artifacts.conversation_uses) AS uses")).rows, [{ artifacts: 3, versions: 4, approvals: 7, saves: 1, uses: 7 }]);
+      assert.deepEqual((await query(servingUrl, "SELECT (SELECT count(*)::int FROM artifacts.artifacts) AS artifacts,(SELECT count(*)::int FROM artifacts.versions) AS versions,(SELECT count(*)::int FROM artifacts.commands WHERE command_kind='use_version') AS approvals,(SELECT count(*)::int FROM artifacts.commands WHERE command_kind='manual_save') AS saves,(SELECT count(*)::int FROM artifacts.conversation_uses) AS uses")).rows, [{ artifacts: 4, versions: 5, approvals: 9, saves: 1, uses: 8 }]);
     },
   });
 });
