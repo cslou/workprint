@@ -85,7 +85,10 @@ one avc1 description, one SPS/PPS pair, and no changed in-band parameter sets or
 unqualified extension NALs. Identical repeated parameters remain allowed, ignoring
 only legal trailing zero padding. Thus later frames cannot change the probed
 geometry/pixel format/profile via another SPS/PPS or sample description. Limits
-are4096 structural boxes,7200 video samples/chunks and65536 NAL units; process,
+are4096 structural boxes,7200 video samples/chunks and65536 NAL units. Video
+sample ranges must be monotonic/non-overlapping, keeping inspection linear in the
+bounded input rather than re-reading aliased chunks. Parameter NALs are capped
+at65535bytes, matching the avcC length field. Process,
 output, memory, temp and absolute lifetime bounds are unchanged. JPEG inspection
 continues through the actual EOI, handling stuffed entropy/restart markers and
 rejecting EXIF/ICC APP1/APP2 even after a completed scan. Real late-SPS and post-scan

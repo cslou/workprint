@@ -61,21 +61,24 @@ export function requireStableAvc(bytes: Buffer) {
       if(!first||first>chunks.count||!count||count>7200||bytes.readUInt32BE(start+8)!==1)throw unsupported();return{first,count};
     });
     if(maps[0]!.first!==1||maps.some((row,i)=>i>0&&row.first<=maps[i-1]!.first))throw invalid();
-    let sample=0,map=0;
+    let sample=0,map=0,previousEnd=mdat.data;
     for(let chunk=1;chunk<=chunks.count;chunk++){
       while(map+1<maps.length&&maps[map+1]!.first<=chunk)map++;
       const at=chunks.start+(chunk-1)*stride,raw=stride===4?BigInt(bytes.readUInt32BE(at)):bytes.readBigUInt64BE(at);
       if(raw>BigInt(bytes.length))throw invalid();let offset=Number(raw);
+      if(offset<previousEnd)throw invalid();
       for(let i=0;i<maps[map]!.count;i++){
         if(sample>=samples)throw invalid();const size=fixed||bytes.readUInt32BE(stsz.data+12+sample*4);sample++;
         const end=offset+size;if(!size||offset<mdat.data||end>mdat.end)throw invalid();
         while(offset<end){
           if(++nalCount>65536||offset+lengthBytes>end)throw invalid();const size=bytes.readUIntBE(offset,lengthBytes);offset+=lengthBytes;
           if(!size||size>end-offset||bytes[offset]!&128)throw invalid();const type=bytes[offset]!&31,nal=bytes.subarray(offset,offset+size);
+          if((type===7||type===8)&&size>65535)throw unsupported();
           if(type===7?!parameterBytes(nal).equals(sps):type===8?!parameterBytes(nal).equals(pps):![1,5,6,9,10,11,12].includes(type))throw unsupported();
           offset+=size;
         }
       }
+      previousEnd=offset;
     }
     if(sample!==samples)throw invalid();
   }
