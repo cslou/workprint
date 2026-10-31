@@ -1,6 +1,7 @@
 import { crc32 } from 'node:zlib';
 import { MAX_UPLOAD_IMAGE_BYTES, MAX_UPLOAD_VIDEO_BYTES } from '@workprint/contracts';
 import { UploadError } from './errors.js';
+import { requireStableAvc } from './media-avc.js';
 
 const invalid = () => new UploadError('invalid_input');
 const unsupported = () => new UploadError('unsupported');
@@ -24,12 +25,27 @@ export function inspectMediaBytes(bytes: Uint8Array, kind: 'image' | 'video', co
   }
   if(kind==='image' && contentType==='image/jpeg') {
     if(b.length<4 || b.readUInt16BE(0)!==0xffd8 || b.readUInt16BE(b.length-2)!==0xffd9)throw invalid();
-    let p=2,width=0,height=0;
-    while(p<b.length-2){if(b[p++]!==255)throw invalid();while(b[p]===255)p++;const marker=b[p++]!;if(marker===0xda)break;if(p+2>b.length)throw invalid();const n=b.readUInt16BE(p);if(n<2 || p+n>b.length)throw invalid();
+    let p=2,width=0,height=0,scan=false,seenScan=false,ended=false,markers=0;
+    while(p<b.length){
+      if(scan){
+        // Stuffed FF00 is entropy, and RST0–RST7 have no length. Every other
+        // marker returns to segment parsing, including metadata after a scan.
+        if(b[p++]!==255)continue;const start=p-1;while(b[p]===255)p++;
+        if(p>=b.length)throw invalid();const marker=b[p++]!;
+        if(marker===0 || (marker>=0xd0&&marker<=0xd7))continue;
+        p=start;scan=false;
+      }
+      if(++markers>4096 || b[p++]!==255)throw invalid();while(b[p]===255)p++;
+      if(p>=b.length)throw invalid();const marker=b[p++]!;
+      if(marker===0xd9){if(!seenScan||p!==b.length)throw invalid();ended=true;break;}
+      if(marker===0 || marker===0xd8 || (marker>=0xd0&&marker<=0xd7) || p+2>b.length)throw invalid();
+      const n=b.readUInt16BE(p);if(n<2 || p+n>b.length)throw invalid();
       if([0xe1,0xe2].includes(marker) || (marker>=0xc0 && marker<=0xcf && ![0xc0,0xc4,0xc8,0xcc].includes(marker)))throw unsupported();
-      if(marker===0xc0){if(width || n!==17 || b[p+2]!==8 || b[p+7]!==3)throw unsupported();height=b.readUInt16BE(p+3);width=b.readUInt16BE(p+5);}p+=n;
+      if(marker===0xc0){if(width || n!==17 || b[p+2]!==8 || b[p+7]!==3)throw unsupported();height=b.readUInt16BE(p+3);width=b.readUInt16BE(p+5);}
+      if(marker===0xda){if(!width||!height||n<6||b[p+2]!<1||b[p+2]!>3||n!==6+2*b[p+2]!)throw invalid();scan=true;seenScan=true;}
+      p+=n;
     }
-    if(!width || !height)throw invalid();if(width>4096 || height>4096)throw unsupported();return{width,height};
+    if(!ended || !width || !height)throw invalid();if(width>4096 || height>4096)throw unsupported();return{width,height};
   }
   if(kind==='video' && contentType==='video/mp4') {
     let p=0;const boxes:string[]=[];
@@ -37,7 +53,7 @@ export function inspectMediaBytes(bytes: Uint8Array, kind: 'image' | 'video', co
       if(type==='ftyp'){if(p!==0 || n<16 || n%4 || b.toString('ascii',p+8,p+12)!=='isom')throw unsupported();for(let q=p+16;q<p+n;q+=4)if(!['isom','iso2','avc1','mp41'].includes(b.toString('ascii',q,q+4)))throw unsupported();}
       boxes.push(type);p+=n;
     }
-    if(['ftyp','moov','mdat'].some(t=>boxes.filter(x=>x===t).length!==1))throw invalid();return{};
+    if(['ftyp','moov','mdat'].some(t=>boxes.filter(x=>x===t).length!==1))throw invalid();requireStableAvc(b);return{};
   }
   throw unsupported();
 }

@@ -79,8 +79,19 @@ Other variants are explicitly unqualified, not implicitly supported. Limits are
 10MiB/4096square for images and100MiB/1920x1080,60fps/120s for video.
 Shared byte constants coordinate transport/storage/policy/inspection; the additive
 application-only SQL migration admits100MiB while retaining the10MiB image guard. Full decode must match declared frame
-count and duration; generated PNG posters are separately probed, fully decoded,
-CRC/structure/dimension checked and captured. No conversion service is exposed.
+count and duration. `artifacts/uploads/media-avc.ts` walks bounded MP4 sample
+and chunk tables across every video sample, not just the initial probe window:
+one avc1 description, one SPS/PPS pair, and no changed in-band parameter sets or
+unqualified extension NALs. Identical repeated parameters remain allowed, ignoring
+only legal trailing zero padding. Thus later frames cannot change the probed
+geometry/pixel format/profile via another SPS/PPS or sample description. Limits
+are4096 structural boxes,7200 video samples/chunks and65536 NAL units; process,
+output, memory, temp and absolute lifetime bounds are unchanged. JPEG inspection
+continues through the actual EOI, handling stuffed entropy/restart markers and
+rejecting EXIF/ICC APP1/APP2 even after a completed scan. Real late-SPS and post-scan
+APP1 regressions fail with zero publication/use/approval effects; repeated fixed
+parameters and real JPEG restart/stuffed-entropy controls pass. Generated PNG
+posters are separately probed, fully decoded, CRC/structure/dimension checked and captured. No conversion service is exposed.
 
 Positive actual synthetic PNG/JPEG/H264+AAC/poster tests and spoof/truncation,
 CRC, oversized dimensions, damaged H264, snapshot-mutation, unsupported metadata
