@@ -7,9 +7,10 @@ import { HTTPException } from 'hono/http-exception';
 import { timeout } from 'hono/timeout';
 import { createBackend } from './backend.js';
 import { createIngress } from './ingress.js';
+import { installServerShutdown } from './shutdown.js';
 
 /** One listener and execution owner, shared by production and isolated compositions. */
-export async function startServer(mastra: Mastra, beforeMastra: readonly MiddlewareHandler[] = []) {
+export async function startServer(mastra: Mastra, beforeMastra: readonly MiddlewareHandler[] = [], beforeNativeShutdown?: () => Promise<void>) {
   const options = mastra.getServer();
   const drainTimeout = options?.drainTimeout ?? 5000;
   if (!Number.isFinite(drainTimeout) || drainTimeout < 0 || drainTimeout > 2147483647) {
@@ -45,48 +46,7 @@ export async function startServer(mastra: Mastra, beforeMastra: readonly Middlew
   if (typeof mastra.startWorkers === 'function') await mastra.startWorkers();
   else await mastra.startEventEngine();
 
-  const timedOut = Symbol('shutdown-timeout');
-  const bounded = async (work: Promise<unknown>, milliseconds: number) => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    try {
-      return await Promise.race([work, new Promise<typeof timedOut>((resolve) => {
-        timer = setTimeout(() => resolve(timedOut), milliseconds);
-      })]);
-    } finally { clearTimeout(timer); }
-  };
-  if (options?.handleShutdownSignals !== false) {
-    let shutdownStartedAt: number | undefined;
-    const shutdown = async (signal: NodeJS.Signals) => {
-      if (shutdownStartedAt !== undefined) {
-        if (Date.now() - shutdownStartedAt >= 250) process.exit(1);
-        return;
-      }
-      shutdownStartedAt = Date.now();
-      const logger = mastra.getLogger();
-      logger.info('Shutting down Mastra server', { signal });
-      try {
-        const drained = new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-        const closeIdle = () => server.closeIdleConnections();
-        closeIdle();
-        const sweep = setInterval(closeIdle, 100);
-        sweep.unref();
-        try {
-          if (await bounded(drained, drainTimeout) === timedOut) {
-            logger.warn('Mastra server drain timed out; closing remaining HTTP connections', { timeoutMs: drainTimeout });
-            server.closeAllConnections();
-          }
-        } finally { clearInterval(sweep); }
-      } catch (error) { logger.error('Error while draining Mastra server', { error }); }
-      try {
-        if (await bounded(mastra.shutdown({ drainTimeout }), drainTimeout + 5000) === timedOut) {
-          logger.warn('Mastra shutdown timed out; forcing exit', { timeoutMs: drainTimeout + 5000 });
-        }
-      } catch (error) { logger.error('Error during Mastra shutdown', { error }); }
-      process.exit(0);
-    };
-    process.on('SIGINT', () => { void shutdown('SIGINT'); });
-    process.on('SIGTERM', () => { void shutdown('SIGTERM'); });
-  }
+  if (options?.handleShutdownSignals !== false) installServerShutdown(server, mastra, drainTimeout, beforeNativeShutdown);
   const recoveries: Promise<unknown>[] = [];
   if (mastra.recoveryConfig?.workflows !== 'off') {
     recoveries.push(mastra.restartAllActiveWorkflowRuns().catch((error: unknown) => {

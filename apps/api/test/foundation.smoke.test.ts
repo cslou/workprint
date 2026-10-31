@@ -115,7 +115,7 @@ test('clean tracked export installs frozen, prepares, builds and serves built/de
       // This checks generated assets/logs for escaped credentials, not source snapshots.
       const contents = await readFile(file);
       assert.ok(!contents.includes(sentinel), `Secret escaped into ${file}`);
-      if (file.startsWith(join(checkout, 'apps/web/dist')) || file.startsWith(join(checkout, 'apps/api/dist'))) assert.doesNotMatch(contents.toString(), /controlledTurnProvider|controlledNativeControlProvider|controlled-qualification|controlled-native-control|turn-test\/control|turn-entry\.mjs|native-turn-provider|native-control-provider/, 'Controlled native providers/routes/launchers are absent from production artifacts');
+      if (file.startsWith(join(checkout, 'apps/web/dist')) || file.startsWith(join(checkout, 'apps/api/dist'))) assert.doesNotMatch(contents.toString(), /controlledTurnProvider|controlledNativeControlProvider|controlledNativeWorkflowProvider|controlled-qualification|controlled-native-control|qualification-native-workflow|qualification-native-sleep|qualification-native-deadline|workflow-test\/(?:control|state)|native-workflow-(?:provider|definition|budget|outcome)|turn-test\/control|turn-entry\.mjs|native-turn-provider|native-control-provider/, 'Controlled native providers/routes/launchers are absent from production artifacts');
       if (file.startsWith(join(checkout, 'apps/web/dist'))) assert.doesNotMatch(contents.toString(), /Isolated UI verification|Isolated Library|Isolated shell|Read-only details|test\/mount|references\/flow|libraryTest|shellTest|navigationVisual|navigation-reference|Presentation-only native navigation examples/, 'Test compositions are absent from browser artifacts');
     }
   }
