@@ -85,8 +85,13 @@ export function nativeNavigationRoutes(storage: Pick<MastraCompositeStore, 'getS
       // Never expose private metadata, system instructions or tool payloads as browser state.
       const messages = result.messages.map(message => {
         const parts = message.content.parts;
-        if (!['user', 'assistant'].includes(message.role) || message.threadId !== id || message.resourceId !== accountId || !parts || parts.some(part => part.type !== 'text')) throw new Error('Unsupported native history');
-        return { id: message.id, threadId: id, resourceId: accountId, role: message.role, createdAt: message.createdAt, content: { format: 2, parts: parts.map(part => ({ type: 'text', text: 'text' in part ? part.text : '' })) } };
+        const signal = message.content.metadata?.signal;
+        const userSignal = message.role === 'signal' && message.type === 'user' && signal !== null && typeof signal === 'object' &&
+          'id' in signal && signal.id === message.id && 'type' in signal && signal.type === 'user' && 'tagName' in signal && signal.tagName === 'user';
+        // Presentation role only: preserve the native input signal/message ID, never alias execution IDs.
+        const role = userSignal ? 'user' : message.role;
+        if (!['user', 'assistant'].includes(role) || message.threadId !== id || message.resourceId !== accountId || !parts || parts.some(part => part.type !== 'text')) throw new Error('Unsupported native history');
+        return { id: message.id, threadId: id, resourceId: accountId, role, createdAt: message.createdAt, content: { format: 2, parts: parts.map(part => ({ type: 'text', text: 'text' in part ? part.text : '' })) } };
       });
       return json(context, { messages, total: result.total, page: result.page, perPage: result.perPage, hasMore: result.hasMore, uiMessages: null });
     }),

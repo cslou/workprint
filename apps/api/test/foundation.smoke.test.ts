@@ -110,11 +110,12 @@ test('clean tracked export installs frozen, prepares, builds and serves built/de
   await database.stop();
   await assert.rejects(readFile(join(checkout, 'outputs/local-database.env')), { code: 'ENOENT' });
   assert.equal(await digest(), before, 'Frozen install/build leave lockfile unchanged');
-  for (const file of [...globSync(`${checkout}/apps/web/dist/**/*`), ...globSync(`${fixture.logs}/*.log`), ...globSync(`${checkout}/outputs/*.log`)]) {
+  for (const file of [...globSync(`${checkout}/apps/web/dist/**/*`), ...globSync(`${checkout}/apps/api/dist/**/*`), ...globSync(`${fixture.logs}/*.log`), ...globSync(`${checkout}/outputs/*.log`)]) {
     if ((await stat(file)).isFile()) {
       // This checks generated assets/logs for escaped credentials, not source snapshots.
       const contents = await readFile(file);
       assert.ok(!contents.includes(sentinel), `Secret escaped into ${file}`);
+      if (file.startsWith(join(checkout, 'apps/web/dist')) || file.startsWith(join(checkout, 'apps/api/dist'))) assert.doesNotMatch(contents.toString(), /controlledTurnProvider|controlled-qualification|turn-test\/control|turn-entry\.mjs|native-turn-provider/, 'Controlled native providers/routes/launchers are absent from production artifacts');
       if (file.startsWith(join(checkout, 'apps/web/dist'))) assert.doesNotMatch(contents.toString(), /Isolated UI verification|Isolated Library|Isolated shell|Read-only details|test\/mount|references\/flow|libraryTest|shellTest|navigationVisual|navigation-reference|Presentation-only native navigation examples/, 'Test compositions are absent from browser artifacts');
     }
   }

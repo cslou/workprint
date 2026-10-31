@@ -2,7 +2,7 @@ import { Mastra } from '@mastra/core';
 import { registerApiRoute, type ApiRoute } from '@mastra/core/server';
 import { PostgresStore } from '@mastra/pg';
 import { Pool } from 'pg';
-import { createOwnedConversationCheck } from '../agent/index.js';
+import { createOwnedConversationCheck, bindNativeTurns, type NativeTurnModel } from '../agent/index.js';
 import { createApplication } from '../application/index.js';
 import { loadServerConfig } from './config.js';
 import { verifyAccount } from './auth.js';
@@ -10,9 +10,10 @@ import { applicationRoutes } from './application-routes.js';
 import { verifiedIngressAccount } from './ingress.js';
 import { createAdmissionPolicy, decorateCors } from './admission.js';
 import { nativeNavigationRoutes } from './native-navigation.js';
+import { nativeTurnRoutes, isNativeTurnRoute } from './native-turns.js';
 
 /** One backend: cataloged application routes plus explicit test-composition additions. */
-export async function createBackend(routes: ApiRoute[] = []) {
+export async function createBackend(routes: ApiRoute[] = [], turnModel?: NativeTurnModel) {
   const config = loadServerConfig(process.env);
   const pool = new Pool({
     connectionString: config.connectionString, max: 4, connectionTimeoutMillis: 5000,
@@ -50,8 +51,8 @@ export async function createBackend(routes: ApiRoute[] = []) {
   const storage = new PostgresStore({ id: 'workprint-native', schemaName: 'mastra', disableInit: true, pool });
   const application = createApplication({ checkOwnedConversation: createOwnedConversationCheck(storage) });
   const protectedRoutes = [...applicationRoutes(application), ...nativeNavigationRoutes(storage, application.checkOwnedConversation), ...routes];
-  const policy = createAdmissionPolicy(protectedRoutes, config.browserOrigin);
-  return new Mastra({
+  const policy = createAdmissionPolicy([...protectedRoutes, ...nativeTurnRoutes], config.browserOrigin);
+  const mastra = new Mastra({
     storage,
     server: {
       host: '127.0.0.1', port: config.port,
@@ -61,12 +62,13 @@ export async function createBackend(routes: ApiRoute[] = []) {
       build: { swaggerUI: false, openAPIDocs: false },
       apiRoutes: [
         ...protectedRoutes,
-        // Mastra skips server middleware for framework-public routes. Custom routes
-        // precede native registration, so this terminal fallback closes those too.
-        registerApiRoute('/*', {
+        // With no qualified native catalog, retain the terminal custom fallback.
+        // A native composition relies on mandatory pre-Mastra closed admission;
+        // a nested custom wildcard cannot fall through to native adapter routes.
+        ...(turnModel ? [] : [registerApiRoute('/*', {
           method: 'ALL',
           handler: (context) => context.json({ error: { code: 'not_found', message: 'Not found' } }, 404),
-        }),
+        })]),
       ],
       middleware: [async (context, next) => {
         const admittedAccount = verifiedIngressAccount(context);
@@ -75,6 +77,8 @@ export async function createBackend(routes: ApiRoute[] = []) {
           await next();
           return context.res;
         }
+        // Native turns require the app-owned pre-Mastra body/ownership admission.
+        if (isNativeTurnRoute(context)) return context.json({ error: { code: 'integration_failure', message: 'Native turns unavailable' } }, 503);
         const { origin, preflight } = policy.cors(context);
         if (origin && preflight) return context.body(null, 204);
         if (context.req.path === '/health' && context.req.method === 'GET') return next();
@@ -97,4 +101,6 @@ export async function createBackend(routes: ApiRoute[] = []) {
       }],
     },
   });
+  if (turnModel) bindNativeTurns(mastra, turnModel);
+  return mastra;
 }
