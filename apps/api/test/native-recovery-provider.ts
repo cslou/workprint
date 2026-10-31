@@ -18,7 +18,7 @@ export function controlledNativeRecoveryProvider(instrumentation: RecoveryInstru
   const turns = controlledNativeControlProvider(), budget = nativeWorkflowBudget();
   const admitted = new Set<string>(), dispatched = new Set<string>();
   let mastra: Mastra;
-  let startupSweeps = 0;
+  let startupSweeps = 0, startupSettled = 0;
   const pool = () => {
     const storage = mastra.getStorage();
     if (!(storage instanceof PostgresStore)) throw new Error('Recovery fixture requires public native Postgres pool');
@@ -66,34 +66,38 @@ export function controlledNativeRecoveryProvider(instrumentation: RecoveryInstru
     if (!row || row.workflowName !== workflow.id) throw new Error('Recovery native run missing');
     return { runId: row.runId, resourceId: row.resourceId, status: workflowSnapshot(row).status };
   };
+  const reconcileIntent = async (intent: RecoveryIntent) => {
+    const resourceId = intent.resourceId;
+    const row = await (await native()).getWorkflowRunById({ runId: intent.runId });
+    if (row && (row.workflowName !== workflow.id || row.resourceId !== resourceId)) throw new Error('Recovery native intent binding mismatch');
+    if (row && terminalWorkflow(workflowSnapshot(row).status)) { await releaseTerminal({ runId: row.runId, workflowName: workflow.id, resourceId }); return project(row.runId); }
+    if (!admit(intent)) throw new Error('Recovery fixture admission exceeded');
+    const run = await workflow.createRun({ runId: intent.runId, resourceId });
+    if (!row || workflowSnapshot(row).status === 'pending') {
+      const acknowledgement = await run.startAsync({ inputData: { logicalId: intent.logicalId, resourceId, boundary: intent.boundary,
+        wakeAt: new Date(intent.committedAt.getTime() + (intent.boundary === 'run-deadline' ? 4000 : intent.boundary === 'waiting' ? 2500 : 1)).toISOString() } });
+      if (acknowledgement.runId !== intent.runId) throw new Error('Native recovery start acknowledged a different run');
+      dispatched.add(intent.runId);
+    } else if (['running', 'waiting'].includes(workflowSnapshot(row).status) && !dispatched.has(intent.runId)) {
+      try { await run.restart(); }
+      catch (error) {
+        if (!(error instanceof Error) || !('id' in error) || error.id !== 'WORKFLOW_RESTART_RUN_OWNED') throw error;
+        await instrumentation.event({ kind: 'native-owned', runId: intent.runId });
+      }
+    } else if (!dispatched.has(intent.runId)) throw new Error('Recovery native outcome requires explicit handling');
+    return project(intent.runId);
+  };
+  const inflight = new Map<string, ReturnType<typeof reconcileIntent>>();
+  const handoff = (intent: RecoveryIntent) => {
+    const existing = inflight.get(intent.runId); if (existing) return existing;
+    const work = reconcileIntent(intent).finally(() => inflight.delete(intent.runId)); inflight.set(intent.runId, work); return work;
+  };
   const reconcile = async (resourceId: string) => {
     const records = [];
-    for (const intent of await fixture().list(resourceId)) {
-      const row = await (await native()).getWorkflowRunById({ runId: intent.runId });
-      if (row && (row.workflowName !== workflow.id || row.resourceId !== intent.resourceId)) throw new Error('Recovery native intent binding mismatch');
-      if (row && terminalWorkflow(workflowSnapshot(row).status)) { await releaseTerminal({ runId: row.runId, workflowName: workflow.id, resourceId }); records.push(await project(row.runId)); continue; }
-      if (!admit(intent)) throw new Error('Recovery fixture admission exceeded');
-      const run = await workflow.createRun({ runId: intent.runId, resourceId });
-      if (!row || workflowSnapshot(row).status === 'pending') {
-        const acknowledgement = await run.startAsync({ inputData: { logicalId: intent.logicalId, resourceId, boundary: intent.boundary,
-          wakeAt: new Date(intent.committedAt.getTime() + (intent.boundary === 'run-deadline' ? 4000 : intent.boundary === 'waiting' ? 2500 : 1)).toISOString() } });
-        if (acknowledgement.runId !== intent.runId) throw new Error('Native recovery start acknowledged a different run');
-        dispatched.add(intent.runId);
-      } else if (['running', 'waiting'].includes(workflowSnapshot(row).status) && !dispatched.has(intent.runId)) {
-        try { await run.restart(); }
-        catch (error) {
-          if (!(error instanceof Error) || !('id' in error) || error.id !== 'WORKFLOW_RESTART_RUN_OWNED') throw error;
-          await instrumentation.event({ kind: 'native-owned', runId: intent.runId });
-        }
-      } else if (!dispatched.has(intent.runId)) throw new Error('Recovery native outcome requires explicit handling');
-      records.push(await project(intent.runId));
-    }
+    const intents = await fixture().list(resourceId);
+    if (intents[0]) await instrumentation.barrier('reconcile-listed', intents[0].runId);
+    for (const intent of intents) records.push(await handoff(intent));
     return records;
-  };
-  const inflight = new Map<string, ReturnType<typeof reconcile>>();
-  const boundedReconcile = (resourceId: string) => {
-    const existing = inflight.get(resourceId); if (existing) return existing;
-    const work = reconcile(resourceId).finally(() => inflight.delete(resourceId)); inflight.set(resourceId, work); return work;
   };
   const schema = z.discriminatedUnion('action', [
     z.object({ action: z.literal('start'), logicalId: z.uuid(), boundary: recoveryBoundary }).strict(),
@@ -113,7 +117,7 @@ export function controlledNativeRecoveryProvider(instrumentation: RecoveryInstru
         if (!admit(intent, permit)) throw new Error('Recovery fixture reservation missing');
         await instrumentation.event({ kind: 'intent', runId: intent.runId });
         await instrumentation.barrier('committed-before-start', intent.runId);
-        const result = await boundedReconcile(resourceId);
+        const result = [await handoff(intent)];
         if (intent.boundary === 'started-before-ack') await instrumentation.barrier('started-before-ack', intent.runId);
         return context.json({ runId: intent.runId, records: result });
       }
@@ -121,7 +125,7 @@ export function controlledNativeRecoveryProvider(instrumentation: RecoveryInstru
         const intent = await fixture().get(parsed.data.logicalId, resourceId); if (!intent) return context.json({ missing: true }, 404);
         await canonical(intent.runId, intent.logicalId, resourceId); await cancel(intent); return context.json(await project(intent.runId));
       }
-      return context.json(await boundedReconcile(resourceId));
+      return context.json(await reconcile(resourceId));
     } catch (error) {
       if (error instanceof NativeCancellationUnconfirmed) return context.json({ error: { code: error.code } }, 503);
       throw error;
@@ -129,12 +133,12 @@ export function controlledNativeRecoveryProvider(instrumentation: RecoveryInstru
   };
   return { ...turns,
     routes: [...turns.routes, registerApiRoute('/recovery-test/control', { method: 'POST', handler }),
-      registerApiRoute('/recovery-test/state', { method: 'GET', handler: context => context.json({ pid: process.pid, startupSweeps, budget: budget.state(), inflight: inflight.size,
+      registerApiRoute('/recovery-test/state', { method: 'GET', handler: context => context.json({ pid: process.pid, startupSweeps, startupSettled, budget: budget.state(), inflight: inflight.size,
         pool: { total: pool().totalCount, idle: pool().idleCount, waiting: pool().waitingCount } }) })],
     configure: (instance: Mastra) => {
       mastra = instance; turns.configure(instance); instance.addWorkflow(workflow);
       const recover = instance.restartAllActiveWorkflowRuns.bind(instance);
-      instance.restartAllActiveWorkflowRuns = async () => { startupSweeps++; await recover(); };
+      instance.restartAllActiveWorkflowRuns = async () => { startupSweeps++; try { await recover(); } finally { startupSettled++; } };
     },
     beforeRecovery: async () => {
       for (const intent of await fixture().list()) {
@@ -149,8 +153,9 @@ export function controlledNativeRecoveryProvider(instrumentation: RecoveryInstru
         if (!row || !terminalWorkflow(workflowSnapshot(row).status)) await cancel(intent);
         else await releaseTerminal({ runId: row.runId, workflowName: workflow.id, resourceId: intent.resourceId });
       }
+      await Promise.all([...inflight.values()]);
       if (budget.state().active || budget.state().timers || inflight.size) throw new Error('Recovery fixture did not settle before shutdown');
-      console.info(JSON.stringify({ event: 'native-recovery-settled', ...budget.state() }));
+      console.info(JSON.stringify({ event: 'native-recovery-settled', ...budget.state(), inflight: inflight.size }));
     },
   };
 }

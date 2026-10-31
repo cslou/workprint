@@ -95,7 +95,7 @@ export async function nativeTurnFixture(options: { control?: boolean; workflows?
         if (serving.server.termination?.signal !== 'SIGKILL') throw new Error('Owned fixture did not exit from actual SIGKILL');
         return { pid, ...serving.server.termination };
       },
-      recoveryBarrier: (phase: RecoveryIntent['boundary'] | 'released') => writeFile(recoveryControl, JSON.stringify({ phase }), { mode: 0o600 }),
+      recoveryBarrier: (phase: RecoveryIntent['boundary'] | 'released' | 'reconcile-listed') => writeFile(recoveryControl, JSON.stringify({ phase }), { mode: 0o600 }),
       recoveryEvents: async () => (await readFile(recoveryEvents, 'utf8')).trim().split('\n').filter(Boolean).map(line => JSON.parse(line) as RecoveryEvent),
       recoveryIntents: () => nativeRecoveryStore(store.pool).list(),
       recoveryEffects: async () => (await store.pool.query<{ logical_id: string; run_id: string }>('SELECT logical_id,run_id FROM qualification.effect ORDER BY logical_id')).rows,

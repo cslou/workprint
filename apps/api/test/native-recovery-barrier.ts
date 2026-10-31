@@ -11,17 +11,19 @@ export type RecoveryInstrumentation = {
 
 /** Trusted local barrier inputs, never native status/ownership or production environment controls. */
 export function recoveryInstrumentation(control: string, events: string): RecoveryInstrumentation {
-  const schema = z.object({ phase: z.union([recoveryBoundary, z.literal('released')]) }).strict();
+  const schema = z.object({ phase: z.union([recoveryBoundary, z.literal('released'), z.literal('reconcile-listed')]) }).strict();
   const phase = async () => schema.parse(JSON.parse(await readFile(control, 'utf8')) as unknown).phase;
   const event = (value: RecoveryEvent) => appendFile(events, JSON.stringify({ ...value, pid: process.pid }) + '\n');
   return { event, barrier: async (wanted, runId, signal) => {
     if (await phase() !== wanted) return;
     await event({ kind: 'barrier', phase: wanted, runId });
     const deadline = performance.now() + 5000;
-    while (await phase() === wanted) {
-      if (signal?.aborted) throw new Error('Recovery fixture barrier canceled');
-      if (performance.now() >= deadline) throw new Error('Recovery fixture barrier wait exceeded');
-      await delay(10);
-    }
+    try {
+      while (await phase() === wanted) {
+        if (signal?.aborted) throw new Error('Recovery fixture barrier canceled');
+        if (performance.now() >= deadline) throw new Error('Recovery fixture barrier wait exceeded');
+        await delay(10);
+      }
+    } finally { await event({ kind: 'barrier-exit', phase: wanted, runId }); }
   } };
 }
