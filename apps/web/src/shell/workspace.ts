@@ -13,8 +13,7 @@ export function classifyWorkspaceFailure(code: ClientError['code']): WorkspaceFa
 export function useWorkspace(connection: BrowserClient, scope: ReadScope | null) {
   const client = connection.kind === 'configured' ? connection.client : null;
   const id = scope?.conversationId;
-  const [refresh, setRefresh] = useState(0);
-  const read = useMemo(() => { void refresh; return client && id ? (signal: AbortSignal) => client.workspace({ params: { id }, query: {}, body: {} }, { signal }) : null; }, [client, id, refresh]);
+  const read = useMemo(() => client && id ? (signal: AbortSignal) => client.workspace({ params: { id }, query: {}, body: {} }, { signal }) : null, [client, id]);
   const state = useScopedRead(scope, read);
   const key = JSON.stringify([scope?.accountId, scope?.conversationId]);
   const active = useRef(key); active.current = key;
@@ -31,6 +30,5 @@ export function useWorkspace(connection: BrowserClient, scope: ReadScope | null)
     });
   }, [key]);
   const visible = state.kind === 'settled' && state.result.ok && confirmed.key === key ? { ...state, result: { ok: true as const, value: [...confirmed.effects.values()].reduce(applySavedVersion, state.result.value) } } : state;
-  const onUploaded = useCallback(() => { if (active.current !== key) return; setConfirmed({ key, effects: new Map() }); setRefresh(n => n + 1); }, [key]);
-  return { ...visible, onSaved, onUploaded, failure: state.kind === 'settled' && !state.result.ok ? classifyWorkspaceFailure(state.result.error.code) : null };
+  return { ...visible, onSaved, onUploaded: onSaved, failure: state.kind === 'settled' && !state.result.ok ? classifyWorkspaceFailure(state.result.error.code) : null };
 }

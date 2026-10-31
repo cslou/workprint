@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import type { ApiClient, UploadSession } from '@workprint/api-client';
+import type { OperationResponse } from '@workprint/contracts';
 import type { BrowserClient } from '../api/client.js';
 import type { ReadScope } from '../api/use-scoped-read.js';
 import { Button } from '../ui/controls.js';
@@ -12,7 +13,7 @@ import './composer.css';
 export type ComposerDraft = { value: string; onChange(value: string): void };
 
 /** Only explicit presses call the supported unavailable-native boundary. */
-export function Composer({ native, working = false, docked = false, placeholder = 'Describe your video…', draft, connection, scope, uploadSession, onUploaded }: { uploadSession?: UploadSession; onUploaded?(): void; native: ApiClient['native']; working?: boolean; docked?: boolean; placeholder?: string; draft?: ComposerDraft; connection?: BrowserClient; scope?: ReadScope | null }) {
+export function Composer({ native, working = false, docked = false, placeholder = 'Describe your video…', draft, connection, scope, uploadSession, onUploaded }: { uploadSession?: UploadSession; onUploaded?(result: OperationResponse<'confirmUpload'>): void; native: ApiClient['native']; working?: boolean; docked?: boolean; placeholder?: string; draft?: ComposerDraft; connection?: BrowserClient; scope?: ReadScope | null }) {
   const [localText, setLocalText] = useState('');
   const text = draft?.value ?? localText;
   const setText = draft?.onChange ?? setLocalText;
@@ -33,7 +34,8 @@ export function Composer({ native, working = false, docked = false, placeholder 
   const upload = async (event: ChangeEvent<HTMLInputElement>) => {
     const input = event.currentTarget, file = input.files?.[0]; input.value = '';
     if (!file || uploading) return; setFeedback(null);
-    if (await uploadState.session.select(file)) onUploaded?.();
+    const saved = await uploadState.session.select(file);
+    if (saved) onUploaded?.(saved);
   };
   const closeUpload = () => { uploadState.session.close(); fileInput.current?.parentElement?.querySelector('button')?.focus(); };
   const blockedCopy = uploadState.state.confirmationStarted ? confirmFeedback : uploadFeedback;

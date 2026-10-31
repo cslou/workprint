@@ -11,7 +11,7 @@ import { ProposalCard, proposalLines, deriveProposalDisplayFacts, type ProposalI
 import { useQuestionRead, useProposalRead, useInputVersions } from './review-reads.js';
 import './question.css';
 
-export type QuestionReviewProps = { uploadSession?: UploadSession; onUploaded?(): void; connection: BrowserClient; scope: ReadScope | null; question: Question; proposalPrerequisite?: Proposal; workspace?: OperationResponse<'workspace'>; inputNames?: ProposalInputNames; versionPrerequisites?: readonly Version[]; draft?: ComposerDraft };
+export type QuestionReviewProps = { uploadSession?: UploadSession; onUploaded?(result: OperationResponse<'confirmUpload'>): void; connection: BrowserClient; scope: ReadScope | null; question: Question; proposalPrerequisite?: Proposal; workspace?: OperationResponse<'workspace'>; inputNames?: ProposalInputNames; versionPrerequisites?: readonly Version[]; draft?: ComposerDraft };
 export function QuestionReview(props: QuestionReviewProps) {
   return <ScopedQuestion key={JSON.stringify([props.scope?.accountId, props.scope?.conversationId])} {...props} />;
 }
