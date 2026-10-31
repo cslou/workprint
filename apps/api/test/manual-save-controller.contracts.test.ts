@@ -54,6 +54,19 @@ test('conflict review is explicit and continuing changes only the local base bef
   controller.dispose();
 });
 
+test('association saves capture derived exact dependencies with content and retain them on unknown retry', async () => {
+  const sent: Request[] = [];
+  const associationTarget = { ...target, dependencies: () => ['exact-image'] };
+  const controller = createManualSave({ conversationId: 'conversation', version: version(1, 'Original.'), target: associationTarget, client: {
+    async saveVersion(input) { sent.push(structuredClone(input)); return sent.length === 1 ? { ok: false, error: { code: 'transport_failure', message: 'Lost response' } } : { ok: true, value: { version: version(2, 'Associated image.', ['exact-image']) } }; },
+    async artifactVersions() { throw new Error('No automatic read'); },
+  } });
+  controller.begin(); controller.change('Associated image.'); await controller.submit();
+  assert.deepEqual(sent[0]?.body.dependencies, ['exact-image']);
+  assert.equal(controller.getSnapshot().phase, 'unknown'); await controller.retry();
+  assert.deepEqual(sent[1], sent[0]); assert.equal(controller.getSnapshot().editing, false); controller.dispose();
+});
+
 test('incompatible target/dependencies block continuation and disposed scope cannot accept late reads or writes', async () => {
   const latest = deferred<ClientResult<OperationResponse<'artifactVersions'>>>();
   const save = deferred<ClientResult<Result>>(); let calls = 0;

@@ -1,0 +1,21 @@
+.wp-picker-item { min-width: 0; }
+.wp-picker-tile { width: 100%; }
+.wp-picker-select, .wp-picker-inspect { display: inline-block; margin-top: var(--space-6); padding: var(--space-4) var(--space-10); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-pill); font: inherit; font-size: var(--font-size-12); background: transparent; color: var(--color-text-secondary); }
+.wp-picker-inspect { cursor: pointer; }
+.wp-picker-search-note { margin: 0; padding: var(--space-4) var(--space-16); color: var(--color-text-subtle); font-size: var(--font-size-12); }
+.wp-modal:has(.wp-library-inspector) { max-height: calc(100vh - 2 * var(--space-24)); display: flex; flex-direction: column; }
+.wp-modal:has(.wp-library-inspector) > .wp-dialog { display: flex; flex-direction: column; min-height: 0; }
+.wp-library-inspector { font-size: var(--font-size-14); overflow-wrap: anywhere; overflow: auto; min-height: 0; }
+.wp-library-inspector p { white-space: pre-wrap; }
+.wp-library-meta { color: var(--color-text-subtle); font-size: var(--font-size-12); }
+.wp-library-section { padding: var(--space-16) 0; border-top: var(--border-width-default) solid var(--color-border-default); }
+.wp-library-section h3, .wp-library-inspector h3 { font-size: var(--font-size-13); font-weight: var(--font-weight-semibold); margin: 0 0 var(--space-8); }
+.wp-library-history { display: flex; gap: var(--space-8); flex-wrap: wrap; padding-top: var(--space-10); }
+.wp-library-inspector-actions { display: flex; gap: var(--space-10); flex-wrap: wrap; align-items: center; padding-top: var(--space-16); }
+.wp-library-inspector-actions p { width: 100%; font-size: var(--font-size-13); color: var(--color-text-secondary); }
+.wp-library-inspector-actions .wp-button:last-child { margin-left: auto; }
+.wp-library-preview { background: var(--color-bg-sunken); border-radius: var(--radius-lg); min-height: var(--size-media-thumb-panel); display: grid; place-items: center; }
+.wp-library-preview img { display: block; max-width: 100%; max-height: var(--size-layout-viewer); object-fit: contain; }
+@media (max-width: 820px) {
+  .wp-picker:has(.wp-picker-search-note) .wp-search-field { display: grid; width: 100%; margin-left: 0; }
+}

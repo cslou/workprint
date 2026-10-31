@@ -6,16 +6,19 @@ import { test, expect } from '../material-network.js';
 import { browserOrigin } from '../origin.js';
 import { ownedReadReference } from '../owned-read-reference.js';
 import { mountOwnedWindowReference } from '../owned-read-mount.js';
+import { libraryReuseReference, mountReuseWindowReference } from '../library-reuse-reference.js';
 import { ownedPanelFrame } from '../owned-panel-frame.js';
 import { settleCapture } from '../capture.js';
 import { compare } from '../compare.js';
 import type { verifyBuiltAdmission as VerifyBuiltAdmission } from '../../../apps/api/test/auth-built-fixture.js';
 import type { prepareLibraryWindow as PrepareLibraryWindow } from '../../../apps/api/test/paged-saved-work.js';
+import type { query as Query } from '../../../apps/api/test/postgres.js';
 
 type Batch = { items: { id: string; latestVersion?: { id: string } }[]; nextCursor: string | null };
 for (const width of [1440, 390]) test(`owned windows traverse 1105 records and return without losing exact choices at ${width}`, async ({ page, context, materialNetwork }, info) => {
   test.setTimeout(240000);
   await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+  const { query } = await import(pathToFileURL(resolve('apps/api/.test-build/test/postgres.js')).href) as { query: typeof Query };
   const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
   const { prepareLibraryWindow } = await import(pathToFileURL(resolve('apps/api/.test-build/test/paged-saved-work.js')).href) as { prepareLibraryWindow: typeof PrepareLibraryWindow };
   let saved: Awaited<ReturnType<typeof PrepareLibraryWindow>> | undefined;
@@ -35,7 +38,9 @@ for (const width of [1440, 390]) test(`owned windows traverse 1105 records and r
       const pair = async (feature: 'library' | 'history', loaded: number, terminal: boolean) => {
         const source = await ownedReadReference(feature === 'library' ? 'library-page' : 'script-history');
         const reference = await context.newPage(); await reference.setViewportSize({ width, height: width === 390 ? 844 : 900 });
-        await mountOwnedWindowReference(reference, source, loaded - 999, loaded, 1105);
+        const typed = feature === 'library' ? await libraryReuseReference('library-ready') : null;
+        if (typed) await mountReuseWindowReference(reference, typed, loaded - 999, loaded, 1105);
+        else await mountOwnedWindowReference(reference, source, loaded - 999, loaded, 1105);
         if (terminal) await reference.locator('.preview-page-controls .ref-secondary').evaluate(node => node.remove());
         const expectedSelector = feature === 'library' ? '.preview-library-controls' : '.preview-page-controls';
         const actualSelector = feature === 'library' ? '.wp-picker-pagination' : '.wp-version-pagination';
@@ -59,7 +64,7 @@ for (const width of [1440, 390]) test(`owned windows traverse 1105 records and r
         const actual = await page.locator(actualSelector).screenshot({ path: info.outputPath(`${prefix}-actual.png`), animations: 'disabled' });
         await page.screenshot({ path: info.outputPath(`${prefix}-actual-full.png`), fullPage: true });
         const changedPixels = await compare(expected, actual, info.outputPath(prefix));
-        await writeFile(info.outputPath(`${prefix}-result.json`), JSON.stringify({ width, loaded, terminal, expectedGeometry, actualGeometry, changedPixels, tolerance: 0, referenceHashes: source.hashes, revision: info.config.metadata, approval: 'docs/design/design.md#bounded-saved-work-navigation' }, null, 2));
+        await writeFile(info.outputPath(`${prefix}-result.json`), JSON.stringify({ width, loaded, terminal, expectedGeometry, actualGeometry, changedPixels, tolerance: 0, referenceHashes: { ...source.hashes, ...typed?.hashes }, revision: info.config.metadata, approval: typed ? 'docs/design/design.md#exact-library-reuse-and-reference-editing' : 'docs/design/design.md#bounded-saved-work-navigation' }, null, 2));
         expect(actualGeometry).toEqual(expectedGeometry); expect(changedPixels).toBe(0);
       };
       await page.goto('/saved-work.html'); await page.waitForFunction(() => !!(window as unknown as { savedWorkTest?: unknown }).savedWorkTest);
@@ -88,11 +93,14 @@ for (const width of [1440, 390]) test(`owned windows traverse 1105 records and r
       await expect(page.locator('.wp-picker-tile')).toHaveCount(20); await expect(page.locator('.wp-picker-tile').first()).toBeFocused();
       await expect(page.locator('.wp-picker-tile').first()).toHaveAttribute('aria-pressed', 'true'); await expect(page.locator('.wp-picker-tray')).toContainText('2 selected');
       await expect(page.getByRole('button', { name: 'Back to first page', exact: true })).toHaveCount(0);
-      await page.getByRole('button', { name: 'Remove Script', exact: true }).first().click();
-      allow(`/v1/conversations/${data.conversationA}/uses`, {}, 'POST'); const request = page.waitForRequest(request => request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/uses'));
+      await page.getByRole('button', { name: 'Remove Station script', exact: true }).first().click();
+      materialNetwork.expectOperations({ origin: target.origin, method: 'POST', path: `/v1/conversations/${data.conversationA}/uses`, query: {}, count: 1, purpose: 'script' }); const request = page.waitForRequest(request => request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/uses'));
+      const acknowledgement = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/uses'));
       await page.getByRole('button', { name: 'Attach (1)', exact: true }).click();
-      expect((await request).postDataJSON().versionId).toBe(lastVersion); expect(lastVersion).not.toBe(firstVersion);
-      await expect(page.getByRole('status')).toContainText('Attaching from your Library is not available yet.');
+      expect((await request).postDataJSON()).toMatchObject({ versionId: lastVersion, purpose: 'script' }); expect(lastVersion).not.toBe(firstVersion);
+      const used = await acknowledgement; expect(used.status()).toBe(200);
+      expect((await used.json()).use).toMatchObject({ versionId: lastVersion, state: 'approved', binding: { purpose: 'script' } });
+      await expect(page.locator('.wp-picker-count')).toHaveText('Nothing selected yet');
       await page.getByRole('button', { name: 'Close', exact: true }).click();
       const frame = await ownedReadReference('script-history'); await ownedPanelFrame(page, frame.html); await configure(true);
       const path = `/v1/artifacts/${data.current.artifactId}/versions`;
@@ -128,7 +136,9 @@ for (const width of [1440, 390]) test(`owned windows traverse 1105 records and r
         await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
         await expect(page.locator('.wp-version-history-row')).toHaveCount(0); await expect(page.getByRole('button', { name: 'Back to first page', exact: true })).toHaveCount(0);
       } finally { release(); page.off('requestfinished', onSettled); page.off('requestfailed', onSettled); }
-    }, { browserOrigin, prepareSavedWork: async setup => { saved = await prepareLibraryWindow(setup); } });
+    }, { browserOrigin, prepareSavedWork: async setup => { saved = await prepareLibraryWindow(setup); }, verifySavedEffects: async url => {
+      expect((await query(url, "SELECT (SELECT count(*)::int FROM artifacts.commands) AS commands,(SELECT count(*)::int FROM artifacts.commands WHERE command_kind='use_version') AS uses,(SELECT count(*)::int FROM artifacts.versions) AS versions,(SELECT count(*)::int FROM artifacts.conversation_uses) AS approvals,(SELECT count(*)::int FROM artifacts.manual_changes) AS edits")).rows).toEqual([{ commands: 1, uses: 1, versions: 2209, approvals: 1, edits: 0 }]);
+    } });
   } finally { for (const fn of cleanup.reverse()) await fn(); }
 });
 
