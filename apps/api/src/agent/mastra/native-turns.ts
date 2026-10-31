@@ -5,7 +5,7 @@ import { TokenLimiterProcessor, type Processor } from '@mastra/core/processors';
 import { createNativeTextMemory } from './native-text-memory.js';
 
 export const nativeAssistantId = 'assistant';
-export const nativeTurnLimits = Object.freeze({ inputBytes: 8192, estimatedOutputTokens: 64, firstContentMs: 3000, modelCallMs: 7000, executionMs: 8000, cleanupMs: 100 });
+export const nativeTurnLimits = Object.freeze({ inputBytes: 8192, estimatedOutputTokens: 64, firstContentMs: 3000, modelCallMs: 7000, executionMs: 8000, cleanupMs: 3000 });
 export type NativeTurnModel = Extract<MastraModelConfig, { specificationVersion: 'v2' | 'v3' | 'v4' }>;
 const bindings = new WeakSet<Mastra>();
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);

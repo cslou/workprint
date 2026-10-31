@@ -15,7 +15,7 @@ import { createNativeTextMemory } from '../src/agent/mastra/native-text-memory.j
 import { nativeTurnLimits } from '../src/agent/index.js';
 import { setTimeout as delay } from 'node:timers/promises';
 
-export async function nativeTurnFixture() {
+export async function nativeTurnFixture(options: { control?: boolean } = {}) {
   const auth = await isolatedAuth();
   const cleanups: (() => Promise<unknown>)[] = [auth.close];
   const close = async () => {
@@ -31,12 +31,13 @@ export async function nativeTurnFixture() {
     const base = await buildServerComposition(env.logs, 'native-turns', undefined, env.env);
     const project = resolve(dirname(base), '../..'); const entry = join(project, 'turn-entry.mjs');
     await writeFile(entry, `
-      import {controlledTurnProvider} from ${JSON.stringify(pathToFileURL(join(root, 'apps/api/.test-build/test/native-turn-provider.js')).href)};
+      import {${options.control ? 'controlledNativeControlProvider' : 'controlledTurnProvider'} as createProvider} from ${JSON.stringify(pathToFileURL(join(root, `apps/api/.test-build/test/${options.control ? 'native-control-provider' : 'native-turn-provider'}.js`)).href)};
       import {createBackend} from './src/mastra/backend.js';
       import {startServer} from './src/mastra/server.js';
-      const probe=controlledTurnProvider();
+      const probe=createProvider();
       const mastra=await createBackend(probe.routes,probe.model);
       probe.instrument(mastra.getAgent('assistant'));
+      probe.configure?.(mastra);
       await startServer(mastra,[probe.beforeMastra]);
     `);
     const serving = await startAuthServer(entry, env.env, { url: auth.url, anonKey: auth.anonKey, servingUrl: db.servingUrl, accounts: [] }, join(env.logs, 'native-turn-http.log'), { env: { WORKPRINT_BROWSER_ORIGIN: 'http://127.0.0.1:4180' } });
@@ -68,7 +69,7 @@ export async function nativeTurnFixture() {
       servingBusy: async () => Number((await query(db.adminUrl, "SELECT count(*) AS busy FROM pg_stat_activity WHERE datname = current_database() AND usename = 'wp_serving' AND state <> 'idle'")).rows[0]?.busy),
       read: (threadId: string, who = 0) => memory.listMessages({ threadId, resourceId: users[who]!.id, page: 0, perPage: 100, orderBy: { field: 'createdAt', direction: 'ASC' } }),
       snapshot: async () => JSON.stringify({ threads: await memory.listThreads({ page: 0, perPage: 100 }), messages: await memory.listMessages({ threadId: (await memory.listThreads({ page: 0, perPage: 100 })).threads.map(t => t.id), perPage: 1000 }) }),
-      sdk: (who = 0) => new MastraClient({ baseUrl: serving.origin, retries: 0, headers: { Authorization: `Bearer ${tokens[who]!}` }, abortSignal: AbortSignal.timeout(20000) }).getAgent('assistant'),
+      sdk: (who = 0, signal: AbortSignal = AbortSignal.timeout(20000)) => new MastraClient({ baseUrl: serving.origin, retries: 0, headers: { Authorization: `Bearer ${tokens[who]!}` }, abortSignal: signal }).getAgent('assistant'),
       navigationSdk: (who = 0) => new MastraClient({ baseUrl: serving.origin, apiPrefix: '', retries: 0, headers: { Authorization: `Bearer ${tokens[who]!}` }, abortSignal: AbortSignal.timeout(5000) }),
       memorySave: (args: Parameters<ReturnType<typeof createNativeTextMemory>['saveMessages']>[0]) => createNativeTextMemory(store).saveMessages(args),
       seedUnsupportedSignal: async (kind: 'notification' | 'forged-user') => {

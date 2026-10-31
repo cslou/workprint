@@ -108,5 +108,5 @@ export function controlledTurnProvider() {
       held--;
     }
   };
-  return { model, routes, instrument, beforeMastra };
+  return { model, routes, instrument, beforeMastra, state };
 }

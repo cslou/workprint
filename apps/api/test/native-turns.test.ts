@@ -170,11 +170,13 @@ test('native turns use verified owned input and truthful native persistence', { 
     const before = await fixture.snapshot(); const production = await fixture.production();
     for (const who of [0, 1]) {
       const thread = who ? foreign : own;
-      for (const tail of ['send-message', 'threads/subscribe']) {
-        const response = await production.request('/api/agents/assistant/' + tail, { threadId: thread.id, resourceId: fixture.users[who]!.id, ...(tail === 'send-message' ? { message: 'Unavailable input' } : { withInitialHistory: false }) }, who);
+      for (const tail of ['send-message', 'queue-message', 'threads/subscribe']) {
+        const response = await production.request('/api/agents/assistant/' + tail, { threadId: thread.id, resourceId: fixture.users[who]!.id, ...(tail.endsWith('message') ? { message: 'Unavailable input' } : { withInitialHistory: false }) }, who);
         assert.equal(response.status, 503); assert.deepEqual(await response.json(), { error: { code: 'integration_failure', message: 'Native turns unavailable' } });
       }
-      for (const path of ['/turn-test/control', '/api/agents', '/api/agents/assistant/threads/abort', '/api/agents/assistant/stream']) assert.equal((await production.request(path, path.includes('/api/agents/assistant/') ? {} : undefined, who)).status, 404);
+      assert.equal((await production.request('/api/agents/assistant/threads/abort', { threadId: thread.id, resourceId: fixture.users[who]!.id, expectedRunId: randomUUID(), clearPendingSignals: false }, who)).status, 503);
+      assert.equal((await production.request('/api/agents/assistant/observe', { runId: randomUUID() }, who)).status, 503);
+      for (const path of ['/turn-test/control', '/api/agents', '/api/agents/assistant/stream']) assert.equal((await production.request(path, path.includes('/api/agents/assistant/') ? {} : undefined, who)).status, 404);
     }
     assert.equal(await fixture.snapshot(), before);
   });
