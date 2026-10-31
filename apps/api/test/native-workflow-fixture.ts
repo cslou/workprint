@@ -3,10 +3,11 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { nativeControlFixture } from './native-control-fixture.js';
 import type { NativeWorkflowState } from './native-workflow-definition.js';
 import { workflowFixtureNames, workflowRecord, workflowSnapshot } from './native-workflow-provider.js';
+import { terminalWorkflow } from './native-workflow-outcome.js';
 
 type RuntimeState = NativeWorkflowState & { pid: number; pool: { total: number; idle: number; waiting: number } };
 
-export const terminalWorkflow = (status: string) => ['success', 'failed', 'canceled', 'tripwire', 'bailed'].includes(status);
+export { terminalWorkflow } from './native-workflow-outcome.js';
 export async function workflowWatch<T>(work: Promise<T>, milliseconds: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try { return await Promise.race([work, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Independent workflow watchdog exceeded')), milliseconds); })]); }

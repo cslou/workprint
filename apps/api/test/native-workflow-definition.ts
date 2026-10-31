@@ -2,15 +2,16 @@ import { createStep, createWorkflow, type WorkflowOptions } from '@mastra/core/w
 import { z } from 'zod';
 import type { NativeWorkflowBudget } from './native-workflow-budget.js';
 import { workflowFixtureLimits } from './native-workflow-budget.js';
+import { terminalWorkflow, type NativeWorkflowIdentity } from './native-workflow-outcome.js';
 
 /** Definitions and external-wait gates exist only in the isolated test build. */
-export function nativeWorkflowDefinition(budget: NativeWorkflowBudget) {
+export function nativeWorkflowDefinition(budget: NativeWorkflowBudget, releaseTerminal: (identity: NativeWorkflowIdentity) => Promise<void>) {
   const gates = new Map<string, () => void>();
   const events: { kind: string; runId: string; progress?: number }[] = [];
   let active = 0, listeners = 0, timers = 0, entered = 0, aborted = 0, timedOut = 0;
-  const options: WorkflowOptions = { shouldPersistSnapshot: () => true, onFinish: result => {
+  const options: WorkflowOptions = { shouldPersistSnapshot: () => true, onFinish: async result => {
     if (result.status === 'suspended') budget.suspend(result.runId);
-    else if (['success', 'failed', 'canceled', 'tripwire', 'bailed'].includes(result.status)) budget.release(result.runId);
+    else if (terminalWorkflow(result.status)) await releaseTerminal({ runId: result.runId, workflowName: result.workflowId, resourceId: result.resourceId });
   } };
   const input = z.object({ kind: z.enum(['held', 'suspend', 'failure']), waitMs: z.number().int().min(1).max(workflowFixtureLimits.waitMs) });
   const output = z.object({ progress: z.number().int() });

@@ -75,6 +75,9 @@ export async function nativeTurnFixture(options: { control?: boolean; workflows?
       nativeRuns: async () => { const workflows = await store.getStore('workflows'); if (!workflows) throw new Error('Native fixture workflows unavailable'); return (await workflows.listWorkflowRuns({ page: 0, perPage: 100 })).runs.length; },
       servingBusy: async () => Number((await query(db.adminUrl, "SELECT count(*) AS busy FROM pg_stat_activity WHERE datname = current_database() AND usename = 'wp_serving' AND state <> 'idle'")).rows[0]?.busy),
       servingConnections: async () => Number((await query(db.adminUrl, "SELECT count(*) AS connections FROM pg_stat_activity WHERE datname = current_database() AND usename = 'wp_serving'")).rows[0]?.connections),
+      workflowPersistence: (enabled: boolean) => query(db.setupUrl, enabled
+        ? 'GRANT UPDATE ON ALL TABLES IN SCHEMA mastra TO wp_serving'
+        : 'REVOKE UPDATE ON ALL TABLES IN SCHEMA mastra FROM wp_serving'),
       read: (threadId: string, who = 0) => memory.listMessages({ threadId, resourceId: users[who]!.id, page: 0, perPage: 100, orderBy: { field: 'createdAt', direction: 'ASC' } }),
       snapshot: async () => JSON.stringify({ threads: await memory.listThreads({ page: 0, perPage: 100 }), messages: await memory.listMessages({ threadId: (await memory.listThreads({ page: 0, perPage: 100 })).threads.map(t => t.id), perPage: 1000 }) }),
       sdk: (who = 0, signal: AbortSignal = AbortSignal.timeout(20000)) => new MastraClient({ baseUrl: serving.origin, retries: 0, headers: { Authorization: `Bearer ${tokens[who]!}` }, abortSignal: signal }).getAgent('assistant'),
