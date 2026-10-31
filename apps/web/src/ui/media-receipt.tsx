@@ -1,9 +1,9 @@
 import type { Version } from '@workprint/contracts';
 import type { BrowserClient } from '../api/client.js';
-import { Button } from '../ui/controls.js';
-import { StatusPill } from '../ui/status.js';
-import { useOwnedImage } from './use-owned-image.js';
-import '../ui/upload-feedback.css';
+import { Button } from './controls.js';
+import { StatusPill } from './status.js';
+import { useOwnedImage } from '../api/use-owned-image.js';
+import './upload-feedback.css';
 
 export type MediaVersion=Extract<Version,{kind:'image'|'video'}>;
 /** Read-only exact-version receipt, shared by upload and the existing persisted asset viewer. */

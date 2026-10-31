@@ -1,7 +1,7 @@
 import type { UploadSession,UploadState } from '@workprint/api-client';
 import type { BrowserClient } from '../api/client.js';
 import { Button } from '../ui/controls.js';
-import { MediaReceipt } from '../media/index.js';
+import { MediaReceipt } from '../ui/media-receipt.js';
 import '../ui/upload-feedback.css';
 
 const stopCopy='Stopping only stops waiting here; it cannot revoke issued transfer access or undo a saved version.';

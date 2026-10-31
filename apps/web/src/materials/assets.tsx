@@ -6,7 +6,7 @@ import { ManualVersionEditor } from '../versions/manual-editor.js';
 import { savedTextTarget } from '../versions/targets.js';
 import { VersionReview } from '../versions/review.js';
 import { ReferenceSheet } from './sheet.js';
-import { MediaReceipt } from '../media/index.js';
+import { MediaReceipt } from '../ui/media-receipt.js';
 import type { ScriptProps } from './script.js';
 import { savedMaterialPresentation } from './content.js';
 import './assets.css';

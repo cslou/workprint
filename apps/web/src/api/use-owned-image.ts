@@ -1,7 +1,7 @@
 import { useEffect,useState } from 'react';
 import { readPrivateImage } from '@workprint/api-client';
 import type { Version } from '@workprint/contracts';
-import type { BrowserClient } from '../api/client.js';
+import type { BrowserClient } from './client.js';
 
 export function useOwnedImage(connection:BrowserClient|undefined,version:Version|null){
   const client=connection?.kind==='configured'?connection.client:null,media=version&&(version.kind==='image'||version.kind==='video')?version.media:null;
