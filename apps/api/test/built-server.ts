@@ -16,7 +16,7 @@ export async function buildServerComposition(logs: string, name: string, composi
   const entry = join(project, 'entry.mjs');
   await writeFile(entry, `${composition(join(project, 'src'))}
     import { startServer } from './src/mastra/server.js';
-    await startServer(mastra, typeof beforeMastra === 'undefined' ? [] : beforeMastra).then(server => {
+    await startServer(mastra, typeof beforeMastra === 'undefined' ? [] : beforeMastra, typeof beforeNativeShutdown === 'function' ? beforeNativeShutdown : undefined).then(server => {
       if (typeof afterServer === 'function') return afterServer(server);
     });
   `);

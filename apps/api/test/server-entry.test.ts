@@ -124,7 +124,7 @@ test('built entry preserves HTTP, worker, recovery and signal lifecycle', { time
   const fixture = await environment();
   t.diagnostic(`Evidence: ${fixture.logs}`);
   const journal = join(fixture.logs, 'lifecycle.jsonl');
-  const events = async () => (await readFile(journal, 'utf8')).trim().split('\n').filter(Boolean).map((line) => JSON.parse(line) as { event: string; pid: number; time: number });
+  const events = async () => (await readFile(journal, 'utf8')).trim().split('\n').filter(Boolean).map((line) => JSON.parse(line) as { event: string; pid: number; time: number; drainTimeout?: number });
   const waitFor = async (event: string) => {
     const deadline = Date.now() + 5000;
     for (;;) {
@@ -139,7 +139,7 @@ test('built entry preserves HTTP, worker, recovery and signal lifecycle', { time
     import { setTimeout as delay } from 'node:timers/promises';
     import { registerApiRoute } from '@mastra/core/server';
     import { createBackend } from ${JSON.stringify(join(directory, 'mastra/backend.js'))};
-    const record = event => appendFileSync(${JSON.stringify(journal)}, JSON.stringify({ event, pid: process.pid, time: Date.now() }) + '\\n');
+    const record = (event, extra = {}) => appendFileSync(${JSON.stringify(journal)}, JSON.stringify({ event, pid: process.pid, time: Date.now(), ...extra }) + '\\n');
     export const mastra = await createBackend([
       registerApiRoute('/__entry/error', { method: 'GET', handler: () => { throw new Error('Synthetic entry failure'); } }),
       registerApiRoute('/__entry/slow', { method: 'GET', handler: async c => { record('request-started'); await delay(600); return c.json({ completed: true }); } }),
@@ -155,8 +155,9 @@ test('built entry preserves HTTP, worker, recovery and signal lifecycle', { time
     mastra.restartAllActiveWorkflowRuns = async () => { record('workflow-recovery'); await delay(400); record('workflow-failure'); throw new Error('Synthetic startup recovery failure'); };
     const durable = mastra.recoverAllDurableAgents.bind(mastra);
     mastra.recoverAllDurableAgents = async () => { record('durable-recovery'); return durable(); };
+    const beforeNativeShutdown = async () => { record('owned-native-shutdown'); if (process.env.ENTRY_FAIL_NATIVE_HOOK === '1') throw new Error('Controlled owned native shutdown failure'); if (process.env.ENTRY_STALL_NATIVE_HOOK === '1') await new Promise(() => {}); };
     const shutdown = mastra.shutdown.bind(mastra);
-    mastra.shutdown = async options => { record('core-shutdown'); if (process.env.ENTRY_STALL_SHUTDOWN === '1') await new Promise(() => {}); return shutdown(options); };
+    mastra.shutdown = async options => { record('core-shutdown', options); const result = await shutdown(options); record('core-shutdown-complete'); if (process.env.ENTRY_FAIL_SHUTDOWN === '1') throw new Error('Controlled native shutdown failure'); if (process.env.ENTRY_STALL_SHUTDOWN === '1') await new Promise(() => {}); return result; };
   `, fixture.env);
   const begin = async (name: string, extra: NodeJS.ProcessEnv = {}) => {
     await writeFile(journal, '');
@@ -202,8 +203,8 @@ test('built entry preserves HTTP, worker, recovery and signal lifecycle', { time
     assert.equal(await exitWithin(target.server, 6000), 0);
     assert.ok(Date.now() - started < 5000);
   });
-  const stalled = async (name: string) => {
-    const target = await begin(name);
+  const stalled = async (name: string, extra: NodeJS.ProcessEnv = {}) => {
+    const target = await begin(name, extra);
     const upload = request(`${target.origin}/__entry/stalled`, { method: 'POST', headers: { ...target.headers, 'Content-Type': 'application/json' } });
     const closed = new Promise<void>((resolve) => { upload.once('error', () => {}); upload.once('close', resolve); });
     upload.end('{}');
@@ -212,14 +213,14 @@ test('built entry preserves HTTP, worker, recovery and signal lifecycle', { time
     t.after(() => { upload.destroy(); });
     return { ...target, upload, closed };
   };
-  await t.test('stalled handler is server-closed at the five-second drain bound', async () => {
+  await t.test('stalled handler is server-closed within the two-second HTTP share', async () => {
     const target = await stalled('stalled');
     const started = Date.now();
     await signal('workers-started', 'SIGTERM');
     assert.equal(await exitWithin(target.server, 7000), 0);
     await target.closed;
     assert.equal(target.upload.writableEnded, true, 'The stalled work has a completed request body');
-    assert.ok(Date.now() - started >= 4800 && Date.now() - started < 6500);
+    assert.ok(Date.now() - started >= 1800 && Date.now() - started < 3500);
     assert.match(await readFile(join(fixture.logs, 'stalled.log'), 'utf8'), /drain timed out; closing remaining HTTP connections/);
   });
   await t.test('duplicate signal inside 250 ms is ignored', async () => {
@@ -236,13 +237,54 @@ test('built entry preserves HTTP, worker, recovery and signal lifecycle', { time
     await signal('workers-started', 'SIGTERM');
     assert.equal(await exitWithin(target.server, 2000), 1);
   });
-  await t.test('core shutdown is bounded at drain plus five seconds', async () => {
+  await t.test('stalled native acknowledgment exits nonzero within the one total deadline', async () => {
     const target = await begin('core-stall', { ENTRY_STALL_SHUTDOWN: '1' });
     const started = Date.now();
     await signal('workers-started', 'SIGTERM');
-    assert.equal(await exitWithin(target.server, 12000), 0);
-    assert.ok(Date.now() - started >= 9800 && Date.now() - started < 11500);
-    assert.match(await readFile(join(fixture.logs, 'core-stall.log'), 'utf8'), /Mastra shutdown timed out; forcing exit/);
+    assert.equal(await exitWithin(target.server, 9000), 1);
+    const elapsed = Date.now() - started;
+    assert.ok(elapsed >= 6800 && elapsed < 8000);
+    t.diagnostic(`Native stalled acknowledgment signal-to-exit ${elapsed} ms; exit 1`);
+    assert.match(await readFile(join(fixture.logs, 'core-stall.log'), 'utf8'), /Total shutdown deadline exceeded/);
+  });
+  await t.test('one seven-second total deadline bounds held HTTP and a stalled native acknowledgment', async () => {
+    const target = await stalled('total-stall', { ENTRY_STALL_SHUTDOWN: '1' });
+    const started = Date.now();
+    await signal('workers-started', 'SIGTERM');
+    assert.equal(await exitWithin(target.server, 9000), 1, 'The server itself exits; the watchdog never kills it');
+    await target.closed;
+    const elapsed = Date.now() - started;
+    assert.ok(elapsed >= 6800 && elapsed < 8000, `One total seven-second deadline: ${elapsed} ms`);
+    const records = await events();
+    const nativeStart = records.find(row => row.event === 'core-shutdown' && row.pid === records.find(event => event.event === 'workers-started')?.pid);
+    assert.ok(nativeStart && nativeStart.time - started >= 1800 && nativeStart.time - started < 3000, 'HTTP receives at most its two-second share');
+    assert.ok(nativeStart.drainTimeout! > 3500 && nativeStart.drainTimeout! <= 5000, 'Native drain receives only the remaining total budget');
+    assert.ok(records.some(row => row.event === 'core-shutdown-complete'), 'Real native shutdown completes before its acknowledgment is withheld');
+    t.diagnostic(`Combined HTTP/native stall signal-to-exit ${elapsed} ms; HTTP ${nativeStart.time - started} ms; native drain allowance ${nativeStart.drainTimeout} ms; exit 1`);
+    assert.match(await readFile(join(fixture.logs, 'total-stall.log'), 'utf8'), /Total shutdown deadline exceeded/);
+  });
+  await t.test('native shutdown rejection is an honest nonzero exit', async () => {
+    const target = await begin('core-error', { ENTRY_FAIL_SHUTDOWN: '1' });
+    await signal('workers-started', 'SIGTERM');
+    assert.equal(await exitWithin(target.server, 3000), 1);
+    assert.match(await readFile(join(fixture.logs, 'core-error.log'), 'utf8'), /Error during Mastra shutdown/);
+  });
+  await t.test('owned native adapter failure still calls real Mastra shutdown and exits nonzero', async () => {
+    const target = await begin('owned-error', { ENTRY_FAIL_NATIVE_HOOK: '1' });
+    await signal('workers-started', 'SIGTERM');
+    assert.equal(await exitWithin(target.server, 3000), 1);
+    assert.ok((await events()).some(row => row.event === 'core-shutdown-complete'));
+    assert.match(await readFile(join(fixture.logs, 'owned-error.log'), 'utf8'), /Error while settling owned native work/);
+  });
+  await t.test('a stalled owned native adapter also spends the same seven-second total budget', async () => {
+    const target = await stalled('owned-stall', { ENTRY_STALL_NATIVE_HOOK: '1' });
+    const started = Date.now();
+    await signal('workers-started', 'SIGTERM');
+    assert.equal(await exitWithin(target.server, 9000), 1);
+    const elapsed = Date.now() - started;
+    assert.ok(elapsed >= 6800 && elapsed < 8000);
+    assert.match(await readFile(join(fixture.logs, 'owned-stall.log'), 'utf8'), /Total shutdown deadline exceeded/);
+    t.diagnostic(`Owned adapter stall signal-to-exit ${elapsed} ms; exit 1`);
   });
   await fixture.noNetwork();
 });
