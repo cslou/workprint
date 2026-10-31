@@ -51,4 +51,5 @@ export function createApplication(collaborators: ApplicationCollaborators) {
 export type Application = ReturnType<typeof createApplication>;
 export { withUploads, type UploadApplication } from './uploads.js';
 export { withManualSaves, type ManualSaveApplication } from './manual-saves.js';
+export { withVersionUses, type VersionUseApplication } from './version-uses.js';
 export { withSavedWork, type SavedWorkApplication, type SavedWorkReads } from './saved-reads.js';

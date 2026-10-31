@@ -14,6 +14,12 @@ Human saves preserve existing structured fields, order, stable identities and ex
 
 A short transaction serializes the trusted owner/conversation/command/operation identity, rechecks a canonical payload hash, checks the latest artifact base and commits publication, immutable version/dependencies, optional exact approved use, immutable result and manual-change journal together. Identical retries return that original result without reapplying use effects, even after later decisions. Conflicting payload reuse is invalid. The journal retains the edited base and previous exact use version separately; reads do not consume changes. No native turn, provider call, native wait or external collaborator runs inside SQL.
 
+## Human exact-version reuse
+
+`createVersionUses()` supplies a human-only capability for owned Script, reference and Storyboard uses. It authorizes the target conversation and exact version's native origin before SQL; reference use also accepts owned saved images/videos without granting a Shot/Panel choice. A short owner-serialized transaction updates only the matching purpose/role/artifact use, preserves independent conversation uses and records an immutable command result. It creates no Artifact Version, object copy, automatic latest pin or selection revision. Identical retries return the original result without reapplying a later decision; conflicting payload reuse fails. New associations respect the existing100-use workspace bound. Panel-image and Shot-video decisions retain their unavailable application boundary.
+
+The in-progress Library delivery still needs test-only built-in read-only semantics, reference-association editing and approved inspection/recovery consumers; this capability is not completion of those boundaries.
+
 ## Private upload coordination
 
 `uploads/records.ts` owns immutable request/confirmation identities and short SQL lease/reservation phases; `coordinator.ts` owns the admitted bounded request; `completion.ts` commits visibility; `cleanup.ts` performs explicit bounded cleanup. `policy.ts` validates MIME/size/kind and exact existing Shot/Panel targets. Native ownership and target-origin authorization finish outside SQL, as do all storage and inspection waits. Composition supplies private S3 mechanics, never caller ownership/producer flags.

@@ -5,3 +5,4 @@ export { createMediaVerifier } from './uploads/media-verifier.js';
 export type { MediaVerifier, VerifiedMedia } from './uploads/types.js';
 export { ArtifactError } from './errors.js';
 export { createArtifactWriters, type ArtifactSaveWriter } from './writers.js';
+export { createVersionUses } from './uses.js';
