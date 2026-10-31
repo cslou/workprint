@@ -1,0 +1,4 @@
+/* Frozen r73 surroundings with the approved upload composer's disabled attachment state. */
+.composer .attach[aria-disabled="true"] { opacity: var(--opacity-disabled); }
+/* Existing asset-row/key-placeholder primitives, with matched synthetic public version facts. */
+.receipt-key { display: grid; place-items: center; width: 56px; height: 56px; border: var(--border-dashed); border-radius: var(--radius-md); color: var(--color-text-subtle); font-size: 11px; background: var(--color-bg-sunken); }

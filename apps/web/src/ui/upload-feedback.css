@@ -1,6 +1,6 @@
 .wp-upload-status { width: min(640px, 100%); margin: 0 auto 24px; padding: 16px; border: 1px solid var(--color-border-default); border-radius: var(--radius-xl); background: var(--color-bg-surface); }
 .wp-upload-status h3 { font-size: 14px; margin: 0 0 4px; overflow-wrap: anywhere; }
-.wp-upload-status p { margin: 8px 0; font-size: 13px; color: var(--color-text-secondary); }
+.wp-upload-status p[role="status"], .wp-upload-status p.wp-upload-meta { margin: 8px 0; font-size: 13px; color: var(--color-text-secondary); }
 .wp-upload-meta { font-size: 12px; color: var(--color-text-subtle); overflow-wrap: anywhere; }
 .wp-upload-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 .wp-upload-media { width: min(480px, 100%); }

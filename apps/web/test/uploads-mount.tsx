@@ -5,11 +5,12 @@ import type { ReadScope } from '../src/api/use-scoped-read.js';
 import { createBrowserClient } from '../src/api/client.js';
 import type { BrowserClient } from '../src/api/client.js';
 import { Composer } from '../src/conversation/composer.js';
+import { Shell } from '../src/shell/shell.js';
 import { confirmUpload } from '../src/uploads/uploads.js';
 import '../src/ui/tokens.css';
 import '../src/ui/foundations.css';
 
-// Isolated actual upload composer/consumer. No production shell or fabricated confirmation control.
+// Actual Composer, optionally in the unchanged Shell for main-context verification. No fabricated confirmation.
 const node = document.getElementById('root');
 if (!node) throw new Error('Missing uploads test root');
 const root = createRoot(node);
@@ -17,13 +18,15 @@ let connection: BrowserClient = { kind: 'missing' };
 let scope: ReadScope | null = null;
 let accessToken: string | null = null;
 let confirmation = '';
+let fullShell = false;
 const uiUploadSession = createUploadSession();
 let mountGeneration = 0;
 let pending: AbortController | null = null;
 let prepared: { file: File; grant: OperationResponse<'requestUpload'>; confirmOperation: string } | null = null;
-const render = () => root.render(<div style={{ width: 'min(720px, 100%)' }}><Composer uploadSession={uiUploadSession} key={JSON.stringify([scope?.accountId ?? null, scope?.conversationId ?? null])} native={nativeConversations} connection={connection} scope={scope} /><p className={confirmation ? 'wp-chat-feedback' : undefined} data-confirm role="status">{confirmation}</p></div>);
+const render = () => root.render(fullShell && scope ? <Shell connection={connection} session={{accountId:scope.accountId,name:'Synthetic creator'}} {...(scope.conversationId ? {conversationId:scope.conversationId} : {})}/> : <div style={{ width: 'min(720px, 100%)' }}><Composer uploadSession={uiUploadSession} key={JSON.stringify([scope?.accountId ?? null, scope?.conversationId ?? null])} native={nativeConversations} connection={connection} scope={scope} /><p className={confirmation ? 'wp-chat-feedback' : undefined} data-confirm role="status">{confirmation}</p></div>);
 (window as unknown as { uploadsTest: unknown }).uploadsTest = {
-  configure({ apiOrigin, token = null, accountId, conversationId }: { apiOrigin?: string; token?: string | null; accountId: string; conversationId?: string }) {
+  configure({ apiOrigin, token = null, accountId, conversationId, fullShell: shell = false }: { apiOrigin?: string; token?: string | null; accountId: string; conversationId?: string; fullShell?: boolean }) {
+    fullShell = shell;
     mountGeneration += 1; pending?.abort(); prepared = null;
     accessToken = token;
     if (apiOrigin !== undefined) connection = createBrowserClient(apiOrigin, async () => accessToken);
@@ -61,5 +64,6 @@ const render = () => root.render(<div style={{ width: 'min(720px, 100%)' }}><Com
     }
     return outcome.kind;
   },
+  rotateToken(token: string) { accessToken = token; },
   unmount() { mountGeneration += 1; pending?.abort(); prepared = null; root.render(null); },
 };

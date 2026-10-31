@@ -15,7 +15,7 @@ import type { PrivateStorageConfiguration } from '../src/storage/index.js';
 
 // Shared by current-scope checks and the separately invoked B-001 qualification.
 // Private fixture input is never inherited by serving. Accounts already exist.
-export type BuiltAdmissionTarget = { origin: string; accessToken: string; accessTokens: readonly string[]; logs: string };
+export type BuiltAdmissionTarget = { origin: string; accessToken: string; accessTokens: readonly string[]; refreshAccessTokens(): Promise<readonly string[]>; logs: string };
 export type SavedWorkSetup = { accountIds: readonly string[]; native: PostgresStore; servingUrl: string; setupUrl?: string };
 type FixtureContext = { diagnostic(message: string): void; after(cleanup: () => void | Promise<void>): void };
 export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (server: BuiltAdmissionTarget) => Promise<void>, options: { browserOrigin?: string; storage?: PrivateStorageConfiguration; media?: { toolchainDirectory: string; dockerPath: string; archivePath?: string }; prepareSavedWork?: (setup: SavedWorkSetup) => Promise<void>; verifySavedEffects?: (servingUrl: string) => Promise<void> } = {}) {
@@ -66,7 +66,7 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
   `);
   const productionEntry = await build('production', `export { mastra } from ${JSON.stringify(join(root, 'apps/api/src/mastra/index.ts'))};`);
   // Fresh sign-ins happen after building. Never log request/response credentials.
-  const identities = await Promise.all(config.accounts.map(async (account) => {
+  const signIn = () => Promise.all(config.accounts.map(async (account) => {
     const response = await fetch(`${config.url}/auth/v1/token?grant_type=password`, {
       method: 'POST', headers: { apikey: config.anonKey, 'Content-Type': 'application/json' },
       body: JSON.stringify(account), signal: AbortSignal.timeout(3000),
@@ -74,6 +74,12 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
     assert.equal(response.status, 200, 'Authorized fixture sign-in');
     return await response.json() as { access_token: string; user: { id: string } };
   }));
+  const identities = await signIn(), accessTokens = identities.map(identity => identity.access_token);
+  const refreshAccessTokens = async () => {
+    const refreshed = await signIn();
+    assert.deepEqual(refreshed.map(identity => identity.user.id), identities.map(identity => identity.user.id), 'Renewed fixture sign-ins retain exact owners');
+    const tokens = refreshed.map(identity => identity.access_token); accessTokens.push(...tokens); return tokens;
+  };
   assert.notEqual(identities[0]!.user.id, identities[1]!.user.id);
   // Application tests own their data database; Auth alone uses the authorized shared stack.
   const database = await isolatedPostgres();
@@ -229,7 +235,7 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
   assert.equal(oversized.status, 400, 'Application rejects completed JSON beyond 1 MiB');
   assert.equal(oversized.payload.error.code, 'invalid_input');
 
-  if (qualifyIngress) await qualifyIngress({ origin, accessToken: identities[0]!.access_token, accessTokens: identities.map((identity) => identity.access_token), logs: fixture.logs });
+  if (qualifyIngress) await qualifyIngress({ origin, accessToken: identities[0]!.access_token, accessTokens: identities.map((identity) => identity.access_token), refreshAccessTokens, logs: fixture.logs });
   for (const [path, method] of [['/v1/conversations/c/workspace/extra', 'GET'], ['/v1/conversations//workspace', 'GET'], ['/v1/conversations/c/workspace', 'POST'], ['/v1/library/', 'GET']] as const) {
     assert.equal((await raw(path, method, undefined)).status, 404, 'Only exact catalog paths/methods are admitted');
   }
@@ -252,7 +258,7 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
   await production.stop();
   for (const name of ['probe.log', 'production.log', 'probe-build.log', 'production-build.log', 'failure.log', 'malformed.log', 'stall.log', 'body-stall.log']) {
     const log = await readFile(join(fixture.logs, name), 'utf8');
-    for (const secret of [sentinel, signingKey, signingControl, expired, config.anonKey, config.servingUrl, new URL(config.servingUrl).password, ...config.accounts.map((account) => account.password), ...identities.map((identity) => identity.access_token)]) assert.ok(!log.includes(secret));
+    for (const secret of [sentinel, signingKey, signingControl, expired, config.anonKey, config.servingUrl, new URL(config.servingUrl).password, ...config.accounts.map((account) => account.password), ...accessTokens]) assert.ok(!log.includes(secret));
   }
   await fixture.noNetwork();
 }
