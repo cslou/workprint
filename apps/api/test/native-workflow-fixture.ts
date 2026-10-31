@@ -14,8 +14,8 @@ export async function workflowWatch<T>(work: Promise<T>, milliseconds: number): 
   finally { clearTimeout(timer); }
 }
 
-export async function nativeWorkflowFixture() {
-  const fixture = await nativeControlFixture({ workflows: true });
+export async function nativeWorkflowFixture(options: { workflowResumeBoundary?: 'createRun' | 'resume' } = {}) {
+  const fixture = await nativeControlFixture({ workflows: true, ...options });
   const state = async () => {
     const response = await fixture.request('/workflow-test/state'); assert.equal(response.status, 200);
     const value = await response.json() as RuntimeState;
@@ -37,7 +37,7 @@ export async function nativeWorkflowFixture() {
     const value = await wait(value => value.pool.total === value.pool.idle && value.pool.waiting === 0, 1000);
     assert.equal(await fixture.servingBusy(), 0); return value.pool;
   };
-  const start = async (kind: 'held' | 'suspend' | 'failure' | 'sleep' | 'deadline' = 'held', who = 0, waitMs?: number) => {
+  const start = async (kind: 'held' | 'suspend' | 'suspend-held' | 'failure' | 'sleep' | 'deadline' = 'held', who = 0, waitMs?: number) => {
     const response = await request({ action: 'start', kind, ...(waitMs === undefined ? {} : { waitMs }) }, who); assert.equal(response.status, 200);
     const value = await response.json() as { runId: string; resourceId: string; ack: { runId: string } };
     assert.equal(value.resourceId, fixture.users[who]!.id); assert.equal(value.ack.runId, value.runId); return value.runId;
@@ -67,4 +67,3 @@ export async function nativeWorkflowFixture() {
   return { ...fixture, workflowState: state, workflowRequest: request, workflowControl: control, workflowRows: rows, savedWorkflow: saved,
     waitWorkflow: wait, idleWorkflowPool: idlePool, startWorkflow: start, releasedWorkflow: released, settleWorkflow: settle, shutdown };
 }
-export type NativeWorkflowFixture = Awaited<ReturnType<typeof nativeWorkflowFixture>>;

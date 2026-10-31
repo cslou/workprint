@@ -13,14 +13,16 @@ export function nativeWorkflowDefinition(budget: NativeWorkflowBudget, releaseTe
     if (result.status === 'suspended') budget.suspend(result.runId);
     else if (terminalWorkflow(result.status)) await releaseTerminal({ runId: result.runId, workflowName: result.workflowId, resourceId: result.resourceId });
   } };
-  const input = z.object({ kind: z.enum(['held', 'suspend', 'failure']), waitMs: z.number().int().min(1).max(workflowFixtureLimits.waitMs) });
+  const input = z.object({ kind: z.enum(['held', 'suspend', 'suspend-held', 'failure']), waitMs: z.number().int().min(1).max(workflowFixtureLimits.waitMs) });
   const output = z.object({ progress: z.number().int() });
   const work = createStep({ id: 'qualification-work', inputSchema: input, outputSchema: output, resumeSchema: z.object({ proceed: z.boolean() }), suspendSchema: z.object({ waiting: z.boolean() }), retries: 0,
     execute: async ({ inputData, resumeData, suspend, runId, abortSignal }) => {
+      // Native step entry confirms resumption; failed handle/claim operations keep the original wait timer.
+      if (resumeData) budget.resume(runId);
       entered++; events.push({ kind: 'entered', runId, progress: 1 });
       if (inputData.kind === 'failure') throw new Error('Controlled native workflow failure');
-      if (inputData.kind === 'suspend' && !resumeData) return suspend({ waiting: true });
-      if (inputData.kind === 'held') await new Promise<void>((resolve, reject) => {
+      if ((inputData.kind === 'suspend' || inputData.kind === 'suspend-held') && !resumeData) return suspend({ waiting: true });
+      if (inputData.kind === 'held' || inputData.kind === 'suspend-held') await new Promise<void>((resolve, reject) => {
         active++;
         let done = false;
         const finish = (kind: string) => {

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import test from 'node:test';
 import { nativeWorkflowFixture, workflowWatch } from './native-workflow-fixture.js';
 
@@ -54,4 +55,64 @@ for (const boundary of ['explicit', 'wait-deadline', 'run-deadline', 'shutdown']
   const log = await readFile(join(fixture.logs, 'native-turn-http.log'), 'utf8');
   assert.doesNotMatch(log, /"event":"native-workflow-settled"/, 'No false settled receipt');
   assert.equal(await fixture.servingConnections(), 0);
+});
+
+for (const boundary of ['createRun', 'resume'] as const) test(`real PG ${boundary} failure preserves the original five-second suspension deadline`, { timeout: 45000 }, async t => {
+  const fixture = await nativeWorkflowFixture({ workflowResumeBoundary: boundary });
+  t.diagnostic(`Evidence: ${fixture.logs}`);
+  t.after(async () => {
+    try {
+      await fixture.releaseWorkflowResume();
+      await fixture.workflowReadability(true); await fixture.workflowPersistence(true);
+      await fixture.settleWorkflow();
+    } finally { await fixture.close(); }
+  });
+  const started = performance.now(), runId = await fixture.startWorkflow('suspend');
+  await fixture.waitWorkflow(async value => value.budget.timers === 2 && (await fixture.savedWorkflow(runId)).status === 'suspended');
+  await delay(2600); // Age the original wait budget: restarting five seconds must fail this test.
+  const pending = fixture.workflowRequest({ action: 'resume', runId });
+  await fixture.waitWorkflow(() => fixture.workflowResumeReached(), 1000);
+  if (boundary === 'createRun') await fixture.workflowReadability(false);
+  else await fixture.workflowPersistence(false);
+  await fixture.releaseWorkflowResume();
+  const response = await pending;
+  await fixture.workflowReadability(true); await fixture.workflowPersistence(true);
+  assert.equal(response.status, 500, 'Actual native persistence/handle acquisition fails, not a fabricated adapter result');
+  assert.equal((await fixture.savedWorkflow(runId)).status, 'suspended');
+  assert.equal((await fixture.workflowState()).entered, 1, 'Failed resume never re-enters the native step');
+  await fixture.idleWorkflowPool();
+  const log = await readFile(join(fixture.logs, 'native-turn-http.log'), 'utf8');
+  assert.match(log, /permission denied for table/);
+  const remaining = Math.max(1, 6400 - (performance.now() - started));
+  await workflowWatch(fixture.waitWorkflow(async () => (await fixture.savedWorkflow(runId)).status === 'canceled', remaining), remaining + 200);
+  const elapsed = performance.now() - started, state = await fixture.workflowState();
+  assert.ok(elapsed >= 4800 && elapsed < 6400, `Original suspension deadline: ${elapsed} ms`);
+  assert.equal(state.budget.waitExpired, 1); assert.equal(state.budget.runExpired, 0);
+  assert.equal(state.budget.active, 0); assert.equal(state.budget.timers, 0); assert.equal(state.budget.errors, 0);
+  assert.equal((await fixture.savedWorkflow(runId)).runId, runId);
+  await fixture.releasedWorkflow(); await fixture.idleWorkflowPool();
+  t.diagnostic(JSON.stringify({ resumeBoundary: boundary, httpStatus: response.status, originalWaitElapsedMs: elapsed, status: 'canceled', budget: state.budget }));
+});
+
+test('actual native resumed work outlives the original suspension deadline without cancellation or a borrowed pool client', { timeout: 45000 }, async t => {
+  const fixture = await nativeWorkflowFixture();
+  t.diagnostic(`Evidence: ${fixture.logs}`);
+  t.after(async () => { try { await fixture.settleWorkflow(); } finally { await fixture.close(); } });
+  const started = performance.now(), runId = await fixture.startWorkflow('suspend-held');
+  await fixture.waitWorkflow(async value => value.budget.timers === 2 && (await fixture.savedWorkflow(runId)).status === 'suspended');
+  await delay(2600);
+  const pending = fixture.workflowRequest({ action: 'resume', runId });
+  await fixture.waitWorkflow(value => value.gates.includes(runId) && value.entered === 2);
+  await delay(Math.max(0, 5350 - (performance.now() - started)));
+  assert.equal((await fixture.savedWorkflow(runId)).status, 'running');
+  const state = await fixture.workflowState();
+  assert.equal(state.budget.waitExpired, 0); assert.equal(state.budget.runExpired, 0);
+  assert.equal(state.budget.active, 1); assert.equal(state.budget.timers, 1, 'Only the unchanged whole-run deadline remains');
+  const pool = await fixture.idleWorkflowPool();
+  await fixture.workflowControl('release', runId);
+  assert.equal((await pending).status, 200);
+  await fixture.releasedWorkflow();
+  assert.equal((await fixture.savedWorkflow(runId)).status, 'success');
+  assert.deepEqual((await fixture.savedWorkflow(runId)).result, { progress: 2 });
+  t.diagnostic(JSON.stringify({ resumedPastOriginalWaitMs: performance.now() - started, status: 'success', pool, waitExpired: state.budget.waitExpired }));
 });

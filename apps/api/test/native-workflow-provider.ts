@@ -17,14 +17,13 @@ export const workflowRecord = (run: WorkflowRun) => {
   return { runId: run.runId, resourceId: run.resourceId, workflowName: run.workflowName, status: snapshot.status, result: snapshot.result,
     steps: snapshot.context, errorName: snapshot.error?.name };
 };
-export type NativeWorkflowRecord = ReturnType<typeof workflowRecord>;
 
 /** Separate build input only. Native snapshots, not permits or caller claims, authorize controls. */
-export function controlledNativeWorkflowProvider() {
+export function controlledNativeWorkflowProvider(options: { beforeResume?: (phase: 'createRun' | 'resume') => Promise<void> } = {}) {
   const turns = controlledNativeControlProvider();
   const budget = nativeWorkflowBudget();
   let mastra: Mastra | undefined;
-  const startSchema = z.object({ action: z.literal('start'), kind: z.enum(['held', 'suspend', 'failure', 'sleep', 'deadline']),
+  const startSchema = z.object({ action: z.literal('start'), kind: z.enum(['held', 'suspend', 'suspend-held', 'failure', 'sleep', 'deadline']),
     waitMs: z.number().int().min(1).max(workflowFixtureLimits.waitMs).default(workflowFixtureLimits.waitMs), resourceId: z.uuid().optional() }).strict();
   const controlSchema = z.object({ action: z.enum(['read', 'cancel', 'resume', 'release']), runId: z.uuid() }).strict();
   const storage = async () => {
@@ -59,7 +58,7 @@ export function controlledNativeWorkflowProvider() {
         const run = await workflow.createRun({ resourceId: account });
         cancelStarted = () => cancel({ runId: run.runId, workflowName: workflow.id, resourceId: account }, () => run.cancel());
         permit.bind(run.runId, cancelStarted);
-        const ack = await run.startAsync({ inputData: { kind: kind === 'suspend' || kind === 'failure' ? kind : 'held', waitMs, progress: 0 } });
+        const ack = await run.startAsync({ inputData: { kind: kind === 'suspend' || kind === 'suspend-held' || kind === 'failure' ? kind : 'held', waitMs, progress: 0 } });
         return context.json({ runId: run.runId, resourceId: run.resourceId, ack });
       } catch (error) {
         if (cancelStarted) await cancelStarted();
@@ -81,8 +80,9 @@ export function controlledNativeWorkflowProvider() {
       await cancel({ runId, workflowName: workflow.id, resourceId: account }, () => run.cancel());
     } else if (action === 'resume') {
       if (workflow !== definition.controlled || workflowSnapshot(row).status !== 'suspended') return context.json({ invalid: true }, 400);
-      budget.resume(runId);
+      await options.beforeResume?.('createRun');
       const run = await definition.controlled.createRun({ runId, resourceId: account });
+      await options.beforeResume?.('resume');
       await run.resume({ step: 'qualification-work', resumeData: { proceed: true } });
     }
     const current = await store.getWorkflowRunById({ runId });

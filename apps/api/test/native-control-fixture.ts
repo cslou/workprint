@@ -3,7 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import type { NativeControlState } from './native-control-provider.js';
 import { nativeTurnFixture, releasedNativeFixture } from './native-turn-fixture.js';
 
-export async function nativeControlFixture(options: { workflows?: boolean } = {}) {
+export async function nativeControlFixture(options: { workflows?: boolean; workflowResumeBoundary?: 'createRun' | 'resume' } = {}) {
   const fixture = await nativeTurnFixture({ control: true, ...options });
   const state = async (): Promise<NativeControlState> => {
     const response = await fixture.request('/turn-test/control'); assert.equal(response.status, 200);

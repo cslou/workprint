@@ -1,7 +1,7 @@
 import { PostgresStore } from '@mastra/pg';
 import { randomUUID } from 'node:crypto';
 import { MastraClient } from '@mastra/client-js';
-import { writeFile } from 'node:fs/promises';
+import { access, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { isolatedAuth } from './isolated-auth.js';
@@ -15,7 +15,7 @@ import { createNativeTextMemory } from '../src/agent/mastra/native-text-memory.j
 import { nativeTurnLimits } from '../src/agent/index.js';
 import { setTimeout as delay } from 'node:timers/promises';
 
-export async function nativeTurnFixture(options: { control?: boolean; workflows?: boolean } = {}) {
+export async function nativeTurnFixture(options: { control?: boolean; workflows?: boolean; workflowResumeBoundary?: 'createRun' | 'resume' } = {}) {
   const auth = await isolatedAuth();
   const cleanups: (() => Promise<unknown>)[] = [auth.close];
   const close = async () => {
@@ -31,11 +31,23 @@ export async function nativeTurnFixture(options: { control?: boolean; workflows?
     const base = await buildServerComposition(env.logs, 'native-turns', undefined, env.env);
     const project = resolve(dirname(base), '../..'); const entry = join(project, 'turn-entry.mjs');
     const provider = options.workflows ? ['native-workflow-provider', 'controlledNativeWorkflowProvider'] : options.control ? ['native-control-provider', 'controlledNativeControlProvider'] : ['native-turn-provider', 'controlledTurnProvider'];
+    const resumeEntered = join(env.logs, 'workflow-resume-entered'), resumeRelease = join(env.logs, 'workflow-resume-release');
+    const resumeOptions = options.workflowResumeBoundary ? `{ beforeResume: async phase => {
+      if (phase !== ${JSON.stringify(options.workflowResumeBoundary)}) return;
+      await writeFile(${JSON.stringify(resumeEntered)}, phase, { mode: 0o600 });
+      const end = performance.now() + 2000;
+      while (!await access(${JSON.stringify(resumeRelease)}).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error; })) {
+        if (performance.now() >= end) throw new Error('Native resume boundary watchdog exceeded');
+        await delay(10);
+      }
+    } }` : '';
     await writeFile(entry, `
+      import { access, writeFile } from 'node:fs/promises';
+      import { setTimeout as delay } from 'node:timers/promises';
       import {${provider[1]} as createProvider} from ${JSON.stringify(pathToFileURL(join(root, `apps/api/.test-build/test/${provider[0]}.js`)).href)};
       import {createBackend} from './src/mastra/backend.js';
       import {startServer} from './src/mastra/server.js';
-      const probe=createProvider();
+      const probe=createProvider(${resumeOptions});
       const mastra=await createBackend(probe.routes,probe.model);
       probe.instrument(mastra.getAgent('assistant'));
       probe.configure?.(mastra);
@@ -75,6 +87,11 @@ export async function nativeTurnFixture(options: { control?: boolean; workflows?
       nativeRuns: async () => { const workflows = await store.getStore('workflows'); if (!workflows) throw new Error('Native fixture workflows unavailable'); return (await workflows.listWorkflowRuns({ page: 0, perPage: 100 })).runs.length; },
       servingBusy: async () => Number((await query(db.adminUrl, "SELECT count(*) AS busy FROM pg_stat_activity WHERE datname = current_database() AND usename = 'wp_serving' AND state <> 'idle'")).rows[0]?.busy),
       servingConnections: async () => Number((await query(db.adminUrl, "SELECT count(*) AS connections FROM pg_stat_activity WHERE datname = current_database() AND usename = 'wp_serving'")).rows[0]?.connections),
+      workflowResumeReached: () => access(resumeEntered).then(() => true, (error: NodeJS.ErrnoException) => { if (error.code === 'ENOENT') return false; throw error; }),
+      releaseWorkflowResume: () => writeFile(resumeRelease, '', { mode: 0o600 }),
+      workflowReadability: (enabled: boolean) => query(db.setupUrl, enabled
+        ? 'GRANT SELECT ON ALL TABLES IN SCHEMA mastra TO wp_serving'
+        : 'REVOKE SELECT ON ALL TABLES IN SCHEMA mastra FROM wp_serving'),
       workflowPersistence: (enabled: boolean) => query(db.setupUrl, enabled
         ? 'GRANT UPDATE ON ALL TABLES IN SCHEMA mastra TO wp_serving'
         : 'REVOKE UPDATE ON ALL TABLES IN SCHEMA mastra FROM wp_serving'),
