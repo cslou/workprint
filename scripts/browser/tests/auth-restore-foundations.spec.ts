@@ -36,7 +36,7 @@ test('cold validation retry coalesces, restores exact native history and leaves 
     const saved = await f.application!.saveNative(user.id, [{ role: 'user', text: 'Exact restoration proof — synthetic, not AI' }], 'Retry owned history');
     const before = await f.application!.snapshot();
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
-    await page.goto(origin); await account(page); await signIn(page, user.email, user.password);
+    await page.goto(origin + '/app'); await account(page); await signIn(page, user.email, user.password);
     await expect(page.getByRole('dialog')).toBeHidden();
     await f.auth.pauseAuthUpstream();
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
@@ -76,7 +76,7 @@ test('failed cold retry settles and may be explicitly retried without password e
   try {
     await observeOwner(page); const user = await f.auth.createAccount();
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
-    await page.goto(origin); await account(page); await signIn(page, user.email, user.password); await expect(page.getByRole('dialog')).toBeHidden();
+    await page.goto(origin + '/app'); await account(page); await signIn(page, user.email, user.password); await expect(page.getByRole('dialog')).toBeHidden();
     await f.auth.pauseAuthUpstream();
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 2 });
     await page.reload(); await expect.poll(() => snapshot(page)).toEqual({ screen: 'startup-failed', confirmed: false, busy: false });

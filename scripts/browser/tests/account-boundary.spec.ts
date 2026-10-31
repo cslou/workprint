@@ -8,7 +8,7 @@ const login = (network: MaterialNetwork, url: string) => network.expectOperation
 test('genuine authenticated revocation after failure clears uncertainty', async ({ page, materialNetwork }) => {
   test.setTimeout(45000); const f = await fixture(page);
   try {
-    const user = await f.auth.createAccount(); await page.goto(origin); await account(page); login(materialNetwork, f.auth.url); await signIn(page, user.email, user.password); await expect(page.getByRole('dialog')).toBeHidden(); await account(page, user.email);
+    const user = await f.auth.createAccount(); await page.goto(origin + '/app'); await account(page); login(materialNetwork, f.auth.url); await signIn(page, user.email, user.password); await expect(page.locator('[role="dialog"], .wp-auth-card')).toBeHidden(); await account(page, user.email);
     await page.evaluate(() => {
       const original = Storage.prototype.removeItem;
       (window as unknown as { restoreRemoval: () => void }).restoreRemoval = () => { Storage.prototype.removeItem = original; };
@@ -16,12 +16,12 @@ test('genuine authenticated revocation after failure clears uncertainty', async 
     });
     await f.auth.pauseAuthUpstream();
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/logout', query: { scope: 'local' }, count: 1 });
-    await page.getByRole('button', { name: 'Sign out', exact: true }).click(); await expect(page.getByRole('dialog')).toContainText('We couldn’t confirm sign-out.');
+    await page.getByRole('button', { name: 'Sign out', exact: true }).click(); await expect(page.locator('[role="dialog"], .wp-auth-card')).toContainText('We couldn’t confirm sign-out.');
     await page.evaluate(() => (window as unknown as { restoreRemoval: () => void }).restoreRemoval()); await f.auth.resumeAuthUpstream();
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/logout', query: { scope: 'local' }, count: 1 });
     const confirmed = page.waitForResponse(response => new URL(response.url()).pathname === '/auth/v1/logout' && response.status() === 204);
     await page.getByRole('button', { name: 'Try sign-out again', exact: true }).click(); await confirmed;
-    await expect(page.getByRole('dialog')).toContainText('Signed out.'); await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeEnabled();
+    await expect(page.locator('[role="dialog"], .wp-auth-card')).toContainText('Signed out.'); await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeEnabled();
   } finally { await f.close(); }
 });
 
@@ -34,7 +34,7 @@ test('failed browser storage can be repaired locally before fresh SDK sign-in', 
       (window as unknown as { restoreStorage: () => void }).restoreStorage = () => { Storage.prototype.setItem = original; };
       Storage.prototype.setItem = function(key, value) { if (key === 'workprint.auth-storage-check') throw new DOMException('Controlled unavailable storage', 'QuotaExceededError'); return original.call(this, key, value); };
     });
-    await page.goto(origin); await expect(page.getByRole('dialog')).toContainText('Account access is locked in this tab.');
+    await page.goto(origin + '/app'); await expect(page.locator('[role="dialog"], .wp-auth-card')).toContainText('Account access is locked in this tab.');
     await page.evaluate(() => (window as unknown as { restoreStorage: () => void }).restoreStorage());
     await page.getByRole('button', { name: 'Try again', exact: true }).click();
     await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
@@ -46,7 +46,7 @@ test('failed browser storage can be repaired locally before fresh SDK sign-in', 
 test('pending and unconfirmed sign-out report unsaved lock without false retry success', async ({ page, materialNetwork }) => {
   test.setTimeout(45000); const f = await fixture(page); let release: (() => void) | undefined;
   try {
-    const user = await f.auth.createAccount(); await page.goto(origin); await account(page); login(materialNetwork, f.auth.url); await signIn(page, user.email, user.password); await expect(page.getByRole('dialog')).toBeHidden(); await account(page, user.email);
+    const user = await f.auth.createAccount(); await page.goto(origin + '/app'); await account(page); login(materialNetwork, f.auth.url); await signIn(page, user.email, user.password); await expect(page.locator('[role="dialog"], .wp-auth-card')).toBeHidden(); await account(page, user.email);
     await page.evaluate(() => {
       const original = Storage.prototype.setItem;
       (window as unknown as { restoreStorage: () => void }).restoreStorage = () => { Storage.prototype.setItem = original; };
@@ -60,16 +60,16 @@ test('pending and unconfirmed sign-out report unsaved lock without false retry s
     });
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/logout', query: { scope: 'local' }, count: 1 });
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
-    await expect(page.getByRole('dialog')).toContainText('Signing out…');
-    await expect(page.getByRole('dialog')).toContainText('Your browser couldn’t save the account lock. Access is locked in this tab.');
+    await expect(page.locator('[role="dialog"], .wp-auth-card')).toContainText('Signing out…');
+    await expect(page.locator('[role="dialog"], .wp-auth-card')).toContainText('Your browser couldn’t save the account lock. Access is locked in this tab.');
     await expect(page.getByRole('button', { name: 'Try sign-out again', exact: true })).toHaveCount(0);
     await expect.poll(() => held).toBe(true); release!();
-    await expect(page.getByRole('dialog')).toContainText('We couldn’t confirm sign-out.');
-    await expect(page.getByRole('dialog')).toContainText('the lock couldn’t be saved.');
+    await expect(page.locator('[role="dialog"], .wp-auth-card')).toContainText('We couldn’t confirm sign-out.');
+    await expect(page.locator('[role="dialog"], .wp-auth-card')).toContainText('the lock couldn’t be saved.');
     await page.evaluate(() => (window as unknown as { restoreStorage: () => void }).restoreStorage());
     await page.getByRole('button', { name: 'Try sign-out again', exact: true }).click();
-    await expect(page.getByRole('dialog')).toContainText('Account access is locked here. Try signing out again.');
-    await expect(page.getByRole('dialog')).not.toContainText('Signed out.');
+    await expect(page.locator('[role="dialog"], .wp-auth-card')).toContainText('Account access is locked here. Try signing out again.');
+    await expect(page.locator('[role="dialog"], .wp-auth-card')).not.toContainText('Signed out.');
     // The one-logout allowance proves the credential-free retry did not authenticate revocation.
   } finally { release?.(); await f.close(); }
 });
@@ -100,8 +100,8 @@ test('late real terminal body cannot fence a newly authenticated account', async
     const old = await f.auth.createAccount(), newer = await f.auth.createAccount();
     await f.application!.saveNative(old.id); const saved = await f.application!.snapshot();
     await page.clock.install({ time: Date.now() }); await page.clock.pauseAt(Date.now());
-    await page.goto(origin); await account(page); login(materialNetwork, f.auth.url); await signIn(page, old.email, old.password); await expect(page.getByRole('dialog')).toBeHidden();
-    const other = await context.newPage(); materialNetwork.expectOperations({ origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 }); await other.goto(origin); await expect(other.getByRole('button', { name: old.email, exact: true })).toBeVisible();
+    await page.goto(origin + '/app'); await account(page); login(materialNetwork, f.auth.url); await signIn(page, old.email, old.password); await expect(page.locator('[role="dialog"], .wp-auth-card')).toBeHidden();
+    const other = await context.newPage(); materialNetwork.expectOperations({ origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 }); await other.goto(origin + '/app'); await expect(other.getByRole('button', { name: old.email, exact: true })).toBeVisible();
     expect((await f.auth.request('admin/users/' + old.id, undefined, f.auth.serviceKey, 'DELETE')).status).toBe(200);
     // Drive the owning read explicitly; do not run both tabs' automatic-refresh timers.
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'refresh_token' }, count: 1 });
@@ -131,10 +131,10 @@ test('late real terminal body cannot fence a newly authenticated account', async
 });
 
 async function enterRecovery(page: import('@playwright/test').Page, materialNetwork: MaterialNetwork, f: Awaited<ReturnType<typeof fixture>>, email: string) {
-    await page.goto(origin); await account(page); await page.getByRole('button', { name: 'Forgot password?', exact: true }).click();
+    await page.goto(origin + '/app'); await account(page); await page.getByRole('button', { name: 'Forgot password?', exact: true }).click();
     await privateFill(page.getByLabel('Email', { exact: true }), email);
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/recover', query: { redirect_to: origin + '/auth/callback' }, count: 1 });
-    await page.getByRole('button', { name: 'Send reset link', exact: true }).click(); await expect(page.getByRole('dialog')).toContainText('Check your email.');
+    await page.getByRole('button', { name: 'Send reset link', exact: true }).click(); await expect(page.locator('[role="dialog"], .wp-auth-card')).toContainText('Check your email.');
     const link = await f.auth.recoveryLink(email);
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'GET', path: '/auth/v1/verify', query: { token: '[private]', type: 'recovery', redirect_to: origin + '/auth/callback' }, count: 1 }, { origin, method: 'GET', path: '/auth/callback', query: { code: '[private]' }, count: 1 }, { origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'pkce' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
     await privateNavigate(page, link); await expect(page.getByLabel('New password', { exact: true })).toBeVisible();
@@ -146,7 +146,7 @@ test('late failed recovery navigation cannot replace a newer sign-in intent', as
     const first = await f.auth.createAccount(), newer = await f.auth.createAccount();
     await page.clock.install({ time: Date.now() }); await page.clock.pauseAt(Date.now());
     await enterRecovery(page, materialNetwork, f, first.email);
-    const other = await context.newPage(); await other.goto(origin); await account(other); await expect(other.getByLabel('Email', { exact: true })).toBeVisible();
+    const other = await context.newPage(); await other.goto(origin + '/app'); await account(other); await expect(other.getByLabel('Email', { exact: true })).toBeVisible();
     const removed = await f.auth.request('admin/users/' + first.id, undefined, f.auth.serviceKey, 'DELETE'); expect(removed.status).toBe(200); await removed.body?.cancel();
     let oldHeld = false, newHeld = false;
     const oldGate = new Promise<void>(resolve => { releaseOld = resolve; }), newGate = new Promise<void>(resolve => { releaseNew = resolve; });
@@ -191,26 +191,28 @@ for (const same of [false, true]) test(`suspended recovery cannot update a newer
     await enterRecovery(page, materialNetwork, f, first.email);
     await privateFill(page.getByLabel('New password', { exact: true }), first.nextPassword); await privateFill(page.getByLabel('Confirm password', { exact: true }), first.nextPassword);
     await cdp.send('Page.setWebLifecycleState', { state: 'frozen' }); frozen = true;
-    const other = await context.newPage(); await other.goto(origin); await account(other); login(materialNetwork, f.auth.url); await signIn(other, newer.email, newer.password); await expect(other.getByRole('button', { name: newer.email, exact: true })).toBeVisible();
+    const other = await context.newPage(); await other.goto(origin + '/app'); await account(other); login(materialNetwork, f.auth.url); await signIn(other, newer.email, newer.password); await expect(other.getByRole('button', { name: newer.email, exact: true })).toBeVisible();
     await cdp.send('Page.setWebLifecycleState', { state: 'active' }); frozen = false;
     if (await page.getByRole('button', { name: 'Update password', exact: true }).count()) await page.getByRole('button', { name: 'Update password', exact: true }).click();
-    await expect(page.getByRole('dialog')).toContainText(/This reset link can’t be used\.|Password updated\.|Your session has ended\./);
+    await expect(page.locator('[role="dialog"], .wp-auth-card')).toContainText(/This reset link can’t be used\.|Password updated\.|Your session has ended\./);
     // Verify the actual new account's original credential before asserting the safe presentation.
     // No PUT/logout allowance: the old recovery must not mutate/revoke the newly published session.
     const check = await f.auth.request('token?grant_type=password', { email: newer.email, password: newer.password }); expect(check.status).toBe(200); await check.body?.cancel();
-    await expect(page.getByRole('dialog')).toContainText('This reset link can’t be used.');
+    await expect(page.locator('[role="dialog"], .wp-auth-card')).toContainText('This reset link can’t be used.');
   } finally { if (frozen) await cdp.send('Page.setWebLifecycleState', { state: 'active' }); await cdp.detach(); await f.close(); }
 });
 
-test('failed initial session validation offers the approved fresh sign-in action', async ({ page, materialNetwork }) => {
+test('failed initial session validation retries the existing owner without password re-entry', async ({ page, materialNetwork }) => {
   test.setTimeout(45000); const f = await fixture(page);
   try {
-    const user = await f.auth.createAccount(); await page.goto(origin); await account(page); login(materialNetwork, f.auth.url); await signIn(page, user.email, user.password); await expect(page.getByRole('dialog')).toBeHidden();
+    const user = await f.auth.createAccount(); await page.goto(origin + '/app'); await account(page); login(materialNetwork, f.auth.url); await signIn(page, user.email, user.password); await expect(page.locator('[role="dialog"], .wp-auth-card')).toBeHidden();
     await page.route(f.auth.url + '/auth/v1/user', route => route.fulfill({ status: 503, json: { message: 'Controlled initial validation outage' } }));
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
-    await page.reload(); await account(page); await expect(page.getByRole('dialog')).toContainText('Your session couldn’t be checked.');
-    await page.getByRole('button', { name: 'Sign in', exact: true }).click(); await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
-    await page.unroute(f.auth.url + '/auth/v1/user'); login(materialNetwork, f.auth.url); await signIn(page, user.email, user.password); await expect(page.getByRole('button', { name: user.email, exact: true })).toBeVisible();
+    await page.reload(); await expect(page.getByRole('heading', { name: 'Couldn’t check your session', exact: true })).toBeVisible();
+    await expect(page.locator('.wp-shell')).toHaveCount(0);
+    await page.unroute(f.auth.url + '/auth/v1/user');
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
+    await page.getByRole('button', { name: 'Try again', exact: true }).click(); await expect(page.getByRole('button', { name: user.email, exact: true })).toBeVisible();
   } finally { await f.close(); }
 });
 
@@ -218,7 +220,7 @@ test('actual session_not_found restoration cannot remove a newer SDK session', a
   test.setTimeout(60000); const f = await fixture(page, true); let release: (() => void) | undefined;
   try {
     const old = await f.auth.createAccount(), newer = await f.auth.createAccount(); await f.application!.saveNative(old.id); const saved = await f.application!.snapshot();
-    await page.goto(origin); await account(page); login(materialNetwork, f.auth.url); await signIn(page, old.email, old.password); await expect(page.getByRole('dialog')).toBeHidden();
+    await page.goto(origin + '/app'); await account(page); login(materialNetwork, f.auth.url); await signIn(page, old.email, old.password); await expect(page.locator('[role="dialog"], .wp-auth-card')).toBeHidden();
     // An ordinary same-account initialization broadcast cannot replace this verified account UI.
     await account(page, old.email);
     const waiting = await context.newPage(); let held = false; let finished!: () => void;
@@ -234,12 +236,12 @@ test('actual session_not_found restoration cannot remove a newer SDK session', a
         held = true; await gate; await privateFulfill(route, { response });
       } finally { finished(); }
     });
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 }); await waiting.goto(origin); await expect.poll(() => held).toBe(true);
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 }); await waiting.goto(origin + '/app'); await expect.poll(() => held).toBe(true);
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/logout', query: { scope: 'local' }, count: 1 });
     await page.getByRole('button', { name: 'Switch account', exact: true }).click();
     // The exact old session was revoked above, so its SDK logout cannot claim authenticated success.
     await expect(page.getByRole('button', { name: 'Try sign-out again', exact: true })).toBeEnabled();
-    const fresh = await context.newPage(); await fresh.goto(origin); await account(fresh);
+    const fresh = await context.newPage(); await fresh.goto(origin + '/app'); await account(fresh);
     login(materialNetwork, f.auth.url); await signIn(fresh, newer.email, newer.password); await expect(fresh.getByRole('button', { name: newer.email, exact: true })).toBeVisible();
     release!(); await settled;
     await expect.poll(() => waiting.evaluate(async () => (await navigator.locks.query()).held?.some(lock => lock.name === 'workprint.auth-change') ?? false)).toBe(false);

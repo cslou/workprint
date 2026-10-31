@@ -116,6 +116,12 @@ export async function fixture(page: Page, backend = false, options: Parameters<t
   }
 }
 export async function account(page: Page, name = 'Account') {
+  if (name === 'Account' && !await page.locator('.wp-shell').count()) {
+    if (new URL(page.url()).pathname === '/') await page.goto(origin + '/sign-in');
+    const signInAction = page.getByRole('button', { name: /^(Back to sign in|Sign in)$/ });
+    if (!await page.getByLabel('Email', { exact: true }).count() && await signInAction.count()) await signInAction.click();
+    return;
+  }
   if (page.viewportSize()!.width <= 820) await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByRole('button', { name, exact: true }).click();
 }

@@ -8,7 +8,7 @@ import type { MaterialNetwork } from '../material-network.js';
 
 test.use({ screenshot: 'off', trace: 'off', video: 'off' });
 async function reset(page: Page, network: MaterialNetwork, f: Awaited<ReturnType<typeof fixture>>, email: string) {
-  await page.goto(origin); await account(page);
+  await page.goto(origin + '/app'); await account(page);
   await page.getByRole('button', { name: 'Forgot password?', exact: true }).click();
   await privateFill(page.getByLabel('Email', { exact: true }), email);
   network.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/recover', query: { redirect_to: origin + '/auth/callback' }, count: 1 });
@@ -39,7 +39,7 @@ test('real password policy rejection and uncertain successful mutation have dist
   test.setTimeout(90000); const f = await fixture(page);
   try {
     const user = await f.auth.createAccount(); await reset(page, materialNetwork, f, user.email);
-    await expect(page.getByRole('dialog')).toContainText('Check your email.');
+    await expect(page.locator('[role="dialog"], .wp-auth-card')).toContainText('Check your email.');
     const link = await f.auth.recoveryLink(user.email); consume(materialNetwork, f.auth.url, true); await privateNavigate(page, link);
     await privateFill(page.getByLabel('New password', { exact: true }), 'x'); await privateFill(page.getByLabel('Confirm password', { exact: true }), 'y');
     await page.getByRole('button', { name: 'Update password', exact: true }).click();
@@ -56,27 +56,27 @@ test('real password policy rejection and uncertain successful mutation have dist
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'PUT', path: '/auth/v1/user', query: {}, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 }, { origin: f.auth.url, method: 'POST', path: '/auth/v1/logout', query: { scope: 'local' }, count: 1 });
     await privateFill(page.getByLabel('New password', { exact: true }), user.nextPassword); await privateFill(page.getByLabel('Confirm password', { exact: true }), user.nextPassword);
     await page.getByRole('button', { name: 'Update password', exact: true }).click();
-    await expect(page.getByRole('dialog')).toContainText('We couldn’t confirm the password update.');
+    await expect(page.locator('[role="dialog"], .wp-auth-card')).toContainText('We couldn’t confirm the password update.');
     await expect(page.getByRole('button', { name: 'Back to sign in', exact: true })).toBeEnabled();
     await page.unroute(f.auth.url + '/auth/v1/user');
     await page.getByRole('button', { name: 'Back to sign in', exact: true }).click();
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
-    await signIn(page, user.email, user.nextPassword); await expect(page.getByRole('dialog')).toBeHidden();
+    await signIn(page, user.email, user.nextPassword); await expect(page.locator('[role="dialog"], .wp-auth-card')).toBeHidden();
   } finally { await f.close(); }
 });
 
-test('closing pending sign-in dismisses rather than replays it; Switch account fences before fresh sign-in', async ({ page, materialNetwork }) => {
-  test.setTimeout(90000); const f = await fixture(page);
+test('Escape cannot bypass pending sign-in; Switch account fences before fresh sign-in', async ({ page, materialNetwork }) => {
+  test.setTimeout(90000); const f = await fixture(page); let release = () => {};
   try {
     const first = await f.auth.createAccount(), second = await f.auth.createAccount();
-    await page.goto(origin); await account(page);
-    let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
+    await page.goto(origin + '/app'); await account(page);
+    const gate = new Promise<void>(resolve => { release = resolve; });
     await page.route(f.auth.url + '/auth/v1/token?grant_type=password', async route => { await gate; await privateContinue(route); });
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
     await signIn(page, first.email, first.password);
     await expect(page.getByRole('button', { name: 'Signing in…', exact: true })).toBeDisabled();
     expect(await page.getByLabel('Password', { exact: true }).inputValue() === '', 'Submitted password remained in pending DOM').toBe(true);
-    await page.keyboard.press('Escape'); await expect(page.getByRole('dialog')).toBeHidden();
+    await page.keyboard.press('Escape'); await expect(page.locator('.wp-auth-card')).toBeVisible(); await expect(page.locator('.wp-shell')).toHaveCount(0);
     release(); await expect(page.getByRole('button', { name: first.email, exact: true })).toBeVisible();
     await page.unroute(f.auth.url + '/auth/v1/token?grant_type=password');
     await page.getByRole('textbox', { name: 'Message', exact: true }).fill('First-account unsent draft');
@@ -88,7 +88,7 @@ test('closing pending sign-in dismisses rather than replays it; Switch account f
     await signIn(page, second.email, second.password);
     await expect(page.getByRole('button', { name: second.email, exact: true })).toBeVisible();
     await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('');
-  } finally { await f.close(); }
+  } finally { release(); await f.close(); }
 });
 
 test('occupied frontend port is refused before borrowing another listener', async ({ page }) => {
@@ -127,7 +127,7 @@ test('built production account entry uses the qualified SDK and validated public
   test.setTimeout(90000); const f = await fixture(page, false, {}, 'built');
   try {
     const user = await f.auth.createAccount();
-    await page.goto(origin); await account(page);
+    await page.goto(origin + '/app'); await account(page);
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
     await signIn(page, user.email, user.password);
     await expect(page.getByRole('button', { name: user.email, exact: true })).toBeVisible();
@@ -142,12 +142,12 @@ for (const mode of ['invalid', 'expired'] as const) test(`real delivered ${mode}
   test.setTimeout(90000); const f = await fixture(page, false, { otpExpirySeconds: mode === 'expired' ? 1 : 300 });
   try {
     const user = await f.auth.createAccount(); await reset(page, materialNetwork, f, user.email);
-    await expect(page.getByRole('dialog')).toContainText('Check your email.');
+    await expect(page.locator('[role="dialog"], .wp-auth-card')).toContainText('Check your email.');
     const link = new URL(await f.auth.recoveryLink(user.email));
     if (mode === 'invalid') link.searchParams.set('token', 'deliberately-invalid-owned-fixture-token');
     else await new Promise(resolve => setTimeout(resolve, 2100)); // Real configured one-second server OTP expiry.
     consume(materialNetwork, f.auth.url, false, mode === 'invalid'); await privateNavigate(page, link.href);
-    await expect(page.getByRole('dialog')).toContainText('This reset link can’t be used.');
+    await expect(page.locator('[role="dialog"], .wp-auth-card')).toContainText('This reset link can’t be used.');
     await expect(page.getByRole('button', { name: 'Request a new link', exact: true })).toBeEnabled();
   } finally { await f.close(); }
 });

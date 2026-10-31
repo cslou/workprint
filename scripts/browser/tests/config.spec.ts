@@ -53,6 +53,7 @@ test('default dev and production build expose no interchangeable test compositio
   `], { cwd: web, env, log: join(fixture.logs, 'web-build.log') });
   const testRoot = await realpath(join(web, 'test'));
   const serverHelpers = await Promise.all(['native-conversations.ts', 'built-server.ts', 'server-entry.test.ts', 'auth-built-fixture.ts', 'auth-server.ts', 'request-intake.test.ts', 'isolated-auth.ts', 'auth-fixture-resources.ts', 'auth-mail.ts', 'isolated-auth.security.test.ts', 'account-browser-fixture.ts'].map(file => realpath(resolve('apps/api/test', file))));
+  serverHelpers.push(await realpath(resolve('scripts/browser/entry-reference.ts')));
   const graph = JSON.parse(await readFile(inputsFile, 'utf8')) as { inputs: string[]; inlineLimit: number | null };
   expect(graph.inputs.length).toBeGreaterThan(0);
   for (const input of new Set(graph.inputs)) {
@@ -120,16 +121,21 @@ test('default dev and production build expose no interchangeable test compositio
       }
       for (const suffix of ['', '?context=viewer&reference=proposal&fixture=1&__qualification=1']) {
         await page.goto(origin + suffix);
-        await expect(page.getByRole('button', { name: 'New video', exact: true })).toBeVisible();
-        await expect(page.getByRole('tab', { name: 'Script', exact: true })).toHaveAttribute('aria-selected', 'true');
-        await expect(page.getByRole('tabpanel')).toHaveText('Your script will appear here once you describe your video.');
+        // Story 8 intentionally replaces the signed-out workspace/modal with public entry and a card.
+        await expect(page.getByRole('heading', { name: 'Make room for your next idea.', exact: true })).toBeVisible();
+        await expect(page.locator('.wp-shell')).toHaveCount(0);
         expect(await page.evaluate(() => Object.keys(window).filter(key => /Test$/.test(key)))).toEqual([]);
-        await page.getByRole('button', { name: 'Account', exact: true }).press('Enter');
-        await expect(page.getByRole('dialog')).toContainText('Sign-in is not configured for this build.');
+        await page.getByRole('link', { name: 'Sign in', exact: true }).press('Enter');
+        await expect(page.locator('.wp-auth-card')).toContainText('Sign-in is not configured for this build.');
         await expect(page.getByLabel('Email', { exact: true })).toHaveCount(0);
         await expect(page.getByLabel('Password', { exact: true })).toHaveCount(0);
         await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toHaveCount(0);
         await page.keyboard.press('Escape');
+        await expect(page.locator('.wp-auth-card')).toBeVisible();
+        await page.goto(origin + '/app');
+        await expect(page.locator('.wp-shell')).toHaveCount(0);
+        await expect(page.locator('.wp-auth-card')).toContainText('Sign-in is not configured for this build.');
+        expect(await page.evaluate(() => Object.keys(window).filter(key => /Test$/.test(key)))).toEqual([]);
       }
     } finally { try { await page.goto('about:blank'); } finally { await server.stop(); } }
   }

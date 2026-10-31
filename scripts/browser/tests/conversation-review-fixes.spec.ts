@@ -112,6 +112,8 @@ test('native history retires viewport subscriptions when real sign-out unmounts 
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     await expect(page.getByRole('heading', { name: saved.title!, exact: true })).not.toBeVisible();
     await page.keyboard.press('Escape'); await expect.poll(bindings).toBe(0);
+    // Unmounting is immediate; do not close the browser before the single SDK revocation settles.
+    await expect(page.getByText('Signed out.', { exact: true })).toBeVisible();
     expect(await f.application!.snapshot()).toBe(snapshot);
   } finally { await f.close(); }
 });

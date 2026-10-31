@@ -1,5 +1,6 @@
 import { AuthClient, type Session, type AuthChangeEvent } from '@supabase/auth-js';
 import { terminalRefreshRejection } from './refresh.js';
+import { readExitNotice, saveExitNotice } from './exit-notice.js';
 import { authChange, exchangePassword } from './sign-in.js';
 import { currentIntent, saveFence, fenceKey, intentKey } from './intent.js';
 import type { PublicAuthConfig } from './public-config.js';
@@ -47,6 +48,8 @@ export class AccountOwner {
     if (config.kind !== 'configured') { this.set({ screen: 'unconfigured', open: this.recoveryWanted }); return; }
     try {
       this.intent = currentIntent(); this.blocked = localStorage.getItem(fenceKey) !== null;
+      const notice = readExitNotice(this.intent);
+      if (notice) this.exit = { ...notice, intent: this.intent, accountId: null };
       localStorage.setItem('workprint.auth-storage-check', '1'); localStorage.removeItem('workprint.auth-storage-check');
     } catch { this.blocked = true; this.fenceSaved = false; this.set({ screen: 'account-lock-not-saved', open: true }); return; }
     if (this.recoveryWanted) { this.fence('checking-link'); this.recoveryWanted = true; this.set({ open: true }); }
@@ -78,7 +81,8 @@ export class AccountOwner {
       if (this.recoveryWanted) {
         if (!code || code.length > 4096 || !this.fenceSaved) this.set({ screen: this.fenceSaved ? 'invalid-link' : 'account-lock-not-saved' });
         else void this.consume(code, scope);
-      } else if (this.blocked || !initialAccountId) this.set({ screen: 'sign-in', busy: false });
+      } else if (this.blocked && this.exit) { this.exit.accountId = initialAccountId; this.showExit(this.exit); }
+      else if (this.blocked || !initialAccountId) this.set({ screen: 'sign-in', busy: false });
       else void this.restore(scope);
     }).catch(() => { this.initializing = false; if (this.current(scope)) this.set({ screen: 'startup-failed', busy: false }); });
     window.addEventListener('storage', this.onStorage);
@@ -291,7 +295,9 @@ export class AccountOwner {
     }
     this.fence(switchAccount ? 'switching' : 'signed-out');
     const scope = this.scope(), exit: Exit = { accountId, intent: scope.intent, confirmed: previous?.confirmed ?? false, switchAccount, ...(previous?.recoveryOutcome ? { recoveryOutcome: previous.recoveryOutcome } : {}) };
-    this.exit = exit; this.operation = true; this.set({ open: true, busy: true, screen: this.fenceSaved ? switchAccount ? 'switching' : 'signed-out' : 'signout-pending-lock-not-saved' });
+    this.exit = exit;
+    try { saveExitNotice(exit.intent, exit); } catch { this.fenceSaved = false; }
+    this.operation = true; this.set({ open: true, busy: true, screen: this.fenceSaved ? switchAccount ? 'switching' : 'signed-out' : 'signout-pending-lock-not-saved' });
     try {
       await this.ready;
       await this.guarded(scope, () => this.revoke(scope, exit));
@@ -324,6 +330,7 @@ export class AccountOwner {
     this.showExit(exit);
   }
   private showExit(exit: Exit) {
+    try { saveExitNotice(exit.intent, exit); } catch { this.fenceSaved = false; }
     this.set({ busy: false, screen: this.fenceSaved ? exit.confirmed ? exit.recoveryOutcome ?? (exit.switchAccount ? 'sign-in' : 'signed-out') : 'signout-unconfirmed' : exit.confirmed ? 'signout-confirmed-lock-not-saved' : 'signout-unconfirmed-lock-not-saved' });
   }
   retryFence = async () => {

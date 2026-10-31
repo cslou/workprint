@@ -15,7 +15,7 @@ export type EntryDecision =
 /** Pure presentation policy. The caller owns rendering/history; backend Auth still owns admission. */
 export function entryDecision(url: URL, state: AccountPresentation): EntryDecision {
   // Callback purpose and secret stripping belong to AccountOwner, ahead of ordinary redirects.
-  if (url.pathname === '/auth/callback') return { kind: 'recovery' };
+  if (url.pathname === '/auth/callback') return state.screen === 'sign-in' ? { kind: 'replace', target: '/sign-in' } : { kind: 'recovery' };
   if (url.pathname === '/') {
     if (url.searchParams.has('conversation')) return { kind: 'replace', target: workspaceReturn('/app' + url.search) };
     return { kind: 'public' };
