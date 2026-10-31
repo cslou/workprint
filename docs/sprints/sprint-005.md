@@ -206,6 +206,7 @@ The Final Verification Story runs all applicable sprint functional verification 
   1. `Feat(artifacts): Reuse exact Library versions` — owned uses, read-only example semantics and reference checks.
   2. `Feat(library): Persist reference attachments` — actual picker/view/edit paths and regression/visual proof.
 - **Technical notes:** conversation use is separate from global Artifact ownership/read-only content; approving reuse is not approving every version or selecting a Shot video. No production catalog seed endpoint.
+- **Orchestrator decisions (2026-11-01):** Provisionally approve `library-reuse-r1` under delegation, recorded in `docs/design/design.md#exact-library-reuse-and-reference-editing`. Approve a minimal optional server-derived `builtIn` indicator on the Version DTO so workspace/history/reload consumers retain immutable-example presentation; absence means ordinary content for presentation only, never permission to skip server ownership/immutability checks. Reuse existing Library naming instead of introducing a competing flag. No production examples/catalog; test-only fixtures prove built-in reads, owned reuse and rejected writes. Main approves the additive contract intent; implementer owns typed schema/projection/client/tests and related technical docs. Preserve active drafts during exact use; no unconditional workspace refresh/unmount.
 
 #### Story 6: Storyboard edits and selection revision (P3-S5, S5-1)
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)

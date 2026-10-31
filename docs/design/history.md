@@ -1,5 +1,9 @@
 # Workprint — Application Design History
 
+## Exact Library reuse — 2026-11-01
+
+**Provisionally approved by the orchestrator under Lou’s delegation; pending Phase 3 ratification.** Ten narrow and three representative desktop `library-reuse-r1` captures inspected. Exact-version inspection/use, original-identity recovery, partial attachment and reference association/conflict states retain existing primitives and distinguish viewing from human authority. No examples catalog, implicit latest, Shot-video choice or playback. See [binding scope and evidence limits](design.md#exact-library-reuse-and-reference-editing). Built-in mutation controls use server-derived metadata; actual authority stays server-side.
+
 ## Image-only upload restriction — 2026-10-31
 
 **Provisionally approved by the orchestrator under Lou’s delegation; pending Lou’s Phase 3 ratification.** Following Lou’s explicit scope decision, entry and refusal feedback now state JPEG/PNG-only upload limits and temporary video unavailability. Main inspected all six `image-only-uploads-r1` desktop/narrow captures; image success remains Draft without reference approval. See [binding scope and evidence limits](design.md#image-only-upload-restriction). This supersedes video-upload entry/success promises for this delivery, not existing owned-media presentation. Runtime verification and human ratification remain separate.
