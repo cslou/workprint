@@ -1,20 +1,21 @@
 import type { Mastra } from '@mastra/core';
 import type { MastraModelConfig } from '@mastra/core/llm';
 import { registerApiRoute } from '@mastra/core/server';
-import type { Context } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
+import { ServerResponse } from 'node:http';
 
 type Model = Extract<MastraModelConfig, { specificationVersion: 'v2' }>;
 type BoundAgent = Awaited<ReturnType<Mastra['getAgent']>>;
 type Part = Awaited<ReturnType<Model['doStream']>>['stream'] extends ReadableStream<infer P> ? P : never;
-export type TurnMode = 'complete' | 'formatted' | 'incomplete' | 'incomplete-slow' | 'failure' | 'at' | 'over' | 'before' | 'mid' | 'slow';
-const modes: readonly string[] = ['complete', 'formatted', 'incomplete', 'incomplete-slow', 'failure', 'at', 'over', 'before', 'mid', 'slow'];
+export type TurnMode = 'complete' | 'formatted' | 'incomplete' | 'incomplete-slow' | 'failure' | 'at' | 'over' | 'before' | 'mid' | 'slow' | 'send-held' | 'subscribe-held';
+const modes: readonly string[] = ['complete', 'formatted', 'incomplete', 'incomplete-slow', 'failure', 'at', 'over', 'before', 'mid', 'slow', 'send-held', 'subscribe-held'];
 
 /** Only imported by the separately built test launcher; never an environment-selected model. */
 export function controlledTurnProvider() {
   let mode: TurnMode = 'complete';
-  let calls = 0, active = 0, listeners = 0, timers = 0, cancelled = 0, aborted = 0, observers = 0, pumps = 0;
+  let calls = 0, active = 0, listeners = 0, timers = 0, cancelled = 0, aborted = 0, observers = 0, pumps = 0, held = 0, heldListeners = 0;
   let current: { agent: BoundAgent; target: Parameters<BoundAgent['getActiveThreadRunId']>[0] } | undefined;
-  const state = () => ({ calls, active, listeners, timers, cancelled, aborted, observers, pumps, activeRunId: current?.agent.getActiveThreadRunId(current.target) ?? null });
+  const state = () => ({ calls, active, listeners, timers, cancelled, aborted, observers, pumps, held, heldListeners, activeRunId: current?.agent.getActiveThreadRunId(current.target) ?? null });
   const model: Model = {
     specificationVersion: 'v2', provider: 'controlled-qualification', modelId: 'native-text', supportedUrls: {},
     async doGenerate() { throw new Error('Controlled qualification is streaming only'); },
@@ -88,5 +89,24 @@ export function controlledTurnProvider() {
       return { ...sub, stream, unsubscribe() { sub.unsubscribe(); if (!closed) { closed = true; observers--; } } };
     }) as typeof subscribe;
   };
-  return { model, routes, instrument };
+  const beforeMastra: MiddlewareHandler = async (context, next) => {
+    const path = mode === 'send-held' ? '/api/agents/assistant/send-message' : mode === 'subscribe-held' ? '/api/agents/assistant/threads/subscribe' : undefined;
+    if (!path || context.req.path !== path || context.req.method !== 'POST') return next();
+    const outgoing: unknown = context.env?.outgoing;
+    if (!(outgoing instanceof ServerResponse)) throw new Error('Controlled transport binding unavailable');
+    held++;
+    let closed!: () => void, attached = false;
+    try {
+      await new Promise<void>(resolve => {
+        closed = resolve;
+        if (outgoing.destroyed) resolve();
+        else { attached = true; heldListeners++; outgoing.once('close', closed); }
+      });
+      return context.body(null, 204);
+    } finally {
+      if (attached) { outgoing.off('close', closed); heldListeners--; }
+      held--;
+    }
+  };
+  return { model, routes, instrument, beforeMastra };
 }

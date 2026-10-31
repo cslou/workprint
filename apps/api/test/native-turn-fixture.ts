@@ -12,6 +12,8 @@ import { startAuthServer } from './auth-server.js';
 import { createNativeConversation } from './native-conversations.js';
 import type { TurnMode } from './native-turn-provider.js';
 import { createNativeTextMemory } from '../src/agent/mastra/native-text-memory.js';
+import { nativeTurnLimits } from '../src/agent/index.js';
+import { setTimeout as delay } from 'node:timers/promises';
 
 export async function nativeTurnFixture() {
   const auth = await isolatedAuth();
@@ -35,7 +37,7 @@ export async function nativeTurnFixture() {
       const probe=controlledTurnProvider();
       const mastra=await createBackend(probe.routes,probe.model);
       probe.instrument(mastra.getAgent('assistant'));
-      await startServer(mastra);
+      await startServer(mastra,[probe.beforeMastra]);
     `);
     const serving = await startAuthServer(entry, env.env, { url: auth.url, anonKey: auth.anonKey, servingUrl: db.servingUrl, accounts: [] }, join(env.logs, 'native-turn-http.log'), { env: { WORKPRINT_BROWSER_ORIGIN: 'http://127.0.0.1:4180' } });
     cleanups.push(serving.server.stop);
@@ -54,11 +56,12 @@ export async function nativeTurnFixture() {
     const state = async () => {
       const response = await request('/turn-test/control');
       if (response.status !== 200) throw new Error('Controlled state unavailable');
-      const value = await response.json() as { calls: number; active: number; listeners: number; timers: number; cancelled: number; aborted: number; observers: number; pumps: number; activeRunId: string | null };
-      for (const key of ['calls', 'active', 'listeners', 'timers', 'cancelled', 'aborted', 'observers', 'pumps'] as const) if (!Number.isSafeInteger(value[key]) || value[key] < 0) throw new Error('Invalid controlled counter');
+      const value = await response.json() as { calls: number; active: number; listeners: number; timers: number; cancelled: number; aborted: number; observers: number; pumps: number; held: number; heldListeners: number; activeRunId: string | null };
+      for (const key of ['calls', 'active', 'listeners', 'timers', 'cancelled', 'aborted', 'observers', 'pumps', 'held', 'heldListeners'] as const) if (!Number.isSafeInteger(value[key]) || value[key] < 0) throw new Error('Invalid controlled counter');
       return value;
     };
     return { auth, users, origin: serving.origin, close, logs: env.logs, state, request,
+      accessToken: async (who = 0): Promise<string | null> => tokens[who] ?? null,
       mode: async (mode: TurnMode) => { const response = await request('/turn-test/control', { mode }); if (!response.ok) throw new Error('Controlled mode change rejected'); },
       thread: (who = 0) => createNativeConversation(store, users[who]!.id, [], 'Native turn qualification'),
       nativeRuns: async () => { const workflows = await store.getStore('workflows'); if (!workflows) throw new Error('Native fixture workflows unavailable'); return (await workflows.listWorkflowRuns({ page: 0, perPage: 100 })).runs.length; },
@@ -78,8 +81,18 @@ export async function nativeTurnFixture() {
         if (await serving.server.exited !== 0) throw new Error('Controlled serving did not exit cleanly');
         const production = await startAuthServer(base, env.env, { url: auth.url, anonKey: auth.anonKey, servingUrl: db.servingUrl, accounts: [] }, join(env.logs, 'native-production-http.log'), { env: { WORKPRINT_TURN_TEST_PROVIDER: '1', WORKPRINT_ENABLE_INFERENCE: '1' } });
         cleanups.push(production.server.stop);
-        return { request: (path: string, body?: unknown, who = 0) => requestAt(production.origin, path, body, who) };
+        return { origin: production.origin, request: (path: string, body?: unknown, who = 0) => requestAt(production.origin, path, body, who) };
       },
     };
   } catch (error) { try { await close(); } catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Native turn fixture acquisition failed', { cause: cleanupError }); } throw error; }
+}
+
+export async function releasedNativeFixture(fixture: Awaited<ReturnType<typeof nativeTurnFixture>>) {
+  const deadline = Date.now() + nativeTurnLimits.executionMs + 500;
+  for (;;) {
+    const state = await fixture.state();
+    if (!state.active && !state.listeners && !state.timers && !state.observers && !state.pumps && !state.held && !state.heldListeners && !state.activeRunId && await fixture.nativeRuns() === 0 && await fixture.servingBusy() === 0) return state;
+    if (Date.now() >= deadline) throw new Error('Native provider/observer resources must release');
+    await delay(25);
+  }
 }

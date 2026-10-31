@@ -1,23 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { setTimeout as delay } from 'node:timers/promises';
 import { randomUUID } from 'node:crypto';
 import { nativeTurnLimits } from '../src/agent/mastra/native-turns.js';
-import { nativeTurnFixture } from './native-turn-fixture.js';
+import { nativeTurnFixture, releasedNativeFixture as released } from './native-turn-fixture.js';
 
 type Fixture = Awaited<ReturnType<typeof nativeTurnFixture>>;
 type Subscription = Awaited<ReturnType<ReturnType<Fixture['sdk']>['subscribeToThread']>>;
 type Chunk = Parameters<NonNullable<Parameters<Subscription['processDataStream']>[0]['onChunk']>>[0];
 
-async function released(fixture: Fixture) {
-  // A native processing tripwire is not provider cancellation; bound release by the declared execution budget.
-  const deadline = Date.now() + nativeTurnLimits.executionMs + 500;
-  for (;;) {
-    const state = await fixture.state();
-    if (!state.active && !state.listeners && !state.timers && !state.observers && !state.pumps && !state.activeRunId && await fixture.nativeRuns() === 0 && await fixture.servingBusy() === 0) return state;
-    assert.ok(Date.now() < deadline, 'Native provider/observer resources must release'); await delay(25);
-  }
-}
 async function observeSend(fixture: Fixture, threadId: string, who = 0, message = 'Exact native signal text') {
   const agent = fixture.sdk(who), chunks: Chunk[] = [];
   const subscription = await agent.subscribeToThread({ threadId, resourceId: fixture.users[who]!.id, withInitialHistory: false });
