@@ -3,7 +3,7 @@ import type { Pool } from 'pg';
 import { idSchema, operations, versionSchema } from '@workprint/contracts';
 import { createArtifactStore } from '../store.js';
 import { MAX_OBJECT_BYTES } from '../../storage/index.js';
-import { authorizeUpload, parseUploadRequest, uploadTarget } from './policy.js';
+import { authorizeUpload, parseUploadRequest, requireImageUpload, uploadTarget } from './policy.js';
 import { UploadError, uploadError } from './errors.js';
 import { uploadRecords } from './records.js';
 import { completeUpload } from './completion.js';
@@ -45,6 +45,7 @@ export function createUploadCoordinator(pool: Pool, checkOwnedConversation: Owne
     confirm: async (account: string, id: string, operation: string) => {
       if (!idSchema.safeParse(operation).success) throw new UploadError('invalid_input');
       const admitted = await ownedUpload(account, id);
+      requireImageUpload(admitted.kind);
       const claimed = await records.claim(admitted, operation);
       if (claimed.result) return claimed.result;
       const { row, token } = claimed;

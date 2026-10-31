@@ -1,5 +1,18 @@
 # Bounded media process foundation
 
+## Temporary image-only upload admission
+
+The application currently denies video upload requests and confirmation, including
+previously issued/stored video uploads, before external inspection/publication.
+The artifact policy and atomic completion fence enforce this without an enable
+flag. JPEG/PNG verification remains available with the exact local configuration.
+The unresolved MP4 sample-table validation defect is deferred, not fixed; native
+video decoder/process fixtures below are isolated, unqualified for user uploads.
+Re-enablement requires separately authorized correction and independent evidence.
+Previously issued signed access is not revoked and existing saved work is not undone.
+
+## Isolated process and codec mechanics
+
 `child.ts` runs a trusted absolute executable with argument arrays, ignored stdin,
 no shell, a credential-minimal environment, independent stdout/stderr capture
 ceilings of 64 KiB, and at most a 30-second command deadline. Limits may be
@@ -83,8 +96,8 @@ count and duration. `artifacts/uploads/media-avc.ts` walks bounded MP4 sample
 and chunk tables across every video sample, not just the initial probe window:
 one avc1 description, one SPS/PPS pair, and no changed in-band parameter sets or
 unqualified extension NALs. Identical repeated parameters remain allowed, ignoring
-only legal trailing zero padding. Thus later frames cannot change the probed
-geometry/pixel format/profile via another SPS/PPS or sample description. Limits
+only legal trailing zero padding. These controls do not establish video upload safety: the conflicting sample-table
+defect remains deferred, and user video admission is closed. Limits
 are4096 structural boxes,7200 video samples/chunks and65536 NAL units. Video
 sample ranges must be monotonic/non-overlapping, keeping inspection linear in the
 bounded input rather than re-reading aliased chunks. Parameter NALs are capped

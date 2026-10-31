@@ -4,7 +4,7 @@ import { operations, useSchema } from '@workprint/contracts';
 import { transaction } from '../../db/index.js';
 import { lockPublicationOwner, publishVersion } from '../publication.js';
 import { UploadError } from './errors.js';
-import { lockUploadTarget } from './policy.js';
+import { lockUploadTarget, requireImageUpload } from './policy.js';
 import { lockedUpload, requireUploadLease } from './records.js';
 import type { MediaVersion, UploadResult, UploadRow } from './types.js';
 
@@ -14,6 +14,7 @@ export function completeUpload(pool: Pool, admitted: UploadRow, token: string, p
   return transaction(pool, async client => {
     await lockPublicationOwner(client, admitted.owner_id);
     const row = await lockedUpload(client, admitted.owner_id, admitted.upload_id); requireUploadLease(row, token);
+    requireImageUpload(row.kind);
     await lockUploadTarget(client, row);
     const keys = [publication.key, ...(publication.posterKey ? [publication.posterKey] : [])];
     const reserved = (await client.query<{ object_key: string }>('SELECT object_key FROM artifacts.upload_objects WHERE owner_id=$1 AND upload_id=$2 AND object_key=ANY($3::text[]) AND protected_version_id IS NULL FOR UPDATE', [row.owner_id, row.upload_id, keys])).rows;
