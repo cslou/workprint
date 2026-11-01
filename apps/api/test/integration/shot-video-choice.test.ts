@@ -8,13 +8,14 @@ import { publishVersion } from '../../src/artifacts/publication.js';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
 import { transaction } from '../../src/db/index.js';
 import { createNativeConversation } from '../support/native-conversations.js';
-import { isolatedPostgres, query } from '../support/postgres.js';
+import { query } from '../support/postgres.js';
+import { testStack } from '../support/test-stack.js';
 import { applyArtifactMigrations } from '../support/artifact-database.js';
 
 const script = { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'Station', time: 'morning' }, characters: ['Ada'], script: [{ action: 'Ada waits for the train.' }] }] };
 
 test('Shot-video choice keeps one exact version per Shot', { timeout: 120000 }, async t => {
-  const db = await isolatedPostgres(), pool = new Pool({ connectionString: db.servingUrl, max: 4, connectionTimeoutMillis: 1000, statement_timeout: 2000 });
+  const db = await testStack().testDatabase(), pool = new Pool({ connectionString: db.servingUrl, max: 4, connectionTimeoutMillis: 1000, statement_timeout: 2000 });
   const setup = new PostgresStore({ id: 'choice-prerequisite', connectionString: db.setupUrl, schemaName: 'mastra' });
   const native = new PostgresStore({ id: 'choice-serving', schemaName: 'mastra', disableInit: true, pool });
   try {

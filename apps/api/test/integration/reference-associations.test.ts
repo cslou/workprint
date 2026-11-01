@@ -1,7 +1,5 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
-import { realpath } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import { test } from 'node:test';
 import { Pool } from 'pg';
 import { PostgresStore } from '@mastra/pg';
@@ -9,30 +7,25 @@ import { savedReferenceContentSchema } from '@workprint/contracts';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
 import { createArtifactStore, createArtifactWriters, createVersionUses, createMediaVerifier, createUploadCoordinator } from '../../src/artifacts/index.js';
 import { createMediaSandbox, createPrivateObjectStorage } from '../../src/storage/index.js';
-import { MEDIA_ARCHIVE } from '../../src/storage/media/pins.js';
-import { isolatedPostgres } from '../support/postgres.js';
-import { isolatedObjectStorage } from '../support/object-storage.js';
+import { testStack } from '../support/test-stack.js';
 import { applyArtifactMigrations } from '../support/artifact-database.js';
 import { createNativeConversation } from '../support/native-conversations.js';
-import { qualifiedMediaFixtures } from '../support/media-fixtures.js';
 
 const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 
 test('reference edits bind verified owned/read-only images to an immutable expected base without copying or repinning other conversations', { timeout: 120000 }, async t => {
-  const db = await isolatedPostgres(); t.after(db.close);
-  const service = await isolatedObjectStorage(undefined, undefined, message => t.diagnostic(message)); t.after(service.close);
-  const dockerPath = await realpath('/usr/local/bin/docker');
-  const sandbox = await createMediaSandbox({ toolchainDirectory: resolve(`outputs/toolchains/ffmpeg-${MEDIA_ARCHIVE.sha256}`), dockerPath }); t.after(() => sandbox.close());
+  const db = await testStack().testDatabase(); t.after(db.close);
+  const { storage: service, media: fixtures } = testStack();
+  const sandbox = await createMediaSandbox(fixtures.toolchain); t.after(() => sandbox.close());
   const pool = new Pool({ connectionString: db.servingUrl, max: 4 }), setupPool = new Pool({ connectionString: db.setupUrl, max: 1 });
   const native = new PostgresStore({ id: 'reference-image-prerequisites', connectionString: db.setupUrl, schemaName: 'mastra' });
-  const storage = createPrivateObjectStorage({ endpoint: service.endpoint, bucket: service.bucket, region: 'us-east-1', credentials: service.credentials });
+  const storage = createPrivateObjectStorage(service);
   try {
     await native.init(); await db.grantServing(); await applyArtifactMigrations(db.setupUrl);
     const account = 'reference-edit-owner', foreign = 'reference-other-owner', builtin = 'workprint-built-in';
     const conversation = (await createNativeConversation(native, account)).id, other = (await createNativeConversation(native, account)).id;
     const foreignConversation = (await createNativeConversation(native, foreign)).id, builtinOrigin = (await createNativeConversation(native, builtin)).id;
     const check = createOwnedConversationCheck(native), store = createArtifactStore(pool, check), writers = createArtifactWriters(pool, check), uses = createVersionUses(pool, check);
-    const fixtures = await qualifiedMediaFixtures(sandbox, dockerPath);
     const uploads = createUploadCoordinator(pool, check, { storage, verifyMedia: createMediaVerifier(sandbox) });
     const upload = async (owner: string, target: string) => {
       const grant = await uploads.request(owner, target, { operationId: randomUUID(), kind: 'image', filename: 'ordinary.png', contentType: 'image/png', byteSize: fixtures.png.length });

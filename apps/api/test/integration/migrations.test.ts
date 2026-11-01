@@ -4,7 +4,8 @@ import { after, before, describe, test } from 'node:test';
 import { PostgresStore } from '@mastra/pg';
 import { Pool } from 'pg';
 import { assertRestrictedApplicationRole } from '../../src/db/index.js';
-import { isolatedPostgres, query } from '../support/postgres.js';
+import { query } from '../support/postgres.js';
+import { testStack, type TestDatabase } from '../support/test-stack.js';
 import { applyArtifactMigrations as migrate } from '../support/artifact-database.js';
 
 const nativeCatalog = `SELECT c.relname, c.relkind, pg_get_userbyid(c.relowner) AS owner,
@@ -16,10 +17,10 @@ const migrationVersions = readdirSync('supabase/migrations').filter(name => name
 const history = async (url: string) => (await query(url, 'SELECT version FROM supabase_migrations.schema_migrations ORDER BY version')).rows.map(row => row.version as string);
 
 describe('application migrations and database roles', { timeout: 180000 }, () => {
-  let db: Awaited<ReturnType<typeof isolatedPostgres>>;
+  let db: TestDatabase;
   let nativeBefore: unknown[];
   before(async () => {
-    db = await isolatedPostgres();
+    db = await testStack().testDatabase();
     const native = new PostgresStore({ id: 'artifact-migration-fixture', connectionString: db.setupUrl, schemaName: 'mastra' });
     try { await native.init(); } finally { await native.close(); }
     await db.grantServing();
@@ -68,6 +69,10 @@ describe('application migrations and database roles', { timeout: 180000 }, () =>
           await assert.rejects(assertRestrictedApplicationRole(pool), /Privileged application serving connection/);
         } finally { await query(db.adminUrl, `REVOKE CREATE ON ${object} FROM wp_application_creator`); }
       });
-    } finally { await pool.end(); }
+    } finally {
+      await pool.end();
+      // Roles are cluster-wide in the shared stack; databases are not.
+      await query(db.adminUrl, 'DROP ROLE IF EXISTS wp_application_creator');
+    }
   });
 });
