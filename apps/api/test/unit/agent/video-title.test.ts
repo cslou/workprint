@@ -1,16 +1,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { MastraCompositeStore } from '@mastra/core/storage';
-import { cleanTitle, titleInstructions, titleLength, type NativeTurnModel } from '../../../src/agent/index.js';
+import { cleanTitle, createAssistantModel, titleInstructions, titleLength, type NativeTurnModel } from '../../../src/agent/index.js';
 import { createVideoTitler } from '../../../src/agent/mastra/video-title.js';
 
 const owner = 'owner', video = 'video';
 const limits = { titleTokens: 1024, titleMs: 200 };
 
 /** A model whose title stream the test supplies, recording each call's options. */
-function fakeModel(respond: (signal: AbortSignal) => ReadableStream<unknown>) {
+function fakeModel(respond: (signal: AbortSignal) => ReadableStream<unknown>, id = { provider: 'meta', modelId: 'muse-spark-1.3' }) {
   const calls: { prompt: unknown; maxOutputTokens: unknown; providerOptions: unknown; abortSignal: AbortSignal }[] = [];
-  const model = { specificationVersion: 'v2', provider: 'fake', modelId: 'fake', supportedUrls: {},
+  const model = { specificationVersion: 'v2', ...id, supportedUrls: {},
     doGenerate: () => Promise.reject(new Error('unused')),
     async doStream(options: { prompt: unknown; maxOutputTokens: unknown; providerOptions: unknown; abortSignal: AbortSignal }) { calls.push(options); return { stream: respond(options.abortSignal) }; } };
   return { model: model as unknown as NativeTurnModel, calls };
@@ -55,6 +55,27 @@ test('an untitled video gets one capped, minimal-effort call and a title-only sa
   assert.deepEqual(calls[0]!.providerOptions, { openai: { reasoningEffort: 'minimal' }, meta: { reasoningEffort: 'minimal' } });
   assert.deepEqual(calls[0]!.prompt, [{ role: 'system', content: titleInstructions }, { role: 'user', content: [{ type: 'text', text: 'A short film about a night swim' }] }]);
   assert.deepEqual(patches, [{ id: video, title: 'Night swim' }], 'never metadata');
+});
+
+test('a model not qualified for title options gets none, rather than Muse Spark\'s', async () => {
+  const { model, calls } = fakeModel(text('Plain'), { provider: 'other', modelId: 'model' });
+  await createVideoTitler(model, fakeStorage().storage, limits)(owner, video, 'Hello');
+  assert.deepEqual(calls[0]!.providerOptions, {});
+});
+
+test('the production Muse Spark route sends minimal reasoning effort and the 1,024-token cap', async t => {
+  // The real model factory and router, with fetch answered locally: no network.
+  const bodies: Record<string, unknown>[] = [];
+  const chunk = (delta: Record<string, unknown>, finish: string | null = null) => `data: ${JSON.stringify({ id: 'x', object: 'chat.completion.chunk', created: 1, model: 'muse-spark-1.3', choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`;
+  t.mock.method(globalThis, 'fetch', async (_input: unknown, init?: RequestInit) => {
+    bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+    return new Response(chunk({ role: 'assistant', content: 'Night swim' }) + chunk({}, 'stop') + 'data: [DONE]\n\n', { status: 200, headers: { 'content-type': 'text/event-stream' } });
+  });
+  const { storage, patches } = fakeStorage();
+  await createVideoTitler(createAssistantModel({ model: 'meta/muse-spark-1.3', apiKey: 'placeholder-key' }), storage, limits)(owner, video, 'A night swim');
+  assert.equal(bodies.length, 1);
+  assert.equal(bodies[0]!.reasoning_effort, 'minimal'); assert.equal(bodies[0]!.max_tokens, 1024);
+  assert.deepEqual(patches, [{ id: video, title: 'Night swim' }]);
 });
 
 test('a titled, missing or foreign video makes no call', async () => {

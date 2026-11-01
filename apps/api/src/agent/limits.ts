@@ -14,7 +14,7 @@ export interface TurnLimits {
   readonly cleanupMs: number;
   /**
    * Output tokens for the one video-title call. Muse Spark always reasons first and counts it as output:
-   * at minimal effort a title spends about 130–230 reasoning tokens before its few words.
+   * in four live probes at minimal effort a title spent 108–225 reasoning tokens (123–240 in all).
    */
   readonly titleTokens: number;
   /** Overall deadline of the one video-title call; it is never retried. */
