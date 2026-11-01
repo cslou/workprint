@@ -9,6 +9,7 @@ test('explicit New video creates native identity and empty history without enabl
   try {
     const user = await f.auth.createAccount();
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
+    allowList(materialNetwork, f.application!.apiOrigin, user.id);
     await page.goto(origin + '/app'); await account(page); await signIn(page, user.email, user.password);
     await expect(page.getByRole('dialog')).not.toBeVisible();
     materialNetwork.expectOperations({ origin: f.application!.apiOrigin, method: 'POST', path: '/memory/threads', query: {}, count: 1 });
@@ -103,7 +104,7 @@ test('real browser creates beyond one page and traverses owned Recents with focu
     await expect(page.getByRole('list', { name: 'Saved messages' })).toHaveText('Seeded exact text 5');
     expect(await f.application!.snapshot()).toBe(before);
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
-    allowHistory(materialNetwork, f.application!.apiOrigin, user.id, id);
+    allowHistory(materialNetwork, f.application!.apiOrigin, user.id, id); allowList(materialNetwork, f.application!.apiOrigin, user.id);
     await page.reload(); await expect(page.getByRole('heading', { name, exact: true })).toBeFocused();
     await expect(page.getByRole('list', { name: 'Saved messages' })).toHaveText('Seeded exact text 5');
     expect(await f.application!.snapshot()).toBe(before);
