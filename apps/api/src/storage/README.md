@@ -88,7 +88,8 @@ Mutable staging and immutable published keys must remain separate, and only the
 verified byte snapshot may be published. Verification/confirmation policy and
 cleanup coordination are not implied by these mechanical SDK observations.
 
-The repeatable `test/storage.security.test.ts` qualifies those local transport
-properties with synthetic bytes, including replayed staging PUT leaving a
-separate conditional immutable object unchanged. It is not a media decoder,
-working product upload, Artifact publication or R2 qualification claim.
+A repeatable transport suite qualified those local properties with synthetic
+bytes, including replayed staging PUT leaving a separate conditional immutable
+object unchanged. The 2026-11-01 MVP test scope removed it; it was never a
+media decoder, working product upload, Artifact publication or R2
+qualification claim.

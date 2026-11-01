@@ -17,7 +17,7 @@ export function savedMaterialPresentation(version: Version): MaterialPresentatio
     return { versionId: version.id, revision: version.revision, name: subject.name, description: kind,
       sheet: { kicker: kind, name: subject.name, summary: subject.description, sections: [
         { title: 'Identity', text: subject.continuityNotes.join('\n\n') },
-        { title: 'Missing views', text: 'No images are supplied.' },
+        { title: 'Missing views', text: parsed.data.references.length ? `${parsed.data.references.length} exact image associations supplied. Required views and inherited coverage are not declared.` : 'No images are supplied.' },
       ] } };
   }
   return null;

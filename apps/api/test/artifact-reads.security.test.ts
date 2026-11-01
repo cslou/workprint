@@ -77,7 +77,8 @@ test('owned persistence and reads keep exact uses, immutable history, scoped sta
     assert.deepEqual(await counts(), afterForeign, 'Denied fixture/domain writes leave no partial rows');
     assert.notDeepEqual(before, afterForeign);
     await assert.rejects(query(db.setupUrl, `UPDATE artifacts.versions SET revision=99 WHERE version_id='${first.id}'`), /immutable/);
-    await assert.rejects(query(db.servingUrl, "INSERT INTO artifacts.version_dependencies(owner_id,version_id,dependency_id,position) VALUES('account-a','unknown','missing',0)"), /foreign key/);
+    await assert.rejects(query(db.servingUrl, `INSERT INTO artifacts.version_dependencies(owner_id,version_id,dependency_id,position) VALUES('account-a','unknown','${first.id}',0)`), /foreign key/, 'An unknown parent still fails the real parent-version foreign key');
+    await assert.rejects(query(db.servingUrl, `INSERT INTO artifacts.version_dependencies(owner_id,version_id,dependency_id,position) VALUES('account-a','${first.id}','missing',0)`), { code: '23514', message: 'Version link is not owned or read-only' }, 'An unresolved source fails the explicit owned/read-only link guard');
   } finally {
     await native.close(); await serving.close(); if (!pool.ended) await pool.end(); await db.close();
   }

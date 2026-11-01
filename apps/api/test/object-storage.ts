@@ -4,7 +4,9 @@ import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { CreateBucketCommand, DeleteObjectCommand, PutBucketCorsCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { S3Client } from '@aws-sdk/client-s3';
+import { initializeObjectStorage } from './object-storage-startup.js';
+import type { FixtureDiagnostic } from './fixture-observation.js';
 
 // Docker Hub OCI index resolved before first use; never execute the mutable tag alone.
 export const SEAWEED_IMAGE = 'chrislusf/seaweedfs:4.51@sha256:f7a49e3f3972ebed5be2ed4befa4a0c68eb7bdddba6e692d42729ceb545134b8';
@@ -17,7 +19,7 @@ export type ObjectStorageFixture = Readonly<{
 }>;
 
 /** Unique private local service only; no R2 target, shared bucket or account mutation. */
-export async function isolatedObjectStorage(origins: readonly string[] = ['http://127.0.0.1:4279', 'http://127.0.0.1:4280'], diagnostic?: (message: string) => void): Promise<ObjectStorageFixture> {
+export async function isolatedObjectStorage(origins: readonly string[] = ['http://127.0.0.1:4279', 'http://127.0.0.1:4280'], diagnostic?: (message: string) => void, phaseDiagnostic?: FixtureDiagnostic): Promise<ObjectStorageFixture> {
   const owner = randomUUID(), name = `workprint-s3-fixture-${owner}`, bucket = `workprint-${owner}`;
   const directory = await mkdtemp(join(tmpdir(), 'workprint-s3-'));
   await chmod(directory, 0o700);
@@ -73,13 +75,7 @@ export async function isolatedObjectStorage(origins: readonly string[] = ['http:
     }
     const clientConfiguration = { endpoint, region: 'us-east-1', forcePathStyle: true, maxAttempts: 1, requestChecksumCalculation: 'WHEN_REQUIRED' as const, responseChecksumValidation: 'WHEN_REQUIRED' as const };
     client = new S3Client({ ...clientConfiguration, credentials }); foreign = new S3Client({ ...clientConfiguration, credentials: foreignCredentials });
-    await client.send(new CreateBucketCommand({ Bucket: bucket }), { abortSignal: AbortSignal.timeout(3000) });
-    await client.send(new PutBucketCorsCommand({ Bucket: bucket, CORSConfiguration: { CORSRules: [{ AllowedOrigins: [...origins], AllowedMethods: ['PUT', 'GET', 'HEAD'], AllowedHeaders: ['content-type', 'content-length', 'x-amz-content-sha256'], ExposeHeaders: ['ETag', 'Content-Length', 'Content-Type', 'Content-Range', 'Accept-Ranges'], MaxAgeSeconds: 60 }] } }), { abortSignal: AbortSignal.timeout(3000) });
-    // A new single-node cluster defers volume-ID allocation during its initial lease.
-    // Readiness includes one real write; this startup bound is not the product I/O deadline.
-    const readinessKey = `fixture-readiness/${owner}`;
-    await client.send(new PutObjectCommand({ Bucket: bucket, Key: readinessKey, Body: Buffer.from('storage ready'), ContentLength: 13, ContentType: 'application/octet-stream' }), { abortSignal: AbortSignal.timeout(30000) });
-    await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: readinessKey }), { abortSignal: AbortSignal.timeout(3000) });
+    await initializeObjectStorage(client, { bucket, owner, origins }, phaseDiagnostic);
     return { endpoint, bucket, credentials, client, foreign, close };
   } catch (error) {
     if (acquisitionStarted && diagnostic) {

@@ -11,6 +11,7 @@ export type ManualTextTarget = Readonly<{
   read(version: Version): string | null;
   replace(version: Version, text: string): Request['body']['content'] | null;
   compatible(base: Version, latest: Version): boolean;
+  dependencies?(base: Version, content: Request['body']['content']): readonly string[];
 }>;
 export type ManualSaveState = Readonly<{
   base: Version; editing: boolean; text: string;
@@ -61,7 +62,7 @@ export function createManualSave(config: { client: ManualClient; conversationId:
     if (!alive || !state.editing || !['idle', 'rejected'].includes(state.phase)) return;
     const content = config.target.replace(state.base, state.text);
     if (!content || !('content' in state.base)) { update({ phase: 'rejected', failure: 'invalid_input' }); return; }
-    captured = structuredClone({ params: { id: config.conversationId }, query: {}, body: { operationId: crypto.randomUUID(), artifactId: state.base.artifactId, baseVersionId: state.base.id, kind: state.base.kind, content, dependencies: [...state.base.dependencies], ...(config.intendedUse ? { intendedUse: config.intendedUse } : {}) } });
+    captured = structuredClone({ params: { id: config.conversationId }, query: {}, body: { operationId: crypto.randomUUID(), artifactId: state.base.artifactId, baseVersionId: state.base.id, kind: state.base.kind, content, dependencies: [...(config.target.dependencies?.(state.base, content) ?? state.base.dependencies)], ...(config.intendedUse ? { intendedUse: config.intendedUse } : {}) } });
     return execute(captured);
   };
   const reviewLatest = async () => {

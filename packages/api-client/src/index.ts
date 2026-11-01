@@ -7,6 +7,7 @@ export { transferUpload } from './upload-transfer.js';
 export { createUploadSession, type UploadSession, type UploadState, type UploadScope } from './upload-session.js';
 export { readPrivateImage } from './private-image.js';
 export { createManualSave, type ManualSave, type ManualSaveState, type ManualTextTarget } from './manual-save.js';
+export { createExactVersionUse, requestVersionUse, type ExactVersionUse, type ExactVersionUseState, type VersionUseClient } from './version-use.js';
 export type CallOptions = { signal?: AbortSignal };
 type ApplicationMethods = { [N in OperationName]: (input: OperationRequest<N>, options?: CallOptions) => Promise<ClientResult<OperationResponse<N>>> };
 const nativeNames = ['createConversation', 'listConversations', 'loadConversation', 'sendText', 'subscribe', 'stop'] as const;

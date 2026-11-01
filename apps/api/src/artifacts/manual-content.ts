@@ -11,10 +11,10 @@ export function canonicalJson(value: unknown): string {
 function structure(kind: string, raw: unknown) {
   const content = parseContent(kind, raw);
   if ('scenes' in content) return { ...content, scenes: content.scenes.map(scene => ({ ...scene, script: scene.script.map(entry => 'action' in entry ? { action: '' } : { dialogue: { ...entry.dialogue, text: '' } }) })) };
-  if ('subject' in content) return { ...content, subject: { ...content.subject, description: '' } };
+  if ('subject' in content) return { ...content, subject: { ...content.subject, description: '' }, references: [] };
   return { ...content, shots: content.shots.map(shot => ({ ...shot, intent: '', panels: shot.panels.map(panel => ({ ...panel, description: '' })) })) };
 }
-/** Manual saves change existing text, not dependency/selection/order/structure authority. */
+/** Text edits preserve structure; reference edits may replace independently validated image associations. */
 export function assertManualTextChange(base: Version, content: unknown, dependencies: readonly string[]) {
-  if (!('content' in base) || canonicalJson(base.dependencies) !== canonicalJson(dependencies) || canonicalJson(structure(base.kind, base.content)) !== canonicalJson(structure(base.kind, content))) throw new ArtifactError('invalid_input');
+  if (!('content' in base) || (base.kind !== 'reference' && canonicalJson(base.dependencies) !== canonicalJson(dependencies)) || canonicalJson(structure(base.kind, base.content)) !== canonicalJson(structure(base.kind, content))) throw new ArtifactError('invalid_input');
 }

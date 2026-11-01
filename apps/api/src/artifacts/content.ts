@@ -14,6 +14,5 @@ export function assertContentDependencies(content: ReturnType<typeof parseConten
     : 'references' in content ? content.references.map(reference => reference.versionId) : [];
   if (referenced.some(id => !dependencies.has(id))) throw new ArtifactError('invalid_input');
   if ('sourceScriptVersionId' in content && (dependencies.get(content.sourceScriptVersionId)?.kind !== 'script' || content.shots.some(shot => shot.panels.some(panel => panel.references.some(id => dependencies.get(id)?.kind !== 'reference'))))) throw new ArtifactError('invalid_input');
-  // Media references cannot be published by this text-only boundary.
-  if ('subject' in content && content.references.length > 0) throw new ArtifactError('invalid_input');
+  if ('subject' in content && (dependencies.size !== referenced.length || referenced.some(id => dependencies.get(id)?.kind !== 'image'))) throw new ArtifactError('invalid_input');
 }

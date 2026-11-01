@@ -1,13 +1,15 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Button as AriaButton, Dialog, Heading, Modal, ModalOverlay } from 'react-aria-components';
 import { createUploadSession, nativeConversations, type UploadSession } from '@workprint/api-client';
 import type { OperationResponse } from '@workprint/contracts';
 import type { BrowserClient } from '../api/client.js';
+import { DraftGuard } from '../api/draft-guard.js';
 import { Button } from '../ui/controls.js';
 import type { WorkspaceTab } from '../ui/panel.js';
 import { Library } from '../library/library.js';
 import { LibraryPicker } from '../library/picker.js';
+import { createLibrarySelection } from '../library/selection.js';
 import type { LibraryPrerequisites } from '../library/picker.js';
 import { MaterialPanel } from '../materials/panel.js';
 import type { MaterialPrerequisites } from '../materials/presentation.js';
@@ -30,7 +32,7 @@ const nativeCopy = { new: ['New video is not available yet.', 'No conversation w
 export function Shell(props: ShellProps) {
   const [uploadSession] = useState(() => createUploadSession());
   useLayoutEffect(() => () => uploadSession.dispose(), [uploadSession]);
-  return <ScopedShell uploadSession={uploadSession} key={JSON.stringify([props.session?.accountId ?? null, props.conversationId ?? null])} {...props} />;
+  return <DraftGuard key={JSON.stringify([props.session?.accountId ?? null, props.conversationId ?? null])}><ScopedShell uploadSession={uploadSession} {...props} /></DraftGuard>;
 }
 function ScopedShell({ connection, session, conversationId, workspaceContent, materialPrerequisites, storyboardPrerequisites, videoPrerequisites, libraryPrerequisites, uploadSession }: ShellProps & { uploadSession: UploadSession }) {
   const [surface, setSurface] = useState<Surface>(null);
@@ -41,6 +43,9 @@ function ScopedShell({ connection, session, conversationId, workspaceContent, ma
   useLayoutEffect(() => { if (surface) dialogHead.current?.querySelector('button')?.focus(); }, [surface]);
   const scope = session ? { accountId: session.accountId, ...(conversationId === undefined ? {} : { conversationId }) } : null;
   const workspace = useWorkspace(connection, scope);
+  const libraryConnection = useRef(connection); libraryConnection.current = connection;
+  const [librarySelection] = useState(() => createLibrarySelection({ getClient: () => libraryConnection.current.kind === 'configured' ? libraryConnection.current.client : null, ...(conversationId ? { conversationId } : {}), onUsed: workspace.onUsed }));
+  useEffect(() => () => librarySelection.dispose(), [librarySelection]);
   const native = connection.kind === 'configured' ? connection.client.native : nativeConversations;
   const runNative = async (action: 'new' | 'recents' | 'load') => {
     const method = { new: 'createConversation', recents: 'listConversations', load: 'loadConversation' } as const;
@@ -76,7 +81,7 @@ function ScopedShell({ connection, session, conversationId, workspaceContent, ma
       {surface === 'account' && <div className="wp-session-content"><p><b>{session?.name ?? 'Not signed in'}</b></p>{session ? <div className="wp-session-actions"><Button variant="secondary" onPress={() => setSurface('account-unavailable')}>Sign out</Button><Button variant="secondary" onPress={() => setSurface('account-unavailable')}>Switch account</Button></div> : <><p>Sign-in is not available yet.</p><div className="wp-session-actions"><Button isDisabled size="choose">Sign in</Button></div></>}</div>}
       {surface === 'account-unavailable' && <p className="wp-session-message" role="status">Account actions are not available yet. Nothing about your session has changed.</p>}
       {(surface === 'new' || surface === 'recents' || surface === 'load') && <div className="wp-session-content" role="status">{nativeCopy[surface].map((line) => <p key={line}>{line}</p>)}</div>}
-      {surface === 'library' && <Library connection={connection} scope={scope}>{(library, pagination, windowOffset) => <LibraryPicker connection={connection} scope={scope} library={library} pagination={pagination} windowOffset={windowOffset} {...(libraryPrerequisites === undefined ? {} : { prerequisites: libraryPrerequisites })} />}</Library>}
+      {surface === 'library' && <Library connection={connection} scope={scope}>{(library, pagination, windowOffset, filter) => <LibraryPicker filter={filter} selection={librarySelection} connection={connection} scope={scope} library={library} pagination={pagination} windowOffset={windowOffset} {...(libraryPrerequisites === undefined ? {} : { prerequisites: libraryPrerequisites })} />}</Library>}
     </Dialog></Modal></ModalOverlay>
   </>;
 }

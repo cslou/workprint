@@ -3,8 +3,8 @@ import { registerApiRoute, type ApiRoute } from '@mastra/core/server';
 import { PostgresStore } from '@mastra/pg';
 import { Pool } from 'pg';
 import { createOwnedConversationCheck } from '../agent/index.js';
-import { createApplication, withSavedWork, withManualSaves, withUploads } from '../application/index.js';
-import { createArtifactStore, createArtifactWriters, createMediaVerifier, createUploadCoordinator } from '../artifacts/index.js';
+import { createApplication, withSavedWork, withManualSaves, withVersionUses, withUploads } from '../application/index.js';
+import { createArtifactStore, createArtifactWriters, createVersionUses, createMediaVerifier, createUploadCoordinator } from '../artifacts/index.js';
 import { configuredMediaSandbox, configuredObjectStorage } from '../storage/index.js';
 import { assertRestrictedRole } from '../db/index.js';
 import { loadServerConfig } from './config.js';
@@ -38,7 +38,8 @@ export async function createBackend(routes: ApiRoute[] = []) {
   const application = createApplication({ checkOwnedConversation: createOwnedConversationCheck(storage) });
   const savedApplication = withSavedWork(application, createArtifactStore(pool, application.checkOwnedConversation));
   const manualApplication = withManualSaves(savedApplication, createArtifactWriters(pool, application.checkOwnedConversation).human.save);
-  const uploadApplication = withUploads(manualApplication, createUploadCoordinator(pool, application.checkOwnedConversation, { ...(objects ? { storage: objects } : {}), ...(media ? { verifyMedia: createMediaVerifier(media) } : {}) }));
+  const reuseApplication = withVersionUses(manualApplication, createVersionUses(pool, application.checkOwnedConversation).useVersion);
+  const uploadApplication = withUploads(reuseApplication, createUploadCoordinator(pool, application.checkOwnedConversation, { ...(objects ? { storage: objects } : {}), ...(media ? { verifyMedia: createMediaVerifier(media) } : {}) }));
   const protectedRoutes = [...applicationRoutes(uploadApplication), ...routes];
   const matchesRoute = (path: string, method: string) => protectedRoutes.some((route) => {
     const template = route.path.split('/');

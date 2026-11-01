@@ -7,6 +7,7 @@ import { ArtifactError } from './errors.js';
 import { assertManualTextChange, canonicalJson } from './manual-content.js';
 import { publishVersion } from './publication.js';
 import { createArtifactStore } from './store.js';
+import { requireReferenceMedia } from './references.js';
 
 type Command = OperationRequest<'saveVersion'>['body'];
 type Result = OperationResponse<'saveVersion'>;
@@ -48,9 +49,11 @@ export function createArtifactWriters(pool: Pool, checkOwnedConversation: OwnedC
       // All native authorization is completed before acquiring any SQL transaction.
       const base = await reads.version(account, body.baseVersionId);
       if (base.artifactId !== body.artifactId || base.kind !== body.kind) throw new ArtifactError('not_found');
+      if (base.builtIn) throw new ArtifactError('invalid_input');
       const dependencies = new Map<string, Version>();
       for (const id of body.dependencies) dependencies.set(id, await reads.version(account, id));
       assertContentDependencies(content, dependencies);
+      await requireReferenceMedia(pool, content);
       if (producer === 'human') assertManualTextChange(base, content, body.dependencies);
       let intended: { use_id: string; version_id: string } | undefined;
       if (body.intendedUse) {
