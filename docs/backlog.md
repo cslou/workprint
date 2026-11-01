@@ -101,7 +101,7 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 - Problem: The question card UI and contract exist (`questionSchema`, `apps/web/src/conversation/question.tsx`). The agent cannot ask a question yet, and answers cannot reach the agent.
 - Outcome: The agent calls AskUserQuestion with one or more questions, each with options. The tool saves them and the turn ends. The UI shows the question as in demo-02: question N of M, lettered options, plus "type your own answer". The user's choice is sent as their next message, carrying the exact question and option ids (and asset ids, B-016). The agent continues from that message. A typed answer is an ordinary message. Pass: the options appear in the UI, and choosing one resumes the agent with that answer.
 - Constraint:
-  - Every id taken from model arguments or the browser (question or option) must resolve to an exact version owned by the trusted account and video, checked in tool or domain code; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
+  - Every id taken from model arguments or the browser (question or option) must resolve to an exact version owned by the trusted account and video, checked by an account- and video-scoped domain query that the tool reaches through an application function; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
   - The answer's asset comes from the saved question's option, never from an id the browser sends.
   - Kept from former Sprint 007 (`eb98e49`) Stories 1–2:
   - Pending questions load from saved records.
@@ -117,7 +117,7 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 - Problem: The product cannot create images; users can only upload them (Sprint 005).
 - Outcome: A generate-image tool calls Meta's image API from a text prompt, optionally with images already in the user's storage as inputs. It stores the result in private storage as the user's image. The image always appears in the Assets tab. When the user asks for an image directly ("generate me an image"), it also appears in the chat (Lou, 2026-11-01). Pass: the user asks for an image, the agent calls Meta, the image is stored and shown in the chat and in Assets, and a follow-up request can use a stored image as input.
 - Constraint:
-  - Every id taken from model arguments or the browser (image, video, question or option) must resolve to an exact version owned by the trusted account and video, checked in tool or domain code; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
+  - Every id taken from model arguments or the browser (image, video, question or option) must resolve to an exact version owned by the trusted account and video, checked by an account- and video-scoped domain query that the tool reaches through an application function; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
   - The Meta docs, read 2026-11-01, say:
     - model `muse-image-1.0`
     - `POST /v1/images/generations` for text to image, and `POST /v1/images/edits` with 1–10 input images (`image_url` or `file_id`)
@@ -140,7 +140,7 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 - Problem: Question options carry only an id and a label. The agent cannot show image choices, and an answer cannot say which asset was chosen.
 - Outcome: An option can carry a stored image (an exact asset/version), and the UI shows it as a thumbnail. The answer returned to the agent names that exact asset/version, so the agent knows which asset the user means. Pass: the user picks an image option, and the agent's next action uses that exact asset.
 - Constraint:
-  - Every id taken from model arguments or the browser (image, video, question or option) must resolve to an exact version owned by the trusted account and video, checked in tool or domain code; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
+  - Every id taken from model arguments or the browser (image, video, question or option) must resolve to an exact version owned by the trusted account and video, checked by an account- and video-scoped domain query that the tool reaches through an application function; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
   - Do not guess identity from labels or untyped content. Same principle as B-003.
 - References: B-014; B-003; `packages/contracts/src/models.ts` `questionSchema`.
 
@@ -155,7 +155,7 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 - Problem: Storyboard reads and manual edits exist (`apps/api/src/artifacts/storyboard.ts`, `apps/web/src/storyboard/`), but the agent cannot plan shots or make panels.
 - Outcome: The agent plans shots from the current script version, then creates each panel's image through B-015 using the selected reference sheets. It saves a storyboard version linked to that script and those references. Pass: the Storyboard tab shows the planned shots with generated panel images.
 - Constraint:
-  - Every id taken from model arguments or the browser (image, video, question or option) must resolve to an exact version owned by the trusted account and video, checked in tool or domain code; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
+  - Every id taken from model arguments or the browser (image, video, question or option) must resolve to an exact version owned by the trusted account and video, checked by an account- and video-scoped domain query that the tool reaches through an application function; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
   - Built as tools that the agent loop calls, with the skill's steps written into the agent's guidance (Lou, 2026-11-01). Converting them to workflows can be decided later.
   - The saved storyboard schema requires its source script version, and panel references must be reference versions (`apps/api/src/artifacts/content.ts`), so panels can only cite saved reference sheets (B-017).
   - Panels are generated one image call at a time, each shown as it finishes (B-021).
@@ -177,7 +177,7 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 - Constraint:
   - No background workflow in the MVP. The user cannot chat during generation, which is accepted (Lou, 2026-11-01); queueing is B-026.
   - Never resubmit a paid task to recover. An uncertain submission with no task id is marked failed with an unknown outcome.
-  - When Stop, the 35-minute turn deadline (B-012) or the poll's own 30-minute deadline ends a poll, the record moves to a distinct `interrupted` state: the task id is kept and nothing is resubmitted. The Videos tab shows it as stopped waiting, not running. Only an explicit resume (the user asks, and the agent names that record or its shot) polls the saved task again; a new prompt always submits a new task. The resumed record id must be owned by the trusted account and video, checked in tool or domain code, with a foreign or missing id returning not-found (test it). After MiniMax's 7-day query window, an `interrupted` record becomes `failed` with an unknown outcome. A server restart resumes only records still `running`, never `interrupted` ones.
+  - When Stop, the 35-minute turn deadline (B-012) or the poll's own 30-minute deadline ends a poll, the record moves to a distinct `interrupted` state: the task id is kept and nothing is resubmitted. The Videos tab shows it as stopped waiting, not running. Only an explicit resume (the user asks, and the agent names that record or its shot) polls the saved task again; a new prompt always submits a new task. The resumed record id must be owned by the trusted account and video, checked by an account- and video-scoped domain query that the tool reaches through an application function, with a foreign or missing id returning not-found (test it). After MiniMax's 7-day query window, counted from the saved submission time, an `interrupted` record becomes `failed` with an unknown outcome. The expiry is applied lazily when the record is read and before any resume; resuming an expired record makes no MiniMax call. Test both paths. A server restart resumes only records still `running`, never `interrupted` ones.
   - MiniMax result URLs are time-limited and may carry credentials, so never persist or log them; query the task again for a fresh URL. Tasks are queryable only for 7 days.
   - The Videos tab shows the record's saved status (queued, running, interrupted, done, failed) after a reload, with no invented progress.
 - References:
@@ -189,7 +189,7 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 - Problem: The Videos tab and player exist, but nothing produces a generated video.
 - Outcome: A generate-video tool takes a prompt and up to two images (first and last frame, from uploads or storyboard panels) and starts a MiniMax Video V2 task. It waits for the result as in B-025, stores the video, and shows it in the Videos tab. Pass: the generated video is stored, appears in Videos and plays.
 - Constraint:
-  - Every id taken from model arguments or the browser (image, video, question or option) must resolve to an exact version owned by the trusted account and video, checked in tool or domain code; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
+  - Every id taken from model arguments or the browser (image, video, question or option) must resolve to an exact version owned by the trusted account and video, checked by an account- and video-scoped domain query that the tool reaches through an application function; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
   - Lou chose MiniMax for now (2026-11-01); Meta's API has no video generation, only video understanding.
   - The key is `MINIMAX_API_KEY` in the root `.env`, added by Lou on 2026-11-01. It is server-only; never print it.
   - Waiting, resume and failure handling follow B-025.
@@ -204,7 +204,7 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 - Problem: There is no way to combine generated clips into one video.
 - Outcome: A join-videos tool combines an ordered set of the user's stored videos into a new video. The new video is stored and shown in the Videos tab, and the originals are kept. Pass: the joined video plays in Videos in the requested order.
 - Constraint:
-  - Every id taken from model arguments or the browser (image, video, question or option) must resolve to an exact version owned by the trusted account and video, checked in tool or domain code; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
+  - Every id taken from model arguments or the browser (image, video, question or option) must resolve to an exact version owned by the trusted account and video, checked by an account- and video-scoped domain query that the tool reaches through an application function; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
   - This is the agent's assembly tool. Export and download stay in B-009.
   - Stream-copy joining needs matching codec, resolution and frame rate, so incompatible clips fail with a clear message rather than being re-encoded in the MVP.
   - Run ffmpeg inside the existing bounded media sandbox, and verify the output like any other video.
