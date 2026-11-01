@@ -6,17 +6,23 @@ export const titleInstructions = 'Name this short video from the filmmaker’s m
 /** Longest saved title, in characters. */
 export const titleLength = 60;
 
-type StreamPart = { type: string; delta?: unknown };
+type StreamPart = { type: string; delta?: unknown; finishReason?: unknown };
 type StreamCall = (options: {
   prompt: readonly ({ role: 'system'; content: string } | { role: 'user'; content: readonly { type: 'text'; text: string }[] })[];
   maxOutputTokens: number;
   abortSignal: AbortSignal;
 }) => Promise<{ stream: ReadableStream<StreamPart> }>;
 
-/** One line, without wrapping quotes or a trailing full stop, at most `titleLength` characters. */
+/** One line without a `Title:` label, wrapping quotes or bold, or a trailing full stop; at most `titleLength` characters. */
 export function cleanTitle(raw: string): string {
-  const line = raw.replace(/\s+/g, ' ').trim().replace(/^["'“‘]+|["'”’]+$/g, '').replace(/\.$/, '').trim();
-  const characters = [...line];
+  let line = raw.replace(/\s+/g, ' ').trim(), previous = '';
+  // Unwrap until stable, so `"Title".` and `**Title**` both become `Title`. Apostrophes stay: `The Boys'`.
+  while (line !== previous) {
+    previous = line;
+    line = line.replace(/^title:\s*/i, '').replace(/^(\*\*|__)(.*)\1$/, '$2').replace(/^["“‘'](.*)["”’']$/, '$1').replace(/\.$/, '').trim();
+  }
+  // Whole characters as people see them, so an emoji or accented letter is never cut in half.
+  const characters = [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(line)].map(part => part.segment);
   return characters.length <= titleLength ? line : characters.slice(0, titleLength).join('').trimEnd();
 }
 
@@ -36,36 +42,43 @@ export function createVideoTitler(model: NativeTurnModel, storage: MastraComposi
     naming.add(videoId);
     const deadline = new AbortController();
     const timer = setTimeout(() => deadline.abort(new Error('Video title timed out')), limits.titleMs);
+    // Every step races the one deadline, so a hung read, call or save cannot keep the video from later attempts.
+    const expired = new Promise<never>((_, reject) => { deadline.signal.addEventListener('abort', () => reject(deadline.signal.reason), { once: true }); });
+    expired.catch(() => undefined);
+    const bounded = <T>(work: Promise<T>) => Promise.race([work, expired]);
+    let reader: ReadableStreamDefaultReader<StreamPart> | undefined;
     try {
-      const memory = await storage.getStore('memory');
+      const memory = await bounded(storage.getStore('memory'));
       if (!memory) throw new Error('Native memory unavailable');
-      const thread = await memory.getThreadById({ threadId: videoId, resourceId: accountId });
+      const thread = await bounded(memory.getThreadById({ threadId: videoId, resourceId: accountId }));
       if (!thread || thread.resourceId !== accountId || thread.title?.trim()) return;
-      const { stream } = await doStream({
+      const { stream } = await bounded(doStream({
         prompt: [{ role: 'system', content: titleInstructions }, { role: 'user', content: [{ type: 'text', text: message }] }],
         maxOutputTokens: limits.titleTokens, abortSignal: deadline.signal,
-      });
-      let text = '';
-      const reader = stream.getReader();
-      const aborted = new Promise<never>((_, reject) => {
-        if (deadline.signal.aborted) reject(deadline.signal.reason);
-        deadline.signal.addEventListener('abort', () => reject(deadline.signal.reason), { once: true });
-      });
-      aborted.catch(() => undefined);
+      }));
+      reader = stream.getReader();
+      let text = '', finishReason: unknown;
       for (;;) {
-        const next = await Promise.race([reader.read(), aborted]);
+        const next = await bounded(reader.read());
         if (next.done) break;
         if (next.value.type === 'error') throw new Error('Video title call failed');
         if (next.value.type === 'text-delta' && typeof next.value.delta === 'string') text += next.value.delta;
+        if (next.value.type === 'finish') finishReason = next.value.finishReason;
       }
       const title = cleanTitle(text);
-      if (title && !deadline.signal.aborted) await memory.patchThread({ id: videoId, title });
+      if (!title) {
+        // Nothing to save; the finish reason (for example `length`) says why.
+        console.error('Video title failed', { name: 'EmptyTitle', finishReason: typeof finishReason === 'string' && /^[a-z-]{1,32}$/.test(finishReason) ? finishReason : 'unknown' });
+        return;
+      }
+      await bounded(memory.patchThread({ id: videoId, title }));
     } catch (error) {
       // No message or provider detail: the name says enough to tell a timeout from a provider failure.
       console.error('Video title failed', { name: deadline.signal.aborted ? 'TimeoutError' : error instanceof Error ? error.name : 'unknown' });
     } finally {
       clearTimeout(timer);
       if (!deadline.signal.aborted) deadline.abort();
+      reader?.cancel().catch(() => undefined);
       naming.delete(videoId);
     }
   };

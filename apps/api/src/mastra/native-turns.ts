@@ -21,7 +21,7 @@ export function nativeTurnBody(context: Context, body: unknown, bytes: Uint8Arra
 /**
  * An admitted send holds its video until the native send settles; `release` must run once it has.
  * `accepted` runs after the native send was accepted, before the response leaves, so Recents lists the video.
- * It also starts naming an untitled video from the message, without waiting for it.
+ * Once the mark is written, it starts naming an untitled video from the message, without waiting for it.
  */
 export type AdmittedSend = { accepted: () => Promise<void>; release: () => void };
 
@@ -67,10 +67,10 @@ export function nativeTurnAdmission(mastra: Mastra) {
       const message = String(body.message);
       return {
         accepted: async () => {
-          void nameVideo(mastra, accountId, videoId, message);
           const memory = await storage?.getStore('memory');
           if (!memory) throw new Error('Native memory unavailable');
-          await markConversationStarted(memory, videoId, accountId);
+          // A title save rewrites the thread row, so it starts only once the started mark is written.
+          await markConversationStarted(memory, videoId, accountId, () => { void nameVideo(mastra, accountId, videoId, message); });
         },
         release: () => { starting.delete(videoId); },
       };

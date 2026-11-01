@@ -14,7 +14,7 @@ export type ScriptedStep = {
   status?: number;
   /** End the stream without a finish chunk or `[DONE]`. */
   incomplete?: boolean;
-  /** Pause before anything (`before`) or after the first text delta (`mid`) until `release()`. */
+  /** Pause before anything (`before`) or after the first text delta (`mid`) until `release()`. One hold at a time, turn or title. */
   hold?: 'before' | 'mid';
   /** Spread the text deltas out by this many milliseconds each. */
   dripMs?: number;

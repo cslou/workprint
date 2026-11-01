@@ -36,6 +36,12 @@ test('a title is one line without quotes or a full stop, at most 60 characters',
   assert.equal(titleLength, 60); assert.ok([...long].length <= 60); assert.ok(!long.endsWith(' '));
   assert.equal([...cleanTitle('é'.repeat(80))].length, 60);
   assert.equal(cleanTitle('  \n '), '');
+  assert.equal(cleanTitle('"Night swim".'), 'Night swim');
+  assert.equal(cleanTitle('Title: **Night swim**'), 'Night swim');
+  assert.equal(cleanTitle("The Boys'"), "The Boys'");
+  // A family emoji is one character people see; it is kept whole or dropped, never split.
+  const family = '\u{1F469}\u200D\u{1F469}\u200D\u{1F467}';
+  assert.equal(cleanTitle(`${'a'.repeat(59)}${family}b`), `${'a'.repeat(59)}${family}`);
 });
 
 test('an untitled video gets one capped call and a title-only save', async () => {
@@ -70,6 +76,23 @@ test('a call held past the deadline is aborted and saves nothing; a failure save
   const failed = fakeStorage();
   await createVideoTitler(failing.model, failed.storage, limits)(owner, video, 'Hello');
   assert.deepEqual(failed.patches, []);
+});
+
+test('a hung thread read is bounded by the same deadline, and the video can be named by a later message', async () => {
+  const { model, calls } = fakeModel(text('Later'));
+  let hang = true;
+  const patches: Record<string, unknown>[] = [];
+  const memory = {
+    getThreadById: () => hang ? new Promise(() => {}) : Promise.resolve({ id: video, resourceId: owner, title: '', metadata: {} }),
+    patchThread: async (update: Record<string, unknown>) => { patches.push(update); },
+  };
+  const name = createVideoTitler(model, { getStore: async () => memory } as unknown as MastraCompositeStore, limits);
+  const started = Date.now();
+  await name(owner, video, 'One');
+  assert.ok(Date.now() - started < 1000); assert.equal(calls.length, 0);
+  hang = false;
+  await name(owner, video, 'Two');
+  assert.deepEqual(patches, [{ id: video, title: 'Later' }]);
 });
 
 test('while one title call is running for a video, another message makes no second call', async () => {
