@@ -49,6 +49,31 @@ test('a new video streams its first reply, then reload shows the saved conversat
   await expect(recents(page).getByRole('button')).toHaveCount(1);
 });
 
+test('the first reply names the video: Recents and the history heading show the title, and both keep it after reload', async ({ page, backend }) => {
+  const [account] = await backend.accounts(1);
+  const { provider } = backend;
+  provider.scriptTitle({ text: ['Night swim'] });
+  provider.script({ text: ['A lovely idea'], hold: 'before' });
+  await signIn(page, account!);
+  await message(page).fill('A short film about a night swim');
+  await message(page).press('Enter');
+  await expect(working(page)).toBeVisible();
+  const video = videoId(page)!;
+  // The title is named from the accepted message while the reply runs; let it land before the reply ends.
+  await expect.poll(async () => (await backend.read<{ title?: string }>(account!, `/memory/threads/${video}`)).title).toBe('Night swim');
+  provider.release();
+  await expect(live(page).getByRole('listitem', { name: 'Assistant message' })).toHaveText('A lovely idea');
+  await expect(recents(page).getByRole('button', { name: 'Night swim', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Night swim', exact: true })).toBeAttached();
+  expect(provider.titleRequests).toHaveLength(1);
+  expect(provider.requests).toHaveLength(1);
+
+  await page.reload();
+  await expect(saved(page).getByRole('listitem')).toHaveText(['A short film about a night swim', 'A lovely idea']);
+  await expect(recents(page).getByRole('button', { name: 'Night swim', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Night swim', exact: true })).toBeAttached();
+});
+
 /** Lets any send a page might still make arrive before a test asserts there was none. */
 const settle = (page: Page) => page.waitForTimeout(500);
 
