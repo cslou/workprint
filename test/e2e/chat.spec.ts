@@ -346,12 +346,16 @@ test('the assistant\'s script saves show in the Script tab without a reload, and
   const { provider } = backend;
   const panel = page.getByRole('tabpanel');
   const first = 'Mara swims across the dark lake.', second = 'Mara swims faster as the far shore appears.', mine = 'Mara floats and looks at the stars.';
-  provider.script({ toolCalls: [{ name: 'update-script', args: { baseVersionId: null, script: scriptOf(first) } }] }, { text: ['I saved the script.'] });
+  // The reply is held after the tool finishes, so the tab must update on the tool's done line, mid-turn.
+  provider.script({ toolCalls: [{ name: 'update-script', args: { baseVersionId: null, script: scriptOf(first) } }] }, { text: ['I saved the script.'], hold: 'before' });
   await signIn(page, account!);
   await message(page).fill('Write the script');
   await message(page).press('Enter');
   await expect(live(page).getByText('Saved version 1', { exact: true })).toBeVisible();
+  await provider.held();
   await expect(panel).toContainText(first);
+  await expect(page.getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
+  provider.release();
   await expect(working(page)).toHaveCount(0);
 
   // The editor is open with unsaved text when the assistant saves version 2 on version 1.

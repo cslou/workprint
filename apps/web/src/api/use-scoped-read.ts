@@ -9,11 +9,11 @@ export type ReadSnapshot<T> = { key: string | null; read: Reader<T>; state: Read
 
 /**
  * Lands a read result. A result for another scope or reader never lands. A failed refresh keeps the value
- * already shown, so a passing network fault never blanks the page.
+ * already shown, so a passing network fault never blanks the page; an ended session always shows.
  */
 export function landRead<T>(previous: ReadSnapshot<T>, next: ReadSnapshot<T> & { state: { kind: 'settled' } }): ReadSnapshot<T> {
   if (previous.key !== next.key || previous.read !== next.read) return previous;
-  if (!next.state.result.ok && previous.state.kind === 'settled' && previous.state.result.ok) return previous;
+  if (!next.state.result.ok && next.state.result.error.code !== 'unauthenticated' && previous.state.kind === 'settled' && previous.state.result.ok) return previous;
   return next;
 }
 

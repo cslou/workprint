@@ -51,12 +51,14 @@ export function useWorkspace(connection: BrowserClient, scope: ReadScope | null)
     if (active.current !== key || !result.use) return;
     // A replay of an earlier unknown save cannot replace a later explicit use.
     if (deferredUses.current.has(result.use.id)) return false;
+    // Stamp now, not in an updater that may run after a later refresh.
+    const at = clock.current;
     setUses(previous => previous.key === key ? { key, effects: previous.effects.filter(effect => effect.result.use.id !== result.use!.id) } : previous);
     setConfirmed(previous => {
       if (previous.key !== key || (previous.effects.get(result.use!.id)?.version.revision ?? -1) >= result.version.revision) return previous;
       const effects = new Map(previous.effects);
       if (!effects.has(result.use!.id) && effects.size >= 100) return previous;
-      effects.set(result.use!.id, { ...result, at: clock.current });
+      effects.set(result.use!.id, { ...result, at });
       return { key, effects };
     });
   }, [key]);
@@ -65,8 +67,12 @@ export function useWorkspace(connection: BrowserClient, scope: ReadScope | null)
     if (active.current !== key) return;
     const deferred = draftGuard.current.active;
     if (draftGuard.current.uncertain) deferredUses.current.add(result.use.id);
-    setUses(previous => ({ key, effects: [...(previous.key === key ? previous.effects.filter(effect => effect.result.use.id !== result.use.id) : []), { result, version, deferred, at: clock.current }].slice(-100) }));
-  }, [key]);
+    const at = clock.current;
+    setUses(previous => ({ key, effects: [...(previous.key === key ? previous.effects.filter(effect => effect.result.use.id !== result.use.id) : []), { result, version, deferred, at }].slice(-100) }));
+    // A use replaces the script without a revision check, and its confirmation can arrive late (a replayed
+    // command). Re-read once: that read starts after the confirmation, so it covers the use and shows newer work.
+    refresh();
+  }, [key, refresh]);
   useEffect(() => {
     if (hasDrafts) return;
     if (held.current) { held.current = false; reread(); }

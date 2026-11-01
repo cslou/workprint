@@ -31,6 +31,8 @@ test('a read lands only on its own scope and reader, and a failed refresh keeps 
   const shownRead = settled(1, 0);
   assert.equal(landRead(shownRead, failed), shownRead, 'the shown value stays');
   assert.deepEqual(landRead(loading, failed).state, failed.state, 'a first read that fails says so');
+  const signedOut = { ...failed, state: { ...failed.state, result: { ok: false as const, error: { code: 'unauthenticated' as const, message: 'x' } } } };
+  assert.deepEqual(landRead(shownRead, signedOut).state, signedOut.state, 'an ended session is never hidden');
   assert.deepEqual(landRead(settled(1, 0), settled(2, 1)).state, settled(2, 1).state);
 });
 
