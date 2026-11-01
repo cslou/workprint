@@ -24,7 +24,9 @@ export function nativeOutcome(expectedRunId: string, onText: (part: NativeTextDe
     else if (value.type === 'finish') {
       const step = object(payload) ? payload.stepResult : undefined;
       if (object(step) && step.reason === 'abort') return interrupted();
-      if (!started || !messageId || !object(step) || step.reason !== 'stop' || step.messageId !== messageId) return failed('invalid_response', 'Native response did not complete');
+      if (!started || !messageId || !object(step) || typeof step.reason !== 'string' || step.messageId !== messageId) return failed('invalid_response', 'Native response did not complete');
+      // A well-formed finish that is not a stop (for example the output cap) is the server ending the turn.
+      if (step.reason !== 'stop') return ended('error');
       return { ok: true, value: { outcome: 'complete', runId: expectedRunId, assistantMessageId: messageId } };
     } else if (value.type === 'error') return error(object(payload) ? payload.error : undefined);
     else if (value.type === 'tripwire') return ended('rejected');

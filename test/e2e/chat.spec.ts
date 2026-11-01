@@ -67,6 +67,27 @@ test('Shift+Enter adds a line and whitespace-only input is never sent', async ({
   expect(backend.provider.requests).toHaveLength(0);
 });
 
+test('Send waits while saved history is loading or unavailable', async ({ page, backend }) => {
+  const [account] = await backend.accounts(1);
+  const earlier = await backend.app.saveNative(account!.id, [{ role: 'user', text: 'Saved before' }], 'Saved video');
+  await signIn(page, account!);
+  const sent = sends(page);
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  await page.route(`**/memory/threads/${earlier.id}/messages**`, async route => { await held; await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'integration_failure', message: 'Native storage unavailable' } }) }); });
+  await recents(page).getByRole('button', { name: 'Saved video', exact: true }).click();
+  await message(page).fill('Not yet');
+  await message(page).press('Enter');
+  await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeDisabled();
+  release();
+  await expect(page.getByText('This conversation couldn’t be loaded. Check your connection and try again.', { exact: true })).toBeVisible();
+  await message(page).press('Enter');
+  await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeDisabled();
+  await settle(page);
+  expect(sent()).toBe(0);
+  await expect(message(page)).toHaveValue('Not yet');
+});
+
 test('a failed first send keeps the draft and adds nothing to Recents', async ({ page, backend }) => {
   const [account] = await backend.accounts(1);
   await signIn(page, account!);

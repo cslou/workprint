@@ -25,7 +25,7 @@ test('native facade bounds actual HTTP/token/stream faults and releases resource
       const messageId = '44444444-4444-4444-8444-444444444444';
       const start = { type: 'chunk', runId: executionId, data: { type: 'start', runId: mode === 'control-mismatch' ? messageId : executionId, payload: { messageId } } };
       const delta = { type: 'chunk', runId: executionId, data: { type: 'text-delta', runId: executionId, payload: { text: 'Exact control text' } } };
-      const finish = { type: 'finish', runId: executionId, data: { stepResult: { reason: mode === 'control-interrupted' ? 'abort' : 'stop', messageId } } };
+      const finish = { type: 'finish', runId: executionId, data: { stepResult: { reason: mode === 'control-interrupted' ? 'abort' : mode === 'control-length' ? 'length' : 'stop', messageId } } };
       const events = mode === 'control-missing-start' ? [finish] : mode === 'control-incomplete' ? [start, delta] : mode === 'control-error' ? [start, { type: 'error', runId: executionId, data: { error: { name: 'PrivateInternalError', message: 'private-error-marker' } } }] : [start, delta, finish];
       response.end(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')); return;
     }
@@ -112,12 +112,12 @@ test('native facade bounds actual HTTP/token/stream faults and releases resource
     const closed = await second.value.consume(executionId, () => {}); assert.equal(closed.ok, false); if (!closed.ok) assert.equal(closed.error.code, 'cancelled');
     await released(); assert.ok(paths.slice(before).every(path => !path.includes('/abort') && !path.includes('/stop')));
   });
-  for (const fault of ['control-complete', 'control-interrupted', 'control-missing-start', 'control-incomplete', 'control-mismatch', 'control-error']) await t.test(`exact native event decoding: ${fault}`, async () => {
+  for (const fault of ['control-complete', 'control-interrupted', 'control-missing-start', 'control-incomplete', 'control-mismatch', 'control-error', 'control-length']) await t.test(`exact native event decoding: ${fault}`, async () => {
     mode = fault; const before = requests, observation = await client.native.observeTurn({ runId: executionId }); assert.ok(observation.ok);
     let text = ''; const result = await observation.value.consume(part => { text += part.text; }); observation.value.close();
     if (fault === 'control-complete' || fault === 'control-interrupted') { assert.ok(result.ok); assert.equal(result.value.outcome, fault === 'control-complete' ? 'complete' : 'interrupted'); assert.equal(text, 'Exact control text'); }
     // A server error ends the turn as a failed outcome, without its private detail; a broken stream is a client failure.
-    else if (fault === 'control-error') { assert.deepEqual(result, { ok: true, value: { outcome: 'failed', runId: executionId, reason: 'error' } }); }
+    else if (fault === 'control-error' || fault === 'control-length') { assert.deepEqual(result, { ok: true, value: { outcome: 'failed', runId: executionId, reason: 'error' } }); }
     else { assert.ok(!result.ok); assert.equal(result.error.code, 'invalid_response'); }
     assert.ok(!JSON.stringify(result).includes('private-error-marker'));
     await released(); assert.equal(requests - before, 1);
