@@ -49,7 +49,7 @@ test('aborted cancellation preserves status and scoped feedback clears without r
   expect(await page.evaluate(() => (window as unknown as Harness).storyboardTest.nativeStopCalls())).toBe(0);
 });
 
-observedTest('Video Use, list/details and cancellation receive real 401/501 and preserve exact choices/status', async ({ page, materialNetwork }, info) => {
+observedTest('Video Use, list/details and cancellation receive real 401/404/501 and preserve exact choices/status', async ({ page, materialNetwork }, info) => {
   observedTest.setTimeout(120000);
   await info.attach('prerequisite', { body: 'Read-only workspace/version facts; all application operations other than the labelled workspace projection use the built loopback backend.', contentType: 'text/plain' });
   const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
@@ -74,8 +74,9 @@ observedTest('Video Use, list/details and cancellation receive real 401/501 and 
         expect(commands).toEqual([]);
         const use = page.waitForResponse(value => value.url() === `${origin}/v1/conversations/read-only-conversation/uses`);
         await activate(page.locator('.wp-video-row').getByRole('button', { name: 'Use this version', exact: true }), status === 501);
-        expect((await use).status()).toBe(status);
-        await expect(page.getByText(status === 501 ? 'Using this version is not available yet. The current selection is unchanged.' : 'Sign-in required to use this version. The current selection is unchanged.', { exact: true })).toBeVisible();
+        // Shot-video choice is implemented; the fixture conversation is not owned, so an authenticated Use is denied without effects.
+        expect((await use).status()).toBe(status === 501 ? 404 : 401);
+        await expect(page.getByText(status === 501 ? 'This version was not selected. The current selection is unchanged.' : 'Sign-in required to use this version. The current selection is unchanged.', { exact: true })).toBeVisible();
         expect(await page.locator('.wp-video-row [data-current-version-id]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-current-version-id')))).toEqual(['video-v1', 'video-v1']);
         const card = page.locator('.wp-request-card[data-request-id="request-running"]');
         const details = page.waitForResponse(value => value.url() === `${origin}/v1/generation-requests/request-running`);

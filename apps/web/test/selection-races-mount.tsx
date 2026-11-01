@@ -26,8 +26,10 @@ const node = document.getElementById('root'); if (!node) throw new Error('Missin
 const root = createRoot(node);
 const projection = { ...workspace, storyboard: { ...workspace.storyboard, shots: workspace.storyboard.shots.map(shot => ({ ...shot, chosenVideoVersionId: videos[0]!.id, panels: shot.panels.map(panel => ({ ...panel, approvedImageVersionId: images[0]!.id, candidateImageVersions: images })) })) }, videos: videos.map((version, index) => ({ id: `candidate-${index}`, batchId: 'batch', proposalId: 'proposal', purpose: 'shot_video' as const, target: { shotId: 'shot-a' }, status: 'succeeded' as const, resultVersionId: version.id, remote: {} })) };
 (window as unknown as { selectionRace: unknown }).selectionRace = {
-  configure(mode: 'video' | 'panel', options: { storyboardFacts?: StoryboardPrerequisites; videoFacts?: VideoPrerequisites; foreignShot?: boolean } = {}) {
-    const displayed = options.foreignShot ? { ...projection, videos: projection.videos.map(request => ({ ...request, target: { shotId: 'unrelated-shot' } })) } : projection;
+  configure(mode: 'video' | 'panel', options: { storyboardFacts?: StoryboardPrerequisites; videoFacts?: VideoPrerequisites; foreignShot?: boolean; bound?: boolean } = {}) {
+    // Bound mode: owned videos already attached to the Shot, with no generation request and no choice yet.
+    const bound = { ...projection, videos: [], storyboard: { ...projection.storyboard, shots: projection.storyboard.shots.map(shot => ({ ...shot, chosenVideoVersionId: null, candidateVideoVersions: videos })) } };
+    const displayed = options.bound ? bound : options.foreignShot ? { ...projection, videos: projection.videos.map(request => ({ ...request, target: { shotId: 'unrelated-shot' } })) } : projection;
     const common = { connection: { kind: 'configured' as const, client }, scope: { accountId: 'read-only-account', conversationId: 'read-only-conversation' }, workspace: displayed };
     root.render(<div className="wp-panel-body" style={{ width: 380 }}>{mode === 'video' ? <Videos {...common} prerequisites={options.videoFacts ?? { versions: videos }} /> : <Storyboard {...common} {...(options.storyboardFacts ? { prerequisites: options.storyboardFacts } : {})} />}</div>);
   },

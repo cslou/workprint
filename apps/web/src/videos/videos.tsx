@@ -35,8 +35,9 @@ function ScopedVideos(props: Props) {
   });
   const rows = orderedStoryboard(props.workspace.storyboard.shots);
   const seen = new Set<string>();
-  const candidates = rows?.flatMap(({ shot, number }) => props.workspace.videos.filter(request => request.purpose === 'shot_video' && request.target.shotId === shot.shotId && request.resultVersionId).flatMap(request => {
-    const id = request.resultVersionId!;
+  // Exact candidates come from settled requests and from owned videos already bound to the Shot.
+  const candidates = rows?.flatMap(({ shot, number }) => [...props.workspace.videos.filter(request => request.purpose === 'shot_video' && request.target.shotId === shot.shotId && request.resultVersionId).map(request => request.resultVersionId!),
+    ...(shot.candidateVideoVersions ?? []).filter(version => version.kind === 'video').map(version => version.id)].flatMap(id => {
     const key = JSON.stringify([shot.shotId, id]);
     if (seen.has(key)) return []; seen.add(key);
     return [{ id, shotId: shot.shotId, number, title: shot.intent ?? `Shot ${number}`, selected: shot.chosenVideoVersionId }];
