@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Button as AriaButton, Dialog, Heading, Modal, ModalOverlay } from 'react-aria-components';
 import { createUploadSession, nativeConversations, type UploadSession } from '@workprint/api-client';
@@ -18,7 +18,8 @@ import type { StoryboardPrerequisites } from '../storyboard/presentation.js';
 import type { VideoPrerequisites } from '../videos/videos.js';
 import { WorkspaceVideos } from './workspace-videos.js';
 import { Composer } from '../conversation/composer.js';
-import { createChatSession, type ChatSession, type ChatSnapshot } from '../conversation/chat-session.js';
+import { createChatSession, type ChatSession } from '../conversation/chat-session.js';
+import { useChatSnapshot } from '../conversation/use-chat.js';
 import { LiveTurns } from '../conversation/live-turns.js';
 import { QuestionReview } from '../conversation/question.js';
 import { useWorkspace } from './workspace.js';
@@ -32,8 +33,6 @@ import './shell.css';
 export type SessionPresentation = { accountId: string; name: string };
 export type ShellProps = { navigation?: NativeNavigationState; onAccountOpen?: () => void; connection: BrowserClient; session: SessionPresentation | null; conversationId?: string; workspaceContent?: (workspace: OperationResponse<'workspace'>) => Partial<Record<WorkspaceTab, ReactNode>>; materialPrerequisites?: MaterialPrerequisites; storyboardPrerequisites?: StoryboardPrerequisites; videoPrerequisites?: VideoPrerequisites; libraryPrerequisites?: LibraryPrerequisites };
 type Surface = 'account' | 'account-unavailable' | 'navigation' | 'library' | 'new' | 'recents' | null;
-const idleChat: ChatSnapshot = { phase: 'idle', turns: [], notice: null };
-const noChat = () => () => {};
 const nativeCopy = { new: ['New video is not available yet.', 'No conversation was created.'], recents: ['Recents are not available yet.', 'No conversation list was loaded.'] } as const;
 
 /** Session is supplied by its qualified owner; this shell never creates or persists one. */
@@ -79,7 +78,9 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
     onConfirmed: (thread, page) => { const current = live.current.navigation, saved = thread ?? current?.history?.thread; if (saved) current?.adopt(saved, page); },
   }) : null);
   useLayoutEffect(() => () => chat?.dispose(), [chat]);
-  const chatState = useSyncExternalStore(chat?.subscribe ?? noChat, chat?.getSnapshot ?? (() => idleChat));
+  const chatState = useChatSnapshot(chat);
+  // Send once the open video's saved history is shown, so the reply lands after it and a re-read can tell old from new.
+  const sendBlocked = !!navigation?.history && navigation.history.kind !== 'ready';
   const liveTurns = <LiveTurns turns={chatState.turns} canRetry={chatState.phase === 'idle'} onRetry={key => void chat?.retry(key)} />;
   const runNative = async (action: 'new' | 'recents') => {
     if (!session && onAccountOpen && connection.kind === 'configured') { onAccountOpen(); return; }
@@ -110,7 +111,7 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
       </nav>
       <main ref={main} className="wp-main" data-layout={!chatState.turns.length && (!navigation?.history || navigation.history.kind === 'ready' && navigation.history.messages.length === 0) ? 'opening' : 'thread'} aria-label={navigation?.history ? 'Conversation' : 'New video'} aria-busy={navigation?.history ? navigation.history.kind === 'loading' : workspace.kind === 'loading'}>
         {navigation?.history ? <NativeHistory state={navigation.history} navigation={navigation} live={chatState.turns.length ? liveTurns : null} /> : <div className="wp-thread"><Welcome owned={!!(navigation && session)} /></div>}
-        {workspace.kind === 'settled' && workspace.result.ok && workspace.result.value.pendingQuestion ? <QuestionReview uploadSession={uploadSession} onUploaded={workspace.onUploaded} connection={connection} scope={scope} question={workspace.result.value.pendingQuestion} workspace={workspace.result.value} draft={draft} /> : <Composer uploadSession={uploadSession} onUploaded={workspace.onUploaded} native={native} chat={chat} draft={draft} connection={connection} scope={scope} />}
+        {workspace.kind === 'settled' && workspace.result.ok && workspace.result.value.pendingQuestion ? <QuestionReview uploadSession={uploadSession} onUploaded={workspace.onUploaded} connection={connection} scope={scope} question={workspace.result.value.pendingQuestion} workspace={workspace.result.value} draft={draft} /> : <Composer uploadSession={uploadSession} onUploaded={workspace.onUploaded} native={native} chat={chat} sendBlocked={sendBlocked} draft={draft} connection={connection} scope={scope} />}
       </main>
       <aside className="wp-workspace" aria-label="This video"><MaterialPanel connection={connection} scope={scope} workspace={projection} onSaved={workspace.onSaved} {...(projection ? { additionalContent: { storyboard: <Storyboard connection={connection} scope={scope} workspace={projection} onSaved={workspace.onSaved} onUsed={workspace.onUsed} {...(storyboardPrerequisites ? { prerequisites: storyboardPrerequisites } : {})} />, videos: <WorkspaceVideos connection={connection} scope={scope} workspace={projection} onUsed={workspace.onUsed} {...(videoPrerequisites ? { videoPrerequisites } : {})} /> } } : {})} {...(materialPrerequisites ? { prerequisites: materialPrerequisites } : {})} placeholder={placeholder} selectedKey={tab} onSelectionChange={(key) => setTab(key as WorkspaceTab)} {...(content === undefined ? {} : { contentOverride: content })} /></aside>
     </div>

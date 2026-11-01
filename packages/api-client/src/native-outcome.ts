@@ -6,8 +6,9 @@ import { failed, nativeTransportLimits, object, uuid } from './native-transport.
 export function nativeOutcome(expectedRunId: string, onText: (part: NativeTextDelta) => void) {
   let messageId: string | undefined, started = false, bytes = 0;
   const interrupted = (): ClientResult<NativeObservedTurn> => ({ ok: true, value: { outcome: 'interrupted', runId: expectedRunId, ...(messageId ? { assistantMessageId: messageId } : {}) } });
-  const error = (value: unknown) => object(value) && value.name === 'MastraTimeoutError'
-    ? failed('timed_out', 'Native execution deadline exceeded') : failed('integration_failure', 'Native execution failed');
+  // The server ended the turn: an outcome, distinct from losing the observation.
+  const ended = (reason: 'error' | 'deadline' | 'rejected'): ClientResult<NativeObservedTurn> => ({ ok: true, value: { outcome: 'failed', runId: expectedRunId, reason } });
+  const error = (value: unknown) => ended(object(value) && value.name === 'MastraTimeoutError' ? 'deadline' : 'error');
   const chunk = (value: unknown): ClientResult<NativeObservedTurn> | undefined => {
     if (!object(value) || value.runId !== expectedRunId) return;
     const payload = value.payload;
@@ -26,7 +27,7 @@ export function nativeOutcome(expectedRunId: string, onText: (part: NativeTextDe
       if (!started || !messageId || !object(step) || step.reason !== 'stop' || step.messageId !== messageId) return failed('invalid_response', 'Native response did not complete');
       return { ok: true, value: { outcome: 'complete', runId: expectedRunId, assistantMessageId: messageId } };
     } else if (value.type === 'error') return error(object(payload) ? payload.error : undefined);
-    else if (value.type === 'tripwire') return failed('integration_failure', 'Native output rejected or interrupted');
+    else if (value.type === 'tripwire') return ended('rejected');
     return undefined;
   };
   const event = (value: unknown): ClientResult<NativeObservedTurn> | undefined => {

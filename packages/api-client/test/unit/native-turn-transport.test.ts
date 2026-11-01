@@ -116,7 +116,10 @@ test('native facade bounds actual HTTP/token/stream faults and releases resource
     mode = fault; const before = requests, observation = await client.native.observeTurn({ runId: executionId }); assert.ok(observation.ok);
     let text = ''; const result = await observation.value.consume(part => { text += part.text; }); observation.value.close();
     if (fault === 'control-complete' || fault === 'control-interrupted') { assert.ok(result.ok); assert.equal(result.value.outcome, fault === 'control-complete' ? 'complete' : 'interrupted'); assert.equal(text, 'Exact control text'); }
-    else { assert.ok(!result.ok); assert.equal(result.error.code, fault === 'control-error' ? 'integration_failure' : 'invalid_response'); assert.ok(!JSON.stringify(result).includes('private-error-marker')); }
+    // A server error ends the turn as a failed outcome, without its private detail; a broken stream is a client failure.
+    else if (fault === 'control-error') { assert.deepEqual(result, { ok: true, value: { outcome: 'failed', runId: executionId, reason: 'error' } }); }
+    else { assert.ok(!result.ok); assert.equal(result.error.code, 'invalid_response'); }
+    assert.ok(!JSON.stringify(result).includes('private-error-marker'));
     await released(); assert.equal(requests - before, 1);
   });
   await t.test('native Stop acknowledgment does not fabricate cancellation or accept another response shape', async () => {

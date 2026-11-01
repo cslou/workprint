@@ -67,7 +67,7 @@ export function nativeTurnAdmission(mastra: Mastra) {
         accepted: async () => {
           const memory = await storage?.getStore('memory');
           if (!memory) throw new Error('Native memory unavailable');
-          await markConversationStarted(memory, videoId);
+          await markConversationStarted(memory, videoId, accountId);
         },
         release: () => { starting.delete(videoId); },
       };

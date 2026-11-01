@@ -98,13 +98,33 @@ test('Send anyway is the only path that sends an unconfirmed message again', asy
 
 test('a reply that fails offers one Retry, which sends the same text once without touching the draft', async () => {
   let attempt = 0;
-  const { session, calls } = harness({ conversationId: video, turn: async onText => { onText({ runId: 'r', text: 'Part' }); return ++attempt === 1 ? fail('integration_failure') : { ok: true, value: { outcome: 'complete', runId: 'r', assistantMessageId: 'a' } }; } });
+  const { session, calls } = harness({ conversationId: video, turn: async onText => { onText({ runId: 'r', text: 'Part' }); return ++attempt === 1 ? { ok: true, value: { outcome: 'failed', runId: 'r', reason: 'error' } } : { ok: true, value: { outcome: 'complete', runId: 'r', assistantMessageId: 'a' } }; } });
   await session.send('Please');
   const failed = session.getSnapshot().turns[0]!;
   assert.equal(failed.state, 'failed'); assert.equal(failed.reply, 'Part');
   await session.retry(failed.key); await session.retry(failed.key);
   assert.deepEqual(calls.send, ['Please', 'Please']); assert.equal(calls.cleared, 1);
   assert.deepEqual(session.getSnapshot().turns.map(turn => [turn.state, turn.retried]), [['failed', true], ['completed', false]]);
+});
+
+test('a lost observation is not a failed reply and offers no Retry; a server failure is', async () => {
+  const outcomes: ClientResult<NativeObservedTurn>[] = [fail('transport_failure'), { ok: true, value: { outcome: 'failed', runId: 'r', reason: 'error' } }];
+  const { session, calls } = harness({ conversationId: video, turn: async () => outcomes.shift()! });
+  await session.send('One'); await session.send('Two');
+  const [lost, failed] = session.getSnapshot().turns;
+  assert.equal(lost!.state, 'lost'); assert.equal(failed!.state, 'failed');
+  await session.retry(lost!.key);
+  assert.deepEqual(calls.send, ['One', 'Two'], 'a lost reply may still be running');
+});
+
+test('a Retry that is rejected outright is given back', async () => {
+  const { session, calls } = harness({ conversationId: video, send: [{ ok: true, value: { runId: 'r1', inputMessageId: 'i1' } }, fail('busy')], turn: async () => ({ ok: true, value: { outcome: 'failed', runId: 'r', reason: 'error' } }) });
+  await session.send('Please');
+  const turn = session.getSnapshot().turns[0]!;
+  await session.retry(turn.key);
+  assert.equal(session.getSnapshot().notice, 'busy');
+  assert.equal(session.getSnapshot().turns[0]!.retried, false);
+  assert.deepEqual(calls.send, ['Please', 'Please']);
 });
 
 test('after dispose, late reply text and results change nothing', async () => {

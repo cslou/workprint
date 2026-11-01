@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import type { ApiClient, UploadSession } from '@workprint/api-client';
 import type { OperationResponse } from '@workprint/contracts';
@@ -8,12 +8,11 @@ import { Button } from '../ui/controls.js';
 import { confirmFeedback, uploadFeedback } from '../uploads/uploads.js';
 import { useUpload } from '../uploads/use-upload.js';
 import { UploadStatus } from '../uploads/status.js';
-import { sendsOnEnter, tooLong, type ChatSession, type ChatSnapshot } from './chat-session.js';
+import { sendsOnEnter, tooLong, type ChatSession } from './chat-session.js';
+import { useChatSnapshot } from './use-chat.js';
 import './composer.css';
 
 export type ComposerDraft = { value: string; onChange(value: string): void };
-const idleChat: ChatSnapshot = { phase: 'idle', turns: [], notice: null };
-const noChat = () => () => {};
 const chatCopy = {
   busy: 'The agent is still working on the last message.',
   not_sent: 'Your message wasn’t sent. It’s still here, so you can try again.',
@@ -21,13 +20,13 @@ const chatCopy = {
 } as const;
 
 /** With a chat session, sends and shows its state; without one, explicit presses reach the unavailable-native boundary. */
-export function Composer({ native, chat, docked = false, placeholder = 'Describe your video…', draft, connection, scope, uploadSession, onUploaded }: { uploadSession?: UploadSession; onUploaded?(result: OperationResponse<'confirmUpload'>): void; native: ApiClient['native']; chat?: ChatSession | null; docked?: boolean; placeholder?: string; draft?: ComposerDraft; connection?: BrowserClient; scope?: ReadScope | null }) {
+export function Composer({ native, chat, sendBlocked = false, docked = false, placeholder = 'Describe your video…', draft, connection, scope, uploadSession, onUploaded }: { uploadSession?: UploadSession; onUploaded?(result: OperationResponse<'confirmUpload'>): void; native: ApiClient['native']; chat?: ChatSession | null; sendBlocked?: boolean; docked?: boolean; placeholder?: string; draft?: ComposerDraft; connection?: BrowserClient; scope?: ReadScope | null }) {
   const [localText, setLocalText] = useState('');
   const text = draft?.value ?? localText;
   const setText = draft?.onChange ?? setLocalText;
   const [feedback, setFeedback] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const chatState = useSyncExternalStore(chat?.subscribe ?? noChat, chat?.getSnapshot ?? (() => idleChat));
+  const chatState = useChatSnapshot(chat);
   const { phase } = chatState;
   const over = tooLong(text);
   // The draft is locked while its send is in flight or its outcome is unknown.
@@ -37,7 +36,7 @@ export function Composer({ native, chat, docked = false, placeholder = 'Describe
   const fileInput = useRef<HTMLInputElement>(null);
   const active = useRef(true);
   useEffect(() => () => { active.current = false; }, []);
-  const canSend = phase === 'idle' && !pending && !over && !!text.trim();
+  const canSend = phase === 'idle' && !sendBlocked && !pending && !over && !!text.trim();
   const send = async () => {
     if (!canSend) return;
     if (chat) { setFeedback(null); await chat.send(text); return; }

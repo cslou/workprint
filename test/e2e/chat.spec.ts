@@ -47,9 +47,13 @@ test('a new video streams its first reply, then reload shows the saved conversat
   await expect(recents(page).getByRole('button')).toHaveCount(1);
 });
 
+/** Lets any send a page might still make arrive before a test asserts there was none. */
+const settle = (page: Page) => page.waitForTimeout(500);
+
 test('Shift+Enter adds a line and whitespace-only input is never sent', async ({ page, backend }) => {
   const [account] = await backend.accounts(1);
   await signIn(page, account!);
+  const sent = sends(page);
   await message(page).fill('first');
   await message(page).press('Shift+Enter');
   await message(page).pressSequentially('second');
@@ -58,6 +62,8 @@ test('Shift+Enter adds a line and whitespace-only input is never sent', async ({
   await message(page).press('Enter');
   await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeDisabled();
   await expect(message(page)).toHaveValue('   \n  ');
+  await settle(page);
+  expect(sent()).toBe(0);
   expect(backend.provider.requests).toHaveLength(0);
 });
 
@@ -105,6 +111,7 @@ test('an unconfirmed send waits: Check again only reads, and only Send anyway se
   await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Check again', exact: true }).click();
   await expect(page.getByText(unconfirmed, { exact: true })).toBeVisible();
+  await settle(page);
   expect(sent()).toBe(1);
   expect(backend.provider.requests).toHaveLength(0);
 

@@ -7,7 +7,8 @@ export type LiveTurn = Readonly<{
   key: number;
   text: string;
   reply: string;
-  state: 'streaming' | 'completed' | 'failed' | 'interrupted';
+  /** failed: the server ended the turn with an error. lost: this page stopped receiving it; it may still finish. */
+  state: 'streaming' | 'completed' | 'failed' | 'interrupted' | 'lost';
   /** A failed or interrupted turn offers Retry once; Retry starts a new turn. */
   retried: boolean;
 }>;
@@ -64,33 +65,34 @@ export function createChatSession(config: ChatSessionConfig) {
   const close = () => { observation?.close(); observation = null; };
   const known = () => new Set([...config.knownMessageIds(), ...sentIds]);
 
-  async function submit(text: string, fromDraft: boolean) {
-    if (!alive || state.phase !== 'idle' || !text.trim()) return;
-    if (tooLong(text)) { update({ notice: 'too_long' }); return; }
+  /** `rejected`: nothing was sent. Otherwise the send was accepted or its outcome is unknown. */
+  async function submit(text: string, fromDraft: boolean): Promise<'rejected' | 'sent'> {
+    if (!alive || state.phase !== 'idle' || !text.trim()) return 'rejected';
+    if (tooLong(text)) { update({ notice: 'too_long' }); return 'rejected'; }
     update({ phase: 'sending', notice: null });
     const scope = { resourceId: config.accountId };
     if (!threadId) {
       const created = await config.native.createConversation(scope);
-      if (!alive) return;
-      if (!created.ok) { update({ phase: 'idle', notice: 'not_sent' }); return; }
+      if (!alive) return 'rejected';
+      if (!created.ok) { update({ phase: 'idle', notice: 'not_sent' }); return 'rejected'; }
       threadId = created.value.id;
       startedThread = created.value;
     }
     const id = threadId;
     // Observe before sending so no reply chunk is missed.
     const subscribed = await config.native.subscribe({ threadId: id, resourceId: config.accountId });
-    if (!alive) { if (subscribed.ok) subscribed.value.close(); return; }
-    if (!subscribed.ok) { update({ phase: 'idle', notice: 'not_sent' }); return; }
+    if (!alive) { if (subscribed.ok) subscribed.value.close(); return 'rejected'; }
+    if (!subscribed.ok) { update({ phase: 'idle', notice: 'not_sent' }); return 'rejected'; }
     observation = subscribed.value;
     const sent = await config.native.sendText({ threadId: id, resourceId: config.accountId, message: text });
-    if (!alive) { close(); return; }
+    if (!alive) { close(); return 'sent'; }
     if (!sent.ok) {
       close();
-      if (sent.error.code === 'busy') { update({ phase: 'idle', notice: 'busy' }); return; }
-      if (definite.has(sent.error.code)) { update({ phase: 'idle', notice: 'not_sent' }); return; }
+      if (sent.error.code === 'busy') { update({ phase: 'idle', notice: 'busy' }); return 'rejected'; }
+      if (definite.has(sent.error.code)) { update({ phase: 'idle', notice: 'not_sent' }); return 'rejected'; }
       pending = { text, fromDraft };
       await check();
-      return;
+      return 'sent';
     }
     sentIds.add(sent.value.inputMessageId);
     if (fromDraft) config.clearDraft();
@@ -99,11 +101,12 @@ export function createChatSession(config: ChatSessionConfig) {
     update({ phase: 'working', turns: [...state.turns, { key, text, reply: '', state: 'streaming', retried: false }] });
     const current = observation;
     const result = await current.consumeTurn(sent.value.runId, part => { if (alive) patchTurn(key, { reply: (state.turns.find(turn => turn.key === key)?.reply ?? '') + part.text }); });
-    if (!alive) return;
+    if (!alive) return 'sent';
     if (observation === current) observation = null;
-    patchTurn(key, { state: result.ok ? result.value.outcome === 'complete' ? 'completed' : 'interrupted' : 'failed' });
+    patchTurn(key, { state: !result.ok ? 'lost' : result.value.outcome === 'complete' ? 'completed' : result.value.outcome });
     update({ phase: 'idle' });
     config.onSettled?.();
+    return 'sent';
   }
 
   /** Re-read history once: a new user message with this text means the send landed. */
@@ -128,13 +131,14 @@ export function createChatSession(config: ChatSessionConfig) {
     getSnapshot: () => state,
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     /** Send the composer draft. The draft is cleared only once the send is accepted or found saved. */
-    send: (text: string) => submit(text, true),
+    send: async (text: string) => { await submit(text, true); },
     /** One new attempt for a failed or interrupted turn: the same text, sent again. */
     retry(key: number) {
       const turn = state.turns.find(candidate => candidate.key === key);
       if (!turn || turn.retried || (turn.state !== 'failed' && turn.state !== 'interrupted') || state.phase !== 'idle') return Promise.resolve();
+      // Disabled at once against double presses; given back if nothing was sent.
       patchTurn(key, { retried: true });
-      return submit(turn.text, false);
+      return submit(turn.text, false).then(outcome => { if (outcome === 'rejected') patchTurn(key, { retried: false }); });
     },
     checkAgain: () => state.phase === 'unconfirmed' ? check() : Promise.resolve(),
     /** Explicitly send the unconfirmed text again; this may duplicate the message and turn. */
@@ -142,7 +146,7 @@ export function createChatSession(config: ChatSessionConfig) {
       if (state.phase !== 'unconfirmed' || !pending) return Promise.resolve();
       const { text, fromDraft } = pending; pending = null;
       update({ phase: 'idle' });
-      return submit(text, fromDraft);
+      return submit(text, fromDraft).then(() => undefined);
     },
     /** The draft changed; drop a stale too-long or not-sent notice. */
     edited() { if (state.notice === 'too_long' || state.notice === 'not_sent') update({ notice: null }); },

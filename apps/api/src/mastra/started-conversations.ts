@@ -5,8 +5,13 @@ import type { MemoryStorage } from '@mastra/core/storage';
  * native thread just before its first send; a thread whose send never landed stays unlisted.
  */
 export const startedConversation: Readonly<Record<string, unknown>> = Object.freeze({ workprintStarted: true });
+const markDeadlineMs = 2000;
 
-export async function markConversationStarted(memory: MemoryStorage, threadId: string) {
-  // Metadata only: leave the title to its own writer.
-  await memory.patchThread({ id: threadId, metadata: { ...startedConversation } });
+export async function markConversationStarted(memory: MemoryStorage, threadId: string, accountId: string) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // Native's serialized metadata merge, never a title write; bounded so a slow write cannot hold the send.
+  const mark = memory.updateThreadMetadata({ id: threadId, resourceId: accountId, update: thread => thread.metadata?.workprintStarted === true ? undefined : { ...startedConversation } });
+  try {
+    await Promise.race([mark, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Started video mark timed out')), markDeadlineMs); })]);
+  } finally { clearTimeout(timer); }
 }
