@@ -12,9 +12,10 @@ export function nativeTurnClient(apiOrigin: string, token: string, accountId: st
   const post = (path: string, body: unknown, signal: AbortSignal = AbortSignal.timeout(30000)) => fetch(apiOrigin + path, {
     method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal,
   });
+  const get = (path: string, signal: AbortSignal = AbortSignal.timeout(30000)) => fetch(apiOrigin + path, { headers: { Authorization: `Bearer ${token}` }, signal });
   const send = (videoId: string, message: string) => post('/api/agents/assistant/send-message', { threadId: videoId, resourceId: accountId, message, ifIdle: { behavior: 'wake' } });
   return {
-    post, send,
+    get, post, send,
     async newVideo() { return (await (await post('/memory/threads', { resourceId: accountId })).json() as { id: string }).id; },
     /** Reads until the run's terminal chunk or `timeoutMs`; `onAccepted` gets the run id as soon as the send is accepted. */
     async turn(videoId: string, message: string, timeoutMs = 30000, onAccepted?: (runId: string) => void): Promise<ObservedTurn> {

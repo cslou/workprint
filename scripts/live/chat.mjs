@@ -64,6 +64,27 @@ try {
     return { firstChunkMs: turn.firstChunkMs, outputCap: 32768 };
   });
 
+  await step('title', async () => {
+    if (!live) { provider.scriptTitle({ text: ['Night swim'] }); provider.script({ text: ['A lovely idea.'] }); }
+    const video = await client.newVideo(), titleRequests = provider.titleRequests.length;
+    const turn = await client.turn(video, 'I want to make a two-minute film about a night swim in a mountain lake.', timeoutMs);
+    assert.ok(completed(turn), `turn did not complete: ${turn.terminal?.type ?? 'no terminal chunk'}`);
+    // The title call has its own 15 s deadline; give it a little longer to be saved.
+    const started = Date.now();
+    let title = '';
+    while (!title && Date.now() - started < 20000) {
+      const response = await client.get(`/memory/threads/${video}`);
+      assert.equal(response.status, 200, `thread read answered ${response.status}`);
+      title = (await response.json()).title ?? '';
+      if (!title) await new Promise(resolve => setTimeout(resolve, 250));
+    }
+    assert.ok(title, 'no title saved within 20 s');
+    assert.ok([...title].length <= 60, `title longer than 60 characters: ${[...title].length}`);
+    if (!live) { assert.equal(title, 'Night swim'); assert.equal(provider.titleRequests.length - titleRequests, 1); }
+    // The title text is the user's own material; record only its length.
+    return { titleCharacters: [...title].length, titledMs: Date.now() - started };
+  });
+
   /** A turn where the model should call `tool`; one rephrase is allowed, and a second decline is a finding, not a failure. */
   const toolStep = (name, tool, prompts, args, reply) => step(name, async () => {
     for (const [attempt, prompt] of prompts.entries()) {
