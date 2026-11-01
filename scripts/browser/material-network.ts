@@ -3,8 +3,8 @@ import type { OperationRequest } from '../../packages/contracts/src/index.js';
 
 type Entry = { method: string; url: URL; body: unknown };
 type Operation = Readonly<{ origin: string; method: string; path: string; count: number; query: Readonly<Record<string, string>>; purpose?: OperationRequest<'useVersion'>['body']['purpose'] }>;
-type Allowance = Omit<Operation, 'count' | 'query'> & { query: string; consumed: boolean };
-export type MaterialNetwork = { entries: Entry[]; expectOperations(...operations: Operation[]): void; expectObjectTransfer(url: string, count?: number, method?: 'PUT' | 'GET'): void; assertSafe(): void };
+type Allowance = Omit<Operation, 'count' | 'query'> & { query: string; consumed: boolean; optional?: boolean };
+export type MaterialNetwork = { entries: Entry[]; expectOperations(...operations: Operation[]): void; expectObjectTransfer(url: string, count?: number, method?: 'PUT' | 'GET', optional?: number): void; assertSafe(): void };
 const redactQuery = (entries: Iterable<[string, string]>) => [...entries].map(([key, value]): [string, string] => [key, /^x-amz-/i.test(key) ? '[redacted]' : value]);
 const safeURL = (input: URL) => { const url = new URL(input); url.search = new URLSearchParams(redactQuery(url.searchParams)).toString(); return url; };
 const queryKey = (entries: Iterable<[string, string]>) => JSON.stringify([...entries].sort(([a, av], [b, bv]) => a.localeCompare(b) || av.localeCompare(bv)));
@@ -61,18 +61,20 @@ export const test = base.extend<{ materialNetwork: MaterialNetwork }>({
           expect(Number.isInteger(operation.count) && operation.count > 0).toBe(true);
           for (let index = 0; index < operation.count; index++) allowances.push({ origin: operation.origin, method: operation.method, path: operation.path, query: queryKey(Object.entries(operation.query)), ...(operation.purpose ? { purpose: operation.purpose } : {}), consumed: false });
         }
-      }, expectObjectTransfer(value, count = 1, method = 'PUT') {
+      }, expectObjectTransfer(value, count = 1, method = 'PUT', optional = 0) {
         const url = new URL(value);
         expect(url.searchParams.has('X-Amz-Signature'), 'Only an exact signed object grant may be allowed').toBe(true);
         expect(Number.isInteger(count) && count > 0).toBe(true);
         objectOrigins.add(url.origin);
-        for (let index = 0; index < count; index++) allowances.push({ origin: url.origin, method, path: url.pathname, query: queryKey(url.searchParams), consumed: false });
+        expect(Number.isInteger(optional) && optional >= 0).toBe(true);
+        // Optional allowances bound browser-chosen range reads; they never excuse a missing required transfer.
+        for (let index = 0; index < count + optional; index++) allowances.push({ origin: url.origin, method, path: url.pathname, query: queryKey(url.searchParams), consumed: false, ...(index >= count ? { optional: true } : {}) });
       }, assertSafe });
     } finally {
       await context.close();
       try {
         assertSafe();
-        expect(allowances.filter(value => !value.consumed).map(value => `${value.method} ${value.origin}${value.path} query=${JSON.stringify(redactQuery(JSON.parse(value.query) as [string, string][]))}`), 'Expected operations were not consumed').toEqual([]);
+        expect(allowances.filter(value => !value.consumed && !value.optional).map(value => `${value.method} ${value.origin}${value.path} query=${JSON.stringify(redactQuery(JSON.parse(value.query) as [string, string][]))}`), 'Expected operations were not consumed').toEqual([]);
       } finally { context.off('request', record); }
     }
   }, { auto: true }],

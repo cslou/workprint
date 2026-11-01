@@ -1,5 +1,9 @@
 # Workprint — Application Design History
 
+## Private single-clip playback — 2026-11-01
+
+**Provisionally approved by the orchestrator under Lou’s delegation; pending Lou’s Phase 3 ratification.** Six `private-clip-playback-r1` desktop/narrow captures inspected: ready, downloading and download failed. Download reuses the exact-version media access with existing secondary-button and plain-status primitives; Library video inspection now plays the same clip instead of a poster. See [binding scope](design.md#private-single-clip-playback-and-download). Playback and download never use, choose or export a version.
+
 ## Exact Library reuse — 2026-11-01
 
 **Provisionally approved by the orchestrator under Lou’s delegation; pending Phase 3 ratification.** Ten narrow and three representative desktop `library-reuse-r1` captures inspected. Exact-version inspection/use, original-identity recovery, partial attachment and reference association/conflict states retain existing primitives and distinguish viewing from human authority. No examples catalog, implicit latest, Shot-video choice or playback. See [binding scope and evidence limits](design.md#exact-library-reuse-and-reference-editing). Built-in mutation controls use server-derived metadata; actual authority stays server-side.

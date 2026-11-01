@@ -39,7 +39,7 @@ export async function createLibraryMediaFixture(browserOrigin: string, diagnosti
       await exec(['/tools/ffmpeg', '-nostdin', '-v', 'error', '-threads', '1', '-i', '/input.bin', '-frames:v', '1', '-y', '/work/poster.png']);
       return exec(['/bin/cat', '/work/poster.png']);
     }), diagnostic);
-    return { configuration, media, imageBytes: fixtures.png, posterBytes: poster,
+    return { configuration, media, imageBytes: fixtures.png, posterBytes: poster, videoBytes: fixtures.video,
       async prepare(setup: SavedWorkSetup) {
         const work = await prepareLibraryReuseWork(setup), pool = new Pool({ connectionString: setup.servingUrl, max: 2 });
         try {

@@ -19,3 +19,5 @@
 .wp-clip-time { position: absolute; right: 14px; bottom: 9px; color: var(--color-media-on-scrim); font-size: var(--font-size-12); }
 .wp-clip-version > p { margin: var(--space-10) 0 0; color: var(--color-text-secondary); font-size: var(--font-size-13); }
 .wp-clip-version .wp-version-use { margin-top: var(--space-12); }
+.wp-clip-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-10); margin-top: var(--space-12); }
+.wp-clip-actions p { margin: 0; color: var(--color-text-subtle); font-size: var(--font-size-13); }
