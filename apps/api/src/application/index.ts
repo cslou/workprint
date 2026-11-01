@@ -55,3 +55,4 @@ export { withVersionUses, type VersionUseApplication } from './version-uses.js';
 export { withSavedWork, type SavedWorkApplication, type SavedWorkReads } from './saved-reads.js';
 export { withStoryboardEdits, type StoryboardEditApplication } from './storyboard-edits.js';
 export { createWorkspaceReader, type OwnedWorkspace, type OwnedWorkspaceRead, type ReadOwnedWorkspace } from './workspace-reads.js';
+export { createAssistantScriptSaver, type AssistantScriptOutcome, type SaveAssistantScript } from './assistant-scripts.js';

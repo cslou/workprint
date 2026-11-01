@@ -7,3 +7,4 @@ export { ArtifactError } from './errors.js';
 export { createArtifactWriters, type ArtifactSaveWriter } from './writers.js';
 export { createVersionUses } from './uses.js';
 export { createStoryboardEdits } from './storyboard.js';
+export { createAssistantScripts, type AssistantScriptInput, type AssistantScriptSave, type AssistantScripts } from './assistant-scripts.js';
