@@ -11,12 +11,10 @@ import { Library } from '../library/library.js';
 import { LibraryPicker } from '../library/picker.js';
 import { createLibrarySelection } from '../library/selection.js';
 import type { LibraryPrerequisites } from '../library/picker.js';
-import { MaterialPanel } from '../materials/panel.js';
 import type { MaterialPrerequisites } from '../materials/presentation.js';
-import { Storyboard } from '../storyboard/storyboard.js';
 import type { StoryboardPrerequisites } from '../storyboard/presentation.js';
 import type { VideoPrerequisites } from '../videos/videos.js';
-import { WorkspaceVideos } from './workspace-videos.js';
+import { WorkspaceTabs } from './workspace-tabs.js';
 import { Composer } from '../conversation/composer.js';
 import { createChatSession, type ChatSession } from '../conversation/chat-session.js';
 import { useChatSnapshot } from '../conversation/use-chat.js';
@@ -114,7 +112,7 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
         {navigation?.history ? <NativeHistory state={navigation.history} navigation={navigation} live={chatState.turns.length ? liveTurns : null} /> : <div className="wp-thread"><Welcome owned={!!(navigation && session)} /></div>}
         {workspace.kind === 'settled' && workspace.result.ok && workspace.result.value.pendingQuestion ? <QuestionReview uploadSession={uploadSession} onUploaded={workspace.onUploaded} connection={connection} scope={scope} question={workspace.result.value.pendingQuestion} workspace={workspace.result.value} draft={draft} /> : <Composer uploadSession={uploadSession} onUploaded={workspace.onUploaded} native={native} chat={chat} sendBlocked={sendBlocked} draft={draft} connection={connection} scope={scope} />}
       </main>
-      <aside className="wp-workspace" aria-label="This video"><MaterialPanel connection={connection} scope={scope} workspace={projection} onSaved={workspace.onSaved} {...(projection ? { additionalContent: { storyboard: <Storyboard connection={connection} scope={scope} workspace={projection} onSaved={workspace.onSaved} onUsed={workspace.onUsed} {...(storyboardPrerequisites ? { prerequisites: storyboardPrerequisites } : {})} />, videos: <WorkspaceVideos connection={connection} scope={scope} workspace={projection} onUsed={workspace.onUsed} {...(videoPrerequisites ? { videoPrerequisites } : {})} /> } } : {})} {...(materialPrerequisites ? { prerequisites: materialPrerequisites } : {})} placeholder={placeholder} selectedKey={tab} onSelectionChange={(key) => setTab(key as WorkspaceTab)} {...(content === undefined ? {} : { contentOverride: content })} /></aside>
+      <aside className="wp-workspace" aria-label="This video"><WorkspaceTabs connection={connection} scope={scope} workspace={projection} onSaved={workspace.onSaved} onUsed={workspace.onUsed} {...(materialPrerequisites ? { materialPrerequisites } : {})} {...(storyboardPrerequisites ? { storyboardPrerequisites } : {})} {...(videoPrerequisites ? { videoPrerequisites } : {})} placeholder={placeholder} selectedKey={tab} onSelectionChange={(key) => setTab(key as WorkspaceTab)} {...(content === undefined ? {} : { contentOverride: content })} /></aside>
     </div>
     <ModalOverlay className="wp-modal-overlay" isOpen={shown !== null} onOpenChange={(open) => { if (!open) dismiss(); }} isDismissable><Modal className={`wp-modal${navigation && (navigation.dialog || shown === 'navigation') ? ' wp-native-dialog' : ''}`}><Dialog className="wp-dialog"><div className="wp-dialog-head" ref={dialogHead}><Heading slot="title">{title}</Heading><Button variant="icon" aria-label="Close" autoFocus onPress={dismiss}>×</Button></div>
       {shown === 'navigation' && (navigation && session ? <div className="wp-owned-navigation"><div className="wp-navigation-dialog wp-owned-navigation-links">{nav(true)}</div><h3>Recents</h3><Recents navigation={navigation} embedded onActivate={() => setSurface(null)} /><div className="wp-navigation-dialog wp-owned-navigation-account">{account}</div></div> : <div className="wp-navigation-dialog">{nav()}{recent}{account}</div>)}

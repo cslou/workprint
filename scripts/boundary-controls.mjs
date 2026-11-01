@@ -15,6 +15,7 @@ const pairs = [
   ['browser-no-server', 'apps/web/src', `${api}db`],
   ['web-materials-uploads-no-media', 'apps/web/src/materials', 'apps/web/src/media'],
   ['web-materials-uploads-no-media', 'apps/web/src/uploads', 'apps/web/src/media'],
+  ['web-materials-no-shell', 'apps/web/src/materials', 'apps/web/src/shell'],
   ['web-shared-no-features', 'apps/web/src/ui', 'apps/web/src/media'],
   ['web-shared-no-features', 'apps/web/src/api', 'apps/web/src/uploads'],
   ['packages-no-apps', 'packages/contracts/src', `${api}db`],
