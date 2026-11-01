@@ -7,13 +7,14 @@ import { pathToFileURL } from 'node:url';
 const command = process.argv.slice(2);
 if (!command.length) throw new Error('Usage: node scripts/test-stack.mjs <command> [args...]');
 
+const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'];
 const run = env => new Promise((done, fail) => {
   const child = spawn(command[0], command.slice(1), { stdio: 'inherit', env });
   const forward = signal => child.kill(signal);
-  process.on('SIGINT', forward); process.on('SIGTERM', forward);
+  for (const signal of signals) process.on(signal, forward);
   child.on('error', fail);
   child.on('exit', (code, signal) => {
-    process.off('SIGINT', forward); process.off('SIGTERM', forward);
+    for (const name of signals) process.off(name, forward);
     done(code ?? (signal ? 1 : 0));
   });
 });
@@ -26,7 +27,7 @@ const previewPort = process.env.WORKPRINT_PREVIEW_PORT ?? '4180';
 // Stop requests during startup still release whatever was acquired.
 let interrupted = false;
 const interrupt = () => { interrupted = true; };
-process.on('SIGINT', interrupt); process.on('SIGTERM', interrupt);
+for (const signal of signals) process.on(signal, interrupt);
 const stack = await startTestStack({ browserOrigins: [`http://127.0.0.1:${previewPort}`] });
 let status = 1;
 try {

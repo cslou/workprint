@@ -104,7 +104,7 @@ export async function isolatedPostgres(options: { network?: { name: string; owne
     const { stdout } = await exec('docker', [
       'run', '--detach', '--rm', '--name', name,
       '--label', `workprint.fixture=${owner}`, '--publish', '127.0.0.1::5432',
-      ...(options.network ? ['--network', options.network.name, '--network-alias', 'database', '--memory', '256m', '--cpus', '1', '--pids-limit', '128'] : []),
+      ...(options.network ? ['--network', options.network.name, '--network-alias', 'database', '--memory', '1g', '--cpus', '2', '--pids-limit', '256'] : []),
       '--env', 'POSTGRES_PASSWORD', '--tmpfs', '/var/lib/postgresql/data', postgresImage,
     ], { env: { ...process.env, POSTGRES_PASSWORD: password }, timeout: 60000 });
     const acquired = await inspect(name);

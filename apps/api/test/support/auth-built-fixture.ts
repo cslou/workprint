@@ -25,7 +25,7 @@ export async function verifyBuiltAdmission(t: FixtureContext) {
   // Application tests own their data database; Auth is the shared stack's.
   const database = await testDatabase();
   t.after(database.close);
-  const config: AuthFixture = { url: auth.url, anonKey: auth.anonKey, servingUrl: database.servingUrl, accounts: await Promise.all([auth.createAccount(), auth.createAccount()]) };
+  const config: AuthFixture = { url: auth.url, anonKey: auth.anonKey, servingUrl: database.servingUrl, accounts: (await Promise.all([auth.createAccount(), auth.createAccount()])).map(({ email, password }) => ({ email, password })) };
   // Separate compiled compositions share the production entry, never an environment-switched probe.
   const probeEntry = await buildServerComposition(fixture.logs, 'probe', (directory) => `
     import { createBackend } from ${JSON.stringify(join(directory, 'mastra/backend.js'))};

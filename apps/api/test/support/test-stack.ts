@@ -52,6 +52,8 @@ async function startAuthProxy(origins: readonly string[]) {
       response.writeHead(reply.statusCode ?? 502, { ...headers, ...cors });
       reply.pipe(response);
     });
+    // A stalled GoTrue fails fast as a gateway timeout instead of hanging the browser until the test timeout.
+    proxied.setTimeout(5000, () => { if (!response.headersSent) response.writeHead(504, cors); response.end(); proxied.destroy(); });
     proxied.on('error', () => { if (!response.headersSent) response.writeHead(502, cors); response.end(); });
     request.pipe(proxied);
   });
@@ -70,6 +72,10 @@ async function startAuthProxy(origins: readonly string[]) {
  * Tests isolate through their own database, accounts and object keys. Returns the private stack file path for child processes.
  */
 export async function startTestStack(options: { browserOrigins: readonly string[] }) {
+  if (!options.browserOrigins.length || options.browserOrigins.some(value => {
+    try { const url = new URL(value); return url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.origin !== value; }
+    catch { return true; }
+  })) throw new Error('Test stack browser origins must be exact loopback HTTP origins');
   const resources = new AuthFixtureResources();
   const directory = join(process.cwd(), 'outputs', 'fixtures', 'stack', resources.owner);
   const cleanups: (() => unknown)[] = [];
@@ -80,7 +86,8 @@ export async function startTestStack(options: { browserOrigins: readonly string[
     for (const cleanup of cleanups.reverse()) { try { await cleanup(); } catch (error) { errors.push(error); } }
     if (errors.length) throw new AggregateError(errors, 'Test stack cleanup failed');
   })();
-  const lifetime = setTimeout(() => { void close(); }, stackLifetimeMs); lifetime.unref();
+  // The owner's later close() returns this same promise and reports any cleanup failure.
+  const lifetime = setTimeout(() => { close().catch(() => undefined); }, stackLifetimeMs); lifetime.unref();
   try {
     await mkdir(directory, { recursive: true, mode: 0o700 }); cleanups.push(() => rm(directory, { recursive: true, force: true }));
     const proxy = await startAuthProxy(options.browserOrigins); cleanups.push(proxy.close);
@@ -92,6 +99,7 @@ export async function startTestStack(options: { browserOrigins: readonly string[
     // GoTrue owns every table/migration in its own database; tests never touch it.
     const cluster = new URL(database.adminUrl); cluster.pathname = '/postgres';
     await query(cluster.href, 'CREATE DATABASE gotrue');
+    await query(cluster.href, 'REVOKE ALL ON DATABASE gotrue FROM PUBLIC');
     const gotrue = new URL(cluster); gotrue.pathname = '/gotrue';
     await query(gotrue.href, 'CREATE SCHEMA auth AUTHORIZATION postgres');
     gotrue.hostname = 'database'; gotrue.port = '5432'; gotrue.searchParams.set('search_path', 'auth');
