@@ -1,21 +1,22 @@
 import { globSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
-// Never discover stale emitted cases from a different branch or removed source files.
-rmSync('apps/api/.test-build', { recursive: true, force: true });
-const contracts = spawnSync('tsc', ['-p', 'packages/contracts/tsconfig.json'], { stdio: 'inherit' });
-if (contracts.status !== 0) process.exit(contracts.status ?? 1);
-const client = spawnSync('tsc', ['-p', 'packages/api-client/tsconfig.json'], { stdio: 'inherit' });
-if (client.status !== 0) process.exit(client.status ?? 1);
-const player = spawnSync('tsc', ['-p', 'packages/player/tsconfig.json'], { stdio: 'inherit' });
-if (player.status !== 0) process.exit(player.status ?? 1);
-const compile = spawnSync('tsc', ['-p', 'apps/api/tsconfig.json'], { stdio: 'inherit' });
-if (compile.status !== 0) process.exit(compile.status ?? 1);
+// Groups: `unit` needs no Docker; `integration` boots Postgres, Auth, storage or media containers.
 const group = process.argv[2];
+if (group && !['unit', 'integration', 'compile'].includes(group)) throw new Error('Unknown test group');
+
+// Never discover stale emitted cases from a different branch or removed source files.
+for (const directory of ['apps/api/.test-build', 'apps/web/.test-build', 'packages/api-client/.test-build']) rmSync(directory, { recursive: true, force: true });
+for (const project of ['packages/contracts/tsconfig.json', 'packages/api-client/tsconfig.json', 'packages/player/tsconfig.json', 'apps/api/tsconfig.json', 'packages/api-client/tsconfig.test.json', 'apps/web/tsconfig.test.json']) {
+  const compiled = spawnSync('tsc', ['-p', project], { stdio: 'inherit' });
+  if (compiled.status !== 0) process.exit(compiled.status ?? 1);
+}
 // Development fixtures need the same dependency-ordered compilation, not tests.
 if (group === 'compile') process.exit(0);
-if (group) throw new Error('Unknown test group');
-const files = globSync('apps/api/.test-build/**/*.test.js');
+
+const integration = globSync('apps/api/.test-build/test/{integration,http,tooling}/**/*.test.js');
+const unit = [...globSync('apps/api/.test-build/src/**/*.test.js'), ...globSync('packages/api-client/.test-build/test/**/*.test.js'), ...globSync('apps/web/.test-build/src/**/*.test.js')];
+const files = group === 'unit' ? unit : group === 'integration' ? integration : [...unit, ...integration];
 if (files.length === 0) throw new Error('No tests discovered');
 const result = spawnSync(process.execPath, ['--test', '--test-concurrency=1', ...files], { stdio: 'inherit' });
 process.exit(result.status ?? 1);
