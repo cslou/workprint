@@ -122,6 +122,14 @@ test('native facade bounds actual HTTP/token/stream faults and releases resource
     assert.ok(!JSON.stringify(result).includes('private-error-marker'));
     await released(); assert.equal(requests - before, 1);
   });
+  await t.test('a Stop whose acknowledgment never comes settles within 5 s, with the default limits', async () => {
+    mode = 'hold';
+    const defaults = createApiClient({ baseUrl, getAccessToken: async () => 'synthetic-fault-only-bearer' });
+    const started = Date.now();
+    const result = await defaults.native.stop({ ...scope, runId: executionId });
+    assert.ok(!result.ok); assert.ok(Date.now() - started < 5000, `${Date.now() - started} ms`);
+    await released();
+  });
   await t.test('native Stop acknowledgment does not fabricate cancellation or accept another response shape', async () => {
     for (const fault of ['control-stop-good', 'control-stop-bad']) {
       mode = fault; const result = await client.native.stop({ ...scope, runId: executionId });
