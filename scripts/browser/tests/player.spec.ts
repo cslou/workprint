@@ -99,3 +99,18 @@ test('dispose clears the resource and removes listeners', async ({ page }) => {
   expect(listeners.removed).toBeGreaterThanOrEqual(listeners.added);
   expect(listeners.remaining).toBe(0);
 });
+
+test('a same-version refresh that fails never resumes the carried playback later', async ({ page }) => {
+  await page.goto('/player.html');
+  await page.waitForFunction(() => !!(window as unknown as { playerTest?: unknown }).playerTest);
+  const snapshot = () => page.evaluate(() => (window as unknown as Harness).playerTest.snapshot());
+  await page.evaluate((value) => (window as unknown as Harness).playerTest.setSource(value), source('exact', '/fixtures/clip.webm?access=1'));
+  await ready(page);
+  await page.evaluate(() => (window as unknown as Harness).playerTest.play());
+  await expect.poll(async () => (await snapshot()).status).toBe('playing');
+  await page.evaluate((value) => (window as unknown as Harness).playerTest.setSource(value), source('exact', '/fixtures/corrupt.webm'));
+  await expect.poll(async () => (await snapshot()).status).toBe('failed');
+  await page.evaluate((value) => (window as unknown as Harness).playerTest.setSource(value), source('exact', '/fixtures/clip.webm?access=2'));
+  await ready(page);
+  expect((await snapshot()).positionMs).toBe(0);
+});

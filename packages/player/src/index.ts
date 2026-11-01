@@ -64,7 +64,8 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
     if (!value || snapshot.status === 'failed') return;
     switch (event.type) {
       case 'error':
-        if (media.error) publish({ status: 'failed', sourceId: value.sourceId, positionMs: 0, durationMs: null, failure: 'source' });
+        // A failed load never resumes a carried position or playback later.
+        if (media.error) { resume = null; publish({ status: 'failed', sourceId: value.sourceId, positionMs: 0, durationMs: null, failure: 'source' }); }
         return;
       case 'loadedmetadata': {
         const carried = resume;
@@ -129,6 +130,7 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
         if (disposed || token !== playAttempt || sourceGeneration !== generation || !currentSource() || snapshot.status === 'failed') return;
         if (error instanceof DOMException && error.name === 'NotAllowedError') { observe(new Event('pause')); return; }
         if (error instanceof DOMException && error.name === 'AbortError') return;
+        resume = null;
         publish({ status: 'failed', sourceId: value.sourceId, positionMs: 0, durationMs: null, failure: 'source' });
       });
     },
