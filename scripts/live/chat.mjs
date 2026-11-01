@@ -38,6 +38,8 @@ async function childEnvironment() {
 
 const provider = await scriptedProvider();
 const fixture = await accountBrowserFixture({
+  // Saved-work tables, so read-workspace reads a real (empty) workspace.
+  artifacts: true,
   composition: live ? liveChatComposition(provider.gateUrl) : chatComposition(provider),
   environment: childEnvironment,
 });
@@ -62,20 +64,23 @@ try {
     return { firstChunkMs: turn.firstChunkMs, outputCap: 32768 };
   });
 
-  await step('tool', async () => {
-    const prompts = ['Use the test-echo tool to echo the text "workprint-live", then tell me what it returned.', 'Call the test-echo tool now with text "workprint-live". Do not answer before calling it.'];
+  /** A turn where the model should call `tool`; one rephrase is allowed, and a second decline is a finding, not a failure. */
+  const toolStep = (name, tool, prompts, args, reply) => step(name, async () => {
     for (const [attempt, prompt] of prompts.entries()) {
-      if (!live) provider.script({ toolCalls: [{ name: 'test-echo', args: { text: 'workprint-live' } }] }, { text: ['It returned workprint-live.'] });
+      if (!live) provider.script({ toolCalls: [{ name: tool, args }] }, { text: [reply] });
       const turn = await client.turn(await client.newVideo(), prompt, timeoutMs);
-      const called = turn.chunks.some(chunk => chunk.type === 'tool-call' && chunk.payload?.toolName === 'test-echo');
+      // The browser sees the tool only as its safe activity line.
+      const called = turn.chunks.some(chunk => chunk.type === 'tool-activity' && chunk.payload?.tool === tool && chunk.payload?.state === 'done');
       if (!called && attempt === 0) continue;
       assert.ok(called, 'the model declined the tool twice (recorded as a finding, not a sprint failure)');
       assert.ok(completed(turn), `turn did not complete: ${turn.terminal?.type ?? 'no terminal chunk'}`);
-      shapes.tool = sanitize(turn.chunks);
+      shapes[name] = sanitize(turn.chunks);
       return { rephrased: attempt > 0, firstChunkMs: turn.firstChunkMs };
     }
     throw new Error('unreachable');
   });
+  await toolStep('tool', 'test-echo', ['Use the test-echo tool to echo the text "workprint-live", then tell me what it returned.', 'Call the test-echo tool now with text "workprint-live". Do not answer before calling it.'], { text: 'workprint-live' }, 'It returned workprint-live.');
+  await toolStep('read-workspace', 'read-workspace', ['Check our progress on this video.', 'Call the read-workspace tool now to check our progress on this video. Do not answer before calling it.'], {}, 'Nothing is saved yet.');
 
   if (live) {
     const directory = 'apps/api/test/support/fixtures';
@@ -99,8 +104,7 @@ function sanitize(chunks) {
   return chunks.map(chunk => {
     const payload = chunk.payload ?? {};
     const shape = { type: chunk.type, payloadKeys: Object.keys(payload).sort() };
-    if (chunk.type === 'tool-call') Object.assign(shape, { toolName: payload.toolName, argsKeys: Object.keys(payload.args ?? {}).sort() });
-    if (chunk.type === 'tool-result') Object.assign(shape, { toolName: payload.toolName, resultKeys: Object.keys(payload.result ?? {}).sort() });
+    if (chunk.type === 'tool-activity') Object.assign(shape, { tool: payload.tool, state: payload.state });
     if (chunk.type === 'step-finish' || chunk.type === 'finish') Object.assign(shape, { reason: payload.stepResult?.reason });
     if (chunk.type === 'error') Object.assign(shape, { errorName: payload.error?.name });
     return shape;

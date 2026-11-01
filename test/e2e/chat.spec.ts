@@ -243,3 +243,71 @@ test('after a reload mid-turn, a send is busy and keeps the draft; the reply app
   await message(page).press('Enter');
   await expect(live(page).getByRole('listitem', { name: 'Assistant message' })).toHaveText('Now it works');
 });
+
+const phrase = 'Getting up to date on our progress…';
+const toolBody = (request: { body: Record<string, unknown> }) => JSON.stringify((request.body.messages as { role: string; content: unknown }[]).filter(message => message.role === 'tool').at(-1)?.content);
+
+test('read-workspace reads the uploaded image: the done line, the answer, and both after reload', async ({ page, backend }) => {
+  const [account] = await backend.accounts(1);
+  const { provider } = backend;
+  provider.script({ text: ['Hello'] });
+  await signIn(page, account!);
+  await message(page).fill('Start a video');
+  await message(page).press('Enter');
+  await expect(live(page).getByRole('listitem', { name: 'Assistant message' })).toHaveText('Hello');
+  await page.getByLabel('Choose a JPEG or PNG image').setInputFiles({ name: 'synthetic.png', mimeType: 'image/png', buffer: backend.media.imageBytes });
+  await expect(page.getByRole('heading', { name: 'Image saved · Version 1' })).toBeVisible({ timeout: 45_000 });
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  const video = videoId(page)!;
+  const { assets } = await backend.read<{ assets: { version: { id: string } }[] }>(account!, `/v1/conversations/${video}/workspace`);
+  const imageId = assets[0]!.version.id;
+
+  provider.script({ toolCalls: [{ name: 'read-workspace', args: {} }] }, { text: ['You have one image saved.'], hold: 'before' });
+  await message(page).fill('Check our progress on this video');
+  await message(page).press('Enter');
+  const reply = live(page).getByRole('listitem', { name: 'Assistant message' }).last();
+  await expect(reply.getByText('Read 1 saved item', { exact: true })).toBeVisible();
+  await provider.held();
+  // What the model received from the tool: the image by name and exact version id.
+  const result = toolBody(provider.requests.at(-1)!);
+  expect(result).toContain('Image 1 · Version 1');
+  expect(result).toContain(imageId);
+  provider.release();
+  await expect(reply.getByText('You have one image saved.', { exact: true })).toBeVisible();
+  await expect(working(page)).toHaveCount(0);
+
+  await page.reload();
+  const savedReply = saved(page).getByRole('listitem', { name: 'Assistant message' }).last();
+  await expect(savedReply.getByText('Read 1 saved item', { exact: true })).toBeVisible();
+  await expect(savedReply.getByText('You have one image saved.', { exact: true })).toBeVisible();
+  await expect(page.getByText(phrase)).toHaveCount(0);
+});
+
+test('a running tool shows its own phrase with elapsed time, then its done summary', async ({ page, backend }) => {
+  const [account] = await backend.accounts(1);
+  const { provider } = backend;
+  provider.script({ toolCalls: [{ name: 'test-gated', args: {} }] }, { text: ['Gate passed'] });
+  await signIn(page, account!);
+  await message(page).fill('Run the gated tool');
+  await message(page).press('Enter');
+  const line = live(page).locator('.wp-act');
+  await expect(line).toHaveText(/^Running the gated test tool…\d+s$/);
+  await expect(line).toHaveText(/^Running the gated test tool…[1-9]\d*s$/, { timeout: 5_000 });
+  provider.openGate();
+  await expect(line).toHaveText('Gated tool released');
+  await expect(live(page).getByText('Gate passed', { exact: true })).toBeVisible();
+});
+
+test('a registered tool with no phrase shows Working…', async ({ page, backend }) => {
+  const [account] = await backend.accounts(1);
+  const { provider } = backend;
+  provider.script({ toolCalls: [{ name: 'test-unphrased', args: {} }] }, { text: ['Finished'] });
+  await signIn(page, account!);
+  await message(page).fill('Run the unphrased tool');
+  await message(page).press('Enter');
+  const line = live(page).locator('.wp-act');
+  await expect(line).toHaveText(/^Working…\d+s$/);
+  provider.openGate();
+  await expect(line).toHaveText('Done');
+  await expect(live(page).getByText('Finished', { exact: true })).toBeVisible();
+});
