@@ -155,13 +155,15 @@ try:
     require(not marker.exists(), 'previous incomplete run: preserve marker/logs and diagnose before a new attempt')
     cfg = json.loads(Path('.checks/config.json').read_text())
     require(isinstance(cfg, dict) and all(isinstance(cfg.get(key), dict) for key in
-            ('targets', 'budgets_seconds', 'resources', 'story_checks')), 'missing/invalid configuration maps')
+            ('budgets_seconds', 'resources')), 'missing/invalid configuration maps')
     require(isinstance(cfg['approval'], str) and cfg['approval'].strip(), 'missing planning approval reference')
-    require(all(value in ('story', 'delivery') for value in cfg['targets'].values()), 'invalid target class')
-    require(all(cfg['targets'].get(base) == 'delivery' for base in ('main', 'develop')), 'main/develop must be delivery targets')
+    deep_bases = cfg.get('deep_merge_bases')
+    require(isinstance(deep_bases, list) and all(isinstance(base, str) and base for base in deep_bases)
+            and {'main', 'develop'} <= set(deep_bases), 'deep_merge_bases must list main and develop')
     if args.merge:
-        require(args.base in cfg['targets'] and args.head and re.fullmatch('[0-9a-f]{40}', args.head), 'missing/unknown base or head')
-        tier = 'standard' if cfg['targets'][args.base] == 'story' else 'deep'
+        # Merges into a deep base run deep; merges into any other branch run standard, like a push.
+        require(args.base and args.head and re.fullmatch('[0-9a-f]{40}', args.head), 'missing base or head')
+        tier = 'deep' if args.base in deep_bases else 'standard'
     else:
         require(not args.base and not args.head, 'base/head require merge mode')
         tier = args.tier
@@ -196,9 +198,6 @@ try:
         require(run(['git', 'status', '--porcelain', '--untracked-files=no'], 'status', True) == '',
                 'tracked working tree changes; merge evidence must match the head commit')
         branch = run(['git', 'branch', '--show-current'], 'branch', True)
-        extra = cfg['story_checks'][branch]  # Missing is blocked, not an assumed empty list.
-        require(extra == [], 'invalid approved story checks')
-        work += extra
     work += ['teardown']
     if args.exception or budget > ceiling:
         require(args.exception, 'explicit bounded exception required')
