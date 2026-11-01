@@ -9,7 +9,8 @@ import { createNativeConversation } from './native-conversations.js';
 import type { SavedWorkSetup } from './auth-built-fixture.js';
 
 export type ShotChoiceWork = { accountId: string; foreignAccountId: string; conversationId: string; script: Version; planning: Version; candidates: readonly [Version, Version] };
-/** A persisted multi-Panel plan with two candidate clips bound to its first Shot, through domain/native setup only.
+/** A persisted multi-Panel plan with two candidate clips bound to its first Shot. Records go through domain/native
+ * setup plus the same draft-binding insert upload completion performs; never a product seed route.
  * Video upload stays disabled; candidates are published metadata, and playback is qualified separately. */
 export async function prepareShotChoiceWork({ accountIds, native, servingUrl }: SavedWorkSetup): Promise<ShotChoiceWork> {
   const accountId = accountIds[0], foreignAccountId = accountIds[1];

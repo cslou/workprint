@@ -32,7 +32,8 @@ test('real private image inspection and saved-video playback/download grant no a
         await page.evaluate(input => (window as unknown as { savedWorkTest: { configure(input: unknown): void } }).savedWorkTest.configure(input), { apiOrigin: target.origin, token: target.accessTokens[0]!, accountId: saved.accountId, conversationId: saved.conversationId });
       };
       const videoAccess: OperationResponse<'media'>[] = [];
-      let refreshing = false, token = target.accessTokens[0]!;
+      const refreshedAt: number[] = [];
+      let token = target.accessTokens[0]!;
       // Fixture sessions are short-lived; across the expiry wait the owner supplies a current token, as a refreshed session would.
       const renew = async () => {
         token = (await target.refreshAccessTokens())[0]!;
@@ -43,8 +44,9 @@ test('real private image inspection and saved-video playback/download grant no a
         const access = await response.json() as OperationResponse<'media'>;
         if (access.poster) {
           // Playback reads browser-chosen byte ranges, then Download reads the whole object once.
-          // A pre-expiry refresh reloads the same paused source once; it never repeats the download.
-          videoAccess.push(access); materialNetwork.expectObjectTransfer(access.url, refreshing ? 1 : 2, 'GET', 6); materialNetwork.expectObjectTransfer(access.poster, 1, 'GET', 1);
+          // A pre-expiry refresh must reload the same paused source at least once (ranges stay bounded by the optional allowance).
+          const refresh = videoAccess.length > 0; if (refresh) refreshedAt.push(Date.now());
+          videoAccess.push(access); materialNetwork.expectObjectTransfer(access.url, refresh ? 1 : 2, 'GET', 6); materialNetwork.expectObjectTransfer(access.poster, 1, 'GET', 1);
         } else materialNetwork.expectObjectTransfer(access.url, 1, 'GET');
         await route.fulfill({ response });
       });
@@ -75,20 +77,21 @@ test('real private image inspection and saved-video playback/download grant no a
         await expect(page.getByText('Playing or downloading does not use this version or choose it for a Shot.', { exact: true })).toBeVisible();
         // Actual emulator expiry: the mounted clip reacquires the same exact version before expiry, then the first grant stops working.
         await renew();
-        refreshing = true; allow('GET', `/v1/versions/${saved.video.id}/media`);
         await expect.poll(() => videoAccess.length, { timeout: 70000 }).toBe(2);
+        expect(refreshedAt[0]!, 'Reacquired before the held grant expired').toBeLessThan(Date.parse(access.expiresAt));
         expect(videoAccess[1]!.url).not.toBe(access.url);
         await expect(page.locator('.wp-clip-surface[data-ready="true"]')).toHaveCount(1);
-        await new Promise(done => setTimeout(done, Math.max(0, Date.parse(access.expiresAt) - Date.now()) + 2000));
-        const expired = await fetch(access.url, { headers: { Range: 'bytes=0-0' } }); await expired.body?.cancel();
-        expect(expired.status).toBe(403);
+        await new Promise(done => setTimeout(done, Math.max(0, Date.parse(access.expiresAt) - Date.now())));
+        // The emulator judges expiry by its own clock; poll briefly instead of assuming no skew.
+        await expect.poll(async () => { const expired = await fetch(access.url, { headers: { Range: 'bytes=0-0' } }); await expired.body?.cancel(); return expired.status; }, { timeout: 15000 }).toBe(403);
         await expect(page.locator('.wp-clip-surface[data-ready="true"]')).toHaveCount(1);
         await renew();
       };
       await configure(); allow('GET', '/v1/library'); await page.getByRole('button', { name: 'Library', exact: true }).click();
       for (const version of [saved.image, saved.video]) {
         assert.ok('media' in version);
-        allow('GET', `/v1/versions/${version.id}`); allow('GET', `/v1/versions/${version.id}/media`);
+        // The video's second media read is its pre-expiry refresh while the clip stays mounted.
+        allow('GET', `/v1/versions/${version.id}`); allow('GET', `/v1/versions/${version.id}/media`, {}, version.kind === 'video' ? 2 : 1);
         const tile = page.locator(`[data-page-id="${version.artifactId}"]`).locator('..');
         await tile.getByRole('button', { name: /^Inspect / }).click();
         if (version.kind === 'video') await playAndDownload(version.media.byteSize);
