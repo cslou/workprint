@@ -8,14 +8,12 @@ from pathlib import Path
 
 # Adapt only to verified repo commands; keep lists out of event wrappers.
 # Tier map and inventory: docs/regression-gates.md. The test stack's lifecycle lives inside
-# stack-suites; setup records a resource baseline and teardown fails on anything this run left behind.
-# Steps print 'NOTICE:' lines for non-blocking results the final report must carry.
-BASELINE = '.checks/.logs/stack-baseline.json'
+# stack-suites; setup records a baseline in this run's logs (CHECKS_RUN_DIR) and teardown fails on
+# anything this run left behind. Steps print 'GATE-NOTICE:' lines for non-blocking results the report must carry.
 COMPILED = ['env', 'WORKPRINT_TESTS_COMPILED=1']
 COMMANDS = {
     # Compile the tests once; later groups reuse the build.
-    'setup': ['sh', '-c', 'node scripts/test-stack-leftovers.mjs baseline ' + BASELINE
-              + ' && pnpm exec node scripts/test.mjs compile'],
+    'setup': ['sh', '-c', 'node scripts/test-stack-leftovers.mjs baseline && pnpm exec node scripts/test.mjs compile'],
     'check': ['pnpm', 'check'],
     'unit': COMPILED + ['pnpm', 'test:unit'],
     'build': ['pnpm', 'build'],
@@ -23,11 +21,11 @@ COMMANDS = {
     # One shared stack for integration and browser journeys.
     'stack-suites': COMPILED + ['pnpm', 'exec', 'node', 'scripts/test-stack.mjs', 'sh', '-c',
                                 'node scripts/test.mjs integration'
-                                ' || { echo "NOTICE: integration failed; browser journeys not run"; exit 1; }; '
+                                ' || { echo "GATE-NOTICE: integration failed; browser journeys not run"; exit 1; }; '
                                 'playwright test --config test/e2e/playwright.config.ts'
-                                ' || { echo "NOTICE: browser journeys failed after integration passed"; exit 1; }'],
+                                ' || { echo "GATE-NOTICE: browser journeys failed after integration passed"; exit 1; }'],
     'audit': ['node', 'scripts/audit.mjs'],
-    'teardown': ['node', 'scripts/test-stack-leftovers.mjs', 'verify', BASELINE],
+    'teardown': ['node', 'scripts/test-stack-leftovers.mjs', 'verify'],
 }
 TIERS = {'quick': ['check', 'unit'], 'standard': ['check', 'unit', 'build', 'tooling'],
          'deep': ['check', 'unit', 'build', 'tooling', 'stack-suites', 'audit']}
@@ -73,8 +71,8 @@ def group_alive(pid):
 
 def notices():
     found = []
-    for path in sorted(logs.iterdir(), key=lambda item: int(item.name.split('-')[0])):
-        found += [line.rstrip() for line in path.read_text(errors='replace').splitlines() if line.startswith('NOTICE:')]
+    for path in sorted(logs.glob('*.log'), key=lambda item: int(item.name.split('-')[0])):
+        found += [line.rstrip() for line in path.read_text(errors='replace').splitlines() if line.startswith('GATE-NOTICE:')]
     return found
 
 def run(argv, label, capture=False, cleaning=False):
@@ -85,13 +83,13 @@ def run(argv, label, capture=False, cleaning=False):
         cutoff = min(deadline - cleanup, time.monotonic() + teardown)
     if time.monotonic() >= cutoff:
         raise GateFailure('budget exhausted before ' + label, 124)
-    path = logs / (str(len(list(logs.iterdir()))) + '-' + label + '.log')
+    path = logs / (str(len(list(logs.glob('*.log')))) + '-' + label + '.log')
     print('-> ' + label + ' log=' + str(path), flush=True)
     problem = None
     leftovers = False
     with path.open('w') as output:
         child = subprocess.Popen(argv, stdout=output, stderr=subprocess.STDOUT, start_new_session=True,
-                                 env={**os.environ, 'CHECKS_JOBS': str(limits['jobs'])},
+                                 env={**os.environ, 'CHECKS_JOBS': str(limits['jobs']), 'CHECKS_RUN_DIR': str(logs)},
                                  preexec_fn=lambda: resource.setrlimit(resource.RLIMIT_NOFILE,
                                                         (limits['open_files'], limits['open_files'])))
         try:

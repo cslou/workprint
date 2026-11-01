@@ -84,8 +84,11 @@ export async function startTestStack(options: { browserOrigins: readonly string[
   const close = () => closing ??= (async () => {
     clearTimeout(lifetime);
     const errors: unknown[] = [];
-    for (const cleanup of cleanups.reverse()) { try { await cleanup(); } catch (error) { errors.push(error); } }
+    // The stack directory goes last and only after every release succeeded, so a remaining directory marks an incomplete cleanup.
+    const [directoryCleanup, ...releases] = cleanups;
+    for (const cleanup of releases.reverse()) { try { await cleanup(); } catch (error) { errors.push(error); } }
     if (errors.length) throw new AggregateError(errors, 'Test stack cleanup failed');
+    await directoryCleanup?.();
   })();
   // The owner's later close() returns this same promise and reports any cleanup failure.
   const lifetime = setTimeout(() => { close().catch(() => undefined); }, stackLifetimeMs); lifetime.unref();
@@ -144,9 +147,9 @@ export async function startTestStack(options: { browserOrigins: readonly string[
     const sandbox = await createMediaSandbox(media);
     const files = { png: join(directory, 'image.png'), jpeg: join(directory, 'image.jpg'), video: join(directory, 'clip.mp4'), poster: join(directory, 'poster.png') };
     try {
-      const generated = await qualifiedMediaFixtures(sandbox, media.dockerPath);
+      const generated = await qualifiedMediaFixtures(sandbox, media.dockerPath, options.signal);
       if (!generated.progress.toString().includes('progress=end')) throw new Error('Generated fixture clip did not decode completely');
-      const poster = await qualifiedPoster(sandbox, media.dockerPath, generated.video);
+      const poster = await qualifiedPoster(sandbox, media.dockerPath, generated.video, options.signal);
       await Promise.all([writeFile(files.png, generated.png), writeFile(files.jpeg, generated.jpeg), writeFile(files.video, generated.video), writeFile(files.poster, poster)]);
     } finally { await sandbox.close(); }
     const record: StackRecord = {
@@ -160,7 +163,8 @@ export async function startTestStack(options: { browserOrigins: readonly string[
     return { file, close };
   } catch (error) {
     try { await close(); } catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Test stack startup and cleanup failed', { cause: cleanupError }); }
-    throw error;
+    // Steps cancelled by the abort fail with their own errors; report them as the abort.
+    throw options.signal?.aborted ? options.signal.reason : error;
   }
 }
 

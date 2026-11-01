@@ -4,7 +4,7 @@ This is Workprint's repository map for the harness regression command contract. 
 
 ## Tiers
 
-Every tier starts with `setup`, which records a resource baseline and compiles the tests once. Every tier ends with `teardown`, which fails if the run left resources behind (see [Cleanup](#cleanup)).
+Every tier starts with `setup`, which records a leftover baseline and compiles the tests once. Every tier ends with `teardown`, which fails if the run left resources behind (see [Cleanup](#cleanup)).
 
 | Tier | Trigger | Checks, in order | Proof |
 |---|---|---|---|
@@ -13,13 +13,13 @@ Every tier starts with `setup`, which records a resource baseline and compiles t
 | deep | merges into a delivery target | standard, then `stack-suites`, then `audit` (`scripts/audit.mjs`) | **Integration:** Docker-backed API, database, storage and media tests. **E2E:** eight browser journeys. **Security:** dependency advisories. |
 | full, routine | not configured | none | Invoking either tier exits 2 with "not configured for this repository". It never passes silently. |
 
-`stack-suites` starts one [shared test stack](../README.md#shared-test-stack-test-only) and runs two suites inside it: `node scripts/test.mjs integration`, then the Playwright journeys. A deep run therefore starts the stack only once. If integration fails, the browser journeys do not run. The step prints a `NOTICE:` saying so, so the report shows the browser result as unrun rather than failed.
+`stack-suites` starts one [shared test stack](../README.md#shared-test-stack-test-only) and runs two suites inside it: `node scripts/test.mjs integration`, then the Playwright journeys. A deep run therefore starts the stack only once. If integration fails, the browser journeys do not run. The step prints a `GATE-NOTICE:` saying so, so the report shows the browser result as unrun rather than failed.
 
-The audit blocks only on high and critical advisories. It lists moderate, low and info advisories in its log and prints a `NOTICE:` with their counts. These remain a reported non-pass under the existing exceptions in [Sprint 004](sprints/sprint-004.md) and [Sprint 005](sprints/sprint-005.md) (B-002, B-004, B-008). They never count as a pass.
+The audit blocks only on high and critical advisories. It lists moderate, low and info advisories in its log and prints a `GATE-NOTICE:` with their counts. These remain a reported non-pass under the existing exceptions in [Sprint 004](sprints/sprint-004.md) and [Sprint 005](sprints/sprint-005.md) (B-002, B-004, B-008). They never count as a pass.
 
 ## Reporting
 
-The script prints `PASS` or `INCOMPLETE`, the selected scope, every `NOTICE:` line from the run, and a path to each step's log. The agent that ran the gate turns this output and the logs into the contract's six-section report:
+The script prints `PASS` or `INCOMPLETE`, the selected scope, every `GATE-NOTICE:` line from the run, and a path to each step's log. The agent that ran the gate turns this output and the logs into the contract's six-section report:
 1. status and score
 2. dashboard by category
 3. protection changes
@@ -27,7 +27,7 @@ The script prints `PASS` or `INCOMPLETE`, the selected scope, every `NOTICE:` li
 5. evidence
 6. verdict
 
-That report must carry every `NOTICE:`.
+That report must carry every `GATE-NOTICE:`.
 
 ## Merge targets
 
@@ -63,16 +63,19 @@ The end-to-end app uses loopback port 4180. If another checkout is using that po
 
 ## Cleanup
 
-The test stack belongs to `stack-suites`. It removes the stack on exit, on SIGTERM, and on an interrupt during startup.
+The test stack belongs to `stack-suites`. It removes the stack on exit, on SIGTERM, and on an interrupt during startup, including during media fixture generation.
+
+Each stack keeps its `outputs/fixtures/stack/<owner>` directory until every container, network and server it started has been released. A directory that is still there therefore marks an incomplete cleanup, for example after a failed removal or a SIGKILL.
 
 Some processes run in their own process groups, so the gate's process-group stop cannot reach them: the API server and Vite started by the journeys, the media `docker` jobs, and Chromium. Their owners stop them during the cleanup reserve.
 
-`teardown` compares the following against the baseline taken in `setup`, and fails the run if any of them are new:
-- `workprint-*` containers and networks;
-- `outputs/fixtures/stack/*` directories;
-- a listener on the preview port.
+`setup` records a baseline in the run's log folder (`CHECKS_RUN_DIR`). `teardown` fails the run if either of these is new:
+- a stack directory in this checkout;
+- a listener on the preview port. This is checked only when the run started the browser journeys, because the port is shared across the host.
 
-Teardown only reports. It never removes anything, because a resource is not proven to be owned just because it is new.
+Docker resources are not compared, because other checkouts create `workprint-*` containers on the same host.
+
+Teardown only reports. It never removes anything, because a resource is not proven to be owned just because it is new. An API server orphaned on a random port by a forced Playwright worker exit is not detected. Step 3 below covers it.
 
 ## Running
 

@@ -1,17 +1,16 @@
-import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createServer } from 'node:net';
 
-// Records, then compares, the test resources a regression-gate run could leave behind: workprint-* containers and
-// networks, stack directories and the end-to-end preview port. It only reports; ownership of anything new must be
-// confirmed before removal (see docs/regression-gates.md#incomplete-runs).
-const [mode, file] = process.argv.slice(2);
-if (!['baseline', 'verify'].includes(mode) || !file) throw new Error('Usage: node scripts/test-stack-leftovers.mjs baseline|verify <file>');
+// Records, then compares, what a regression-gate run could leave behind in this checkout. A test stack keeps its
+// outputs/fixtures/stack/<owner> directory until every container, network and server it started is released, so a new
+// directory means an incomplete stack cleanup. The preview port is host-wide, so it is compared only when the run
+// started browser journeys. Reports only; confirm ownership before removing anything (docs/regression-gates.md).
+const [mode] = process.argv.slice(2);
+const run = process.env.CHECKS_RUN_DIR;
+if (!['baseline', 'verify'].includes(mode) || !run) throw new Error('Usage: CHECKS_RUN_DIR=<run logs> node scripts/test-stack-leftovers.mjs baseline|verify');
+const file = join(run, 'stack-baseline.json');
 
-const docker = args => {
-  const result = spawnSync('docker', args, { encoding: 'utf8' });
-  return result.status === 0 ? result.stdout.split('\n').filter(line => line.startsWith('workprint-')).sort() : null;
-};
 const portFree = port => new Promise(done => {
   const server = createServer();
   server.once('error', () => done(false));
@@ -19,25 +18,18 @@ const portFree = port => new Promise(done => {
 });
 const stacks = 'outputs/fixtures/stack';
 const port = Number(process.env.WORKPRINT_PREVIEW_PORT ?? '4180');
-const snapshot = {
-  // Docker may be stopped for Docker-free tiers; null means nothing could have been created there.
-  containers: docker(['ps', '-a', '--format', '{{.Names}}']),
-  networks: docker(['network', 'ls', '--format', '{{.Name}}']),
-  stacks: existsSync(stacks) ? readdirSync(stacks).sort() : [],
-  port: { number: port, free: await portFree(port) },
-};
+const snapshot = { stacks: existsSync(stacks) ? readdirSync(stacks).sort() : [], portFree: await portFree(port) };
 
 if (mode === 'baseline') {
-  writeFileSync(file, JSON.stringify(snapshot));
+  writeFileSync(file, JSON.stringify(snapshot), { flag: 'wx' });
   process.exit(0);
 }
+if (!existsSync(file)) throw new Error(`No baseline for this run at ${file}; leftovers cannot be checked`);
 const baseline = JSON.parse(readFileSync(file, 'utf8'));
-const added = (before, after) => before === null || after === null ? [] : after.filter(name => !before.includes(name));
+const browserJourneys = readdirSync(run).some(name => name.endsWith('-stack-suites.log'));
 const leftovers = [
-  ...added(baseline.containers, snapshot.containers).map(name => `container ${name}`),
-  ...added(baseline.networks, snapshot.networks).map(name => `network ${name}`),
-  ...added(baseline.stacks, snapshot.stacks).map(name => `stack directory ${stacks}/${name}`),
-  ...(baseline.port.free && !snapshot.port.free ? [`listener on 127.0.0.1:${port}`] : []),
+  ...snapshot.stacks.filter(name => !baseline.stacks.includes(name)).map(name => `stack directory ${stacks}/${name}`),
+  ...(browserJourneys && baseline.portFree && !snapshot.portFree ? [`listener on 127.0.0.1:${port}`] : []),
 ];
 if (leftovers.length) {
   console.error(`Leftover test resources from this run:\n${leftovers.join('\n')}`);
