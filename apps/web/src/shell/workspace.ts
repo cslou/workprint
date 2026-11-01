@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { OperationResponse, Version } from '@workprint/contracts';
 import { useDraftGuard, useUncertainDrafts } from '../api/draft-guard.js';
-import { applyUsedVersion } from '../workspace/used.js';
+import { applyUsedEffects } from '../workspace/used.js';
 import { applySavedVersion } from '../workspace/saved.js';
 import type { ClientError } from '@workprint/api-client';
 import type { BrowserClient } from '../api/client.js';
@@ -51,6 +51,6 @@ export function useWorkspace(connection: BrowserClient, scope: ReadScope | null)
     setUses(previous => previous.key === key && previous.effects.some(effect => effect.deferred) ? { key, effects: previous.effects.map(effect => ({ ...effect, deferred: false })) } : previous);
   }, [hasDrafts, key]);
   const visible = state.kind === 'settled' && state.result.ok && confirmed.key === key ? { ...state, result: { ok: true as const, value: [...confirmed.effects.values()].reduce(applySavedVersion, state.result.value) } } : state;
-  const merged = visible.kind === 'settled' && visible.result.ok && uses.key === key ? { ...visible, result: { ok: true as const, value: uses.effects.filter(effect => !effect.deferred).reduce((workspace, effect) => applyUsedVersion(workspace, effect.result, effect.version), visible.result.value) } } : visible;
+  const merged = visible.kind === 'settled' && visible.result.ok && uses.key === key ? { ...visible, result: { ok: true as const, value: applyUsedEffects(visible.result.value, uses.effects.filter(effect => !effect.deferred)) } } : visible;
   return { ...merged, onSaved, onUploaded: onSaved, onUsed, failure: state.kind === 'settled' && !state.result.ok ? classifyWorkspaceFailure(state.result.error.code) : null };
 }

@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { ApiClient, ClientResult } from '@workprint/api-client';
-import { versionSchema, useBindingSchema, type OperationResponse } from '@workprint/contracts';
+import { versionSchema, useBindingSchema, type OperationResponse, type Version } from '@workprint/contracts';
 import { createBrowserClient } from '../src/api/client.js';
 import { Videos, type VideoPrerequisites } from '../src/videos/videos.js';
 import type { StoryboardPrerequisites } from '../src/storyboard/presentation.js';
 import { Storyboard } from '../src/storyboard/storyboard.js';
-import { applyUsedVersion } from '../src/workspace/used.js';
+import { applyUsedEffects } from '../src/workspace/used.js';
 import { workspace, video, image } from './storyboard-fixtures.js';
 import '../src/ui/tokens.css';
 import '../src/ui/foundations.css';
@@ -32,10 +32,12 @@ const script = versionSchema.parse({ id: 'script-v3', artifactId: 'script-artifa
 let useScript: (selectionRevision: number) => void = () => { throw new Error('Composed mode is not mounted'); };
 let composedRevision = -1;
 function Composed({ initial, common }: { initial: OperationResponse<'workspace'>; common: Omit<Parameters<typeof Videos>[0], 'workspace'> }) {
-  const [workspace, setWorkspace] = useState(initial);
+  // Receipts accumulate and apply through the shell's ordering function, in arrival order.
+  const [effects, setEffects] = useState<{ result: OperationResponse<'useVersion'>; version: Version }[]>([]);
+  const workspace = applyUsedEffects(initial, effects);
   composedRevision = workspace.selectionRevision;
-  useScript = selectionRevision => setWorkspace(current => applyUsedVersion(current, { use: { id: 'script-use', versionId: script.id, binding: { purpose: 'script' }, state: 'approved' }, selectionRevision }, script));
-  return <Videos {...common} workspace={workspace} onUsed={(result, version) => setWorkspace(current => applyUsedVersion(current, result, version))} />;
+  useScript = selectionRevision => setEffects(current => [...current, { result: { use: { id: 'script-use', versionId: script.id, binding: { purpose: 'script' }, state: 'approved' }, selectionRevision }, version: script }]);
+  return <Videos {...common} workspace={workspace} onUsed={(result, version) => setEffects(current => [...current, { result, version }])} />;
 }
 (window as unknown as { selectionRace: unknown }).selectionRace = {
   configure(mode: 'video' | 'panel', options: { storyboardFacts?: StoryboardPrerequisites; videoFacts?: VideoPrerequisites; foreignShot?: boolean; bound?: boolean; composed?: boolean } = {}) {

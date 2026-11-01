@@ -61,3 +61,16 @@ test('a later unrelated use at the same revision keeps exactly the confirmed Sho
   await expect(page.getByText('Chosen', { exact: true })).toHaveCount(1);
   await expect(rows.nth(1).getByText('Chosen', { exact: true })).toBeVisible();
 });
+test('out-of-order Shot-video receipts settle on the choice the server committed last', async ({ page }) => {
+  await page.goto('/selection-races.html'); await page.waitForFunction(() => !!(window as unknown as Harness).selectionRace);
+  await page.evaluate(() => (window as unknown as Harness).selectionRace.configure('video', { bound: true, composed: true }));
+  const rows = page.locator('.wp-video-row'); await expect(rows).toHaveCount(2);
+  await rows.nth(1).getByRole('button', { name: 'Use this version', exact: true }).click();
+  await rows.nth(0).getByRole('button', { name: 'Use this version', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as Harness).selectionRace.pending())).toBe(2);
+  // The server committed v2 at 10 and then v1 at 11; v1's response arrives first, both before the next render.
+  await page.evaluate(() => { const harness = (window as unknown as Harness).selectionRace; harness.complete('video-v1', 11); harness.complete('video-v2', 10); });
+  await expect.poll(() => page.evaluate(() => (window as unknown as Harness).selectionRace.composedRevision())).toBe(11);
+  await expect(page.getByText('Chosen', { exact: true })).toHaveCount(1);
+  await expect(rows.nth(0).getByText('Chosen', { exact: true })).toBeVisible();
+});

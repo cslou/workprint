@@ -36,3 +36,9 @@ export function applyUsedVersion(workspace: OperationResponse<'workspace'>, resu
   }
   return workspace;
 }
+
+/** Apply confirmed receipts in server commit order: a higher selection revision committed later.
+ * Equal revisions (unrelated uses, no-op re-choices) keep their arrival order. */
+export function applyUsedEffects(workspace: OperationResponse<'workspace'>, effects: readonly { result: OperationResponse<'useVersion'>; version: Version }[]): OperationResponse<'workspace'> {
+  return [...effects].sort((a, b) => a.result.selectionRevision - b.result.selectionRevision).reduce((current, effect) => applyUsedVersion(current, effect.result, effect.version), workspace);
+}
