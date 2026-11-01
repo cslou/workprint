@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { registerApiRoute } from '@mastra/core/server';
 import type { MastraCompositeStore, MemoryStorage } from '@mastra/core/storage';
 import type { Context } from 'hono';
+import { projectToolActivity, type AgentTool, type ToolActivity, type ToolActivityState } from '../agent/index.js';
 import type { CheckOwnedConversation } from '../application/index.js';
 import { readBody } from './body.js';
 import { startedConversation } from './started-conversations.js';
@@ -26,8 +27,28 @@ function pagination(context: Context, fallback: number, accountId: string) {
   return { page: Number(page), perPage: Number(perPage) };
 }
 
+type StoredPart = NonNullable<Awaited<ReturnType<MemoryStorage['listMessages']>>['messages'][number]['content']['parts']>[number];
+const unsupported = () => new Error('Unsupported native history');
+type HistoryPart = { type: 'text'; text: string } | ({ type: 'tool-activity' } & ToolActivity);
+type HistoryMessage = { id: string; threadId: string; resourceId: string; role: string; createdAt: Date; content: { format: 2; parts: HistoryPart[] } };
+const storedToolStates: Readonly<Record<string, ToolActivityState>> = { result: 'done', 'output-error': 'failed' };
+
+/**
+ * One saved assistant part as the browser may see it, or null to leave it out. Text stays; a tool call
+ * becomes its safe activity line (never arguments or results); step markers, reasoning and a failed reply's
+ * error are left out. Anything else fails the read closed.
+ */
+function assistantPart(part: StoredPart, tools: readonly AgentTool[]) {
+  if (part.type === 'text') return { type: 'text' as const, text: part.text };
+  if (part.type === 'step-start' || part.type === 'reasoning' || part.type === 'error') return null;
+  if (part.type !== 'tool-invocation') throw unsupported();
+  const { toolInvocation } = part;
+  const activity = projectToolActivity(tools, { toolCallId: toolInvocation.toolCallId, toolName: toolInvocation.toolName, state: storedToolStates[toolInvocation.state] ?? 'incomplete', ...('result' in toolInvocation ? { output: toolInvocation.result } : {}) });
+  return activity ? { type: 'tool-activity' as const, ...activity } : null;
+}
+
 /** Qualified native wire shapes over supported native storage only; no Agent or second store. */
-export function nativeNavigationRoutes(storage: Pick<MastraCompositeStore, 'getStore'>, checkOwned: CheckOwnedConversation) {
+export function nativeNavigationRoutes(storage: Pick<MastraCompositeStore, 'getStore'>, checkOwned: CheckOwnedConversation, tools: readonly AgentTool[] = []) {
   const route = (method: 'GET' | 'POST', path: string, action: (context: Context, accountId: string, memory: MemoryStorage) => Promise<Response>) => registerApiRoute(path, { method, handler: async context => {
     const accountId: unknown = context.get('requestContext').get('accountId');
     if (typeof accountId !== 'string') return failure(context, 401, 'unauthenticated', 'Authentication required');
@@ -84,18 +105,22 @@ export function nativeNavigationRoutes(storage: Pick<MastraCompositeStore, 'getS
       const expected = Math.min(page.perPage, Math.max(0, result.total - page.page * page.perPage));
       if (result.messages.length !== expected) return unavailable(context);
       // Never expose private metadata, system instructions or tool payloads as browser state.
-      const messages = result.messages.flatMap(message => {
-        // A failed reply keeps its error part in storage; the browser sees only the text that streamed.
+      const messages = result.messages.flatMap((message): HistoryMessage[] => {
         const stored = message.content.parts;
-        const parts = message.role === 'assistant' ? stored?.filter(part => part.type !== 'error') : stored;
-        if (message.role === 'assistant' && stored?.length && !parts?.length) return [];
         const signal = message.content.metadata?.signal;
         const userSignal = message.role === 'signal' && message.type === 'user' && signal !== null && typeof signal === 'object' &&
           'id' in signal && signal.id === message.id && 'type' in signal && signal.type === 'user' && 'tagName' in signal && signal.tagName === 'user';
         // Presentation role only: preserve the native input signal/message ID, never alias execution IDs.
         const role = userSignal ? 'user' : message.role;
-        if (!['user', 'assistant'].includes(role) || message.threadId !== id || message.resourceId !== accountId || !parts || parts.some(part => part.type !== 'text')) throw new Error('Unsupported native history');
-        return [{ id: message.id, threadId: id, resourceId: accountId, role, createdAt: message.createdAt, content: { format: 2, parts: parts.map(part => ({ type: 'text', text: 'text' in part ? part.text : '' })) } }];
+        if (!['user', 'assistant'].includes(role) || message.threadId !== id || message.resourceId !== accountId || !stored) throw unsupported();
+        if (role === 'user') {
+          if (stored.some(part => part.type !== 'text')) throw unsupported();
+          return [{ id: message.id, threadId: id, resourceId: accountId, role, createdAt: message.createdAt, content: { format: 2, parts: stored.map(part => ({ type: 'text' as const, text: 'text' in part ? part.text : '' })) } }];
+        }
+        // A failed reply keeps its error part in storage; the browser sees only what streamed. A reply left with nothing is omitted.
+        const parts = stored.flatMap(part => { const safe = assistantPart(part, tools); return safe ? [safe] : []; });
+        if (stored.length && !parts.length) return [];
+        return [{ id: message.id, threadId: id, resourceId: accountId, role, createdAt: message.createdAt, content: { format: 2, parts } }];
       });
       return json(context, { messages, total: result.total, page: result.page, perPage: result.perPage, hasMore: result.hasMore, uiMessages: null });
     }),

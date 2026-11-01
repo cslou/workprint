@@ -30,6 +30,7 @@ export async function scriptedProvider() {
   const steps: ScriptedStep[] = [];
   const requests: RecordedRequest[] = [];
   const unscripted: RecordedRequest[] = [];
+  let toolCalls = 0;
   let releaseHold: (() => void) | undefined, holdReached: (() => void) | undefined;
   let held = new Promise<void>(resolve => { holdReached = resolve; });
   function newGate() {
@@ -63,7 +64,8 @@ export async function scriptedProvider() {
       if (step.dripMs) await wait(step.dripMs);
     }
     for (const [index, call] of (step.toolCalls ?? []).entries()) {
-      response.write(chunk({ tool_calls: [{ index, id: `call_${requests.length}_${index}`, type: 'function', function: { name: call.name, arguments: JSON.stringify(call.args) } }] }));
+      // Unique for the provider's life, as a real provider's are: memory keys saved tool results by call id.
+      response.write(chunk({ tool_calls: [{ index, id: `call_${++toolCalls}`, type: 'function', function: { name: call.name, arguments: JSON.stringify(call.args) } }] }));
     }
     if (step.incomplete) { response.end(); return; }
     response.write(chunk({}, step.finish ?? (step.toolCalls?.length ? 'tool_calls' : 'stop')));

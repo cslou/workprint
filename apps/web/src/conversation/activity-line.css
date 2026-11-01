@@ -1,0 +1,8 @@
+.wp-act { display: flex; align-items: center; gap: var(--space-6); margin: 0 0 var(--space-4); font-size: var(--font-size-13); color: var(--color-text-subtle); }
+.wp-act + p, p + .wp-act { margin-top: var(--space-10); }
+.wp-act svg { flex: none; width: 13px; height: 13px; fill: none; stroke: var(--color-status-ready-text); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.wp-act-run { animation: wp-act-pulse var(--duration-pulse) ease-in-out infinite; }
+.wp-act-elapsed { font-variant-numeric: tabular-nums; }
+.wp-act-elapsed::before { content: '·'; margin-right: var(--space-6); }
+@keyframes wp-act-pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .wp-act-run { animation: none; } }

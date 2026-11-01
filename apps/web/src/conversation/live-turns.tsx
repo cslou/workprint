@@ -1,4 +1,5 @@
 import { Button } from '../ui/controls.js';
+import { ActivityLine } from './activity-line.js';
 import type { LiveTurn } from './chat-session.js';
 import './live-turns.css';
 
@@ -17,8 +18,8 @@ export function LiveTurns({ turns, canRetry, onRetry }: { turns: readonly LiveTu
     const retry = turn.state !== 'lost' && !turn.retried;
     return [
       <li key={`${turn.key}-user`} className="wp-saved-user" aria-label="Your message"><span>{turn.text}</span></li>,
-      ...(turn.reply || notice ? [<li key={`${turn.key}-reply`} className="wp-saved-assistant" aria-label="Assistant message" aria-busy={turn.state === 'streaming'}>
-        {turn.reply && <p>{turn.reply}</p>}
+      ...(turn.parts.length || notice ? [<li key={`${turn.key}-reply`} className="wp-saved-assistant" aria-label="Assistant message" aria-busy={turn.state === 'streaming'}>
+        {turn.parts.map((part, index) => part.kind === 'text' ? <p key={index}>{part.text}</p> : <ActivityLine key={part.activity.toolCallId} activity={part.activity} startedAt={part.startedAt} />)}
         {notice && <div className="wp-turn-notice"><p role="status">{notice}</p>{retry && <Button variant="secondary" isDisabled={!canRetry} onPress={() => onRetry(turn.key)}>Retry</Button>}</div>}
       </li>] : []),
     ];

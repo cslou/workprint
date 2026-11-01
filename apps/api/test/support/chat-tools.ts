@@ -28,9 +28,9 @@ export function chatTestTools(gateUrl: string): AgentTool[] {
       execute: async (_input, { scope }) => ({ accountId: scope.accountId, videoId: scope.videoId }),
     },
     {
-      id: 'test-unphrased', description: 'A test tool with no activity phrase.',
+      id: 'test-unphrased', description: 'A test tool with no activity phrase that, like test-gated, waits for the test.',
       inputSchema: z.strictObject({}),
-      execute: async () => ({ done: true }),
+      execute: async (_input, { signal }) => ({ done: (await fetch(gateUrl, { signal })).ok }),
     },
   ];
 }

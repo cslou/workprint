@@ -1,9 +1,10 @@
 import type { ClientResult } from './types.js';
 import type { NativeObservedTurn, NativeTextDelta } from './native-types.js';
 import { failed, nativeTransportLimits, object, uuid } from './native-transport.js';
+import { isToolActivity, type NativeToolActivityChunk } from './native-activity.js';
 
 /** Per-observation decoder state only, never a stored turn/status or ownership ledger. */
-export function nativeOutcome(expectedRunId: string, onText: (part: NativeTextDelta) => void) {
+export function nativeOutcome(expectedRunId: string, onText: (part: NativeTextDelta) => void, onActivity?: (activity: NativeToolActivityChunk) => void) {
   let messageId: string | undefined, started = false, bytes = 0;
   const interrupted = (): ClientResult<NativeObservedTurn> => ({ ok: true, value: { outcome: 'interrupted', runId: expectedRunId, ...(messageId ? { assistantMessageId: messageId } : {}) } });
   // The server ended the turn: an outcome, distinct from losing the observation.
@@ -20,6 +21,9 @@ export function nativeOutcome(expectedRunId: string, onText: (part: NativeTextDe
       bytes += new TextEncoder().encode(payload.text).byteLength;
       if (bytes > nativeTransportLimits.outputBytes) return failed('invalid_response', 'Native output limit exceeded');
       onText({ runId: expectedRunId, text: payload.text });
+    } else if (value.type === 'tool-activity') {
+      if (!started || !isToolActivity(payload)) return failed('invalid_response', 'Invalid native tool activity');
+      onActivity?.({ ...payload, runId: expectedRunId });
     } else if (value.type === 'abort') return interrupted();
     else if (value.type === 'finish') {
       const step = object(payload) ? payload.stepResult : undefined;

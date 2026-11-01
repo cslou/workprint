@@ -2,12 +2,13 @@ import type { CallOptions, ClientResult } from './types.js';
 import type { NativeObservedFinish, NativeObservedTurn, NativeSendReceipt, NativeTextDelta, NativeTextInput, NativeTurnScope } from './native-types.js';
 import { failed, nativeCaught, nativeLifetime, nativeSdk, nativeSendReceipt, nativeTransportLimits, scoped, unavailableNative, uuid, validNativeText, type NativeConfig } from './native-transport.js';
 import { nativeOutcome } from './native-outcome.js';
+import type { NativeToolActivityChunk } from './native-activity.js';
 
 export type { NativeTurnScope, NativeTextInput, NativeSendReceipt, NativeObservedFinish, NativeObservedTurn, NativeTextDelta } from './native-types.js';
 export { nativeTransportLimits } from './native-transport.js';
 export type NativeObservation = {
   consume(runId: NativeSendReceipt['runId'], onText: (part: NativeTextDelta) => void): Promise<ClientResult<NativeObservedFinish>>;
-  consumeTurn(runId: NativeSendReceipt['runId'], onText: (part: NativeTextDelta) => void): Promise<ClientResult<NativeObservedTurn>>;
+  consumeTurn(runId: NativeSendReceipt['runId'], onText: (part: NativeTextDelta) => void, onActivity?: (activity: NativeToolActivityChunk) => void): Promise<ClientResult<NativeObservedTurn>>;
   close(): void;
 };
 export type NativeTurnMethods = {
@@ -43,11 +44,11 @@ export function createNativeTurns(config: NativeConfig): NativeTurnMethods {
           life.budget(streamMs);
           let consumed = false;
           const close = () => { life.fail(failed('cancelled', 'Native observation closed')); subscription.unsubscribe(); };
-          const consumeTurn = async (expectedRunId: string, onText: (part: NativeTextDelta) => void): Promise<ClientResult<NativeObservedTurn>> => {
+          const consumeTurn = async (expectedRunId: string, onText: (part: NativeTextDelta) => void, onActivity?: (activity: NativeToolActivityChunk) => void): Promise<ClientResult<NativeObservedTurn>> => {
             if (consumed) return failed('invalid_input', 'Native observation already consumed'); consumed = true;
             if (!uuid(expectedRunId)) { close(); return failed('invalid_input', 'Invalid native execution identity'); }
             let terminal: ClientResult<NativeObservedTurn> | undefined;
-            const decoder = nativeOutcome(expectedRunId, onText);
+            const decoder = nativeOutcome(expectedRunId, onText, onActivity);
             const processing = async (): Promise<ClientResult<NativeObservedTurn>> => {
               try {
                 await subscription.processDataStream({ reconnect: false, onChunk: chunk => {

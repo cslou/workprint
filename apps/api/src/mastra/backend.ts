@@ -54,7 +54,7 @@ export async function createBackend(routes: ApiRoute[] = [], turns?: TurnComposi
   const reuseApplication = withVersionUses(manualApplication, createVersionUses(pool, application.checkOwnedConversation).useVersion);
   const planningApplication = withStoryboardEdits(reuseApplication, createStoryboardEdits(pool, application.checkOwnedConversation).editStoryboard);
   const uploadApplication = withUploads(planningApplication, createUploadCoordinator(pool, application.checkOwnedConversation, { ...(objects ? { storage: objects } : {}), ...(media ? { verifyMedia: createMediaVerifier(media) } : {}) }));
-  const protectedRoutes = [...applicationRoutes(uploadApplication), ...nativeNavigationRoutes(storage, application.checkOwnedConversation), ...routes];
+  const protectedRoutes = [...applicationRoutes(uploadApplication), ...nativeNavigationRoutes(storage, application.checkOwnedConversation, tools), ...routes];
   const policy = createAdmissionPolicy([...protectedRoutes, ...nativeTurnRoutes], config.browserOrigin);
   const mastra = new ResourceMastra({
     storage,
