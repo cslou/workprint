@@ -62,7 +62,12 @@ export function createStoryboardEdits(pool: Pool, checkOwnedConversation: Parame
       const current = await reads.version(account, used.version_id);
       if (base.kind !== 'storyboard' || current.kind !== 'storyboard' || base.artifactId !== current.artifactId || !('content' in base) || !('content' in current)) throw new ArtifactError('not_found');
       if (base.builtIn) throw new ArtifactError('invalid_input');
-      if (base.id !== current.id) throw new ArtifactError('stale_revision');
+      if (base.id !== current.id) {
+        // A lost response can commit between the first replay check and this read.
+        const committed = await replay(pool);
+        if (committed) return committed;
+        throw new ArtifactError('stale_revision');
+      }
       const before = savedStoryboardContentSchema.parse(current.content);
       const content = editedPlan(savedStoryboardContentSchema.parse(base.content), body.shots);
       if (canonicalJson(content) === canonicalJson(before)) throw new ArtifactError('invalid_input');

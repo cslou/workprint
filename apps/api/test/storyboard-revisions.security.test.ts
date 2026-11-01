@@ -123,15 +123,26 @@ test('storyboard edits keep stable Shot/Panel identities, advance one selection 
     assert.ok(racing.some(result => result.status === 'rejected' && (result.reason as { code?: string }).code === 'stale_revision'));
     assert.equal((await store.workspace(owner, conversation)).selectionRevision, 2);
 
-    // Using an earlier plan with a different Shot order is itself an order change; the same order is not.
-    const restored = await uses.useVersion(owner, conversation, { operationId: randomUUID(), versionId: textEdit.version.id, purpose: 'storyboard' });
+    // A failure after the revision advance rolls back every effect of the edit.
+    const winner = (await store.workspace(owner, conversation)).storyboard.work!.version, failing = randomUUID();
+    await query(db.setupUrl, `CREATE FUNCTION artifacts.injected_change_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected journal failure'; END; $$;
+      CREATE TRIGGER injected_change_failure BEFORE INSERT ON artifacts.manual_changes FOR EACH ROW WHEN (NEW.operation_id = '${failing}') EXECUTE FUNCTION artifacts.injected_change_failure()`);
+    const beforeFailure = await fingerprint();
+    await assert.rejects(edits.editStoryboard(owner, conversation, { operationId: failing, baseVersionId: winner.id, shots: shots(['s2', 's3', 's1'], (_shot, panelId) => panelId === 'p2' ? { description: 'Her ticket, torn.', references: [guard.id] } : {}) }), /injected journal failure/);
+    assert.deepEqual(await fingerprint(), beforeFailure, 'No version, use, revision, command or journal survives a failed transaction');
+
+    // Using an earlier plan with a different Shot order is itself an order change, journalled with its affected work; the same version is not.
+    const restored = await uses.useVersion(owner, conversation, { operationId: randomUUID(), versionId: board.id, purpose: 'storyboard' });
     assert.equal(restored.selectionRevision, 3);
-    const same = await uses.useVersion(owner, conversation, { operationId: randomUUID(), versionId: textEdit.version.id, purpose: 'storyboard' });
+    const same = await uses.useVersion(owner, conversation, { operationId: randomUUID(), versionId: board.id, purpose: 'storyboard' });
     assert.equal(same.selectionRevision, 3);
+    const decisions = (await query(db.servingUrl, `SELECT operation_id,previous_version_id,version_id,affected_version_ids,selection_revision::int AS revision FROM artifacts.use_changes c
+      JOIN artifacts.commands USING (owner_id,conversation_id,command_kind,operation_id) WHERE c.version_id='${board.id}' ORDER BY c.created_at`)).rows;
+    assert.deepEqual(decisions.map(row => [row.previous_version_id, row.version_id, row.affected_version_ids, row.revision]), [[winner.id, board.id, [first.id, second.id].sort(), 3], [null, board.id, [], null]]);
+    assert.equal((await query(db.servingUrl, "SELECT count(*)::int AS count FROM artifacts.use_changes WHERE previous_version_id IS NOT NULL AND version_id IN (SELECT version_id FROM artifacts.versions WHERE kind='image')")).rows[0]?.count, 1, 'Approving another Panel image journals the approval it replaced');
 
     const journal = (await query(db.servingUrl, "SELECT version_id,affected_version_ids,selection_revision::int AS revision FROM artifacts.manual_changes WHERE command_kind='edit_storyboard' ORDER BY created_at")).rows;
-    assert.deepEqual(journal.map(row => [row.version_id, row.affected_version_ids, row.revision]).slice(0, 2), [[textEdit.version.id, [first.id, second.id].sort(), null], [reordered.version.id, [], 1]]);
-    assert.equal(journal.length, 3);
+    assert.deepEqual(journal.map(row => [row.version_id, row.affected_version_ids, row.revision]), [[textEdit.version.id, [first.id, second.id].sort(), null], [reordered.version.id, [], 1], [winner.id, [], 2]]);
     assert.equal((await query(db.servingUrl, "SELECT count(*)::int AS count FROM artifacts.commands WHERE command_kind='edit_storyboard'")).rows[0]?.count, 3);
 
     // Upstream manual saves journal the exact dependent plan and the Panel images of every Shot that cites them.
@@ -140,17 +151,18 @@ test('storyboard edits keep stable Shot/Panel identities, advance one selection 
       const saved = await writers.human.save(owner, conversation, { operationId: randomUUID(), artifactId: version.artifactId, baseVersionId: version.id, kind: version.kind as 'script' | 'reference', content, dependencies: [] });
       return (await pool.query<{ affected_version_ids: string[] }>('SELECT affected_version_ids FROM artifacts.manual_changes WHERE version_id=$1', [saved.version.id])).rows[0]?.affected_version_ids;
     };
-    assert.deepEqual(await upstream(ada, { ...reference('Ada'), subject: { ...reference('Ada').subject, description: 'Ada carrying a small case.' } }), [textEdit.version.id, first.id, second.id].sort());
-    assert.deepEqual(await upstream(source, { ...script, scenes: [{ ...script.scenes[0]!, script: [{ action: 'Ada runs for the train.' }] }] }), [textEdit.version.id, first.id, second.id, train.id].sort(), 'A changed source Script has unknown impact on every Shot');
-    assert.equal((await store.workspace(owner, conversation)).storyboard.work?.version.id, textEdit.version.id, 'Upstream saves never rewrite or repin planning');
+    assert.deepEqual(await upstream(ada, { ...reference('Ada'), subject: { ...reference('Ada').subject, description: 'Ada carrying a small case.' } }), [board.id, first.id, second.id].sort());
+    assert.deepEqual(await upstream(source, { ...script, scenes: [{ ...script.scenes[0]!, script: [{ action: 'Ada runs for the train.' }] }] }), [board.id, first.id, second.id, train.id].sort(), 'A changed source Script has unknown impact on every Shot');
+    assert.equal((await store.workspace(owner, conversation)).storyboard.work?.version.id, board.id, 'Upstream saves never rewrite or repin planning');
     assert.equal((await panel('s1', 'p1'))?.approvedImageVersionId, second.id);
 
     // Restricted SQL cannot rewind, skip or erase selection authority.
     for (const sql of [
       'UPDATE artifacts.selection_revisions SET revision=revision+2',
       'UPDATE artifacts.selection_revisions SET revision=1',
-      'DELETE FROM artifacts.selection_revisions',
-    ]) await assert.rejects(query(db.servingUrl, sql), /./);
+    ]) await assert.rejects(query(db.servingUrl, sql), /Selection revisions only advance/);
+    await assert.rejects(query(db.servingUrl, `INSERT INTO artifacts.selection_revisions(owner_id,conversation_id,revision) VALUES('${owner}','${empty}',5)`), /Selection revisions only advance/, 'A first revision cannot skip ahead');
+    await assert.rejects(query(db.servingUrl, 'DELETE FROM artifacts.selection_revisions'), /permission denied/);
     assert.equal((await store.workspace(owner, conversation)).selectionRevision, 3);
     const history = await store.history(owner, board.artifactId);
     assert.deepEqual(history.items.map((version: Version) => version.revision), [4, 3, 2, 1], 'Every saved plan stays in history');
