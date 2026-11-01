@@ -23,7 +23,7 @@ export function Storyboard(props: StoryboardProps) {
 function ScopedStoryboard({ connection, scope, workspace, prerequisites, onSaved }: StoryboardProps) {
   const [refreshed, setRefreshed] = useState<Workspace | null>(null);
   const [drafts, setDrafts] = useState(new Map<string, PlanningDraft>());
-  const [uses, setUses] = useState(new Map<string, OperationResponse<'useVersion'>>());
+  const [uses, setUses] = useState(new Map<string, PanelChoice>());
   const active = useRef(true);
   const latest = useRef(workspace); latest.current = workspace;
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
@@ -46,7 +46,7 @@ function ScopedStoryboard({ connection, scope, workspace, prerequisites, onSaved
     const key = JSON.stringify([base?.id, base?.revision, target]);
     return { value: drafts.get(key) ?? emptyPlanningDraft, onChange: (action: SetStateAction<PlanningDraft>) => setDrafts(previous => { const next = new Map(previous); next.set(key, typeof action === 'function' ? action(previous.get(key) ?? emptyPlanningDraft) : action); return next; }) };
   };
-  const choices = { uses, onUsed: (panelId: string, value: OperationResponse<'useVersion'>) => setUses(previous => { const current = previous.get(panelId); if (current && current.selectionRevision >= value.selectionRevision) return previous; const next = new Map(previous); next.set(panelId, value); return next; }) };
+  const choices = { uses, onUsed: (panelId: string, choice: PanelChoice) => setUses(previous => { const current = previous.get(panelId); if (current && current.value.selectionRevision > choice.value.selectionRevision) return previous; const next = new Map(previous); next.set(panelId, choice); return next; }) };
   return <div className="wp-storyboard">
     <ViewerDialog trigger={<Button variant="secondary"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="7" height="6" rx="1" /><rect x="14" y="4" width="7" height="6" rx="1" /><rect x="3" y="14" width="7" height="6" rx="1" /><rect x="14" y="14" width="7" height="6" rx="1" /></svg>View storyboard</Button>} title={facts?.title ? `Storyboard · ${facts.title}` : 'Storyboard'} size="board">
       <div className="wp-storyboard-board">{rows.map(({ shot, number, panels }) => <section className="wp-board-shot" key={shot.shotId} data-shot-id={shot.shotId}>
@@ -63,15 +63,17 @@ function ScopedStoryboard({ connection, scope, workspace, prerequisites, onSaved
     })}
   </div>;
 }
-type PanelProps = Pick<StoryboardProps, 'connection' | 'scope' | 'workspace'> & { shotId: string; panel: Workspace['storyboard']['shots'][number]['panels'][number]; shotNumber: number; panelNumber: number; facts?: StoryboardPrerequisites; uses: ReadonlyMap<string, OperationResponse<'useVersion'>>; onUsed(panelId: string, value: OperationResponse<'useVersion'>): void };
+type PanelProps = Pick<StoryboardProps, 'connection' | 'scope' | 'workspace'> & { shotId: string; panel: Workspace['storyboard']['shots'][number]['panels'][number]; shotNumber: number; panelNumber: number; facts?: StoryboardPrerequisites; uses: ReadonlyMap<string, PanelChoice>; onUsed(panelId: string, choice: PanelChoice): void };
+/** A Panel-image approval leaves the selection revision unchanged, so a local acknowledgement applies only while the projection it was made against is current. */
+type PanelChoice = { basis: string; value: OperationResponse<'useVersion'> };
 function PanelVersions({ connection, scope, workspace, shotId, panel, shotNumber, panelNumber, facts, uses, onUsed }: PanelProps) {
-  const used = uses.get(panel.panelId);
-  const selected = used && used.selectionRevision > workspace.selectionRevision ? used : null;
+  const used = uses.get(panel.panelId), basis = JSON.stringify([workspace.selectionRevision, panel.approvedImageVersionId]);
+  const selected = used && (used.value.selectionRevision > workspace.selectionRevision || (used.value.selectionRevision === workspace.selectionRevision && used.basis === basis)) ? used.value : null;
   const versions = panel.candidateImageVersions;
   if (new Set(versions.map(version => version.id)).size !== versions.length) return null;
   return <div className="wp-panel-versions">{versions.filter(version => version.kind === 'image').map(version => <ViewerDialog key={version.id} trigger={<Button variant="quiet" aria-label={`View Panel ${shotNumber}.${panelNumber} version ${version.revision}`}>Version {version.revision}</Button>} title={`Panel ${shotNumber}.${panelNumber} · Version ${version.revision}`} size="wide">
     <PanelVersion connection={connection} scope={scope} version={version} caption={`Shot ${shotNumber} · Panel ${shotNumber}.${panelNumber} · Version ${version.revision}`} {...(facts ? { facts } : {})} />
-    <VersionUse connection={connection} scope={scope} version={version} binding={{ purpose: 'panel_image', shotId, panelId: panel.panelId }} currentUse={selected?.use ?? null} selectedVersionId={selected?.use.versionId ?? panel.approvedImageVersionId} selectionRevision={selected?.selectionRevision ?? workspace.selectionRevision} presentation="viewer" onUsed={value => onUsed(panel.panelId, value)} />
+    <VersionUse connection={connection} scope={scope} version={version} binding={{ purpose: 'panel_image', shotId, panelId: panel.panelId }} currentUse={selected?.use ?? null} selectedVersionId={selected?.use.versionId ?? panel.approvedImageVersionId} selectionRevision={selected?.selectionRevision ?? workspace.selectionRevision} presentation="viewer" onUsed={value => onUsed(panel.panelId, { basis, value })} />
   </ViewerDialog>)}</div>;
 }
 function PanelVersion({ connection, scope, version, caption, facts }: { connection: BrowserClient; scope: ReadScope | null; version: Version; caption: string; facts?: StoryboardPrerequisites }) {
