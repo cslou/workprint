@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { readPrivateVideo } from '@workprint/api-client';
 import type { CSSProperties, ReactElement, ReactNode } from 'react';
 import type { OperationResponse, Version } from '@workprint/contracts';
 import { createSingleClipPlayer } from '@workprint/player';
@@ -6,6 +7,7 @@ import type { PlayerSnapshot, PlayerSource } from '@workprint/player';
 import type { BrowserClient } from '../api/client.js';
 import type { ReadScope } from '../api/use-scoped-read.js';
 import { ViewerDialog } from '../ui/overlays.js';
+import { Button } from '../ui/controls.js';
 import { VersionUse } from '../versions/use.js';
 import { useVersionMedia } from './reads.js';
 import './media.css';
@@ -28,6 +30,8 @@ const copy = {
   unauthenticated: 'Sign-in required to load this video.',
   not_implemented: 'Loading this video is not available yet.',
   failed: 'This video could not be loaded. Nothing was changed.',
+  downloading: 'Downloading this exact version…',
+  downloadFailed: 'This video could not be downloaded. Nothing was changed.',
 } as const;
 const failureCopy = (code: string) => code === 'unauthenticated' ? copy.unauthenticated : code === 'not_implemented' ? copy.not_implemented : copy.failed;
 const idleSnapshot: PlayerSnapshot = { status: 'idle', sourceId: null, positionMs: 0, durationMs: null, failure: null };
@@ -40,13 +44,49 @@ export function SingleClipViewer(props: Props) {
   </ViewerDialog>;
 }
 function ClipViewer({ connection, scope, version, caption, binding, currentUse, selectedVersionId, selectionRevision, onUsed }: Props) {
-  const media = useVersionMedia(connection.kind === 'configured' ? connection.client : null, scope, version.id, true);
-  const settled = media.state.kind === 'settled' ? media.state.result : null;
-  const source = settled?.ok && !media.expired ? settled.value : null;
   return <div className="wp-clip-version" data-displayed-version-id={version.id}>
-    {source ? <ClipPlayer source={{ sourceId: version.id, url: source.url, ...(source.poster === undefined ? {} : { posterUrl: source.poster }), ...(source.measured.durationMs === undefined ? {} : { durationMs: source.measured.durationMs }) }} /> : <ClipEmpty>{media.state.kind === 'loading' ? copy.loading : media.expired ? copy.failed : settled && !settled.ok ? failureCopy(settled.error.code) : copy.failed}</ClipEmpty>}
+    <PrivateClip connection={connection} scope={scope} version={version} />
     <p>{caption}</p>
     <VersionUse connection={connection} scope={scope} version={version} binding={binding} currentUse={currentUse} selectedVersionId={selectedVersionId} selectionRevision={selectionRevision} presentation="viewer" onUsed={onUsed} />
+  </div>;
+}
+/**
+ * Private playback and download of one exact video version through its owned media access.
+ * Viewing, playing and downloading never use, choose or export the version.
+ */
+export function PrivateClip({ connection, scope, version }: { connection: BrowserClient; scope: ReadScope | null; version: Version }) {
+  const media = useVersionMedia(connection.kind === 'configured' ? connection.client : null, scope, version.id, true);
+  const settled = media.state.kind === 'settled' ? media.state.result : null;
+  const source = media.source;
+  return <>
+    {source ? <ClipPlayer source={{ sourceId: version.id, url: source.url, ...(source.poster === undefined ? {} : { posterUrl: source.poster }), ...(source.measured.durationMs === undefined ? {} : { durationMs: source.measured.durationMs }) }} /> : <ClipEmpty>{media.state.kind === 'loading' ? copy.loading : media.expired ? copy.failed : settled && !settled.ok ? failureCopy(settled.error.code) : copy.failed}</ClipEmpty>}
+    {source && version.kind === 'video' ? <ClipDownload key={JSON.stringify([version.id, scope?.accountId ?? null, scope?.conversationId ?? null])} url={source.url} version={version} /> : null}
+  </>;
+}
+const extension: Readonly<Record<string, string>> = { 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov' };
+/** Saves the exact version's bytes from the currently held access; it never requests export or new access. */
+function ClipDownload({ url, version }: { url: string; version: Extract<Version, { kind: 'image' | 'video' }> }) {
+  const [phase, setPhase] = useState<'idle' | 'pending' | 'failed'>('idle');
+  const controller = useRef<AbortController | null>(null);
+  useEffect(() => () => controller.current?.abort(), []);
+  const download = async () => {
+    const current = controller.current = new AbortController();
+    setPhase('pending');
+    const result = await readPrivateVideo(url, current.signal, version.media);
+    if (current.signal.aborted) return;
+    controller.current = null;
+    if (!result.ok) { setPhase('failed'); return; }
+    const object = URL.createObjectURL(result.value);
+    const anchor = document.createElement('a');
+    anchor.href = object;
+    anchor.download = `version-${version.revision}.${extension[version.media.contentType] ?? 'video'}`;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(object), 0);
+    setPhase('idle');
+  };
+  return <div className="wp-clip-actions">
+    <Button variant="secondary" isDisabled={phase === 'pending'} onPress={() => void download()}>Download</Button>
+    {phase !== 'idle' && <p role="status">{phase === 'pending' ? copy.downloading : copy.downloadFailed}</p>}
   </div>;
 }
 function ClipEmpty({ children }: { children: ReactNode }) {
@@ -63,10 +103,10 @@ function ClipPlayer({ source }: { source: PlayerSource }) {
     const instance = createSingleClipPlayer(element);
     player.current = instance;
     const unsubscribe = instance.subscribe(setSnapshot);
-    instance.setSource(source);
     return () => { unsubscribe(); instance.dispose(); player.current = null; };
-    // The source identity is the only resubscription key.
-  }, [key]);
+  }, []);
+  // A reacquired URL for the same exact version keeps the player, so position and play state carry over.
+  useEffect(() => { player.current?.setSource(source); }, [key]);
   const ready = snapshot.status === 'ready' || snapshot.status === 'playing' || snapshot.status === 'paused' || snapshot.status === 'ended';
   const duration = snapshot.durationMs ?? 0;
   const position = Math.min(snapshot.positionMs, duration || snapshot.positionMs);

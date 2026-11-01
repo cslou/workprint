@@ -5,9 +5,13 @@ import { useScopedRead, type ReadScope } from '../api/use-scoped-read.js';
 
 export type MediaSource = OperationResponse<'media'>;
 
+/** Reacquire before expiry so a playing source can switch while its current URL still works. */
+const refreshLead = (remainingMs: number) => Math.min(10_000, remainingMs / 2);
+
 /**
  * Exact-version media access. The owning viewer supplies the client and scope;
  * this hook never resolves a version ID or keeps a URL beyond its expiry.
+ * `source` keeps the last unexpired access for the same version and scope while a refresh is pending.
  */
 export function useVersionMedia(client: ApiClient | null, scope: ReadScope | null, versionId: string, open: boolean) {
   const [generation, setGeneration] = useState(0);
@@ -17,6 +21,12 @@ export function useVersionMedia(client: ApiClient | null, scope: ReadScope | nul
   const [expired, setExpired] = useState(false);
   const immediate = useRef(false);
   const scopeKey = JSON.stringify([scope?.accountId ?? null, scope?.conversationId ?? null]);
+  const identity = JSON.stringify([versionId, scopeKey]);
+  const [held, setHeld] = useState<{ identity: string; client: ApiClient; value: MediaSource } | null>(null);
+  useEffect(() => {
+    if (state.kind !== 'settled') return;
+    setHeld(client && state.result.ok && Date.parse(state.result.value.expiresAt) > Date.now() ? { identity, client, value: state.result.value } : null);
+  }, [state, identity, client]);
   // A new viewer/source starts a fresh expiry policy; close and scope changes discard it.
   useEffect(() => { immediate.current = false; setExpired(false); }, [open, versionId, scopeKey]);
   useEffect(() => {
@@ -34,8 +44,12 @@ export function useVersionMedia(client: ApiClient | null, scope: ReadScope | nul
     }
     immediate.current = false;
     setExpired(false);
-    const timer = setTimeout(reacquire, Math.min(expires - Date.now(), 2 ** 31 - 1));
+    const remaining = expires - Date.now();
+    const timer = setTimeout(reacquire, Math.min(remaining - refreshLead(remaining), 2 ** 31 - 1));
     return () => clearTimeout(timer);
   }, [open, state, reacquire, versionId, scopeKey]);
-  return { state, reacquire, expired };
+  const settled = state.kind === 'settled' && state.result.ok ? state.result.value : null;
+  const retained = state.kind === 'loading' && held?.identity === identity && held.client === client && Date.parse(held.value.expiresAt) > Date.now() ? held.value : null;
+  const source = !open || expired ? null : settled ?? retained;
+  return { state, reacquire, expired, source };
 }

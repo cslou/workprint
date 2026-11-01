@@ -16,7 +16,11 @@ export type PlayerSnapshot =
 
 /** One supplied-source player. The web owns the element, markup, access and selection. */
 export interface SingleClipPlayer {
-  /** Replace or clear the supplied source. Events from an earlier source are discarded. */
+  /**
+   * Replace or clear the supplied source. Events from an earlier source are discarded.
+   * A new URL for the same sourceId is reacquired access to the same exact version:
+   * position and play/pause state carry over once the new URL has metadata.
+   */
   setSource(source: PlayerSource | null): void;
   play(): void;
   pause(): void;
@@ -38,6 +42,7 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
   let generation = 0;
   let playAttempt = 0;
   let pauseRequested = false;
+  let resume: { positionMs: number; status: 'ready' | 'playing' | 'paused' | 'ended' } | null = null;
   const listeners = new Set<(value: PlayerSnapshot) => void>();
 
   const emit = () => { for (const listener of [...listeners]) listener(snapshot); };
@@ -61,9 +66,14 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
       case 'error':
         if (media.error) publish({ status: 'failed', sourceId: value.sourceId, positionMs: 0, durationMs: null, failure: 'source' });
         return;
-      case 'loadedmetadata':
-        publish({ status: media.paused ? 'ready' : 'playing', sourceId: value.sourceId, positionMs: position(), durationMs: measuredDuration(value), failure: null });
+      case 'loadedmetadata': {
+        const carried = resume;
+        resume = null;
+        if (carried) media.currentTime = carried.positionMs / 1000;
+        publish({ status: carried ? (carried.status === 'playing' ? 'paused' : carried.status) : media.paused ? 'ready' : 'playing', sourceId: value.sourceId, positionMs: carried?.positionMs ?? position(), durationMs: measuredDuration(value), failure: null });
+        if (carried?.status === 'playing') player.play();
         return;
+      }
       case 'play':
       case 'playing':
         if (pauseRequested) { try { media.pause(); } catch { /* no resource */ } publish({ status: 'paused', sourceId: value.sourceId, positionMs: position(), durationMs: measuredDuration(value), failure: null }); return; }
@@ -90,20 +100,23 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
   media.preload = 'metadata';
   media.controls = false;
 
-  return {
+  const player: SingleClipPlayer = {
     setSource(next) {
       if (disposed) return;
+      const status = snapshot.status;
+      const carried = next && source?.sourceId === next.sourceId && (status === 'ready' || status === 'playing' || status === 'paused' || status === 'ended') ? { positionMs: position(), status } : resume && next && source?.sourceId === next.sourceId ? resume : null;
       generation += 1;
       playAttempt += 1;
       pauseRequested = false;
       source = null;
+      resume = carried;
       release();
       if (!next) { publish(idle); return; }
       source = next;
       if (next.posterUrl !== undefined) media.setAttribute('poster', next.posterUrl);
       media.setAttribute('src', next.url);
       try { media.load(); } catch { /* a supplied URL that cannot load reports through the error event */ }
-      publish({ status: 'loading', sourceId: next.sourceId, positionMs: 0, durationMs: normalizeDuration(next.durationMs) ?? null, failure: null });
+      publish({ status: 'loading', sourceId: next.sourceId, positionMs: carried?.positionMs ?? 0, durationMs: normalizeDuration(next.durationMs) ?? null, failure: null });
     },
     play() {
       const value = currentSource();
@@ -111,6 +124,7 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
       const token = ++playAttempt;
       const sourceGeneration = generation;
       pauseRequested = false;
+      if (resume) resume = { ...resume, status: 'playing' };
       void media.play().catch((error: unknown) => {
         if (disposed || token !== playAttempt || sourceGeneration !== generation || !currentSource() || snapshot.status === 'failed') return;
         if (error instanceof DOMException && error.name === 'NotAllowedError') { observe(new Event('pause')); return; }
@@ -122,6 +136,7 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
       if (!currentSource()) return;
       playAttempt += 1;
       pauseRequested = true;
+      if (resume?.status === 'playing') resume = { ...resume, status: 'paused' };
       try { media.pause(); } catch { /* no media resource to pause */ }
       if (snapshot.status === 'ready' || snapshot.status === 'playing') publish({ status: 'paused', sourceId: source!.sourceId, positionMs: position(), durationMs: measuredDuration(source!), failure: null });
     },
@@ -144,10 +159,12 @@ export function createSingleClipPlayer(media: HTMLVideoElement): SingleClipPlaye
       generation += 1;
       playAttempt += 1;
       source = null;
+      resume = null;
       release();
       for (const name of mediaEvents) media.removeEventListener(name, observe);
       listeners.clear();
       snapshot = idle;
     },
   };
+  return player;
 }
