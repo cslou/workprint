@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { test, expect } from '../material-network.js';
@@ -10,7 +11,7 @@ import type { OperationRequest, OperationResponse } from '../../../packages/cont
 import type { query as Query } from '../../../apps/api/test/postgres.js';
 
 test.use({ trace: 'off', video: 'off' });
-test('real private image and qualified saved-video poster inspection grants no approval; reference edits retain exact images through conflict and lost response', async ({ page, materialNetwork }) => {
+test('real private image inspection and saved-video playback/download grant no approval; reference edits retain exact images through conflict and lost response', async ({ page, materialNetwork }) => {
   test.setTimeout(240000);
   const { createLibraryMediaFixture } = await import(pathToFileURL(resolve('apps/api/.test-build/test/library-media-work.js')).href) as { createLibraryMediaFixture: typeof Fixture };
   const { query } = await import(pathToFileURL(resolve('apps/api/.test-build/test/postgres.js')).href) as { query: typeof Query };
@@ -30,21 +31,54 @@ test('real private image and qualified saved-video poster inspection grants no a
         await page.goto('/saved-work.html'); await page.waitForFunction(() => !!(window as unknown as { savedWorkTest?: unknown }).savedWorkTest);
         await page.evaluate(input => (window as unknown as { savedWorkTest: { configure(input: unknown): void } }).savedWorkTest.configure(input), { apiOrigin: target.origin, token: target.accessTokens[0]!, accountId: saved.accountId, conversationId: saved.conversationId });
       };
+      const videoAccess: OperationResponse<'media'>[] = [];
       await page.route(url => url.origin === target.origin && [saved.image.id, saved.video.id].some(id => url.pathname === `/v1/versions/${id}/media`), async route => {
         const response = await route.fetch(); expect(response.status()).toBe(200);
         const access = await response.json() as OperationResponse<'media'>;
-        materialNetwork.expectObjectTransfer(access.poster ?? access.url, 1, 'GET'); await route.fulfill({ response });
+        if (access.poster) {
+          // Playback reads browser-chosen byte ranges, then Download reads the whole object once.
+          videoAccess.push(access); materialNetwork.expectObjectTransfer(access.url, 2, 'GET', 6); materialNetwork.expectObjectTransfer(access.poster, 1, 'GET', 1);
+        } else materialNetwork.expectObjectTransfer(access.url, 1, 'GET');
+        await route.fulfill({ response });
       });
+      const objectResponses: { url: string; status: number; range: string | null }[] = [];
+      page.on('response', response => { if (new URL(response.url()).searchParams.has('X-Amz-Signature')) objectResponses.push({ url: response.url(), status: response.status(), range: response.headers()['content-range'] ?? null }); });
+      // An uploaded video plays without a Script/Shot plan: decoded picture and embedded audio, ranged private transport, exact download bytes.
+      const playAndDownload = async (byteSize: number) => {
+        const clip = page.locator('.wp-clip-media');
+        await expect(page.locator('.wp-clip-surface[data-ready="true"]')).toHaveCount(1);
+        expect(await clip.evaluate(node => [(node as HTMLVideoElement).videoWidth, (node as HTMLVideoElement).videoHeight])).toEqual([320, 180]);
+        await page.getByRole('button', { name: 'Play', exact: true }).click();
+        await expect.poll(() => clip.evaluate(node => { const video = node as HTMLVideoElement & { webkitAudioDecodedByteCount: number }; return video.getVideoPlaybackQuality().totalVideoFrames > 0 && video.webkitAudioDecodedByteCount > 0; }), { timeout: 10000 }).toBe(true);
+        await expect.poll(() => page.locator('.wp-clip-surface').getAttribute('data-player-status')).toBe('ended');
+        await page.getByRole('slider', { name: 'Seek' }).fill('500');
+        await expect.poll(() => clip.evaluate(node => (node as HTMLVideoElement).currentTime)).toBeCloseTo(0.5, 1);
+        const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download', exact: true }).click()]);
+        expect(download.suggestedFilename()).toBe('version-1.mp4');
+        expect(createHash('sha256').update(await readFile(await download.path())).digest('hex')).toBe(createHash('sha256').update(media.videoBytes).digest('hex'));
+        const access = videoAccess.at(-1)!;
+        const transfers = objectResponses.filter(response => response.url === access.url);
+        expect(transfers.some(response => response.status === 206 && new RegExp(`^bytes \\d+-\\d+/${byteSize}$`).test(response.range ?? '')), 'Playback reads private byte ranges').toBe(true);
+        const slice = await fetch(access.url, { headers: { Range: 'bytes=100-199' } });
+        expect([slice.status, slice.headers.get('content-range')]).toEqual([206, `bytes 100-199/${byteSize}`]);
+        expect(Buffer.from(await slice.arrayBuffer()).equals(media.videoBytes.subarray(100, 200))).toBe(true);
+        const unsigned = new URL(access.url); unsigned.search = '';
+        const denied = await fetch(unsigned); await denied.body?.cancel();
+        expect(denied.status).toBe(403);
+        await expect(page.getByText('Playing or downloading does not use this version or choose it for a Shot.', { exact: true })).toBeVisible();
+      };
       await configure(); allow('GET', '/v1/library'); await page.getByRole('button', { name: 'Library', exact: true }).click();
       for (const version of [saved.image, saved.video]) {
         assert.ok('media' in version);
         allow('GET', `/v1/versions/${version.id}`); allow('GET', `/v1/versions/${version.id}/media`);
         const tile = page.locator(`[data-page-id="${version.artifactId}"]`).locator('..');
         await tile.getByRole('button', { name: /^Inspect / }).click();
-        const image = page.getByRole('img', { name: version.kind === 'video' ? 'Saved video poster' : 'Saved image', exact: true });
-        await expect(image).toHaveAttribute('src', /^blob:/); await expect(image).toBeVisible(); await expect(page.locator('video')).toHaveCount(0);
-        expect(await image.evaluate(node => ({ width: (node as HTMLImageElement).naturalWidth, height: (node as HTMLImageElement).naturalHeight }))).toEqual({ width: version.media.width, height: version.media.height });
-        if (version.kind === 'video') await expect(page.getByText('Poster-only inspection.', { exact: false })).toBeVisible();
+        if (version.kind === 'video') await playAndDownload(version.media.byteSize);
+        else {
+          const image = page.getByRole('img', { name: 'Saved image', exact: true });
+          await expect(image).toHaveAttribute('src', /^blob:/); await expect(image).toBeVisible(); await expect(page.locator('video')).toHaveCount(0);
+          expect(await image.evaluate(node => ({ width: (node as HTMLImageElement).naturalWidth, height: (node as HTMLImageElement).naturalHeight }))).toEqual({ width: version.media.width, height: version.media.height });
+        }
         await page.getByRole('button', { name: 'Back to Library', exact: true }).click();
         await expect(tile.getByRole('button', { name: /^Inspect / })).toBeFocused();
       }
