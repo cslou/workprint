@@ -15,7 +15,16 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
   - Lou chose Muse Spark for now (2026-11-01): `muse-spark-1.3`, which Meta lists as recommended for new work and as supporting tool calling. Keep the model swappable, since Lou plans to switch it later.
   - One backend and one Mastra instance; native threads stay the conversation store.
   - The key stays server-only.
-  - Raise the current turn limits deliberately rather than removing them.
+  - Raise the current turn limits deliberately rather than removing them:
+    - a long overall turn deadline that covers a video tool's 30-minute poll (B-025)
+    - short per-model-call deadlines
+    - an output cap large enough for a full script
+    - a step cap (for example 20 steps) so a looping agent stops
+  - One active turn per video, with no queue in the MVP (B-026 is Later). While the agent is busy, the composer says so and Send is unavailable; it is not silently dropped.
+  - Configuration:
+    - The root `.env` holds `META_API_KEY`. Mastra documents `META_MODEL_API_KEY` for its `meta/` provider.
+    - Map the key explicitly on the server; never rename or print it.
+  - Testing: the send path has no surviving tests. Use a test-only scripted model for deterministic browser tests (it is never in the production build), plus a few live calls.
   - Kept from Sprint 006 Stories 1–2 and 4:
     - A missing or invalid model configuration makes zero provider calls.
     - No hidden retries or model fallbacks.
@@ -31,12 +40,17 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 ### B-021 — Stream replies and show tool activity in the chat
 - Problem: Without streaming, a long agent turn looks frozen. demo-02 also shows tool steps as they happen ("Writing the script… Wrote the script · 3 shots"), which B-012's text-only plan does not cover.
 - Outcome: Reply text appears as it streams, and each tool call shows a short in-progress line and then a done line. The chat shows sending, streaming, completed, interrupted and failed states honestly. Switching video or account mid-stream drops the late events, so nothing renders in the wrong video. Pass: a reply with a tool call streams text and shows the tool line live; reload shows the saved result.
+- Constraint:
+  - Each tool supplies its own short in-progress and done labels; for example, update-script returns "3 shots".
+  - Long tools show elapsed time, for example "Generating video… 2 min" (B-025).
+  - Tool lines must survive a reload, so confirm on the installed Mastra version that tool calls are saved with the assistant message.
+- Test: a test-only scripted model calls a tool. The test holds the tool open and asserts the in-progress line, releases it and asserts the done line and the streamed text, then reloads and asserts both are still shown.
 - References: [Sprint 006](sprints/sprint-006.md) Story 2 states and scope rules; `docs/design/demo-02.html`; B-012.
 
 ### B-022 — Stop the agent's reply
 - Problem: An agent loop that calls paid tools needs a way to stop it. Sprint 006 Story 3 plans an exact-turn Stop, bundled with queue and reconnect work the MVP doesn't need.
-- Outcome: A Stop button ends the current agent turn. The UI settles within a bounded time and says "stopped" only when the stop is confirmed, or "unknown" otherwise. Stop never cancels background generation jobs (B-025). Pass: Stop mid-reply ends streaming within the bound, the partial reply is saved or marked interrupted, and a running video job continues.
-- Constraint: Stopping the turn does not promise that remote work or charges stopped.
+- Outcome: A Stop button ends the current agent turn, including any tool still waiting. The UI settles within a bounded time and says "stopped" only when the stop is confirmed, or "unknown" otherwise. Pass: Stop mid-reply ends streaming within the bound, and the partial reply is saved or marked interrupted. Stop during video generation ends the polling, and the saved MiniMax task stays on record so it can be resumed (B-025).
+- Constraint: Stop does not cancel the provider's task. MiniMax may still finish and charge, and an in-flight Meta image may still be billed. The UI never claims remote work or charges stopped.
 - References: [Sprint 006](sprints/sprint-006.md) Story 3 Stop criteria (five-second acknowledgment cap, ten-second local settlement); the exact-turn control from Sprint 004.
 
 ### B-023 — Agent reads the video's current work
@@ -49,7 +63,7 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 
 ### B-013 — Agent tool: update the video's script
 - Problem: The Script tab can only show and manually edit saved scripts. The agent has no way to write one.
-- Outcome: An update-script tool, in its own directory, saves a new assistant-made script version for the current video/thread. The user sees the Script tab update to match. Pass: the database holds the new version and the Script tab shows it.
+- Outcome: An update-script tool, in its own directory, saves a new assistant-made script version for the current video/thread and makes it the video's current script as a draft (not approved) workspace use. The user sees the Script tab update to match. Pass: the database holds the new version and the Script tab shows it.
 - Constraint: The saved version is a draft, not an approval. Turn the animation-studio skill's instructions into the tool's description and the agent's guidance rather than copying its local file workflow. The skill's Scene Script YAML schema differs from Workprint's saved script content, so the mapping needs a decision.
 - References:
   - `~/projects/animation-studio/.pi/skills/create-scene-script/SKILL.md` and `references/scene-script-schema.md`: Lou's create-script skill.
@@ -58,12 +72,12 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 
 ### B-024 — Workspace tabs update when the agent saves
 - Problem: The Script, Assets, Storyboard and Videos tabs refresh only on reload or after the user's own saves. Every pass condition that says "user sees … updated" (B-013, B-015, B-017 to B-020) depends on this.
-- Outcome: After a tool saves or a background job finishes, the affected tab re-reads the authoritative workspace and shows the new version. Same-video drafts and unsaved manual edits are kept. Pass: the agent updates the script, and the Script tab shows it without a reload while an open manual edit survives.
+- Outcome: When the stream reports a saving tool's result (B-021), and again when the turn ends, the browser re-reads the authoritative workspace and the affected tab shows the new version. No new push channel is needed. Same-video drafts and unsaved manual edits are kept. Pass: the agent updates the script, and the Script tab shows it without a reload while an open manual edit survives.
 - References: `apps/web/src/shell/workspace.ts`; B-011 (the related first-read recovery); spec P3-S9 and P4-S14.
 
 ### B-014 — Agent tool: AskUserQuestion with options in the UI
 - Problem: The question card UI and contract exist (`questionSchema`, `apps/web/src/conversation/question.tsx`). The agent cannot ask a question yet, and answers cannot reach the agent.
-- Outcome: The agent calls AskUserQuestion with a prompt and options. The turn waits, and the UI shows the question as in demo-02: question N of M, lettered options, plus "type your own answer". The user's choice goes back to the agent, which continues with it. Pass: the options appear in the UI, and choosing one resumes the agent with that answer.
+- Outcome: The agent calls AskUserQuestion with one or more questions, each with options. The tool saves them and the turn ends. The UI shows the question as in demo-02: question N of M, lettered options, plus "type your own answer". The user's choice is sent as their next message, carrying the exact question and option ids (and asset ids, B-016). The agent continues from that message. A typed answer is an ordinary message. Pass: the options appear in the UI, and choosing one resumes the agent with that answer.
 - Constraint: Kept from Sprint 007 Stories 1–2:
   - Pending questions load from saved records.
   - Answering is idempotent: a repeated answer has no extra effect, and a stale or already-answered question cannot be answered again.
@@ -86,6 +100,10 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
     - $0.01 per image
   - Confirm the real response shape with one live call before writing the parser.
   - The key stays server-only.
+  - Request `output_format: png` or `jpeg`. Meta defaults to WebP, but private storage accepts only `image/png` and `image/jpeg` (`supabase/migrations/20261031000000_private_uploads.sql`).
+  - Our storage is private, so input images go to Meta as base64 data URLs, never as public links.
+  - The chat history stores only the saved image's id; the chat renders it through the owned image read (`apps/web/src/api/use-owned-image.ts`). Never put base64 in messages.
+  - Generated images pass the same verification as uploads before they are saved.
 - Constraint: No user authorization before paid calls in the MVP (Lou, 2026-11-01); added later in B-030.
 - References:
   - [Meta image generation](https://dev.meta.ai/docs/image-generation).
@@ -108,24 +126,44 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 ### B-018 — Agent makes the storyboard from the script
 - Problem: Storyboard reads and manual edits exist (`apps/api/src/artifacts/storyboard.ts`, `apps/web/src/storyboard/`), but the agent cannot plan shots or make panels.
 - Outcome: The agent plans shots from the current script version, then creates each panel's image through B-015 using the selected reference sheets. It saves a storyboard version linked to that script and those references. Pass: the Storyboard tab shows the planned shots with generated panel images.
-- Constraint: Built as tools that the agent loop calls, with the skill's steps written into the agent's guidance (Lou, 2026-11-01). Converting them to workflows can be decided later.
+- Constraint:
+  - Built as tools that the agent loop calls, with the skill's steps written into the agent's guidance (Lou, 2026-11-01). Converting them to workflows can be decided later.
+  - The saved storyboard schema requires its source script version, and panel references must be reference versions (`apps/api/src/artifacts/content.ts`), so panels can only cite saved reference sheets (B-017).
+  - Panels are generated one image call at a time, each shown as it finishes (B-021).
 - References: `~/projects/animation-studio/.pi/skills/create-storyboard/SKILL.md` with `references/panel-generation-strategy.md` and `storyboard-schema.md`; B-013, B-015, B-017.
 
-### B-025 — Run generation jobs outside the chat turn, with status
-- Problem: MiniMax video generation takes minutes, which is far past any reasonable turn timeout. If the tool waits inside the turn, the turn times out or a Stop kills the job. Sprint 007 Story 3 plans a generation-status view but no jobs that would fill it.
-- Outcome: A generation tool starts a background job (a Mastra workflow, using the execution Sprint 004 already proved) and returns at once. The job's saved status (queued, running, done, failed) shows in the Videos tab and survives reload. On completion the result is stored and the tab updates (B-024). Pass: start a video, keep chatting or Stop the reply, and the video still arrives with its status visible throughout.
+### B-025 — Long video generation waits in the tool, with a saved task and resume
+- Problem: MiniMax video takes about 1–5 minutes. The tool must wait for it without losing a paid task on Stop, disconnect or restart.
+- Outcome: Following the Pi `generate-video` pattern (Lou, 2026-11-01), the tool:
+  1. submits to MiniMax
+  2. saves the task id in a generation record before polling
+  3. polls about every 10 seconds, with a 30-minute deadline
+  4. downloads, verifies and stores the video
+  5. marks the record done or failed, then returns the video to the agent
+
+  The turn stays open throughout, and the chat shows "Generating video… N min" (B-021). One call may submit several shots and poll them in parallel. Pass:
+  - A video started in chat arrives, and the agent continues with it.
+  - Closing the browser does not stop it; Sprint 004 made disconnect end only the viewing.
+  - After a server restart mid-poll, the same saved task resumes and nothing is resubmitted.
 - Constraint:
-  - Status comes only from saved records, with no invented progress percentage.
-  - Polling is bounded and stops when the view closes.
-  - An uncertain provider submission is marked failed with an unknown outcome, never silently resubmitted.
-- References: [Sprint 007](sprints/sprint-007.md) Story 3; spec "Submission and recovery contract" and P3-S18/S19; `packages/contracts` `generationRequestSchema`.
+  - No background workflow in the MVP. The user cannot chat during generation, which is accepted (Lou, 2026-11-01); queueing is B-026.
+  - Never resubmit a paid task to recover. An uncertain submission with no task id is marked failed with an unknown outcome.
+  - MiniMax result URLs are time-limited and may carry credentials, so never persist or log them; query the task again for a fresh URL. Tasks are queryable only for 7 days.
+  - The Videos tab shows the record's saved status (queued, running, done, failed) after a reload, with no invented progress.
+- References:
+  - `~/projects/animation-studio/.pi/skills/generate-video/SKILL.md` (submit → save manifest → poll → download → validate, plus `--resume-manifest`).
+  - `references/minimax-video-v2.md`.
+  - [Sprint 007](sprints/sprint-007.md) Story 3 (generation records); `packages/contracts` `generationRequestSchema`.
 
 ### B-019 — Agent tool: generate a video with MiniMax
 - Problem: The Videos tab and player exist, but nothing produces a generated video.
-- Outcome: A generate-video tool takes a prompt and one or more images (uploads or storyboard panels) and starts a MiniMax job. It waits for the result, stores the video, and shows it in the Videos tab. Pass: the generated video is stored, appears in Videos and plays.
+- Outcome: A generate-video tool takes a prompt and up to two images (first and last frame, from uploads or storyboard panels) and starts a MiniMax Video V2 task. It waits for the result as in B-025, stores the video, and shows it in the Videos tab. Pass: the generated video is stored, appears in Videos and plays.
 - Constraint:
   - Lou chose MiniMax for now (2026-11-01); Meta's API has no video generation, only video understanding.
-  - Generation is asynchronous, so the job runs in the background (B-025), survives a long wait and reports failure honestly.
+  - Waiting, resume and failure handling follow B-025.
+  - Frames go to MiniMax as data URLs, because storage is private.
+  - Use one fixed resolution and frame rate for every shot, so B-020 can join clips without re-encoding.
+  - The result must pass the Sprint 005 media verification (`video/mp4`) before it is saved and playable.
   - Confirm the real response shape with one live call before writing the parser. The key stays server-only.
 - Constraint: No user authorization before paid calls in the MVP (Lou, 2026-11-01); added later in B-030.
 - References: `~/projects/animation-studio/.pi/skills/generate-video/SKILL.md` and `references/minimax-video-v2.md` (MiniMax Video Generation V2, up to two endpoint frames); `apps/web/src/videos/`; `packages/player`.
@@ -133,7 +171,10 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 ### B-020 — Agent tool: join videos together
 - Problem: There is no way to combine generated clips into one video.
 - Outcome: A join-videos tool combines an ordered set of the user's stored videos into a new video. The new video is stored and shown in the Videos tab, and the originals are kept. Pass: the joined video plays in Videos in the requested order.
-- Constraint: This is the agent's assembly tool. Export and download stay in B-009.
+- Constraint:
+  - This is the agent's assembly tool. Export and download stay in B-009.
+  - Stream-copy joining needs matching codec, resolution and frame rate, so incompatible clips fail with a clear message rather than being re-encoded in the MVP.
+  - Run ffmpeg inside the existing bounded media sandbox, and verify the output like any other video.
 - References: `~/projects/animation-studio/.pi/skills/assemble-video/SKILL.md` (stream-copy joining with compatibility checks) and `.pi/lib/ffmpeg.mjs`; `apps/api/src/storage/media/sandbox.ts` (the existing ffmpeg sandbox); B-019.
 
 ## In progress
@@ -146,6 +187,15 @@ Deprioritized: everything here waits until the Next items are done (Lou, 2026-11
 - Problem: Sprint 006 Story 3 planned letting the user send up to three more messages while a reply streams, kept in order. Lou does not need it for the MVP but wants it tracked (2026-11-01).
 - Outcome: Messages typed during a reply queue in order with distinct identities. Overflow is rejected before any extra model call, and an unclear queue acknowledgment never resends.
 - References: [Sprint 006](sprints/sprint-006.md) Story 3.
+
+### B-032 — Run video generation in the background so chat stays free
+- Problem: In the MVP the video tool waits inside the turn (B-025), so the user cannot chat for 1–5 minutes per video. Lou accepted this for the MVP and wants a better approach afterwards (2026-11-01).
+- Outcome: The tool starts an independent job and returns at once. The job's saved status shows in Videos, and the agent learns of the result without the user having to ask.
+- Constraint:
+  - Reuse the Mastra workflow execution that Sprint 004 qualified; no second scheduler.
+  - Stop and disconnect never cancel the job.
+  - Telling the agent that a job finished is the hard part. It needs a saved-report and acknowledgment design.
+- References: B-025; spec "Submission and recovery contract", P3-S18/S19 and P4-S9/S14; B-026, B-029.
 
 ### B-027 — Reconnect to an in-progress reply after reload
 - Problem: Sprint 006 Story 3 planned re-attaching to a still-running turn after a reload or reconnect, inside the native three-second replay window. The MVP shows the saved result instead.
