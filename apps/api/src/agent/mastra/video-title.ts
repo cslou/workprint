@@ -16,10 +16,10 @@ type StreamCall = (options: {
 /** One line without a `Title:` label, wrapping quotes or bold, or a trailing full stop; at most `titleLength` characters. */
 export function cleanTitle(raw: string): string {
   let line = raw.replace(/\s+/g, ' ').trim(), previous = '';
-  // Unwrap until stable, so `"Title".` and `**Title**` both become `Title`. Apostrophes stay: `The Boys'`.
+  // Unwrap matching pairs until stable, so `"Title".` and `**Title**` both become `Title`. Straight single quotes stay, being apostrophes as often: `'Tis the Boys'`.
   while (line !== previous) {
     previous = line;
-    line = line.replace(/^title:\s*/i, '').replace(/^(\*\*|__)(.*)\1$/, '$2').replace(/^["“‘'](.*)["”’']$/, '$1').replace(/\.$/, '').trim();
+    line = line.replace(/^title:\s*/i, '').replace(/^(\*\*|__)(.*)\1$/, '$2').replace(/^(?:"(.*)"|“(.*)”|‘(.*)’)$/, '$1$2$3').replace(/\.$/, '').trim();
   }
   // Whole characters as people see them, so an emoji or accented letter is never cut in half.
   const characters = [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(line)].map(part => part.segment);
@@ -63,7 +63,7 @@ export function createVideoTitler(model: NativeTurnModel, storage: MastraComposi
         if (next.done) break;
         if (next.value.type === 'error') throw new Error('Video title call failed');
         if (next.value.type === 'text-delta' && typeof next.value.delta === 'string') text += next.value.delta;
-        if (next.value.type === 'finish') finishReason = next.value.finishReason;
+        if (next.value.type === 'finish') finishReason = typeof next.value.finishReason === 'object' && next.value.finishReason !== null ? (next.value.finishReason as { unified?: unknown }).unified : next.value.finishReason;
       }
       const title = cleanTitle(text);
       if (!title) {

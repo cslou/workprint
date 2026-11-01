@@ -39,6 +39,8 @@ test('a title is one line without quotes or a full stop, at most 60 characters',
   assert.equal(cleanTitle('"Night swim".'), 'Night swim');
   assert.equal(cleanTitle('Title: **Night swim**'), 'Night swim');
   assert.equal(cleanTitle("The Boys'"), "The Boys'");
+  assert.equal(cleanTitle(`"Rock" and 'Roll'`), `"Rock" and 'Roll'`, 'only a matching pair is unwrapped');
+  assert.equal(cleanTitle("'Tis the Boys'"), "'Tis the Boys'");
   // A family emoji is one character people see; it is kept whole or dropped, never split.
   const family = '\u{1F469}\u200D\u{1F469}\u200D\u{1F467}';
   assert.equal(cleanTitle(`${'a'.repeat(59)}${family}b`), `${'a'.repeat(59)}${family}`);
