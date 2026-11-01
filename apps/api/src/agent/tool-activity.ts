@@ -1,4 +1,5 @@
 import type { AgentTool } from './tools/index.js';
+import { graphemes } from './graphemes.js';
 
 /** Shown for a registered tool that defines no activity phrase. */
 export const genericToolPhrase = 'Working…';
@@ -22,5 +23,6 @@ export function projectToolActivity(registry: readonly AgentTool[], call: { tool
   let summary: string | undefined;
   try { summary = tool.doneSummary(call.output); } catch { summary = undefined; }
   const flat = typeof summary === 'string' ? summary.replace(/\s+/g, ' ').trim() : '';
-  return flat ? { ...activity, summary: flat.length <= summaryCharacters ? flat : `${flat.slice(0, summaryCharacters - 1)}…` } : activity;
+  const characters = graphemes(flat);
+  return flat ? { ...activity, summary: characters.length <= summaryCharacters ? flat : `${characters.slice(0, summaryCharacters - 1).join('')}…` } : activity;
 }

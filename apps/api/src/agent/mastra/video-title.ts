@@ -1,5 +1,6 @@
 import type { MastraCompositeStore } from '@mastra/core/storage';
 import { titleProviderOptions, type NativeTurnModel, type TitleProviderOptions } from './model.js';
+import { graphemes } from '../graphemes.js';
 
 /** The title call's only instructions; also how a scripted provider tells a title request from a turn. */
 export const titleInstructions = 'Name this short video from the filmmaker’s message in at most six words. Reply with the title only, no quotes.';
@@ -22,8 +23,7 @@ export function cleanTitle(raw: string): string {
     previous = line;
     line = line.replace(/^title:\s*/i, '').replace(/^(\*\*|__)(.*)\1$/, '$2').replace(/^(?:"(.*)"|“(.*)”|‘(.*)’)$/, '$1$2$3').replace(/\.$/, '').trim();
   }
-  // Whole characters as people see them, so an emoji or accented letter is never cut in half.
-  const characters = [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(line)].map(part => part.segment);
+  const characters = graphemes(line);
   return characters.length <= titleLength ? line : characters.slice(0, titleLength).join('').trimEnd();
 }
 
