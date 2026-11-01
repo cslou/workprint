@@ -192,7 +192,7 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
         const settled = result as { ok: boolean; value: unknown };
         assert.equal(settled.ok, true, 'Owned Library read settles successfully');
         assert.ok(operations.library.response.safeParse(settled.value).success);
-      } else if (name === 'workspace' || name === 'artifactVersions' || name === 'version' || name === 'requestUpload' || name === 'confirmUpload' || name === 'media') {
+      } else if (name === 'workspace' || name === 'artifactVersions' || name === 'version' || name === 'requestUpload' || name === 'confirmUpload' || name === 'media' || name === 'useVersion' || name === 'editStoryboard') {
         assert.deepEqual(result, { ok: false, error: { code: 'not_found', message: 'Saved work not found' } }, 'Unknown and foreign reads share their denial');
       } else if (name === 'saveVersion') {
         assert.deepEqual(result, { ok: false, error: { code: 'invalid_input', message: 'Invalid saved-work request' } }, 'Unsupported initial/empty save creates no effects');

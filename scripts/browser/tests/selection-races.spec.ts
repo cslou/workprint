@@ -25,3 +25,14 @@ test('Panel choice is shared by every exact-version viewer', async ({ page }) =>
   await page.getByRole('button', { name: 'View Panel 1.1 version 1', exact: true }).click();
   await expect(page.locator('[data-current-version-id]')).toHaveAttribute('data-current-version-id', 'panel-image-v2');
 });
+test('Panel-image approval at an unchanged selection revision shows the exact choice until the projection changes', async ({ page }) => {
+  await page.goto('/selection-races.html'); await page.waitForFunction(() => !!(window as unknown as Harness).selectionRace);
+  await page.evaluate(() => (window as unknown as Harness).selectionRace.configure('panel'));
+  await page.getByRole('button', { name: 'View Panel 1.1 version 2', exact: true }).click();
+  await page.getByRole('button', { name: 'Use this version', exact: true }).click();
+  await page.evaluate(() => (window as unknown as Harness).selectionRace.complete('panel-image-v2', 9));
+  await expect(page.locator('[data-current-version-id]')).toHaveAttribute('data-current-version-id', 'panel-image-v2');
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'View Panel 1.1 version 1', exact: true }).click();
+  await expect(page.locator('[data-current-version-id]')).toHaveAttribute('data-current-version-id', 'panel-image-v2');
+});

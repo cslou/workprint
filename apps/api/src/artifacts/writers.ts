@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
-import { idSchema, operations, useSchema, type OperationRequest, type OperationResponse, type Version } from '@workprint/contracts';
+import { idSchema, operations, savedStoryboardContentSchema, useSchema, type OperationRequest, type OperationResponse, type Version } from '@workprint/contracts';
 import { transaction } from '../db/index.js';
 import { parseContent, assertContentDependencies } from './content.js';
 import { ArtifactError } from './errors.js';
@@ -8,6 +8,7 @@ import { assertManualTextChange, canonicalJson } from './manual-content.js';
 import { publishVersion } from './publication.js';
 import { createArtifactStore } from './store.js';
 import { requireReferenceMedia } from './references.js';
+import { affectedVersions, changedShots, upstreamAffected } from './selection.js';
 
 type Command = OperationRequest<'saveVersion'>['body'];
 type Result = OperationResponse<'saveVersion'>;
@@ -56,6 +57,7 @@ export function createArtifactWriters(pool: Pool, checkOwnedConversation: OwnedC
       await requireReferenceMedia(pool, content);
       if (producer === 'human') assertManualTextChange(base, content, body.dependencies);
       let intended: { use_id: string; version_id: string } | undefined;
+      let planChange: ReadonlySet<string> | undefined;
       if (body.intendedUse) {
         const matches = (await pool.query<{ use_id: string; version_id: string }>(`SELECT u.use_id,u.version_id FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.owner_id AND v.version_id=u.version_id
           WHERE u.owner_id=$1 AND u.conversation_id=$2 AND u.binding=$3::jsonb AND v.artifact_id=$4 LIMIT 2`, [account, conversation, body.intendedUse, body.artifactId])).rows;
@@ -65,6 +67,7 @@ export function createArtifactWriters(pool: Pool, checkOwnedConversation: OwnedC
         const used = await reads.version(account, intended.version_id);
         // Promoting a structural planning draft would bypass later selection-revision rules.
         if (body.kind === 'storyboard') assertManualTextChange(used, content, body.dependencies);
+        if (body.kind === 'storyboard' && 'content' in used) planChange = changedShots(savedStoryboardContentSchema.parse(used.content), savedStoryboardContentSchema.parse(content));
       }
 
       return transaction(pool, async client => {
@@ -88,7 +91,11 @@ export function createArtifactWriters(pool: Pool, checkOwnedConversation: OwnedC
         }
         const result: Result = { version, ...(use ? { use } : {}) };
         await client.query('INSERT INTO artifacts.commands(owner_id,conversation_id,command_kind,operation_id,payload_hash,result) VALUES($1,$2,$3,$4,$5,$6)', [...scope, hash, result]);
-        if (producer === 'human') await client.query('INSERT INTO artifacts.manual_changes(owner_id,change_id,conversation_id,operation_id,previous_version_id,version_id,use_id,previous_use_version_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8)', [account, randomUUID(), conversation, body.operationId, base.id, version.id, use?.id ?? null, previousUseVersion]);
+        if (producer === 'human') {
+          // Journal exact downstream work needing revalidation; nothing is regenerated or moved.
+          const affected = planChange ? await affectedVersions(client, account, conversation, planChange) : await upstreamAffected(client, account, conversation, base.id);
+          await client.query('INSERT INTO artifacts.manual_changes(owner_id,change_id,conversation_id,operation_id,previous_version_id,version_id,use_id,previous_use_version_id,affected_version_ids) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)', [account, randomUUID(), conversation, body.operationId, base.id, version.id, use?.id ?? null, previousUseVersion, affected]);
+        }
         return result;
       });
     },
