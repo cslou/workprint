@@ -1,13 +1,15 @@
 import type { ClientResult } from './types.js';
 import type { NativeObservedTurn, NativeTextDelta } from './native-types.js';
 import { failed, nativeTransportLimits, object, uuid } from './native-transport.js';
+import { isToolActivity, type NativeToolActivityChunk } from './native-activity.js';
 
 /** Per-observation decoder state only, never a stored turn/status or ownership ledger. */
-export function nativeOutcome(expectedRunId: string, onText: (part: NativeTextDelta) => void) {
+export function nativeOutcome(expectedRunId: string, onText: (part: NativeTextDelta) => void, onActivity?: (activity: NativeToolActivityChunk) => void) {
   let messageId: string | undefined, started = false, bytes = 0;
   const interrupted = (): ClientResult<NativeObservedTurn> => ({ ok: true, value: { outcome: 'interrupted', runId: expectedRunId, ...(messageId ? { assistantMessageId: messageId } : {}) } });
-  const error = (value: unknown) => object(value) && value.name === 'MastraTimeoutError'
-    ? failed('timed_out', 'Native execution deadline exceeded') : failed('integration_failure', 'Native execution failed');
+  // The server ended the turn: an outcome, distinct from losing the observation.
+  const ended = (reason: 'error' | 'deadline' | 'rejected'): ClientResult<NativeObservedTurn> => ({ ok: true, value: { outcome: 'failed', runId: expectedRunId, reason } });
+  const error = (value: unknown) => ended(object(value) && value.name === 'MastraTimeoutError' ? 'deadline' : 'error');
   const chunk = (value: unknown): ClientResult<NativeObservedTurn> | undefined => {
     if (!object(value) || value.runId !== expectedRunId) return;
     const payload = value.payload;
@@ -19,14 +21,19 @@ export function nativeOutcome(expectedRunId: string, onText: (part: NativeTextDe
       bytes += new TextEncoder().encode(payload.text).byteLength;
       if (bytes > nativeTransportLimits.outputBytes) return failed('invalid_response', 'Native output limit exceeded');
       onText({ runId: expectedRunId, text: payload.text });
+    } else if (value.type === 'tool-activity') {
+      if (!started || !isToolActivity(payload)) return failed('invalid_response', 'Invalid native tool activity');
+      onActivity?.({ ...payload, runId: expectedRunId });
     } else if (value.type === 'abort') return interrupted();
     else if (value.type === 'finish') {
       const step = object(payload) ? payload.stepResult : undefined;
       if (object(step) && step.reason === 'abort') return interrupted();
-      if (!started || !messageId || !object(step) || step.reason !== 'stop' || step.messageId !== messageId) return failed('invalid_response', 'Native response did not complete');
+      if (!started || !messageId || !object(step) || typeof step.reason !== 'string' || step.messageId !== messageId) return failed('invalid_response', 'Native response did not complete');
+      // A well-formed finish that is not a stop (for example the output cap) is the server ending the turn.
+      if (step.reason !== 'stop') return ended('error');
       return { ok: true, value: { outcome: 'complete', runId: expectedRunId, assistantMessageId: messageId } };
     } else if (value.type === 'error') return error(object(payload) ? payload.error : undefined);
-    else if (value.type === 'tripwire') return failed('integration_failure', 'Native output rejected or interrupted');
+    else if (value.type === 'tripwire') return ended('rejected');
     return undefined;
   };
   const event = (value: unknown): ClientResult<NativeObservedTurn> | undefined => {
@@ -34,6 +41,7 @@ export function nativeOutcome(expectedRunId: string, onText: (part: NativeTextDe
     const data = value.data;
     if (value.type === 'finish') return chunk({ type: 'finish', runId: value.runId, payload: { stepResult: object(data) ? data.stepResult : undefined } });
     if (value.type === 'error') return error(object(data) ? data.error : undefined);
+    if (value.type === 'abort') return interrupted();
     if (object(data) && typeof data.type === 'string') {
       if (data.runId !== undefined && data.runId !== expectedRunId) return failed('invalid_response', 'Mismatched native execution identity');
       return chunk(data);

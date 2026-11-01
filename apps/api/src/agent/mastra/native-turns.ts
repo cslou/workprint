@@ -1,40 +1,89 @@
 import type { Mastra } from '@mastra/core';
 import { Agent } from '@mastra/core/agent';
-import type { MastraModelConfig } from '@mastra/core/llm';
-import { TokenLimiterProcessor, type Processor } from '@mastra/core/processors';
+import type { Processor } from '@mastra/core/processors';
+import { stepLimitReason, type TurnLimits } from '../limits.js';
+import type { AgentCollaborators, AgentTool } from '../tools/index.js';
+import type { NativeTurnModel } from './model.js';
 import { createNativeTextMemory } from './native-text-memory.js';
+import { withStallLimit } from './stall-limit.js';
+import { createVideoTitler, type NameVideo } from './video-title.js';
+import { nativeTools } from './tools.js';
 
 export const nativeAssistantId = 'assistant';
-export const nativeTurnLimits = Object.freeze({ inputBytes: 8192, estimatedOutputTokens: 64, firstContentMs: 3000, modelCallMs: 7000, executionMs: 8000, cleanupMs: 3000 });
-export type NativeTurnModel = Extract<MastraModelConfig, { specificationVersion: 'v2' | 'v3' | 'v4' }>;
-const bindings = new WeakSet<Mastra>();
+
+/** Everything a turn needs, supplied once by composition. */
+export interface NativeTurns {
+  readonly model: NativeTurnModel;
+  readonly tools: readonly AgentTool[];
+  readonly limits: TurnLimits;
+  readonly collaborators: AgentCollaborators;
+}
+
+/** Static, so the provider's automatic prefix caching holds: no workspace state, no timestamps. */
+export const systemPrompt = [
+  'You are the Workprint assistant. You help one filmmaker plan and make a short video in this conversation.',
+  'Answer clearly and briefly. Use a tool when it helps answer from the video\'s real saved work.',
+  'Never claim a tool\'s result before it has finished, and never invent saved work you have not read.',
+].join('\n');
+
+// What each Mastra instance was bound with: its tools, so stream and history redaction use the same phrases,
+// and its video titler.
+const bindings = new WeakMap<Mastra, { tools: readonly AgentTool[]; nameVideo: NameVideo }>();
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 
-/** Native normalizes incomplete provider EOF to stop; require the actual LLM terminal chunk first. */
-const completedText = {
-  id: 'native-completed-text',
-  processLLMResponse({ chunks, abort }) {
-    const finish = chunks.find(chunk => chunk.type === 'step-finish');
-    if (!finish || !object(finish.payload) || !object(finish.payload.stepResult) || finish.payload.stepResult.reason !== 'stop') abort('Native response did not complete');
-  },
-} satisfies Processor;
+/**
+ * Native normalizes an incomplete provider EOF to stop, so require the LLM's own terminal chunk.
+ * A tool-call end continues the loop, except on the final allowed step, which fails the turn.
+ */
+function completedSteps(maxSteps: number) {
+  return {
+    id: 'native-completed-steps',
+    processLLMResponse({ chunks, stepNumber, abort }) {
+      const finish = chunks.find(chunk => chunk.type === 'step-finish');
+      const reason = finish && object(finish.payload) && object(finish.payload.stepResult) ? finish.payload.stepResult.reason : undefined;
+      if (reason === 'tool-calls') {
+        if (stepNumber + 1 >= maxSteps) abort(stepLimitReason);
+        return;
+      }
+      if (reason !== 'stop') abort('Native response did not complete');
+    },
+  } satisfies Processor;
+}
 
-/** Only trusted composition supplies a model object. No environment/key/provider discovery. */
-export function bindNativeTurns(mastra: Mastra, model: NativeTurnModel) {
+/** Only trusted composition supplies the model, tools and limits. No environment/key/provider discovery. */
+export function bindNativeTurns(mastra: Mastra, turns: NativeTurns) {
   if (bindings.has(mastra)) throw new Error('Native assistant already bound');
   const storage = mastra.getStorage();
   if (!storage) throw new Error('Native assistant storage unavailable');
-  const memory = createNativeTextMemory(storage);
+  const { limits } = turns;
   mastra.addAgent(new Agent({
-    id: nativeAssistantId, name: 'Assistant', instructions: 'Return only a text response. Do not use tools.', model, memory, maxRetries: 0,
-    inputProcessors: [completedText], outputProcessors: [new TokenLimiterProcessor({ limit: nativeTurnLimits.estimatedOutputTokens, strategy: 'abort' })],
+    id: nativeAssistantId, name: 'Assistant', instructions: systemPrompt,
+    model: withStallLimit(turns.model, limits.stallMs),
+    memory: createNativeTextMemory(storage), maxRetries: 0,
+    // Zero automatic provider retries: drop Mastra's default retry and request-repair error processors.
+    errorProcessorDefaults: false,
+    tools: nativeTools(turns.tools, turns.collaborators),
+    inputProcessors: [completedSteps(limits.maxSteps)],
     defaultOptions: {
-      maxSteps: 1,
-      modelSettings: { maxOutputTokens: nativeTurnLimits.estimatedOutputTokens, timeout: { totalMs: nativeTurnLimits.executionMs, stepMs: nativeTurnLimits.modelCallMs, firstChunkMs: nativeTurnLimits.firstContentMs } },
+      maxSteps: limits.maxSteps,
+      modelSettings: { maxOutputTokens: limits.maxOutputTokens, maxRetries: 0, timeout: { totalMs: limits.turnMs } },
     },
-    durable: { cleanupTimeoutMs: nativeTurnLimits.cleanupMs },
+    durable: { cleanupTimeoutMs: limits.cleanupMs },
   }));
-  bindings.add(mastra);
+  bindings.set(mastra, { tools: turns.tools, nameVideo: createVideoTitler(turns.model, storage, limits) });
 }
 
 export function hasNativeTurns(mastra: Mastra) { return bindings.has(mastra); }
+
+/** The tools bound to this instance; none when turns are not bound. */
+export function nativeToolRegistry(mastra: Mastra): readonly AgentTool[] { return bindings.get(mastra)?.tools ?? []; }
+
+/** After an accepted send: name the video from its message if it has no title yet. Never rejects. */
+export function nameVideo(mastra: Mastra, accountId: string, videoId: string, message: string): Promise<void> {
+  return bindings.get(mastra)?.nameVideo(accountId, videoId, message) ?? Promise.resolve();
+}
+
+/** The thread's active run in this process, if any. One active turn per video. */
+export function activeNativeRun(mastra: Mastra, accountId: string, videoId: string): string | undefined {
+  return mastra.getAgent(nativeAssistantId).getActiveThreadRunId({ resourceId: accountId, threadId: videoId });
+}

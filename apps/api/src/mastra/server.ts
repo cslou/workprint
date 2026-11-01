@@ -5,7 +5,9 @@ import { MastraServer, type HonoVariables } from '@mastra/hono';
 import { Hono, type MiddlewareHandler } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { timeout } from 'hono/timeout';
+import { createAssistantModel } from '../agent/index.js';
 import { createBackend } from './backend.js';
+import { loadServerConfig } from './config.js';
 import { createIngress } from './ingress.js';
 import { installServerShutdown } from './shutdown.js';
 
@@ -63,5 +65,6 @@ export async function startServer(mastra: Mastra, beforeMastra: readonly Middlew
 }
 
 if (import.meta.main) {
-  await startServer(await createBackend());
+  const { assistant } = loadServerConfig(process.env);
+  await startServer(await createBackend([], { model: createAssistantModel(assistant) }));
 }

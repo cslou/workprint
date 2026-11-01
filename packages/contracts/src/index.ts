@@ -5,11 +5,11 @@ export * from './saved-content.js';
 export * from './response-limits.js';
 export * from './upload-limits.js';
 
-export const errorCodeSchema = z.enum(['unauthenticated', 'forbidden', 'not_found', 'invalid_input', 'stale_revision', 'superseded', 'unsupported', 'not_implemented', 'integration_failure']);
+export const errorCodeSchema = z.enum(['unauthenticated', 'forbidden', 'not_found', 'invalid_input', 'stale_revision', 'superseded', 'unsupported', 'not_implemented', 'integration_failure', 'busy']);
 export const errorEnvelopeSchema = z.strictObject({ error: z.strictObject({ code: errorCodeSchema, message: z.string().min(1), details: z.strictObject({ issues: z.array(z.strictObject({ path: z.array(z.union([z.string(), z.number()])), message: z.string() })).optional(), ids: z.array(idSchema).optional() }).optional() }) });
 export type ErrorCode = z.infer<typeof errorCodeSchema>;
 export type ErrorEnvelope = z.infer<typeof errorEnvelopeSchema>;
-export const errorStatus: Readonly<Record<ErrorCode, number>> = { unauthenticated: 401, forbidden: 403, not_found: 404, invalid_input: 400, stale_revision: 409, superseded: 409, unsupported: 422, not_implemented: 501, integration_failure: 503 };
+export const errorStatus: Readonly<Record<ErrorCode, number>> = { unauthenticated: 401, forbidden: 403, not_found: 404, invalid_input: 400, stale_revision: 409, superseded: 409, unsupported: 422, not_implemented: 501, integration_failure: 503, busy: 409 };
 export function applicationError(code: ErrorCode, message: string): ErrorEnvelope { return { error: { code, message } }; }
 
 const empty = z.strictObject({});

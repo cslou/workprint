@@ -25,7 +25,13 @@ test('owned native create/list/history is bounded, account-exact and read-only o
     }
     assert.equal(new Set(ids).size, 8);
   });
-  await t.test('bounded native pages traverse all owned records without creating', async () => {
+  await t.test('a created thread with no accepted message is not listed', async () => {
+    const listed = await request('?page=0&perPage=50'); assert.equal(listed.status, 200);
+    assert.deepEqual(listed.value.threads, []); assert.equal(listed.value.total, 0);
+  });
+  const started: string[] = [];
+  for (let i = 0; i < 8; i++) started.push((await fixture.saveNative(users[0]!.id)).id);
+  await t.test('bounded native pages traverse all started owned records without creating', async () => {
     const before = await fixture.snapshot(); const seen: string[] = [];
     for (const page of [0, 1, 2]) {
       const response = await request(`?page=${page}&perPage=3`); assert.equal(response.status, 200);
@@ -33,7 +39,7 @@ test('owned native create/list/history is bounded, account-exact and read-only o
       assert.equal(value.page, page); assert.equal(value.total, 8); assert.equal(value.perPage, 3); assert.equal(value.hasMore, page < 2);
       assert.ok(value.threads.every(thread => thread.resourceId === users[0]!.id)); seen.push(...value.threads.map(thread => thread.id));
     }
-    assert.deepEqual([...seen].sort(), [...ids].sort()); assert.equal(await fixture.snapshot(), before);
+    assert.deepEqual([...seen].sort(), [...started].sort()); assert.equal(await fixture.snapshot(), before);
     const empty = await request('?page=0&perPage=3', 'GET', undefined, 1); assert.deepEqual(empty.value.threads, []);
   });
   const history = await fixture.saveNative(users[0]!.id, Array.from({ length: 9 }, (_, index) => ({ role: index % 2 ? 'assistant' as const : 'user' as const, text: `Exact saved message ${index} <b>text only</b>` })), 'Exact saved history');

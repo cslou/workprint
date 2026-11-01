@@ -1,0 +1,187 @@
+{
+  "observed": "2026-11-01",
+  "model": "meta/muse-spark-1.3",
+  "shapes": {
+    "send": [
+      {
+        "type": "start",
+        "payloadKeys": [
+          "messageId"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "finish",
+        "payloadKeys": [
+          "stepResult"
+        ],
+        "reason": "stop"
+      }
+    ],
+    "tool": [
+      {
+        "type": "start",
+        "payloadKeys": [
+          "messageId"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "phrase",
+          "state",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "test-echo",
+        "state": "running"
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "phrase",
+          "state",
+          "summary",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "test-echo",
+        "state": "done"
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "finish",
+        "payloadKeys": [
+          "stepResult"
+        ],
+        "reason": "stop"
+      }
+    ],
+    "read-workspace": [
+      {
+        "type": "start",
+        "payloadKeys": [
+          "messageId"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "phrase",
+          "state",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "read-workspace",
+        "state": "running"
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "phrase",
+          "state",
+          "summary",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "read-workspace",
+        "state": "done"
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "finish",
+        "payloadKeys": [
+          "stepResult"
+        ],
+        "reason": "stop"
+      }
+    ],
+    "stop": [
+      {
+        "type": "start",
+        "payloadKeys": [
+          "messageId"
+        ]
+      },
+      {
+        "type": "abort",
+        "payloadKeys": []
+      }
+    ]
+  }
+}

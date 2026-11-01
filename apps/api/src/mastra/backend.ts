@@ -2,8 +2,8 @@ import { ResourceMastra } from './resources.js';
 import { registerApiRoute, type ApiRoute } from '@mastra/core/server';
 import { PostgresStore } from '@mastra/pg';
 import { Pool } from 'pg';
-import { createOwnedConversationCheck, bindNativeTurns, type NativeTurnModel } from '../agent/index.js';
-import { createApplication, withSavedWork, withManualSaves, withVersionUses, withStoryboardEdits, withUploads } from '../application/index.js';
+import { createOwnedConversationCheck, bindNativeTurns, productionTools, turnLimits, type AgentCollaborators, type AgentTool, type NativeTurnModel, type TurnLimits } from '../agent/index.js';
+import { createApplication, createWorkspaceReader, withSavedWork, withManualSaves, withVersionUses, withStoryboardEdits, withUploads } from '../application/index.js';
 import { createArtifactStore, createArtifactWriters, createVersionUses, createStoryboardEdits, createMediaVerifier, createUploadCoordinator } from '../artifacts/index.js';
 import { configuredMediaSandbox, configuredObjectStorage } from '../storage/index.js';
 import { assertRestrictedRole } from '../db/index.js';
@@ -15,8 +15,15 @@ import { createAdmissionPolicy, decorateCors } from './admission.js';
 import { nativeNavigationRoutes } from './native-navigation.js';
 import { nativeTurnRoutes, isNativeTurnRoute } from './native-turns.js';
 
+/** Turn composition. Production supplies only the model; a test composition may add tools and override limits. */
+export interface TurnComposition {
+  readonly model: NativeTurnModel;
+  readonly tools?: readonly AgentTool[];
+  readonly limits?: TurnLimits;
+}
+
 /** One backend: cataloged application routes plus explicit test-composition additions. */
-export async function createBackend(routes: ApiRoute[] = [], turnModel?: NativeTurnModel) {
+export async function createBackend(routes: ApiRoute[] = [], turns?: TurnComposition) {
   const config = loadServerConfig(process.env);
   const objects = configuredObjectStorage(process.env);
   const media = await configuredMediaSandbox(process.env).catch(error => { objects?.close(); throw error; });
@@ -38,14 +45,16 @@ export async function createBackend(routes: ApiRoute[] = [], turnModel?: NativeT
     objects?.close(); await media?.close(); await pool.end();
     throw new Error('Serving storage unavailable or privileged; prepare storage separately and use restricted DATABASE_URL');
   }
+  const tools = turns ? turns.tools ?? productionTools : [];
   const storage = new PostgresStore({ id: 'workprint-native', schemaName: 'mastra', disableInit: true, pool });
   const application = createApplication({ checkOwnedConversation: createOwnedConversationCheck(storage) });
-  const savedApplication = withSavedWork(application, createArtifactStore(pool, application.checkOwnedConversation));
+  const savedWork = createArtifactStore(pool, application.checkOwnedConversation);
+  const savedApplication = withSavedWork(application, savedWork);
   const manualApplication = withManualSaves(savedApplication, createArtifactWriters(pool, application.checkOwnedConversation).human.save);
   const reuseApplication = withVersionUses(manualApplication, createVersionUses(pool, application.checkOwnedConversation).useVersion);
   const planningApplication = withStoryboardEdits(reuseApplication, createStoryboardEdits(pool, application.checkOwnedConversation).editStoryboard);
   const uploadApplication = withUploads(planningApplication, createUploadCoordinator(pool, application.checkOwnedConversation, { ...(objects ? { storage: objects } : {}), ...(media ? { verifyMedia: createMediaVerifier(media) } : {}) }));
-  const protectedRoutes = [...applicationRoutes(uploadApplication), ...nativeNavigationRoutes(storage, application.checkOwnedConversation), ...routes];
+  const protectedRoutes = [...applicationRoutes(uploadApplication), ...nativeNavigationRoutes(storage, application.checkOwnedConversation, tools), ...routes];
   const policy = createAdmissionPolicy([...protectedRoutes, ...nativeTurnRoutes], config.browserOrigin);
   const mastra = new ResourceMastra({
     storage,
@@ -60,7 +69,7 @@ export async function createBackend(routes: ApiRoute[] = [], turnModel?: NativeT
         // With no qualified native catalog, retain the terminal custom fallback.
         // A native composition relies on mandatory pre-Mastra closed admission;
         // a nested custom wildcard cannot fall through to native adapter routes.
-        ...(turnModel ? [] : [registerApiRoute('/*', {
+        ...(turns ? [] : [registerApiRoute('/*', {
           method: 'ALL',
           handler: (context) => context.json({ error: { code: 'not_found', message: 'Not found' } }, 404),
         })]),
@@ -96,6 +105,10 @@ export async function createBackend(routes: ApiRoute[] = [], turnModel?: NativeT
       }],
     },
   }, { before: async () => { try { await media?.close(); } finally { objects?.close(); } }, after: async () => { if (!pool.ended) await pool.end(); } });
-  if (turnModel) bindNativeTurns(mastra, turnModel);
+  if (turns) {
+    // Application functions that tools may call, each over the same owned reads as the HTTP boundary.
+    const collaborators: AgentCollaborators = { readWorkspace: createWorkspaceReader(savedWork) };
+    bindNativeTurns(mastra, { model: turns.model, tools, limits: turns.limits ?? turnLimits, collaborators });
+  }
   return mastra;
 }

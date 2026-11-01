@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chat state · Reply failed</title>
+<link rel="stylesheet" href="../app-r11.css">
+<style>
+/* Sprint 006 chat states. Inert preview: no script, nothing is sent. */
+.state-note{font-size:13px;color:var(--fg-subtle);display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px}
+.state-note p{margin:0}
+.state-note button,.unconfirmed button{height:32px;padding:0 14px;border-radius:9999px;border:1px solid var(--border-strong);background:var(--raised);color:var(--fg);font:inherit;font-size:13px;font-weight:600}
+.unconfirmed{width:min(680px,calc(100% - 32px));margin:0 auto 12px;display:grid;gap:8px;font-size:13px;color:var(--fg-muted)}
+.unconfirmed p{margin:0}
+.unconfirmed div{display:flex;flex-wrap:wrap;gap:8px}
+.reply{font-size:14px;max-width:100%}
+.reply p{margin:0}
+.composer .field.locked{color:var(--fg-muted)}
+</style>
+</head>
+<body>
+<div class="app">
+ <nav class="sidebar" aria-label="Workprint">
+  <span class="brand"><span class="mark">a</span><span class="name">Workprint</span></span>
+  <div class="navlist"><span class="navitem">New video</span><span class="navitem">Library</span></div>
+  <div class="section"><div class="navlabel">Recents</div><span class="navitem recent current" aria-current="page">Untitled video</span></div>
+  <div class="spacer"></div>
+  <div class="account"><span class="avatar">A</span>Account</div>
+ </nav>
+ <main class="main" aria-label="Reply failed">
+  <div class="thread chat">
+   <div class="msgs">
+    <div class="me">Vale and Mercer on the gallery bench. Start wide on the two of them sitting.</div>
+    <div class="reply"><p>Here's a first pass at the script. We open wide on the bench, with Vale on the left and</p>
+     <div class="state-note"><p role="status">Something went wrong and this reply didn’t finish.</p><button type="button" disabled>Retry</button></div></div>
+   </div>
+  </div>
+  <div class="composer">
+   <div class="field">Describe your video…</div>
+   <div class="bar"><span>+ Attach photos</span><button class="send" type="button">Send</button></div>
+  </div>
+  <p style="width:min(680px,calc(100% - 32px));margin:-14px auto 24px;font-size:13px;color:var(--fg-subtle)">JPEG or PNG only · Up to 10 MiB · 4096 × 4096 pixels.</p>
+ </main>
+</div>
+</body>
+</html>

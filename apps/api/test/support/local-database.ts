@@ -13,7 +13,8 @@ const stopped = new Promise<void>((resolve) => {
   process.on('SIGTERM', resolve);
 });
 const db = await isolatedPostgres();
-const contents = `DATABASE_URL=${db.servingUrl}\nMIGRATION_DATABASE_URL=${db.setupUrl}\nDEFAULT_ASSISTANT_MODEL=unqualified/disabled\n`;
+// Database settings only; `pnpm dev` layers this file over the root .env for the model and keys.
+const contents = `DATABASE_URL=${db.servingUrl}\nMIGRATION_DATABASE_URL=${db.setupUrl}\n`;
 let written = false;
 let keepAlive: ReturnType<typeof setInterval> | undefined;
 try {

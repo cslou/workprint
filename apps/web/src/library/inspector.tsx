@@ -25,7 +25,8 @@ export function LibraryInspector({ connection, scope, version, selection, close 
   const history = useSyncExternalStore(pages?.subscribe ?? subscribeIdle, pages?.getSnapshot ?? getIdle);
   useEffect(() => { if (pages) { void pages.start(); return pages.dispose; } }, [pages]);
   const binding = useMemo(() => ({ ...bindingFor(requested), ...(bindingFor(requested).purpose === 'reference' && role.trim() ? { role: role.trim() } : {}) }), [requested, role]);
-  const command = useMemo(() => selection.exactUse(requested, binding), [selection, requested, binding]);
+  // A New video gets its id on its first accepted send; a fresh command then targets that id.
+  const command = useMemo(() => selection.exactUse(requested, binding), [selection, requested, binding, scope?.conversationId]);
   const state = useSyncExternalStore(command.subscribe, command.getSnapshot);
   const locked = state.phase === 'pending' || state.phase === 'unknown';
   useEffect(() => () => command.stop(), [command]);

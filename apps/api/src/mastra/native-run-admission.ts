@@ -3,7 +3,7 @@ import type { Context } from 'hono';
 import type { CheckOwnedConversation } from '../application/index.js';
 import { hasNativeTurns, nativeAssistantId } from '../agent/index.js';
 
-export const nativeControlRoutes = ['queue-message', 'threads/abort', 'observe'].map(tail => ({ method: 'POST' as const, path: `/api/agents/${nativeAssistantId}/${tail}` }));
+export const nativeControlRoutes = ['threads/abort', 'observe'].map(tail => ({ method: 'POST' as const, path: `/api/agents/${nativeAssistantId}/${tail}` }));
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 const uuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 

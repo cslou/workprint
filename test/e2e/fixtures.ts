@@ -7,6 +7,8 @@ import { previewOrigin, previewPort } from './origin.js';
 import type * as AppFixture from '../../apps/api/test/support/account-browser-fixture.js';
 import type * as MediaWork from '../../apps/api/test/support/library-media-work.js';
 import type * as Processes from '../../apps/api/test/support/process.js';
+import type * as Provider from '../../apps/api/test/support/scripted-provider.js';
+import type * as Chat from '../../apps/api/test/support/chat-composition.js';
 import type { SavedWorkSetup } from '../../apps/api/test/support/auth-built-fixture.js';
 
 // Fixtures are compiled by `node scripts/test.mjs compile`; Playwright loads the emitted modules.
@@ -17,11 +19,16 @@ const loopback = new Set(['127.0.0.1', 'localhost', '[::1]']);
 
 export type Account = { id: string; email: string; password: string; nextPassword: string };
 
-/** One backend for the worker on the shared test stack (Postgres, Auth, object storage, media): API and the built web app. */
+/**
+ * One backend for the worker on the shared test stack (Postgres, Auth, object storage, media): API and the built web app.
+ * Muse Spark is routed to one scripted provider, which chat journeys script per test.
+ */
 async function startBackend() {
   const { accountBrowserFixture } = await loadSupport<typeof AppFixture>('account-browser-fixture');
   const { createLibraryMediaFixture } = await loadSupport<typeof MediaWork>('library-media-work');
   const { command, start } = await loadSupport<typeof Processes>('process');
+  const { scriptedProvider } = await loadSupport<typeof Provider>('scripted-provider');
+  const { chatComposition } = await loadSupport<typeof Chat>('chat-composition');
   const cleanups: (() => unknown)[] = [];
   const close = async () => {
     const errors: unknown[] = [];
@@ -29,8 +36,9 @@ async function startBackend() {
     if (errors.length) throw new AggregateError(errors, 'End-to-end backend cleanup failed');
   };
   try {
+    const provider = await scriptedProvider(); cleanups.push(provider.close);
     const media = await createLibraryMediaFixture(); cleanups.push(media.close);
-    const app = await accountBrowserFixture({ artifacts: true, storage: media.configuration, media: media.media, serverLifetimeMs: suiteLifetimeMs }, previewOrigin);
+    const app = await accountBrowserFixture({ artifacts: true, storage: media.configuration, media: media.media, serverLifetimeMs: suiteLifetimeMs, composition: chatComposition(provider) }, previewOrigin);
     cleanups.push(app.close);
     const logs = await mkdtemp(join(tmpdir(), 'workprint-e2e-')); cleanups.push(() => rm(logs, { recursive: true, force: true }));
     const env = { PATH: process.env.PATH, HOME: process.env.HOME, WORKPRINT_PUBLIC_SUPABASE_URL: app.auth.url, WORKPRINT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: app.auth.anonKey, WORKPRINT_PUBLIC_API_ORIGIN: app.apiOrigin };
@@ -40,7 +48,7 @@ async function startBackend() {
     cleanups.push(web.stop);
     await web.response(previewOrigin);
     return {
-      app, media, close,
+      app, media, provider, close,
       accounts: (count: number) => Promise.all(Array.from({ length: count }, () => app.auth.createAccount())) as Promise<Account[]>,
       setup: (accounts: readonly Account[]): SavedWorkSetup => ({ accountIds: accounts.map(account => account.id), native: app.native, servingUrl: app.servingUrl, setupUrl: app.setupUrl }),
       /** Read an owned API operation as the account, for asserting persisted state. */

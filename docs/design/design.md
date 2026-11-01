@@ -385,6 +385,13 @@ Each component has the same anchor here and on the [Components page](brand-book/
 - **Done state** (`.done`): a 13px tan tick, then the past tense, for example "Made 3 reference sheets".
 - **Links:** a line that changed a tab links to it (`title="Open Assets"`). Lines that changed no tab are plain text.
 - Keep each line to about 60 characters, with one result per line.
+- **Chat (Sprint 006 Story 3):** the server supplies each tool's phrase and done summary; the browser hard-codes none.
+  - Lines sit inside the assistant's reply, in the order they happened, between its text.
+  - A running line shows the phrase, then `· 12s` elapsed time in tabular figures. Elapsed time appears only while this page watches the tool run.
+  - A tool with no phrase shows "Working…".
+  - A done line with no summary shows "Done".
+  - A tool that failed, or never finished, shows its phrase without the ellipsis, then "· didn’t finish". It claims no result.
+  - Saved history keeps done and didn't-finish lines, with no elapsed time.
 
 ### Chat box
 
@@ -399,11 +406,29 @@ Each component has the same anchor here and on the [Components page](brand-book/
 | Idle, empty | Placeholder "Describe your video…"; Send disabled | — |
 | Typed | Text in `--color-text-primary`; Send enabled | Enter sends |
 | With attachments | Attachment chips above the text: 28px image, name, a type in 11px and × | Remove with × |
-| Agent working | Field reads "Type to add something; I'll pick it up when I'm done…"; the bar shows a pulsing dot with "Working…" and **Stop** | Typing is queued for the agent's next turn. Stop ends the turn |
+| Agent working | The bar shows a pulsing dot with "Working…" and **Stop** in Send's place; Stop is pressed once per turn | You can keep typing a draft, but nothing is queued: one turn per video. A send the server finds busy keeps the draft and shows "The agent is still working on the last message." Stop ends the turn |
 | Question docked | The [question card](#question-card) grows on top, inside the same outline | Typing answers the question, or asks something else and leaves it waiting |
 | Question folded | A "1 question waiting · Show" pill sits above the box | Show reopens the question |
 
 **Never** change the box's colour, swap it for another field, or rename Send.
+
+### Chat states
+
+Inert previews: [`chat-states/`](chat-states/index.html) at 1440 and 390 (Sprint 006). Approved under Lou's delegation on 2026-11-01; Lou ratifies them at QA. They are simple and ChatGPT-like: one line of 13px `--color-text-secondary` text, and at most two secondary buttons.
+
+| State | Where | Copy | Actions |
+| --- | --- | --- | --- |
+| Reply failed | Under the reply, after any text that streamed | "Something went wrong and this reply didn’t finish." | **Retry**, once: it sends the same message again |
+| Reply interrupted | Under the reply | "This reply was interrupted." | **Retry**, once |
+| Reply stopped | Under the reply, after **Stop**, once the server acknowledged the Stop and the reply ended interrupted | "Stopped." | **Retry**, once |
+| Stop unacknowledged | Under the reply, after **Stop**, when the reply ended interrupted but the server did not acknowledge the Stop | "We couldn’t confirm the reply stopped." | **Retry**, once |
+| Stop unconfirmed | Under the reply, when this page stopped hearing the reply after **Stop**, or it did not end within about 8 s of the click (the chat stops watching; it never sends a second Stop) | "We couldn’t confirm the reply stopped." | None: the reply may still be running |
+| Reply lost | Under the reply, when this page stops hearing it (the server may still finish it) | "We lost track of this reply. It may still finish; reload to see it." | None: a Retry could duplicate a reply that is still running |
+| Send unconfirmed | Above the chat box; the draft stays in the box, read-only, and Send is unavailable | "We couldn’t confirm your message was sent." While history is re-read: "Checking whether your message was sent…" with both buttons unavailable | **Check again** (reads history only) and **Send anyway** (may send it twice) |
+| Send rejected | Under the chat box; the draft stays | "Your message wasn’t sent. It’s still here, so you can try again." | Send |
+| Too long | Under the chat box; Send is unavailable | "Messages can be up to 32 KB. Shorten this one to send it." | — |
+
+Copy never says a message was delivered, or a reply stopped, when that is unknown, and never claims the provider stopped work or charges. Closing the page or switching video stops watching only; it never sends a Stop. Saved history shows a failed or interrupted reply as its plain text, without the notice.
 
 ### Question card
 
@@ -1013,8 +1038,8 @@ These states have not been designed. They are listed so they are not mistaken fo
 
 | Category | Status |
 | --- | --- |
-| Generation failed, provider error, timeout | **Not designed** |
-| Network lost or reconnecting; a turn interrupted by Stop | **Not designed** |
+| Generation failed, provider error, timeout | Chat replies: designed in [Chat states](#chat-states). Media generation: **not designed** |
+| Network lost or reconnecting; a turn interrupted by Stop | Interrupted reply: designed in [Chat states](#chat-states). Reconnecting to a running reply: **not designed** (B-027) |
 | Cost, balance and spending limits | **Not designed.** Costs are hidden in the mockups by decision |
 | Upload validation (wrong type, too large) | **Not designed** |
 | Long content (10+ shots, long names, long dialogue) | **Not checked** |

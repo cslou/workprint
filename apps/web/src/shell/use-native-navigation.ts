@@ -3,7 +3,8 @@ import type { ClientError, NativeThread, NativeThreads, NativeMessages } from '@
 import type { BrowserClient } from '../api/client.js';
 
 type Message = NativeMessages['messages'][number];
-export type HistoryState = { id: string; thread: NativeThread | null; messages: Message[]; kind: 'loading' | 'ready' | 'error' | 'unavailable'; page: number; hasMore: boolean; earlier: 'idle' | 'loading' | 'error' };
+/** `quiet`: the chat's own video became saved under the user's typing; do not move focus to its title. */
+export type HistoryState = { id: string; thread: NativeThread | null; messages: Message[]; kind: 'loading' | 'ready' | 'error' | 'unavailable'; page: number; hasMore: boolean; earlier: 'idle' | 'loading' | 'error'; quiet?: true };
 export type RecentsState = { value: NativeThreads | null; pending: boolean; failed: boolean; target: number };
 const failureKind = (error: ClientError) => error.code === 'not_found' ? 'unavailable' as const : 'error' as const;
 const loading = (id: string, thread: NativeThread | null = null): HistoryState => ({ id, thread, messages: [], kind: 'loading', page: 0, hasMore: false, earlier: 'idle' });
@@ -21,6 +22,9 @@ export function useNativeNavigation(connection: BrowserClient, accountId: string
   const [dialog, setDialog] = useState<'recents' | null>(null);
   // Counts New video activations so the shell can focus the opening composer it lands on.
   const [started, setStarted] = useState(0);
+  // Changes when the user opens another video or starts a new one, never when a new video's first send
+  // makes it a saved video, so the chat (and its draft and live reply) stays mounted through that send.
+  const [scope, setScope] = useState(0);
   const active = useRef(true), selection = useRef(0), listing = useRef(0);
   const requests = useRef(new Set<AbortController>());
   const client = connection.kind === 'configured' ? connection.client.native : null;
@@ -28,7 +32,7 @@ export function useNativeNavigation(connection: BrowserClient, accountId: string
   const current = (revision: number) => active.current && selection.current === revision;
   useLayoutEffect(() => { active.current = true; return () => { active.current = false; selection.current++; for (const value of requests.current) value.abort(); requests.current.clear(); }; }, []);
   const remember = (id: string) => { const url = new URL(location.href); url.searchParams.set('conversation', id); window.history.replaceState(null, '', url); };
-  const open = async (id: string, candidate: NativeThread | null = null) => {
+  const load = async (id: string, candidate: NativeThread | null = null) => {
     if (!client || !accountId) { signIn(); return; }
     const revision = ++selection.current, request = controller();
     setDialog(null); setHistory(loading(id, candidate)); remember(id);
@@ -43,8 +47,9 @@ export function useNativeNavigation(connection: BrowserClient, accountId: string
       setHistory({ id, thread: thread.value, messages: [...messages.value.messages].reverse(), kind: 'ready', page: 0, hasMore: messages.value.hasMore, earlier: 'idle' });
     } finally { requests.current.delete(request); }
   };
+  const open = (id: string, candidate: NativeThread | null = null) => { if (client && accountId) setScope(value => value + 1); return load(id, candidate); };
   useEffect(() => {
-    if (restoreId) void open(restoreId);
+    if (restoreId) void load(restoreId);
     // Account composition re-keys this owner; restore is a read, never a create.
   }, []);
   useEffect(() => {
@@ -67,7 +72,7 @@ export function useNativeNavigation(connection: BrowserClient, accountId: string
   // The native thread (whose id is the video id) is created by the first accepted send.
   const startNew = () => {
     if (!client || !accountId) { signIn(); return; }
-    selection.current++; setStarted(value => value + 1);
+    selection.current++; setStarted(value => value + 1); setScope(value => value + 1);
     setDialog(null); setHistory(null);
     const url = new URL(location.href); url.searchParams.delete('conversation'); window.history.replaceState(null, '', url);
   };
@@ -86,6 +91,35 @@ export function useNativeNavigation(connection: BrowserClient, accountId: string
       });
     } finally { requests.current.delete(request); }
   };
-  return { history, recents, quick, dialog, started, startNew, list, open, earlier, openRecents, dismiss() { setDialog(null); } };
+  /**
+   * The open chat's video is now saved: a New video's first accepted send, or a send confirmed by re-reading
+   * history (`page`, newest first). Shows it without reloading or remounting, routes to it and re-lists Recents.
+   */
+  const adopt = (thread: NativeThread, page?: NativeMessages) => {
+    if (!client || !accountId || thread.resourceId !== accountId) return;
+    selection.current++;
+    setHistory(previous => {
+      const same = previous?.id === thread.id && previous.kind === 'ready';
+      return { id: thread.id, thread, messages: page ? [...page.messages].reverse() : same ? previous.messages : [], kind: 'ready', page: 0, hasMore: page ? page.hasMore : same ? previous.hasMore : false, earlier: 'idle', quiet: true };
+    });
+    remember(thread.id); void list();
+  };
+  /**
+   * A turn in the open video ended: re-list Recents, and while the video is untitled re-read it, so a title
+   * generated from its message appears in the history heading. Never moves focus or reloads messages.
+   */
+  const settled = async () => {
+    if (!client || !accountId) return;
+    void list();
+    const shown = history;
+    if (!shown || shown.kind !== 'ready' || shown.thread?.title?.trim()) return;
+    const revision = selection.current, request = controller();
+    try {
+      const thread = await client.loadConversation({ id: shown.id, resourceId: accountId }, { signal: request.signal });
+      if (!current(revision) || !thread.ok) return;
+      setHistory(previous => previous && previous.id === shown.id ? { ...previous, thread: thread.value } : previous);
+    } finally { requests.current.delete(request); }
+  };
+  return { history, recents, quick, dialog, started, scope, startNew, list, open, adopt, settled, earlier, openRecents, dismiss() { setDialog(null); } };
 }
 export type NativeNavigationState = ReturnType<typeof useNativeNavigation>;
