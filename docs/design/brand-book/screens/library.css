@@ -1,0 +1,75 @@
+/* Library reuse and reference states. Each .lib-frame stands in for one
+   viewport: a backdrop shell with the Library dialog over it. Classes carry a
+   lib- prefix to avoid the brand book's shared app-r11 classes; @container
+   replaces the original viewport breakpoint; the overlay is absolute, not fixed. */
+@media (min-width: 821px) { .bb-main [id] { scroll-margin-top: 72px; } }
+.bb-spec.lib-frame { padding: 0; height: 820px; container: lib / inline-size; --opacity-disabled: 0.45; background: var(--color-bg-canvas); color: var(--color-text-primary); font: 14px/1.5 var(--font-family-sans); -webkit-font-smoothing: antialiased; }
+@media (max-width: 820px) { .bb-spec.lib-frame { height: 844px; } }
+.lib-frame :is(h1, h2, h3, p) { margin: revert; }
+.lib-frame p { margin: 8px 0; }
+.lib-frame button { font: inherit; color: inherit; min-height: 32px; border: 1px solid var(--color-border-default); border-radius: var(--radius-pill); padding: 5px 14px; background: transparent; }
+.lib-frame button.lib-primary { background: var(--color-action-primary-bg); color: var(--color-action-primary-text); border-color: transparent; font-weight: 600; }
+.lib-frame button:disabled { opacity: var(--opacity-disabled); }
+
+/* Backdrop shell */
+.lib-frame .lib-shell { display: grid; grid-template-columns: 260px 1fr 380px; height: 100%; }
+.lib-frame .lib-sidebar { padding: 24px; border-right: 1px solid var(--color-border-default); background: var(--color-bg-sunken); }
+.lib-frame .lib-sidebar p { margin-top: 30px; }
+.lib-frame .lib-welcome { padding: 70px 32px; }
+.lib-frame h1 { font: 34px/1.2 var(--font-family-display); }
+.lib-frame .lib-workspace { padding: 16px; border-left: 1px solid var(--color-border-default); background: var(--color-bg-surface); }
+
+/* Dialog */
+.lib-frame .lib-overlay { position: absolute; inset: 0; padding: 24px; display: grid; place-items: center; background: var(--color-media-scrim); }
+.lib-frame .lib-modal { display: flex; flex-direction: column; width: min(1040px, 100%); height: min(760px, 100%); min-height: 0; border-radius: var(--radius-3xl); background: var(--color-bg-surface); box-shadow: var(--shadow-overlay); overflow: hidden; }
+.lib-frame .lib-modal.lib-inspector { width: min(var(--size-layout-viewer), 100%); height: auto; max-height: 100%; }
+.lib-frame .lib-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 12px; gap: 16px; }
+.lib-frame .lib-head h2 { margin: 0; font-size: 17px; }
+.lib-frame .lib-close { border: 0; width: 32px; padding: 0; font-size: 20px; color: var(--color-text-subtle); }
+.lib-frame .lib-body { flex: 1; min-height: 0; overflow: auto; padding: 0 20px 20px; }
+.lib-frame .lib-footer { padding: 14px 20px; border-top: 1px solid var(--color-border-default); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.lib-frame .lib-footer .lib-primary { margin-left: auto; }
+
+/* Library grid */
+.lib-frame .lib-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 16px; }
+.lib-frame .lib-bar .lib-active { background: var(--color-bg-inverse); color: var(--color-text-inverse); }
+.lib-frame .lib-search { width: 220px; margin-left: auto; border: 1px solid var(--color-border-default); border-radius: var(--radius-pill); padding: 7px 12px; background: var(--color-bg-canvas); }
+.lib-frame .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 14px; }
+.lib-frame .lib-tile { min-width: 0; }
+.lib-frame .lib-media { aspect-ratio: 1; border: 1px solid var(--color-border-default); border-radius: var(--radius-lg); background: var(--color-bg-sunken); display: grid; place-items: center; color: var(--color-text-subtle); font-size: 13px; }
+.lib-frame .lib-tile h3 { margin: 8px 0 0; font-size: 14px; }
+.lib-frame .lib-meta { margin: 2px 0 10px; font-size: 12px; color: var(--color-text-subtle); }
+.lib-frame .lib-tile button { font-size: 12px; padding: 4px 10px; margin-right: 4px; }
+.lib-frame .lib-pager { display: flex; gap: 10px; align-items: center; margin-top: 24px; color: var(--color-text-subtle); font-size: 12px; }
+.lib-frame .lib-chip { border: 1px solid var(--color-border-default); border-radius: var(--radius-pill); padding: 4px 10px; font-size: 12px; }
+.lib-frame .lib-notice { font-size: 13px; color: var(--color-text-secondary); margin: 0; width: 100%; }
+
+/* Inspector content */
+.lib-frame .lib-section { padding: 16px 0; border-top: 1px solid var(--color-border-default); }
+.lib-frame .lib-section h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+.lib-frame .lib-field-label { display: grid; gap: 6px; margin: 12px 0; font-size: 12px; color: var(--color-text-subtle); }
+.lib-frame .lib-select { width: 100%; min-height: 34px; border: 1px solid var(--color-border-input); border-radius: var(--radius-md); padding: 6px 10px; background: var(--color-bg-surface); }
+.lib-frame .lib-textarea { width: 100%; min-height: 100px; border: 1px solid var(--color-border-input); border-radius: var(--radius-md); padding: 10px; background: var(--color-bg-surface); font-size: 14px; }
+.lib-frame .lib-history { display: flex; gap: 8px; flex-wrap: wrap; }
+.lib-frame .lib-row { padding: 12px; border: 1px solid var(--color-border-default); border-radius: var(--radius-md); display: flex; gap: 8px; justify-content: space-between; align-items: center; margin: 8px 0; }
+.lib-frame .lib-specimen { height: 210px; border-radius: var(--radius-lg); background: linear-gradient(135deg, #727488, #71a896, #a78b9e); display: grid; place-items: center; color: var(--color-bg-surface); font-size: 12px; }
+
+@container lib (max-width: 820px) {
+  .lib-frame .lib-shell { grid-template-columns: 1fr; }
+  .lib-frame .lib-sidebar, .lib-frame .lib-workspace { display: none; }
+  .lib-frame .lib-welcome { padding: 32px 20px; }
+  .lib-frame .lib-overlay { padding: 12px; }
+  .lib-frame .lib-modal { height: 100%; }
+  .lib-frame .lib-modal.lib-inspector { height: auto; max-height: 100%; }
+  .lib-frame .lib-head { padding: 14px; gap: 8px; }
+  .lib-frame .lib-head h2 { font-size: 15px; }
+  .lib-frame .lib-body { padding: 0 14px 14px; }
+  .lib-frame .lib-footer { padding: 12px 14px; gap: 8px; }
+  .lib-frame .lib-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .lib-frame .lib-search { width: 100%; margin: 6px 0 0; }
+  .lib-frame .lib-bar { gap: 4px; }
+  .lib-frame .lib-bar button { font-size: 12px; padding-inline: 9px; }
+  .lib-frame .lib-tile button { font-size: 11px; padding-inline: 8px; margin-bottom: 4px; }
+  .lib-frame .lib-specimen { height: 170px; }
+  .lib-frame .lib-row { flex-wrap: wrap; }
+}
