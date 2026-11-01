@@ -54,7 +54,8 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 - Problem: Without streaming, a long agent turn looks frozen. demo-02 also shows tool steps as they happen ("Writing the script… Wrote the script · 3 shots"), which B-012's text-only plan does not cover.
 - Outcome: Reply text appears as it streams, and each tool call shows a short in-progress line and then a done line. The chat shows sending, streaming, completed, interrupted and failed states honestly. Failed and interrupted states stay simple and familiar, like ChatGPT's (Lou, 2026-11-01): an inline notice under the affected message, with the draft kept. Any retry is an explicit user action, never automatic. Switching video or account mid-stream drops the late events, so nothing renders in the wrong video. Pass: a reply with a tool call streams text and shows the tool line live; reload shows the saved result.
 - Constraint:
-  - Each tool supplies its own short in-progress and done labels; for example, update-script returns "3 shots".
+  - Each tool comes with its own activity phrase, defined in the tool's directory (Lou, 2026-11-01). For example, read-workspace shows "Getting up to date on our progress…" while it runs. A tool may also return a short done summary, such as update-script's "3 shots".
+  - The browser never hard-codes tool phrases. An unknown tool falls back to a generic "Working…".
   - Long tools show elapsed time, for example "Generating video… 2 min" (B-025).
   - Tool lines must survive a reload, so confirm on the installed Mastra version that tool calls are saved with the assistant message.
 - Test: a test-only scripted model calls a tool. The test holds the tool open and asserts the in-progress line, releases it and asserts the done line and the streamed text, then reloads and asserts both are still shown.

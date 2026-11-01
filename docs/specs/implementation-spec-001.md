@@ -561,8 +561,8 @@ Tools call application/domain functions in process, never application HTTP route
 | Foundation: [Story 001](../stories/story-001.md) | — | Delivered. |
 | Wave 1: [Sprint 004](../sprints/sprint-004.md), Native runtime and conversations | B-001 | Delivered. |
 | Wave 1: [Sprint 005](../sprints/sprint-005.md), Saved work, uploads and media | — | Delivered. |
-| 006: Chat | B-012 agent loop on Muse Spark, B-021 streaming and tool lines, B-022 Stop | Chat with streaming replies, Stop mid-reply, history after reload. |
-| 007: Script | B-023 read the video's work, B-013 update-script tool, B-024 tab refresh | The agent writes and reads the script; the Script tab updates without a reload. |
+| 006: Chat | B-012 agent loop on Muse Spark, B-021 streaming and tool activity phrases, B-022 Stop, B-023 read-workspace tool, B-034 automatic video titles | Chat with streaming replies; a real tool line ("Getting up to date on our progress…"); Stop mid-reply; titled videos in Recents; history after reload. |
+| 007: Script | B-013 update-script tool, B-024 tab refresh | The agent writes the script; the Script tab updates without a reload. |
 | 008: Questions | B-014 AskUserQuestion | Option questions as in `docs/design/demo-02.html`; the chosen option resumes the agent. |
 | 009: Images | B-015 Meta image generation, B-016 image options | Generated images in the chat and Assets; image choices whose exact asset the agent then uses. |
 | 010: Reference sheets | B-017 | Character, place and prop sheets in Assets. |
@@ -570,7 +570,7 @@ Tools call application/domain functions in process, never application HTTP route
 | 012: Video | B-025 waiting with resume, B-019 MiniMax video, B-020 join clips | Shot videos play in Videos; joined clips play as one video. |
 
 **Sprint rules**
-- Each sprint holds one to three backlog items, so Lou can test often. Sprints run in order, each from integrated `phase-3`. Stories are one PR each into `sprint-NNN`. The sprint integrates into `phase-3` on Lou's explicit merge command.
+- Each sprint holds a few small backlog items, so Lou can test often. Sprint 006 takes five because B-023 gives it a real tool to show and B-034 is small (Lou, 2026-11-01). Sprints run in order, each from integrated `phase-3`. Stories are one PR each into `sprint-NNN`. The sprint integrates into `phase-3` on Lou's explicit merge command.
 - Verification:
   - Targeted checks run per change.
   - Deterministic browser and API tests use a test-only scripted model, excluded from the production build.
