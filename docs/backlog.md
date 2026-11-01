@@ -4,10 +4,6 @@ Convention: `docs/conventions/backlog-management.md` (selected harness root; AGE
 
 ## Inbox
 
-### B-031 — Decide whether the MVP is deployed or a local demo
-- Context: The spec's P4-S19 deploys to Cloudflare (web), one Railway backend, Supabase and private R2. Neither sprint plan includes deployment, and with three days left it would take about a day. Lou to decide hosted versus local.
-- References: `docs/specs/implementation-spec-001.md` §7 Deployment and P4-S19.
-
 ## Next
 
 MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority order. B-021 to B-025 were added the same day from the Sprint 006/007 plans and the gaps they exposed, placed where their dependencies need them. They will be tied to Sprint 006 and 007 once grooming is done. Each tool lives in its own directory under the agent module and calls application functions in process, never application HTTP routes (implementation spec §10). Assistant saves and generations never count as human approval (AGENTS.md).
@@ -88,7 +84,7 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
     - $0.01 per image
   - Confirm the real response shape with one live call before writing the parser.
   - The key stays server-only.
-- Blocker: what authorizes a paid call (B-030).
+- Constraint: No user authorization before paid calls in the MVP (Lou, 2026-11-01); added later in B-030.
 - References:
   - [Meta image generation](https://dev.meta.ai/docs/image-generation).
   - `~/projects/animation-studio/.pi/skills/generate-image/references/prompt-preparation.md`: prompt guidance.
@@ -129,7 +125,7 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
   - Lou chose MiniMax for now (2026-11-01); Meta's API has no video generation, only video understanding.
   - Generation is asynchronous, so the job runs in the background (B-025), survives a long wait and reports failure honestly.
   - Confirm the real response shape with one live call before writing the parser. The key stays server-only.
-- Blocker: what authorizes a paid call (B-030).
+- Constraint: No user authorization before paid calls in the MVP (Lou, 2026-11-01); added later in B-030.
 - References: `~/projects/animation-studio/.pi/skills/generate-video/SKILL.md` and `references/minimax-video-v2.md` (MiniMax Video Generation V2, up to two endpoint frames); `apps/web/src/videos/`; `packages/player`.
 
 ### B-020 — Agent tool: join videos together
@@ -168,8 +164,13 @@ Deprioritized: everything here waits until the Next items are done (Lou, 2026-11
 ### B-030 — Review and approve generation proposals before paid calls
 - Problem: The spec requires an exact human-approved proposal before any paid image or video call (P4-S8, P3-S7). Sprint 007 Stories 1–2 planned the proposal card reads and approval. Lou's MVP list has the agent generate on request instead.
 - Outcome: If proposals return, the user reviews the exact prompt, inputs, model and estimate, and approves once before paid work starts. B-003 supplies the input names.
-- Blocker: Lou to decide what authorizes a paid MVP generation call: the direct request itself, or an AskUserQuestion confirmation (B-014).
+- Constraint: Lou decided on 2026-11-01 that the MVP needs no user authorization before paid image or video calls, to save time. This item adds that authorization later.
 - References: [Sprint 007](sprints/sprint-007.md) Stories 1–2; B-003; spec "Submission and recovery contract".
+
+### B-031 — Deploy the MVP
+- Problem: The spec's P4-S19 deploys the reviewed build to Cloudflare (web), one Railway backend, Supabase and private R2, with an operating handoff. Lou decided on 2026-11-01 that the MVP does not need deployment; it runs locally.
+- Outcome: When authorized, deploy the exact reviewed build to those services and verify the deployment-specific wiring. Before any public exposure, re-qualify bounded ingress (archived B-001) and resolve or re-decide the audit exceptions B-004 and B-008.
+- References: `docs/specs/implementation-spec-001.md` §7 Deployment and P4-S19.
 
 ### B-011 — Recover an initially failed workspace read
 - Problem: If the first workspace read fails, a later successful image upload cannot show its new Assets row, because no loaded base exists to add it to. The user must reload. A minor issue (P2) from the PR #41 re-review.
