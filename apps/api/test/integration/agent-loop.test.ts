@@ -11,7 +11,7 @@ import { scriptedProvider } from '../support/scripted-provider.js';
 // test tools registered, and the step cap, stall limit and turn deadline lowered so the edges are reachable.
 test('the Muse Spark agent loop runs tools, enforces its limits and fails without retries', { timeout: 300000 }, async t => {
   const provider = await scriptedProvider(); t.after(provider.close);
-  const fixture = await accountBrowserFixture({ composition: chatComposition(provider, { maxSteps: 3, stallMs: 1000, turnMs: 4000 }) }); t.after(fixture.close);
+  const fixture = await accountBrowserFixture({ composition: chatComposition(provider, { maxSteps: 3, stallMs: 1000, turnMs: 8000 }) }); t.after(fixture.close);
   const user = await fixture.auth.createAccount();
   const token = await fixture.accessToken(user);
   const client = nativeTurnClient(fixture.apiOrigin, token, user.id);
@@ -104,9 +104,10 @@ test('the Muse Spark agent loop runs tools, enforces its limits and fails withou
   });
 
   await t.test('the overall turn deadline fails a turn that keeps streaming past it', async () => {
-    provider.script({ text: Array.from({ length: 12 }, (_, index) => `${index} `), dripMs: 500 });
+    provider.script({ text: Array.from({ length: 24 }, (_, index) => `${index} `), dripMs: 500 });
     const late = await turn(await newVideo(), 'Keep going');
     assert.ok(late.terminal && !completed(late), JSON.stringify(late.terminal));
+    assert.equal((late.terminal.payload?.error as { name?: string } | undefined)?.name, 'MastraTimeoutError');
     assert.equal(provider.requests.length, 1);
   });
 
