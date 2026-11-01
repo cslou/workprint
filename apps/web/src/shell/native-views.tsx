@@ -17,7 +17,7 @@ export function Recents({ navigation, embedded = false, onActivate = () => {} }:
   const heading = useRef<HTMLParagraphElement>(null);
   const placeholder = usePlaceholder(!value && !failed);
   useLayoutEffect(() => { if (value && !pending && !failed && !placeholder.active) heading.current?.focus(); }, [value, pending, failed, placeholder.active]);
-  return <div className="wp-native-recents" aria-busy={pending}>
+  return <div className="wp-native-recents" aria-busy={pending || placeholder.active}>
     {placeholder.active && <>{placeholder.visible && <p className="wp-sr-only" role="status">Loading Recents…</p>}<SkeletonRows count={6} visible={placeholder.visible} /></>}
     {!placeholder.active && !value && failed && <><p role="status">Recents couldn’t be loaded. Check your connection and try again.</p><div className="wp-native-actions"><Button variant="secondary" onPress={() => void navigation.list(target)}>Try again</Button></div></>}
     {!placeholder.active && value && <>

@@ -27,6 +27,7 @@ test('New video is client-only: it returns to the centred opening without creati
     const snapshot = await f.application!.snapshot();
     await page.getByRole('button', { name: 'New video', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'What would you like to make?', exact: true })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeFocused();
     expect(new URL(page.url()).searchParams.has('conversation')).toBe(false);
     await expectCentredOpening(page);
     await page.setViewportSize({ width: 390, height: 560 });
