@@ -8,12 +8,15 @@ export type RecentsState = { value: NativeThreads | null; pending: boolean; fail
 export type CreateState = 'idle' | 'pending' | 'rejected' | 'unknown';
 const failureKind = (error: ClientError) => error.code === 'not_found' ? 'unavailable' as const : 'error' as const;
 const loading = (id: string, thread: NativeThread | null = null): HistoryState => ({ id, thread, messages: [], kind: 'loading', page: 0, hasMore: false, earlier: 'idle' });
-const restoring = () => { const id = new URL(location.href).searchParams.get('conversation'); return id && /^[0-9a-f-]{36}$/i.test(id) ? id : null; };
+const validId = (id: string | null) => id && /^[0-9a-f-]{36}$/i.test(id) ? id : null;
 
 /** Ephemeral presentation only. Native storage is the sole conversation/history authority. */
-export function useNativeNavigation(connection: BrowserClient, accountId: string | null, signIn: () => void) {
+/** `restore` is the routed conversation, already cleared by the entry owner after an account change. */
+export function useNativeNavigation(connection: BrowserClient, accountId: string | null, signIn: () => void, restore: string | null = null) {
   // A URL-restored conversation starts as loading, so the opening welcome never flashes first.
-  const [history, setHistory] = useState<HistoryState | null>(() => { const id = restoring(); return id && accountId && connection.kind === 'configured' ? loading(id) : null; });
+  // One captured restore id drives both the initial loading state and the restore effect.
+  const [restoreId] = useState(() => connection.kind === 'configured' && accountId ? validId(restore) : null);
+  const [history, setHistory] = useState<HistoryState | null>(() => restoreId ? loading(restoreId) : null);
   const [recents, setRecents] = useState<RecentsState>({ value: null, pending: false, failed: false, target: 0 });
   const [quick, setQuick] = useState<NativeThread[] | null>(null);
   const [createState, setCreateState] = useState<CreateState>('idle');
@@ -42,8 +45,7 @@ export function useNativeNavigation(connection: BrowserClient, accountId: string
     } finally { requests.current.delete(request); }
   };
   useEffect(() => {
-    const id = restoring();
-    if (id && accountId) void open(id);
+    if (restoreId) void open(restoreId);
     // Account composition re-keys this owner; restore is a read, never a create.
   }, []);
   useEffect(() => {
