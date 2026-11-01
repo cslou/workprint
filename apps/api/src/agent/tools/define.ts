@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { ReadOwnedWorkspace } from '../../application/index.js';
+import type { ReadOwnedWorkspace, SaveAssistantScript } from '../../application/index.js';
 
 /** Trusted scope from the admitted native run, never from model arguments. */
 export interface ToolScope {
@@ -8,7 +8,7 @@ export interface ToolScope {
 }
 
 /** Application functions that tools may call. Supplied once by composition. */
-export type AgentCollaborators = Readonly<{ readWorkspace: ReadOwnedWorkspace }>;
+export type AgentCollaborators = Readonly<{ readWorkspace: ReadOwnedWorkspace; saveScript: SaveAssistantScript }>;
 
 export interface ToolContext {
   readonly scope: ToolScope;
