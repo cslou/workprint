@@ -8,14 +8,18 @@ const notices = {
   interrupted: 'This reply was interrupted.',
   // The page stopped hearing the reply; the server may still finish it, so claim nothing and offer no Retry.
   lost: 'We lost track of this reply. It may still finish; reload to see it.',
+  stopped: 'Stopped.',
+  // Says nothing about the provider: neither a Stop acknowledgment nor a local abort proves remote work or charges ended.
+  unconfirmed: 'We couldn’t confirm the reply stopped.',
 } as const;
 
 /** Turns sent from this page, after the saved history: the reply streams in, then ends with its state. */
 export function LiveTurns({ turns, canRetry, onRetry }: { turns: readonly LiveTurn[]; canRetry: boolean; onRetry(key: number): void }) {
   if (!turns.length) return null;
   return <ol className="wp-saved-messages" aria-label="New messages">{turns.flatMap(turn => {
-    const notice = turn.state === 'streaming' || turn.state === 'completed' ? null : notices[turn.state];
-    const retry = turn.state !== 'lost' && !turn.retried;
+    const notice = turn.state === 'streaming' || turn.state === 'completed' ? null : turn.state === 'interrupted' && (turn.stop === 'stopped' || turn.stop === 'unconfirmed') ? notices[turn.stop] : notices[turn.state];
+    // A reply that may still be running offers no Retry: it could be duplicated.
+    const retry = turn.state !== 'lost' && turn.stop !== 'unconfirmed' && !turn.retried;
     return [
       <li key={`${turn.key}-user`} className="wp-saved-user" aria-label="Your message"><span>{turn.text}</span></li>,
       ...(turn.parts.length || notice ? [<li key={`${turn.key}-reply`} className="wp-saved-assistant" aria-label="Assistant message" aria-busy={turn.state === 'streaming'}>

@@ -28,6 +28,8 @@ export function Composer({ native, chat, sendBlocked = false, docked = false, pl
   const [pending, setPending] = useState(false);
   const chatState = useChatSnapshot(chat);
   const { phase } = chatState;
+  // Stop is pressed once per turn; the button stays until the turn settles.
+  const stopping = phase === 'working' && chatState.turns.at(-1)?.stop !== undefined;
   const over = tooLong(text);
   // The draft is locked while its send is in flight or its outcome is unknown.
   const locked = phase === 'sending' || phase === 'checking' || phase === 'unconfirmed';
@@ -63,7 +65,7 @@ export function Composer({ native, chat, sendBlocked = false, docked = false, pl
     {chat && unconfirmed && <div className="wp-chat-unconfirmed"><p role="status">{phase === 'checking' ? 'Checking whether your message was sent…' : 'We couldn’t confirm your message was sent.'}</p><div className="wp-native-actions"><Button variant="secondary" isDisabled={phase === 'checking'} onPress={() => void chat.checkAgain()}>Check again</Button><Button variant="secondary" isDisabled={phase === 'checking'} onPress={() => void chat.sendAnyway()}>Send anyway</Button></div></div>}
     <form className={`wp-opening-composer${docked ? ' wp-chat-docked' : ''}`} onSubmit={(event) => { event.preventDefault(); void send(); }}>
       <textarea className="wp-opening-field wp-chat-input" aria-label="Message" placeholder={placeholder} value={text} readOnly={locked} onKeyDown={keyDown} onChange={(event) => { setText(event.target.value); chat?.edited(); }} />
-      <div className="wp-opening-bar"><button type="button" className="wp-opening-attach" aria-label="Attach a file" disabled={uploading} onClick={() => fileInput.current?.click()}><span aria-hidden="true">+</span>{docked ? 'Attach' : 'Attach photos'}</button><input ref={fileInput} className="wp-sr-only" type="file" accept="image/png,image/jpeg" aria-label="Choose a JPEG or PNG image" onChange={(event) => void upload(event)} /><div className="wp-chat-actions">{phase === 'working' && <span className="wp-working-label" role="status"><i aria-hidden="true" />Working…</span>}<Button type="submit" isDisabled={!canSend}>Send</Button></div></div>
+      <div className="wp-opening-bar"><button type="button" className="wp-opening-attach" aria-label="Attach a file" disabled={uploading} onClick={() => fileInput.current?.click()}><span aria-hidden="true">+</span>{docked ? 'Attach' : 'Attach photos'}</button><input ref={fileInput} className="wp-sr-only" type="file" accept="image/png,image/jpeg" aria-label="Choose a JPEG or PNG image" onChange={(event) => void upload(event)} /><div className="wp-chat-actions">{phase === 'working' && <span className="wp-working-label" role="status"><i aria-hidden="true" />Working…</span>}{phase === 'working' && chat ? <button type="button" className="wp-stop" disabled={stopping} onClick={() => void chat.stop()}><span aria-hidden="true" />Stop</button> : <Button type="submit" isDisabled={!canSend}>Send</Button>}</div></div>
     </form>
     <p className="wp-upload-guidance">JPEG or PNG only · Up to 10 MiB · 4096 × 4096 pixels. Video uploads are temporarily unavailable.</p>
     <UploadStatus state={uploadState.state} session={uploadState.session} connection={connection} choose={() => fileInput.current?.click()} close={closeUpload} {...(onUploaded ? { onSaved: onUploaded } : {})} />

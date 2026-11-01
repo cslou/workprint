@@ -33,3 +33,9 @@ test('saved history accepts text and exact tool activity parts only', () => {
   assert.ok(isHistoryPart({ ...line, state: 'incomplete', summary: undefined }));
   for (const bad of [{ ...line, result: {} }, { ...line, state: 'running?' }, { ...line, tool: 'Read Workspace' }, { type: 'tool-invocation', toolInvocation: {} }, { type: 'reasoning', text: 'private' }]) assert.equal(isHistoryPart(bad), false, JSON.stringify(bad));
 });
+
+test('a run observation\'s abort event ends the turn as interrupted', () => {
+  const decoder = nativeOutcome(runId, () => {});
+  assert.equal(decoder.event({ type: 'chunk', runId, data: { type: 'start', runId, payload: { messageId } } }), undefined);
+  assert.deepEqual(decoder.event({ type: 'abort', runId }), { ok: true, value: { outcome: 'interrupted', runId, assistantMessageId: messageId } });
+});

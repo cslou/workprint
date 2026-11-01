@@ -406,7 +406,7 @@ Each component has the same anchor here and on the [Components page](brand-book/
 | Idle, empty | Placeholder "Describe your video…"; Send disabled | — |
 | Typed | Text in `--color-text-primary`; Send enabled | Enter sends |
 | With attachments | Attachment chips above the text: 28px image, name, a type in 11px and × | Remove with × |
-| Agent working | The bar shows a pulsing dot with "Working…" and **Stop**; Send is unavailable | You can keep typing a draft, but nothing is queued: one turn per video. A send the server finds busy keeps the draft and shows "The agent is still working on the last message." Stop ends the turn |
+| Agent working | The bar shows a pulsing dot with "Working…" and **Stop** in Send's place; Stop is pressed once per turn | You can keep typing a draft, but nothing is queued: one turn per video. A send the server finds busy keeps the draft and shows "The agent is still working on the last message." Stop ends the turn |
 | Question docked | The [question card](#question-card) grows on top, inside the same outline | Typing answers the question, or asks something else and leaves it waiting |
 | Question folded | A "1 question waiting · Show" pill sits above the box | Show reopens the question |
 
@@ -419,13 +419,15 @@ Inert previews: [`chat-states/`](chat-states/index.html) at 1440 and 390 (Sprint
 | State | Where | Copy | Actions |
 | --- | --- | --- | --- |
 | Reply failed | Under the reply, after any text that streamed | "Something went wrong and this reply didn’t finish." | **Retry**, once: it sends the same message again |
-| Reply interrupted | Under the reply | "This reply was interrupted." ("Stopped" only once a Stop is confirmed, Sprint 006 Story 4) | **Retry**, once |
+| Reply interrupted | Under the reply | "This reply was interrupted." | **Retry**, once |
+| Reply stopped | Under the reply, after **Stop**, once the server acknowledged the Stop and the reply ended interrupted | "Stopped." | **Retry**, once |
+| Stop unconfirmed | Under the reply, when the Stop was not acknowledged or the reply did not end within about 8 s of the click (the chat stops watching; it never sends a second Stop) | "We couldn’t confirm the reply stopped." | None: the reply may still be running |
 | Reply lost | Under the reply, when this page stops hearing it (the server may still finish it) | "We lost track of this reply. It may still finish; reload to see it." | None: a Retry could duplicate a reply that is still running |
 | Send unconfirmed | Above the chat box; the draft stays in the box, read-only, and Send is unavailable | "We couldn’t confirm your message was sent." While history is re-read: "Checking whether your message was sent…" with both buttons unavailable | **Check again** (reads history only) and **Send anyway** (may send it twice) |
 | Send rejected | Under the chat box; the draft stays | "Your message wasn’t sent. It’s still here, so you can try again." | Send |
 | Too long | Under the chat box; Send is unavailable | "Messages can be up to 32 KB. Shorten this one to send it." | — |
 
-Copy never says a message was delivered, or a reply stopped, when that is unknown. Saved history shows a failed or interrupted reply as its plain text, without the notice.
+Copy never says a message was delivered, or a reply stopped, when that is unknown, and never claims the provider stopped work or charges. Closing the page or switching video stops watching only; it never sends a Stop. Saved history shows a failed or interrupted reply as its plain text, without the notice.
 
 ### Question card
 
