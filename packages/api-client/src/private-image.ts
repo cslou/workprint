@@ -1,5 +1,5 @@
 import { MAX_UPLOAD_IMAGE_BYTES, MAX_UPLOAD_VIDEO_BYTES } from '@workprint/contracts';
-import type { ClientResult } from './result.js';
+import type { ClientResult } from './types.js';
 type Policy={types:readonly string[];maxBytes:number;exactBytes?:number;timeoutMs:number;slots:{active:number;max:number}};
 const images={active:0,max:2},downloads={active:0,max:1};
 const fail=():ClientResult<never>=>({ok:false,error:{code:'transport_failure',message:'Private object unavailable'}});

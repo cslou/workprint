@@ -13,41 +13,22 @@ async function configure(page: Page, value: unknown) {
   await page.waitForFunction(() => !!(window as unknown as { shellTest?: unknown }).shellTest);
   await page.evaluate((input) => (window as unknown as { shellTest: { configure(input: unknown): void } }).shellTest.configure(input), value);
 }
-for (const width of [1440, 390]) test(`keyboard account actions and navigation at ${width}`, async ({ page }) => {
+for (const width of [1440, 390]) test(`keyboard navigation at ${width}`, async ({ page }) => {
   await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
   await page.goto('/shell.html');
   await configure(page, { session: { accountId: 'keyboard-account', name: 'Creator A' } });
-  if (width === 390) { await page.getByRole('button', { name: 'Menu', exact: true }).focus(); await page.keyboard.press('Enter'); }
-  await page.getByRole('button', { name: 'Creator A', exact: true }).focus();
-  await page.keyboard.press('Enter');
-  await page.getByRole('button', { name: 'Switch account', exact: true }).focus();
-  await page.keyboard.press('Space');
-  await expect(page.getByRole('dialog')).toContainText('Account actions are not available yet. Nothing about your session has changed.');
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog')).toBeHidden();
   if (width === 390) { await page.getByRole('button', { name: 'Menu', exact: true }).focus(); await page.keyboard.press('Enter'); }
   await page.getByRole('button', { name: 'Library', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('dialog')).toContainText('Library connection not configured');
 });
 
-for (const width of [1440, 390, 820, 821]) test(`shell navigation, session and native boundaries at ${width}`, async ({ page }) => {
+for (const width of [1440, 390, 820, 821]) test(`shell navigation and native boundaries at ${width}`, async ({ page }) => {
   await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
   await page.goto('/shell.html');
   await configure(page, { session: null });
   const openMenu = async () => { if (width <= 820) await page.getByRole('button', { name: 'Menu', exact: true }).click(); };
-  await openMenu();
-  await page.getByRole('button', { name: 'Account', exact: true }).click();
-  await expect(page.getByRole('dialog')).toContainText('Not signed inSign-in is not available yet.');
-  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeDisabled();
-  await page.keyboard.press('Escape');
   await configure(page, { session: { accountId: 'account-a', name: 'Creator A' } });
-  await openMenu();
-  await page.getByRole('button', { name: 'Creator A', exact: true }).click();
-  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
-  await expect(page.getByRole('dialog')).toContainText('Account actions are not available yet. Nothing about your session has changed.');
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog')).toBeHidden();
   await page.getByRole('button', { name: 'New video', exact: true }).click();
   await expect(page.getByRole('dialog')).toContainText('No conversation was created.');
   await page.keyboard.press('Escape');

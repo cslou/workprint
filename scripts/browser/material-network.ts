@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { expect, test as base, type Request } from '@playwright/test';
 import type { OperationRequest } from '../../packages/contracts/src/index.js';
+import { browserOrigin, previewOrigin } from './origin.js';
 
 type Entry = { method: string; url: URL; body: unknown };
 type Operation = Readonly<{ origin: string; method: string; path: string; count: number; query: Readonly<Record<string, string>>; purpose?: OperationRequest<'useVersion'>['body']['purpose'] }>;
@@ -36,14 +37,25 @@ export const test = base.extend<{ materialNetwork: MaterialNetwork }>({
       const objectRequest = objectOrigins.has(actualURL.origin) || actualURL.searchParams.has('X-Amz-Signature');
       let body: unknown = objectRequest ? 'private object transfer' : null;
       if (!objectRequest && request.postData()) { try { body = request.postDataJSON(); } catch { body = 'non-JSON transfer'; } }
-      const entry = { method: request.method(), url: safeURL(actualURL), body };
+      const url = safeURL(actualURL);
+      const auth = url.pathname.startsWith('/auth/v1/') || url.pathname === '/auth/callback';
+      if (auth) {
+        // Auth payloads/URLs are secret-bearing. Redact before retaining any evidence.
+        body = body && typeof body === 'object' ? Object.fromEntries(Object.keys(body).map(key => [key, '[private]'])) : null;
+        const publicValues: Record<string, readonly string[]> = { grant_type: ['password', 'refresh_token', 'pkce'], type: ['recovery'], scope: ['local', 'global', 'others'], redirect_to: [browserOrigin + '/auth/callback', previewOrigin + '/auth/callback'] };
+        for (const [key, value] of [...url.searchParams.entries()]) if (!publicValues[key]?.includes(value)) url.searchParams.set(key, '[private]');
+        url.hash = '';
+      }
+      const entry = { method: request.method(), url, body };
       entries.push(entry);
       if (objectRequest) {
         expect(Object.hasOwn(request.headers(), 'authorization'), 'API bearer must never reach object storage').toBe(false);
         expect(Object.hasOwn(request.headers(), 'cookie'), 'Application cookies must never reach object storage').toBe(false);
       }
-      if (objectRequest || entry.url.pathname.startsWith('/v1/') || !['GET', 'HEAD', 'OPTIONS'].includes(entry.method)) {
-        const allowance = allowances.find(value => !value.consumed && value.method === entry.method && value.origin === actualURL.origin && value.path === actualURL.pathname && value.query === queryKey(actualURL.searchParams.entries()));
+      if (objectRequest || entry.url.pathname.startsWith('/v1/') || entry.url.pathname.startsWith('/memory/') || auth && entry.method !== 'OPTIONS' || !['GET', 'HEAD', 'OPTIONS'].includes(entry.method)) {
+        // Signed object grants match their exact (unredacted) query; Auth matches its redacted form.
+        const match = objectRequest ? actualURL : entry.url;
+        const allowance = allowances.find(value => !value.consumed && value.method === entry.method && value.origin === match.origin && value.path === match.pathname && value.query === queryKey(match.searchParams.entries()));
         if (allowance) {
           allowance.consumed = true;
           if (entry.method === 'POST' && entry.url.pathname.endsWith('/uses')) expect(entry.body).toMatchObject({ purpose: allowance.purpose ?? 'reference' });
