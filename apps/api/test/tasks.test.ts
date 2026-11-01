@@ -7,6 +7,19 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { root } from './environment.js';
+import { command } from './process.js';
+
+test('root build forwards only explicit public Auth/API settings to Vite', { timeout: 15000 }, async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'workprint-public-build-'));
+  const bin = join(dir, 'bin'), journal = join(dir, 'public.json');
+  await mkdir(bin); await mkdir(join(dir, 'apps/web'), { recursive: true });
+  await writeFile(join(dir, 'package.json'), '{"type":"module"}');
+  const values = { WORKPRINT_PUBLIC_API_ORIGIN: 'http://127.0.0.1:4111', WORKPRINT_PUBLIC_SUPABASE_URL: 'https://auth.example.test', WORKPRINT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_' + 'a'.repeat(24) };
+  await writeFile(join(bin, 'tsc'), '#!' + process.execPath + '\n', { mode: 0o755 });
+  await writeFile(join(bin, 'pnpm'), '#!' + process.execPath + '\n' + `import { writeFileSync } from 'node:fs'; writeFileSync(${JSON.stringify(journal)}, JSON.stringify({ public: Object.fromEntries(${JSON.stringify(Object.keys(values))}.map(key => [key, process.env[key]])), privatePresent: ['DATABASE_URL','SUPABASE_SECRET_KEY'].some(key => process.env[key]) }));`, { mode: 0o755 });
+  await command(process.execPath, [join(root, 'scripts/tasks.mjs'), 'build'], { cwd: dir, env: { PATH: bin + ':' + process.env.PATH, ...values, DATABASE_URL: 'synthetic-private-setting', SUPABASE_SECRET_KEY: 'synthetic-private-setting' }, log: join(dir, 'build.log') });
+  assert.deepEqual(JSON.parse(readFileSync(journal, 'utf8')), { public: values, privatePresent: false });
+});
 
 function killOwnedCompiler(pid: number) {
   try { process.kill(pid, 'SIGKILL'); } catch (error) {
@@ -52,7 +65,7 @@ process.on('SIGINT', () => { appendFileSync(journal, 'compiler cancelled\\n'); p
 const socket = createConnection({ port: ${address.port}, host: '127.0.0.1' }, () => socket.write(String(process.pid) + '\\n'));
 socket.on('data', () => { appendFileSync(journal, 'compiler failed\\n'); process.exit(7); });
 `;
-      for (const name of ['tsc', 'mastra', 'pnpm']) await writeFile(join(bin, name), script, { mode: 0o755 });
+      for (const name of ['tsc', 'pnpm']) await writeFile(join(bin, name), script, { mode: 0o755 });
       const child = spawn(process.execPath, [join(root, 'scripts/tasks.mjs'), task], {
         cwd: dir, env: { PATH: `${bin}:${process.env.PATH}` }, stdio: ['ignore', 'ignore', 'pipe'],
       });

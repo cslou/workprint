@@ -1,5 +1,5 @@
 import { MAX_UPLOAD_IMAGE_BYTES,type OperationRequest,type OperationResponse } from '@workprint/contracts';
-import type { ClientError,ClientResult } from './result.js';
+import type { ClientError,ClientResult } from './types.js';
 import { transferUpload } from './upload-transfer.js';
 
 type UploadClient={requestUpload(input:OperationRequest<'requestUpload'>,options?:{signal?:AbortSignal}):Promise<ClientResult<OperationResponse<'requestUpload'>>>;confirmUpload(input:OperationRequest<'confirmUpload'>,options?:{signal?:AbortSignal}):Promise<ClientResult<OperationResponse<'confirmUpload'>>>};

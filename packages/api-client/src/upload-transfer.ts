@@ -1,5 +1,5 @@
 import { MAX_UPLOAD_VIDEO_BYTES, operations, type OperationResponse } from '@workprint/contracts';
-import type { ClientResult } from './result.js';
+import type { ClientResult } from './types.js';
 
 let active = 0;
 type Grant = OperationResponse<'requestUpload'>;

@@ -1,5 +1,5 @@
 import { useBindingSchema, type OperationRequest, type OperationResponse } from '@workprint/contracts';
-import type { ClientError, ClientResult } from './result.js';
+import type { ClientError, ClientResult } from './types.js';
 
 type Command = OperationRequest<'useVersion'>;
 type Result = OperationResponse<'useVersion'>;

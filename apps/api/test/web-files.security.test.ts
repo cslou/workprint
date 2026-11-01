@@ -20,12 +20,10 @@ test('Vite serves browser modules but denies private research and fixture creden
   await symlink(join(root, 'apps/web/node_modules'), join(web, 'node_modules'), 'dir');
   const paths = ['docs/research/synthetic-private.md', 'outputs/local-database.env', 'outputs/local-object-storage.json', 'outputs/local-supabase.setup.json', 'outputs/toolchains/synthetic-media-cache/archive.tar.xz', 'outputs/toolchains/synthetic-media-cache/bin/ffmpeg', 'outputs/toolchains/synthetic-media-cache/bin/ffprobe', 'outputs/toolchains/synthetic-media-cache/binary-manifest.json', 'outputs/media-job/resource.json'];
   for (const file of paths) { await mkdir(join(checkout,file,'..'),{recursive:true}); await writeFile(join(checkout, file), sentinel); }
-  const helper = 'apps/api/test/native-conversations.ts';
-  await copyFile(join(root, helper), join(checkout, helper));
-  paths.push(helper);
-  for (const file of ['apps/api/test/artifact-database.ts', 'apps/api/test/saved-work.ts', 'apps/api/test/paged-saved-work.ts', 'apps/api/test/object-storage.ts', 'apps/api/test/media-fixtures.ts', 'apps/api/test/auth-built-fixture.ts']) {
-    await copyFile(join(root, file), join(checkout, file));
-    paths.push(file);
+  for (const name of ['native-conversations.ts', 'built-server.ts', 'auth-built-fixture.ts', 'auth-server.ts', 'isolated-auth.ts', 'auth-fixture-resources.ts', 'auth-mail.ts', 'account-browser-fixture.ts', 'native-navigation.test.ts', 'native-client.contracts.test.ts', 'native-workflow-outcome.ts', 'native-workflow-outcome.test.ts', 'artifact-database.ts', 'saved-work.ts', 'paged-saved-work.ts', 'object-storage.ts', 'media-fixtures.ts']) {
+    const helper = `apps/api/test/${name}`;
+    await copyFile(join(root, helper), join(checkout, helper));
+    paths.push(helper);
   }
   const port = await unusedPort();
   const server = await start(process.execPath, [join(root, 'apps/web/node_modules/vite/bin/vite.js'), '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
@@ -35,7 +33,10 @@ test('Vite serves browser modules but denies private research and fixture creden
     const origin = `http://127.0.0.1:${port}`;
     assert.match(await (await server.response(origin)).text(), /src\/main.tsx/);
     const module = await (await server.response(`${origin}/src/main.tsx`)).text();
-    assert.match(module, /import \{ Shell \} from/);
+    assert.match(module, /import \{ OwnedShell \} from/);
+    const composition = await (await server.response(`${origin}/src/shell/owned-shell.tsx`)).text();
+    assert.match(composition, /import \{ Shell \} from/);
+    assert.match(composition, /useNativeNavigation/);
     assert.match(await (await server.response(`${origin}/src/shell/shell.tsx`)).text(), /Workprint/);
     const dependency = module.match(/from "([^"]*react-dom[^"]*)"/)?.[1];
     assert.ok(dependency, 'Transformed module uses a real React dependency');

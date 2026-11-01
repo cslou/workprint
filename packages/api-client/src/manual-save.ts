@@ -1,5 +1,5 @@
 import type { OperationRequest, OperationResponse, Version } from '@workprint/contracts';
-import type { ClientError, ClientResult } from './result.js';
+import type { ClientError, ClientResult } from './types.js';
 
 type Request = OperationRequest<'saveVersion'>;
 type Result = OperationResponse<'saveVersion'>;

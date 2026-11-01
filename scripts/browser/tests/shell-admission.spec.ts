@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import type { verifyBuiltAdmission as VerifyBuiltAdmission } from '../../../apps/api/test/auth-built-fixture.js';
 
-test('shell workspace and Library use real admission; native navigation never calls transport', async ({ page }) => {
+test('isolated workspace and Library retain real admission and local native fallbacks', async ({ page }) => {
   test.setTimeout(120000);
   const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
   const cleanup: (() => void | Promise<void>)[] = [];
@@ -26,11 +26,10 @@ test('shell workspace and Library use real admission; native navigation never ca
       await expect(page.getByRole('main')).toHaveAttribute('aria-busy', 'false');
       await expect(page.getByRole('main')).not.toContainText('Conversation loading is not available yet.');
       expect(requests).toEqual(['GET /v1/conversations/read-only-conversation/workspace']);
-      for (const name of ['New video', 'Recents', 'Open conversation']) {
+      for (const name of ['New video', 'Recents']) {
         await page.getByRole('button', { name, exact: true }).focus();
         await page.keyboard.press('Enter');
         await expect(page.getByRole('dialog')).toBeVisible();
-        if (name === 'Open conversation') await expect(page.getByRole('dialog')).toContainText('Conversation loading is not available yet.The current workspace is unchanged.');
         await expect(page.getByRole('main', { includeHidden: true })).not.toContainText('Conversation loading is not available yet.');
         await page.keyboard.press('Escape');
         await expect(page.getByRole('dialog')).toBeHidden();
