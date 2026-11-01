@@ -33,6 +33,6 @@ function Application() {
   useLayoutEffect(() => { if (decision.kind === 'replace') replaceEntry(decision.target); }, [decision.kind, decision.kind === 'replace' ? decision.target : null]);
   if (decision.kind === 'replace') return null;
   if (decision.kind !== 'workspace') return <EntryPage owner={account} state={state} kind={decision.kind} />;
-  return <><OwnedShell key={state.account!.accountId} connection={connection} session={state.account} onAccountOpen={account.open} /><AccountDialog owner={account} state={state} /></>;
+  return <><OwnedShell key={state.account!.accountId} restore={route.searchParams.get('conversation')} connection={connection} session={state.account} onAccountOpen={account.open} /><AccountDialog owner={account} state={state} /></>;
 }
 createRoot(root).render(<Application />);
