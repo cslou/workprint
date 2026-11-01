@@ -17,7 +17,7 @@
     "test:smoke": "node scripts/test.mjs smoke",
     "test:security": "node scripts/test.mjs security",
     "test:contracts": "node scripts/test.mjs contracts",
-    "test:browser": "node scripts/test.mjs compile && playwright test --config scripts/browser/playwright.config.ts --workers=4 interaction.spec.ts config.spec.ts shell.spec.ts chat.spec.ts question.spec.ts version-races.spec.ts material.spec.ts player.spec.ts request-races.spec.ts selection-races.spec.ts display-prerequisites.spec.ts material-input-races.spec.ts library-attach-races.spec.ts upload-confirm-races.spec.ts attachment-state.spec.ts export-races.spec.ts paged-read.spec.ts manual-targets.spec.ts && playwright test --config scripts/browser/playwright.config.ts --workers=1 videos.spec.ts exports.spec.ts shell-admission.spec.ts owned-reads.spec.ts manual-saves.spec.ts verified-upload.spec.ts library-reuse.spec.ts"
+    "test:browser": "node scripts/test.mjs compile && playwright test --config scripts/browser/playwright.config.ts --workers=4 interaction.spec.ts config.spec.ts shell.spec.ts chat.spec.ts question.spec.ts version-races.spec.ts material.spec.ts player.spec.ts request-races.spec.ts selection-races.spec.ts display-prerequisites.spec.ts material-input-races.spec.ts library-attach-races.spec.ts upload-confirm-races.spec.ts attachment-state.spec.ts export-races.spec.ts paged-read.spec.ts manual-targets.spec.ts && playwright test --config scripts/browser/playwright.config.ts --workers=1 videos.spec.ts exports.spec.ts shell-admission.spec.ts owned-reads.spec.ts manual-saves.spec.ts verified-upload.spec.ts library-reuse.spec.ts library-media.spec.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -22,7 +22,7 @@ Read-only source fixtures are sealed only by the isolated setup role; no product
 
 Library cursors freeze both the requesting owner's publication counter and the reserved source counter. Sealing receives its own counter stamp, so a source sealed after the first page cannot enter an existing window. The optional DTO flag survives workspace/history reloads and private media access remains gated by the exact authorized version and protected source pointer. Human and assistant content writers reject sealed bases independently of presentation metadata.
 
-Approved Library inspection/recovery and reference-edit consumers are still in progress; these backend capabilities are not completion of their browser/visual qualification.
+The web Library inspection/recovery and reference-edit consumers use these capabilities; `library-reuse.spec.ts` and `library-media.spec.ts` exercise them against the real backend.
 
 ## Private upload coordination
 
