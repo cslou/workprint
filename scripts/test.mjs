@@ -14,8 +14,10 @@ for (const project of ['packages/contracts/tsconfig.json', 'packages/api-client/
 // Development fixtures need the same dependency-ordered compilation, not tests.
 if (group === 'compile') process.exit(0);
 
-const integration = globSync('apps/api/.test-build/test/{integration,http,tooling}/**/*.test.js');
-const unit = [...globSync('apps/api/.test-build/src/**/*.test.js'), ...globSync('packages/api-client/.test-build/test/**/*.test.js'), ...globSync('apps/web/.test-build/src/**/*.test.js')];
+// Every compiled test lands in a group: Docker-backed tests live under apps/api/test, all others are unit tests.
+const compiled = globSync('{apps/api,apps/web,packages/api-client}/.test-build/**/*.test.js');
+const integration = compiled.filter(file => file.startsWith('apps/api/.test-build/test/'));
+const unit = compiled.filter(file => !integration.includes(file));
 const files = group === 'unit' ? unit : group === 'integration' ? integration : [...unit, ...integration];
 if (files.length === 0) throw new Error('No tests discovered');
 const result = spawnSync(process.execPath, ['--test', '--test-concurrency=1', ...files], { stdio: 'inherit' });

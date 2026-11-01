@@ -30,12 +30,15 @@ test('native transport validates failures, response bounds and prompt cancellati
     const result = await native.createConversation({ resourceId }); assert.equal(result.ok, false);
     if (!result.ok) assert.equal(result.error.code, 'invalid_response'); assert.equal(count - before, 1);
   });
-  for (const responseMode of ['bodyless', 'malformed', 'oversized', 'boundary', 'guard', 'mismatch', 'unavailable']) await t.test(`native ${responseMode} response is typed without retry`, async () => {
+  for (const responseMode of ['bodyless', 'malformed', 'oversized', 'boundary', 'guard', 'mismatch', 'unavailable']) await t.test(`application/native response equivalence: ${responseMode}`, async () => {
     mode = responseMode; const before = count;
+    const application = createApiClient({ baseUrl, getAccessToken: async () => 'synthetic-test-only-bearer', timeoutMs: 1000 });
+    const result = await application.library({ params: {}, query: {}, body: {} });
     const nativeResult = await native.listConversations({ resourceId, page: 0, perPage: 6 });
     const matched = responseMode === 'unavailable';
+    assert.deepEqual(result, { ok: false, error: { code: matched ? 'integration_failure' : 'invalid_response', message: matched ? 'Native service unavailable' : responseMode === 'oversized' ? 'API response too large' : responseMode === 'mismatch' ? 'Invalid API error response' : 'Invalid API response' } });
     assert.deepEqual(nativeResult, { ok: false, error: { code: matched ? 'integration_failure' : 'invalid_response', message: matched ? 'Native service unavailable' : 'Invalid native response' } });
-    assert.equal(count - before, 1, 'Exactly one HTTP request, without retry');
+    assert.equal(count - before, 2, 'Exactly one HTTP request per transport, without retry');
   });
   await t.test('a suspended response body reaches its deadline once without retry', async () => {
     mode = 'held'; const before = count; const start = performance.now();

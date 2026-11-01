@@ -31,6 +31,8 @@ describe('application migrations and database roles', { timeout: 180000 }, () =>
   test('every migration applies once and re-applying changes nothing', async () => {
     assert.deepEqual(await history(db.setupUrl), migrationVersions);
     assert.deepEqual((await query(db.setupUrl, nativeCatalog)).rows, nativeBefore, 'Application migrations leave the native schema untouched');
+    const tables = (await query(db.setupUrl, "SELECT tablename FROM pg_tables WHERE schemaname='artifacts' ORDER BY tablename")).rows;
+    assert.deepEqual(tables.map(row => row.tablename), ['artifacts', 'commands', 'conversation_uses', 'manual_changes', 'media_objects', 'publication_counters', 'selection_revisions', 'upload_confirmations', 'upload_objects', 'uploads', 'use_changes', 'version_dependencies', 'versions']);
     await migrate(db.setupUrl);
     assert.deepEqual(await history(db.setupUrl), migrationVersions);
     assert.deepEqual((await query(db.setupUrl, nativeCatalog)).rows, nativeBefore);

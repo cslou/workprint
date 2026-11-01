@@ -24,3 +24,27 @@ test('private browser transport bounds initiation, concurrency, deadline and can
     const outcomes = await Promise.all([first, second]); assert.ok(outcomes.every(result => !result.ok && result.error.code === 'timed_out')); assert.equal(requests, 2, 'No queue or implicit retry');
   } finally { server.closeAllConnections(); await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); }
 });
+
+test('the 100 MiB transport ceiling admits exactly its limit without credentials, and one byte over sends nothing', { timeout: 15000 }, async () => {
+  const limit = 100 * 1024 ** 2;
+  let requests = 0, received = 0;
+  const server = createServer(async (request, response) => {
+    requests++;
+    assert.equal(request.headers.authorization, undefined); assert.equal(request.headers.cookie, undefined);
+    for await (const chunk of request) received += (chunk as Buffer).length;
+    response.writeHead(200); response.end();
+  });
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address(); assert.ok(address && typeof address !== 'string');
+  const grant = { uploadId: 'size-boundary', url: `http://127.0.0.1:${address.port}/staging/boundary?X-Amz-Signature=local-control`, expiresAt: new Date(Date.now() + 60000).toISOString(), maxBytes: limit };
+  const file = new Blob([Buffer.alloc(limit)], { type: 'video/mp4' });
+  try {
+    const over = await transferUpload({ ...grant, maxBytes: limit + 1 }, new Blob([file, new Uint8Array([0])], { type: 'video/mp4' }));
+    assert.ok(!over.ok); assert.equal(over.error.code, 'invalid_input'); assert.equal(requests, 0);
+    const exact = await transferUpload(grant, file);
+    assert.ok(exact.ok); assert.equal(received, limit); assert.equal(requests, 1);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  }
+});

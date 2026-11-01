@@ -85,8 +85,11 @@ describe('owned artifact persistence and reads', { timeout: 120000 }, () => {
 
   test('denied writes leave no partial rows', async () => {
     const counts = async () => (await query(db.servingUrl, 'SELECT (SELECT count(*) FROM artifacts.artifacts) AS artifacts, (SELECT count(*) FROM artifacts.versions) AS versions, (SELECT count(*) FROM artifacts.conversation_uses) AS uses')).rows;
+    const initial = await counts();
     const foreign = await store.insert({ ...insert, accountId: 'account-b', conversationId: otherConversation });
     const before = await counts();
+    // The serving role sees the allowed write, so unchanged counts below mean nothing was written.
+    assert.notDeepEqual(before, initial);
     for (const input of [
       { ...insert, conversationId: otherConversation }, { ...insert, dependencies: [foreign.id] },
       { ...insert, dependencies: ['unknown'] }, { ...insert, artifactId: foreign.artifactId },

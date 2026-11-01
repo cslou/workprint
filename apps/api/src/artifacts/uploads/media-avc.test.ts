@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { requireStableAvc } from './media-avc.js';
 
 // Structural-only fixture isolates range accounting; actual codec/publication proof
-// is in media-verifier.security.test.ts. These bytes are not a decode verdict.
+// is in test/integration/image-upload.test.ts. These bytes are not a decode verdict.
 function sampleRanges(){
   const ints=(...values:number[])=>{const out=Buffer.alloc(values.length*4);values.forEach((value,i)=>out.writeUInt32BE(value,i*4));return out;};
   const box=(name:string,payload:Buffer)=>Buffer.concat([ints(payload.length+8),Buffer.from(name),payload]);
