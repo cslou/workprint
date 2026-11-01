@@ -24,8 +24,10 @@ export async function holdRealResponse(page: Page, pattern: string) {
 export function allowSignIn(network: MaterialNetwork, authOrigin: string) {
   network.expectOperations({ origin: authOrigin, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: authOrigin, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
 }
-export async function enter(page: Page, network: MaterialNetwork, fixture: Fixture, user: { email: string; password: string }, id?: string) {
+export async function enter(page: Page, network: MaterialNetwork, fixture: Fixture, user: { id: string; email: string; password: string }, id?: string) {
   allowSignIn(network, fixture.auth.url);
+  // Every workspace entry performs exactly one initial Recents read.
+  allowList(network, fixture.application!.apiOrigin, user.id);
   await page.goto(origin + '/app' + (id ? '?conversation=' + id : '')); await account(page); await signIn(page, user.email, user.password);
   await expect(page.getByRole('dialog')).not.toBeVisible();
 }

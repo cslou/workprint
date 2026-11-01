@@ -43,6 +43,10 @@ export function useNativeNavigation(connection: BrowserClient, accountId: string
     if (id && accountId && /^[0-9a-f-]{36}$/i.test(id)) void open(id);
     // Account composition re-keys this owner; restore is a read, never a create.
   }, []);
+  useEffect(() => {
+    // One initial Recents read per owned workspace entry; scope changes re-key this owner.
+    if (client && accountId) void list();
+  }, []);
   const list = async (page = 0) => {
     if (!client || !accountId) { signIn(); return; }
     const revision = ++listing.current, request = controller();

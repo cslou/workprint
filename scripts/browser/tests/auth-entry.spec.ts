@@ -1,6 +1,6 @@
 import { test, expect } from '../material-network.js';
 import { fixture, origin, signIn, account, privateFill, privateForward, privateFulfill, privateAbort, privateNavigate } from '../account-fixture.js';
-import { allowHistory } from '../navigation-fixture.js';
+import { allowHistory, allowList } from '../navigation-fixture.js';
 import { watchWorkspace, noWorkspace } from '../entry-observer.js';
 
 test.use({ screenshot: 'off', trace: 'off', video: 'off' });
@@ -16,6 +16,7 @@ test('public entry and protected deep links never mount workspace before confirm
     await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('autocomplete', 'current-password');
     expect(materialNetwork.entries.filter(entry => entry.url.pathname.startsWith('/memory/'))).toHaveLength(0);
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
+    allowList(materialNetwork, f.application!.apiOrigin, user.id);
     await signIn(page, user.email, user.password);
     await expect(page).toHaveURL(origin + '/app');
     await expect(page.getByRole('button', { name: 'New video', exact: true })).toBeVisible();
@@ -31,7 +32,7 @@ test('cold failure and held retry keep workspace unmounted, then restore the exa
     const before = await f.application!.snapshot(), target = '/app?conversation=' + saved.id;
     await page.goto(origin + target); await expect(page).toHaveURL(origin + '/sign-in?returnTo=' + encodeURIComponent(target)); await noWorkspace(page);
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
-    allowHistory(materialNetwork, f.application!.apiOrigin, user.id, saved.id);
+    allowHistory(materialNetwork, f.application!.apiOrigin, user.id, saved.id); allowList(materialNetwork, f.application!.apiOrigin, user.id);
     await signIn(page, user.email, user.password); await expect(page.getByRole('list', { name: 'Saved messages' })).toHaveText('Synthetic exact routing history — NOT AI');
     await f.auth.pauseAuthUpstream();
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
@@ -45,7 +46,7 @@ test('cold failure and held retry keep workspace unmounted, then restore the exa
     await page.getByRole('button', { name: 'Try again', exact: true }).click(); await expect.poll(() => held).toBe(true);
     await expect(page.getByRole('heading', { name: 'Checking your session' })).toBeVisible(); await noWorkspace(page);
     expect(materialNetwork.entries.filter(entry => entry.url.pathname.startsWith('/memory/'))).toHaveLength(reads);
-    allowHistory(materialNetwork, f.application!.apiOrigin, user.id, saved.id); release!();
+    allowHistory(materialNetwork, f.application!.apiOrigin, user.id, saved.id); allowList(materialNetwork, f.application!.apiOrigin, user.id); release!();
     await expect(page.getByRole('list', { name: 'Saved messages' })).toHaveText('Synthetic exact routing history — NOT AI');
     await expect(page).toHaveURL(origin + target); expect(await f.application!.snapshot()).toBe(before);
   } finally { release?.(); await f.close(); }
@@ -73,6 +74,7 @@ test('uncertain revocation locks immediately and its truthful feedback survives 
     const before = await f.application!.snapshot();
     await page.goto(origin + '/sign-in');
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
+    allowList(materialNetwork, f.application!.apiOrigin, user.id);
     await signIn(page, user.email, user.password); await expect(page).toHaveURL(origin + '/app');
     await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Private draft must disappear'); await account(page, user.email);
     const gate = new Promise<void>(resolve => { release = resolve; }); let held = false;
