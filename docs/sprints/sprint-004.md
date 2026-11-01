@@ -2,7 +2,17 @@
 
 **Date:** Planned and started 2026-10-29
 **Goal:** Serve the backend through an app-owned entry on the official Mastra Hono adapter and pass bounded-ingress qualification, deliver standard Auth and owned conversation navigation, and qualify native turn transport and independent workflow recovery through the built backend without enabling application inference.
-**Status:** 🔵 In Progress
+**Status:** 🟢 Complete — all stories merged into `sprint-004`. Human QA passed (Lou, 2026-11-01). Integration into `main` awaits Lou's explicit merge command.
+
+**Added-story planning review:** Second independent review **5/5**, no remaining findings. Initial Story 9 P1 and five P2 clarifications are resolved inline. Lou authorizes implementation; displayed design checkpoints remain main-owned under delegation, with whole-sprint QA handback and later human ratification. Added-story kickoff checklists are confirmed only when their design/dependency gates are met.
+
+**QA scope addition (2026-11-01):** Lou requests a mock public landing page, a standalone simple-card sign-in page inspired by Apira’s transition pattern, and a protected workspace that never renders for signed-out users. Add Story 8 below. Lou subsequently requested Story 9 for Recents/navigation skeleton loading and Story 10 for an inviting centered authenticated opening composer. Prior combined verification at `0496afd` remains valid historical evidence for Stories 1a–7, not completion evidence for the expanded sprint. Existing completion records must be refreshed after Stories 8–10.
+
+**QA decisions (2026-11-01, Lou):**
+- **Test trim:** The MVP keeps only crucial suites. One-off screenshot/visual suites, auth-evidence qualification, ingress qualification and non-crucial API/browser specs are removed (merged before the QA build). Run targeted checks per change and one trimmed full run before QA, not repeated heavy runs.
+- **Skeleton timing:** This overrides Story 9's "no artificial delay". Placeholders appear only after about 250ms, reserving their space invisibly, then stay at least about 450ms. History uses the delay only.
+- **Chat header:** The visible conversation title, the "Conversation history" subtext and the divider are removed. A screen-reader-only heading stays the focus target.
+- **New video is client-only:** Clicking it writes nothing; it returns to the opening composer. The video id is the native thread id, and that thread is created by the first accepted send ([Sprint 006](sprint-006.md) Story 2). Until Send ships, New video creates no record. This replaces the earlier explicit create-on-click flow (PR #50).
 
 **Planning result:** sprint-doc-reviewer **4/5**, "Ready to start" (2026-10-29), with one P2 resolved below. The independent dependency review of the Phase 3 packaging returned "sound with fixes"; all its fixes are applied. Lou authorized Phase 3 Wave 1 on 2026-10-29. [Story 001](../stories/story-001.md) merged into `phase-3` at `a7444a2` ([PR #33](https://github.com/cslou/workprint/pull/33)), the start checklists are confirmed, and `sprint-004` branches from that head.
 
@@ -11,6 +21,12 @@
 ---
 
 ## Handoff
+
+### Completion procedure update
+
+**Expanded QA handback:** After Stories 8–10, provide a fresh QA build/URL tied to the expanded head, current-head independent review, combined ordered regression evidence and a public-entry → sign-in → Recents/loading → empty/populated welcome → recovery/logout/Back walkthrough. Preserve the current QA instance until replacement is ready. Main owns delegated design approvals pending Lou’s whole-sprint ratification; do not require routine story-by-story handback. User authorized implementation after planning review; sprint integration still needs its own explicit merge command.
+
+The current canonical Sprint Completion checklist supersedes this document’s older “Final Story” packaging, mandatory verification-count delta and duplicated per-story reruns. Completion records belong in a chore PR, not another implementation story. The combined regression suite covers registered story checks; only nonredundant cross-story checks run separately. Historical criteria below remain evidence context, not an instruction to fabricate counts or repeat covered runs. Human QA, current-head independent review and explicit sprint-integration approval remain separate gates.
 
 ### Project Context
 - **Repo:** `/Users/lou/projects/workprint`
@@ -417,6 +433,106 @@ The Final Verification Story runs all applicable sprint functional verification 
   2. `Test(workflow): Prove guarded step reentry` — lost acknowledgment/repeated-effect and regression evidence.
 - **Technical notes:** startup recovery (`restartAllActiveWorkflowRuns()`) now runs in the app-owned entry from Story 1a. This story qualifies it through real kill/restart and extends that entry if more is needed. the fixture ledger proves the save/start seam, not a production business state machine. Reconciliation is a narrow bounded hand-off using stable identity and supported native state; no polling scheduler or application-owned native schema repair. An essential recovery gap blocks P3-S8/S11–S13 consumers and returns for approval.
 
+#### Story 8: Public entry, standalone sign-in and protected workspace
+- **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THIS ADDED STORY)
+  - [ ] Follows sprint template
+  - [ ] Acceptance criteria are specific and testable
+  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions
+  - [ ] Story is small enough to review and merge independently
+  - [ ] Reviewed by sub-agent
+  - [ ] Review findings addressed or explicitly recorded
+  - [ ] Ready for Lou
+- **Planning review:**
+  - Findings: First independent review 4/5 for this story: clarify restoration retry versus token refresh, and exact route/return handling.
+  - Resolution: Route matrix and owner-revalidation verification added below. Preview/flow approval remains required; no new auth service or dependency.
+- **As a** visitor, **I want** a clear public entry and dedicated sign-in screen before the workspace, **so that** unauthenticated access does not appear to expose the application.
+- **Dependencies:** Existing Story 2 AccountOwner/session fencing and Story 3 navigation; approved incremental landing/sign-in/route-state previews. Preserve active human QA instance until the replacement is ready.
+- **Acceptance criteria:**
+  - [ ] Provide a minimal mock public landing at `/`, standalone sign-in card at `/sign-in` and authenticated workspace at `/app`. Landing CTA navigates to sign-in; confirmed sign-in enters `/app`. Already authenticated sign-in visits replace to the allowed workspace destination. Mock landing is a public visual entry, not a fake workspace or marketing-product expansion.
+  - [ ] Direct `/app` visits without a confirmed session replace to sign-in. During restoration or auth-service failure show neutral checking/retry UI, never mount workspace/history or initiate protected reads. Refresh, browser Back and cross-tab sign-out/expiry preserve the same gate; no transient workspace flash.
+  - [ ] Reuse existing AccountOwner and official Supabase email/password flows; card is presentation, not another session store. Preserve invalid-credential recovery, local lock on uncertain sign-out, password reset/update and `/auth/callback` URL-secret removal. Recovery never grants workspace access before the existing fresh-sign-in requirement. Do not copy Apira’s GitHub-only OAuth restriction or its loading-shell behavior.
+  - [ ] Return destinations are same-origin and allowlisted to supported workspace paths; reject external/protocol-relative, encoded bypass, auth/callback/API and malformed targets, falling back to `/app`. No new query-param conversation protocol; retain existing native owned navigation. Backend Auth/ownership remains authoritative regardless of browser routing.
+  - [ ] Sign-out routes to public landing only after immediately clearing/locking private presentation; uncertain server revocation remains visible and cannot silently restore the workspace. Session expiry routes to sign-in with truthful feedback, while transient restoration failure offers retry without claiming expiry.
+- **Functional verification:**
+  - [ ] Actual browser, built backend, isolated Auth/Postgres: landing CTA → card → sign-in → New video/Recents; direct protected URL signed out; authenticated reload; failed/slow restoration; sign-out/expiry/cross-tab/Back; password recovery callback. Assert workspace DOM never mounts and protected reads never run before confirmed authentication, not merely a screenshot hidden with CSS.
+  - [ ] Exercise safe/unsafe return paths and real authorization failures; compare exact saved history before/after auth routing. Failed credentials preserve retry without duplicate requests or private data exposure. Preserve unknown sign-out lock and callback secret stripping.
+- **Regression verification:**
+  - [ ] Existing account/error/concurrency/boundary/settlement, conversation navigation/history/race, native admission, disabled-Send and production-fixture exclusion checks continue to pass. Full combined ordered sprint suite and independent review run again on the resulting expanded head.
+- **Editorial/design verification:** Main authors incremental previews of public landing, sign-in, checking, error/retry and recovery routing at 1440/390 using Workprint tokens; explicit displayed approval before application implementation. Independent tracked references at 1440/390/820/821 for main surfaces and 1440/390 representative states; keyboard/focus, password-manager labels, contrast/no overflow and no workspace flash. Existing app header/account controls remain for signed-in users.
+- **Manual-only behavior verification:** Behavior automated. Lou reviews new public/sign-in flow and ratifies displayed designs; this is not a substitute for route/session tests.
+- **Planned commits:**
+  1. `Feat(auth): Add public entry and sign-in page` — approved presentational components and entry routes.
+  2. `Feat(auth): Guard workspace session routing` — existing-owner route gate and safe return/recovery handling.
+  3. `Test(auth): Verify protected entry flows` — real browser/session/race and independent visual proof.
+- **Route and restoration decisions:** `/` remains public even when signed in, with an Open workspace CTA; `/app` supports the existing `conversation` query, validated by native ownership rather than trusted from the URL. Legacy `/?conversation=…` migrates to `/app?conversation=…` through the same auth gate. Only `/app` and that supported query are allowed return destinations; other paths/query fields fall back to `/app`. `/auth/callback` recovery handling takes precedence over ordinary authenticated redirects. Pending/unconfirmed sign-out retains existing local lock and visible account-exit feedback on the public page, including Back/reload. Cold restoration failure retries supported session revalidation through the same AccountOwner; ordinary token refresh of an already confirmed session preserves the mounted workspace/draft, while terminal rejection tears it down.
+- **Additional verification:** Real failed cold restoration → explicit Retry → successful owner revalidation restores the exact owned conversation without password re-entry or a second owner. Successful token refresh preserves drafts; terminal rejection hides private UI. Exercise legacy and sign-in return paths with the exact conversation query, recovery precedence and unconfirmed logout after Back/reload.
+- **Technical notes:** Read-only Apira reference: `apps/web/components/auth/SignInCard.tsx`, `app/(auth)/login/page.tsx`, `lib/auth/redirects.ts`, `proxy.ts`. Apira’s marketing is separate and its root redirects to console; its DashboardShell mounts children while auth is loading, so that implementation must NOT be copied. Workprint remains the existing Vite/React client with one AccountOwner; no Next.js migration, OAuth provider change or new auth ledger. Explicit access failure is not permission to weaken backend admission.
+
+#### Story 9: Explicit navigation loading and skeletons
+- **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THIS ADDED STORY)
+  - [ ] Follows sprint template
+  - [ ] Acceptance criteria are specific and testable
+  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions
+  - [ ] Story is small enough to review and merge independently
+  - [ ] Reviewed by sub-agent
+  - [ ] Review findings addressed or explicitly recorded
+  - [ ] Ready for Lou
+- **Planning review:**
+  - Findings: First review 3/5: P1 pending-only tests could miss an initial read that never starts; P2 append wording conflicts with current Previous/Next pagination.
+  - Resolution: Explicit initial-entry lifecycle/test and retained-page-while-pending replacement semantics added. Investigate actual request/state ordering; symptom alone does not establish cause.
+- **As a** creator, **I want** visible loading placeholders for pending navigation data, **so that** a loading sidebar does not look empty or broken.
+- **Dependencies:** Story 8 auth gate; approved skeleton-state previews; existing native Recents pagination and scope fencing.
+- **Acceptance criteria:**
+  - [ ] Establish a bounded inventory of asynchronous fields in the authenticated navigation/open-conversation surface: Recents titles/list, active conversation title and initial history. Implement skeletons where content is genuinely unresolved, retaining already-correct explicit loading UI where appropriate. No repository-wide skeleton retrofit or unrelated Library/media redesign.
+  - [ ] Authenticated workspace entry initiates exactly one initial Recents list read without requiring a Recents/Menu click. From the first relevant authenticated render, unresolved initial Recents renders stable, noninteractive row placeholders, never a blank list or `No videos yet`. Successful zero results alone show empty copy; failure shows explicit error/retry. No artificial delay/minimum spinner duration or fake titles/counts.
+  - [ ] Keep existing Previous/Next page replacement: while the next page is pending or fails, retain the current page, selection and scroll with loading/error feedback. Successful pagination replaces that page using the existing range/focus/announcement contract; no cumulative or infinite list. Same-page refresh retains current rows while pending. Changing account clears all former titles immediately; late results cannot populate the new scope. Desktop sidebar and narrow navigation use the same state semantics.
+  - [ ] Skeleton dimensions reuse approved row/type geometry, reserve layout space and are hidden from assistive technology; the owning region exposes busy/status semantics without repeated announcements. Reduced-motion renders static skeletons. Placeholder rows cannot receive focus or trigger navigation.
+- **Functional verification:**
+  - [ ] Deterministically delay actual authenticated native Recents/history reads through the real browser/backend harness; assert pending placeholders are present before response, empty/error are absent, and success/empty/error transitions settle correctly. Cover failed request/retry and account switch while pending; preserve the original observed blank-state reproduction as red evidence where reproducible.
+  - [ ] Seed owned Recents, enter `/app` without clicking navigation, hold its initial real response and assert skeletons before release then exact titles afterward, with exactly one list request and none before authentication. Delay next-page/refresh and verify current rows/selection/scroll remain while pending, then correct replacement on success; narrow menu opening while data loads and keyboard navigation never focus placeholder rows. No production delay flag or response fixture route.
+- **Regression verification:**
+  - [ ] Run navigation/history/auth teardown/race tests and existing visual geometry checks, including history anchoring, no duplicate requests and no protected reads before authentication. No synthetic data or changed backend pagination contract.
+- **Editorial/design verification:** Approve independently linkable initial/next-page-pending/error/empty and reduced-motion skeleton states at 1440/390; main surfaces also 820/821. Zero-drift tracked references, no horizontal overflow, stable row layout and accessible status/focus checks.
+- **Manual-only behavior verification:** N/A — pending states and transitions automated. Lou reviews perceived loading clarity on the QA build.
+- **Planned commits:**
+  1. `Feat(navigation): Show pending data skeletons` — narrowly scoped loading-state presentation.
+  2. `Test(navigation): Cover delayed recent reads` — real pending/error/pagination/scope and visual evidence.
+- **Technical notes:** Skeletons represent unresolved reads, not failed authorization. Story 8 neutral auth-checking screen must not reveal even a private workspace skeleton before confirmation. Retain native API and existing single session owner.
+
+#### Story 10: Centered authenticated welcome and composer
+- **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THIS ADDED STORY)
+  - [ ] Follows sprint template
+  - [ ] Acceptance criteria are specific and testable
+  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions
+  - [ ] Story is small enough to review and merge independently
+  - [ ] Reviewed by sub-agent
+  - [ ] Review findings addressed or explicitly recorded
+  - [ ] Ready for Lou
+- **Planning review:**
+  - Findings: First review 4/5: clarify complete layout-state matrix and separate native persistence evidence from fixture-only saved-material compatibility.
+  - Resolution: Explicit matrix and two proof lanes added below. User explicitly requests the centered opening composition. Current `demo-01.html` separates welcome/thread and composer, and `design.md` documents a bottom offset; reconcile this scoped conflict in displayed design references instead of treating contradictory legacy geometry as authority.
+- **As a** creator, **I want** an inviting welcome with the input beside its prompt, **so that** the first authenticated screen clearly communicates where to begin.
+- **Dependencies:** Stories 8–9; approved opening/populated/loading layout previews; existing composer, scoped draft and history controllers.
+- **Acceptance criteria:**
+  - [ ] On authenticated entry with no selected conversation, and for a confirmed empty conversation, show the inviting Workprint heading, concise supporting guidance and existing composer together in a centered main-column group. Reuse brand typography/tokens and the welcome intent from `docs/design/demo-01.html` and `flow2-step1-r73.html`; do not center across the sidebar or hide required navigation.
+  - [ ] Use bottom-docked composer for an existing conversation with messages. Pending history uses honest loading presentation, not a premature empty welcome that flashes before messages. A saved-work-only conversation must retain its visible material panels and drafts; empty message history is not permission to discard saved work.
+  - [ ] Transition opening/loading/populated states without remounting or losing the composer draft, attachment/recovery identity, focus or active manual editor. Selecting/reopening conversations preserves existing scope-reset rules and history anchoring. Rendering welcome never creates a conversation or submits a message automatically.
+  - [ ] Keep Send's current unavailable behavior and no live model calls in Sprint 004. Welcome copy must not claim that generation/chat already works; any availability note uses the existing feedback treatment. This authenticated welcome is distinct from Story 8's public landing and must not appear before auth confirmation.
+  - [ ] At narrow widths and short viewports, use natural scrolling and safe spacing rather than a fixed vertical position that clips the heading/input; focused input and action controls remain reachable. Established populated chat behavior remains unchanged.
+- **Functional verification:**
+  - [ ] Actual authenticated browser tests cover no-selection entry, New video with empty history, loading then empty, loading then populated, reopen/reload and saved-work-only conversations. Assert correct centered/docked state from authoritative history, no pre-auth workspace and zero render-triggered create/send effects.
+  - [ ] Type a draft, open/close attachment UI, trigger same-scope updates and switch layout state under controlled history; verify preservation of intended draft/focus/recovery state and correct teardown across accounts/conversations. Cover short/narrow viewport and keyboard scrolling.
+- **Regression verification:**
+  - [ ] Run composer/input/history/scroll/navigation/Auth and applicable upload/manual-edit preservation checks on the actual branch. Do not import unintegrated Sprint 005 implementation; requalify shared composer/shell changes when wave branches integrate. Existing disabled-Send/native separation remains intact.
+- **Editorial/design verification:** Main reconciles the opening-screen guide and linked brand-book/demo references at the component approval checkpoint, retaining unaffected populated-chat designs. Show welcome/empty/history-loading/populated examples at 1440/390 before implementation; independent main comparisons at 1440/390/820/821, representative short-height, focus/no-overflow and zero drift. User direction approves the goal, not unseen pixel designs.
+- **Manual-only behavior verification:** N/A — layout/state transitions automated. Lou ratifies the updated inviting opening composition on the displayed preview and QA build.
+- **Planned commits:**
+  1. `Feat(conversation): Center the opening composer` — approved welcome and authoritative layout-state mapping.
+  2. `Test(conversation): Verify welcome transitions` — empty/loading/populated and preservation/visual proof.
+- **Layout matrix:** No selected or restoring conversation → centered opening only after navigation resolves that no conversation is selected. A selected/URL-restoring conversation → initial loading, never an intermediate empty welcome; confirmed zero history → centered empty presentation; messages → docked composer. History error/foreign/absent → existing error/unavailable feedback, never empty welcome. Workspace pending/error/501 is independent panel feedback, never proof of absent saved materials. Saved-work-only keeps material panels/editor state. Same-scope updates preserve focus; actual navigation retains its intentional heading-focus contract.
+- **Evidence lanes:** Real Auth/backend/native Postgres proves routing, owned history, initial/empty/populated/error transitions and no implicit create/send; observe intermediate renders to rule out welcome flashes. Existing labelled read-only workspace/component fixtures prove saved-material/manual-editor/attachment recovery compatibility because this branch still returns workspace501. That lane is not production saved-work persistence proof; no hidden Sprint005 dependency. Preserve production-fixture exclusion and requalify actual shared consumers when Wave1 branches integrate.
+- **Technical notes:** One composer/controller, not separate welcome and conversation forms with independent state. Layout is presentation, never permission to bypass native ownership or infer model completion from message order. Brand-book example prose about future capabilities is not implementation authorization.
+
 #### Final Story: Sprint Verification & Completion
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
   - [x] Uses the story sections above and the existing regression suite as the verification source of truth
@@ -466,3 +582,46 @@ The Final Verification Story runs all applicable sprint functional verification 
 - Sprint doc includes `## Final Review` with the final completion message and a New Dependencies field containing dependencies or `None`.
 - Sprint-integration PR is reviewed, passes the required gates, and is merged only after the explicit user merge command.
 - If the sprint introduces new flows, they are folded into the implementation spec before sprint integration.
+
+## Final Review
+
+- **Outcome:** All implementation stories are accepted into `sprint-004`:
+  - Stories 1a–7: #34, #35, #37, #40, #42, #43, #44 and #45. Their earlier evidence at `0496afd` remains valid history.
+  - Story 8, public entry, sign-in page and protected `/app`: #46.
+  - Story 9, Recents/navigation skeletons: #47.
+  - Story 10, centred opening composer: #48.
+  - QA follow-ups:
+    - Test trim (9a744cf).
+    - Client-only New video, skeleton timing and header removal: #50.
+    - Fix for a locked tab hanging on "Checking your session": #53.
+    - Focus, `aria-busy`, dead-code and design-guide follow-ups: #54.
+
+  Every PR had a current-head independent review scoring at least 4/5 with no open P0 or P1.
+- **Combined-branch verification:** One trimmed full run at `76e3962`, 212s in total:
+  - frozen install, check and build: PASS
+  - API: 64/64
+  - browser component group: 116/116
+  - serial journeys: 20/20
+
+  Per Lou's MVP direction, visual/screenshot, auth-evidence and ingress qualification and non-crucial specs were removed (see QA decisions above). Their earlier results are history, not current gates.
+- **Human QA:** Lou ran QA on the fresh build: public entry, sign-in, Recents and skeletons, centred welcome, New video, populated history, sign-out and Back, and recovery from a locked tab. Result: pass. Lou also ratified the delegated designs for Stories 8–10 at QA.
+- **Unresolved issues, all P2 and deferred:**
+  - Auth `retryRestore` after an init failure.
+  - A fence-key exit notice can show "session ended" in other tabs.
+  - A stale unused reset verifier brings back the 30s locked-start wait.
+  - Two millisecond-wide cross-tab races are accepted in #53.
+  - `question`/`config` specs should move to the serial group.
+  - Test gaps:
+    - account switch with `?conversation`
+    - Recents failure/empty states
+    - the draft-remount proof
+    - narrow-menu New video focus
+    - restore not stealing focus
+  - The rAF modal-focus guard is duplicated and could become a shared helper.
+  - Full audit remains NON-PASS (B-004, B-008) under the existing private/local-only exception.
+- **Review:** Story and follow-up PRs were reviewed as listed above. This completion record and the cumulative `sprint-004 → main` diff each get a current-head independent review. Sprint integration needs Lou's explicit merge command.
+- **Spec/flow changes:**
+  - New video is client-only. The video id is the native thread id, created by the first accepted send in [Sprint 006](sprint-006.md) Story 2; this is recorded in the implementation spec and the Sprint 006 ACs.
+  - Send remains disabled in this sprint.
+  - Public `/`, `/sign-in` and protected `/app` routing replaces the dialog-first entry.
+- **New Dependencies:** None added by Stories 8–10 or the follow-ups. `pngjs`/`@types/pngjs` were removed with the screenshot suites. Story 1a–7 dependencies are unchanged: `@mastra/hono` 1.7.21, `hono` 4.13.14, `@hono/node-server` 1.19.17, `@mastra/memory` 1.39.0, `@mastra/client-js` 1.56.0 and `@supabase/auth-js` 2.118.0.

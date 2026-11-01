@@ -39,9 +39,7 @@ The exact client-js 1.56.0 dependency avoids copying a native client/protocol/ty
 
 ## Independent visual references
 
-The test-only `apps/web/test/navigation-reference/` freezes all 29 independently authored approved views. Verification never reads ignored previews or derives expected markup/CSS from the consumer. `scripts/browser/navigation-reference.ts` supplies only fictional content and composes tracked references. Main surfaces cover 1440/390/820/821; every representative state covers 1440/390. Comparisons are full-context, zero tolerance, with paired geometry and source hashes.
-
-Two explicit compositions reconcile exploratory artifacts with the binding guide: Session states preserve the earlier approved Auth notice colour/action inset rather than changing Auth to a generic modal; desktop long-title grid tracks are constrained so the required ellipsis works (the unconstrained exploratory track was about 691px inside a 235px sidebar). Frozen files remain unchanged. These are guide-based reference corrections, not masks, weakened assertions or acceptance of current screenshots. Original failures remain recorded. Human ratification and independent review remain separate.
+The frozen visual references and zero-tolerance screenshot comparisons were a one-off qualification. They were removed on 2026-11-01 (Lou's MVP test trim) and are no longer part of verification. Behaviour is covered by the conversation-navigation browser journeys.
 
 ## Completion qualification details
 
