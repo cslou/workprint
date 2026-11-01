@@ -12,11 +12,11 @@
     "db:prepare": "node scripts/tasks.mjs db:prepare",
     "db:migrate": "node supabase/migrate.mjs",
     "db:local": "node scripts/local-database.mjs",
-    "check": "tsc -p packages/contracts/tsconfig.json && tsc -p packages/api-client/tsconfig.json && tsc -p packages/player/tsconfig.json && tsc --noEmit && tsc -p scripts/browser/tsconfig.json && eslint . && node scripts/boundaries.mjs && node scripts/boundary-controls.mjs",
+    "check": "tsc -p packages/contracts/tsconfig.json && tsc -p packages/api-client/tsconfig.json && tsc -p packages/player/tsconfig.json && tsc --noEmit && tsc -p test/e2e/tsconfig.json && eslint . && node scripts/boundaries.mjs && node scripts/boundary-controls.mjs",
     "test": "node scripts/test.mjs",
     "test:unit": "node scripts/test.mjs unit",
     "test:integration": "node scripts/test.mjs integration",
-    "test:browser": "node scripts/test.mjs compile && node scripts/test-stack.mjs playwright test --config scripts/browser/playwright.config.ts"
+    "test:browser": "node scripts/test.mjs compile && node scripts/test-stack.mjs playwright test --config test/e2e/playwright.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

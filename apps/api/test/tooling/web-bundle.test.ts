@@ -34,10 +34,10 @@ test('the production web bundle contains no test code or backend secrets', { tim
   const bundle = Buffer.concat(emitted).toString('utf8');
   for (const secret of [accessKey, secretKey, sentinel]) assert.ok(!bundle.includes(secret), 'Backend secrets must not enter browser output');
   // Web unit-test titles survive minification, so they identify test code if it were ever bundled.
-  const webTests = readdirSync(join(root, 'apps/web/src'), { recursive: true, encoding: 'utf8' }).filter(file => file.endsWith('.test.ts'));
+  const webTests = readdirSync(join(root, 'apps/web/test/unit'), { recursive: true, encoding: 'utf8' }).filter(file => file.endsWith('.test.ts'));
   assert.ok(webTests.length > 0);
   for (const file of webTests) {
-    const titles = [...(await readFile(join(root, 'apps/web/src', file), 'utf8')).matchAll(/^test\('([^']+)'/gm)].map(match => match[1]!);
+    const titles = [...(await readFile(join(root, 'apps/web/test/unit', file), 'utf8')).matchAll(/^test\('([^']+)'/gm)].map(match => match[1]!);
     for (const title of titles) assert.ok(!bundle.includes(title), `Test code bundled: ${file}`);
   }
   await fixture.noNetwork();

@@ -1,7 +1,7 @@
 import { globSync, rmSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
 
-// Groups: `unit` needs no Docker; `integration` runs against one shared stack of Postgres, Auth and storage containers.
+// Groups: `unit` (each package's test/unit) needs no Docker; `integration` (the rest of apps/api/test) runs against one shared stack of Postgres, Auth and storage containers.
 const group = process.argv[2];
 if (group && !['unit', 'integration', 'compile'].includes(group)) throw new Error('Unknown test group');
 
@@ -14,10 +14,14 @@ for (const project of ['packages/contracts/tsconfig.json', 'packages/api-client/
 // Development fixtures need the same dependency-ordered compilation, not tests.
 if (group === 'compile') process.exit(0);
 
-// Every compiled test lands in a group: Docker-backed tests live under apps/api/test, all others are unit tests.
+// Tests live in each package's test/ folder, never beside source; every compiled test lands in exactly one group.
+const misplaced = globSync('{apps,packages}/*/src/**/*.test.{ts,tsx}');
+if (misplaced.length) throw new Error(`Tests belong in <package>/test/, not beside source: ${misplaced.join(', ')}`);
 const compiled = globSync('{apps/api,apps/web,packages/api-client}/.test-build/**/*.test.js');
-const integration = compiled.filter(file => file.startsWith('apps/api/.test-build/test/'));
-const unit = compiled.filter(file => !integration.includes(file));
+const unit = compiled.filter(file => file.includes('/.test-build/test/unit/'));
+const integration = compiled.filter(file => file.startsWith('apps/api/.test-build/test/') && !unit.includes(file));
+const orphaned = compiled.filter(file => !unit.includes(file) && !integration.includes(file));
+if (orphaned.length) throw new Error(`Tests outside a known group: ${orphaned.join(', ')}`);
 const files = group === 'unit' ? unit : group === 'integration' ? integration : [...unit, ...integration];
 if (files.length === 0) throw new Error('No tests discovered');
 const run = [process.execPath, '--test', '--test-concurrency=1', ...files];
