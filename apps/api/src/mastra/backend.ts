@@ -3,7 +3,7 @@ import { registerApiRoute, type ApiRoute } from '@mastra/core/server';
 import { PostgresStore } from '@mastra/pg';
 import { Pool } from 'pg';
 import { createOwnedConversationCheck, bindNativeTurns, productionTools, turnLimits, type AgentCollaborators, type AgentTool, type NativeTurnModel, type TurnLimits } from '../agent/index.js';
-import { createApplication, withSavedWork, withManualSaves, withVersionUses, withStoryboardEdits, withUploads } from '../application/index.js';
+import { createApplication, createWorkspaceReader, withSavedWork, withManualSaves, withVersionUses, withStoryboardEdits, withUploads } from '../application/index.js';
 import { createArtifactStore, createArtifactWriters, createVersionUses, createStoryboardEdits, createMediaVerifier, createUploadCoordinator } from '../artifacts/index.js';
 import { configuredMediaSandbox, configuredObjectStorage } from '../storage/index.js';
 import { assertRestrictedRole } from '../db/index.js';
@@ -45,9 +45,11 @@ export async function createBackend(routes: ApiRoute[] = [], turns?: TurnComposi
     objects?.close(); await media?.close(); await pool.end();
     throw new Error('Serving storage unavailable or privileged; prepare storage separately and use restricted DATABASE_URL');
   }
+  const tools = turns ? turns.tools ?? productionTools : [];
   const storage = new PostgresStore({ id: 'workprint-native', schemaName: 'mastra', disableInit: true, pool });
   const application = createApplication({ checkOwnedConversation: createOwnedConversationCheck(storage) });
-  const savedApplication = withSavedWork(application, createArtifactStore(pool, application.checkOwnedConversation));
+  const savedWork = createArtifactStore(pool, application.checkOwnedConversation);
+  const savedApplication = withSavedWork(application, savedWork);
   const manualApplication = withManualSaves(savedApplication, createArtifactWriters(pool, application.checkOwnedConversation).human.save);
   const reuseApplication = withVersionUses(manualApplication, createVersionUses(pool, application.checkOwnedConversation).useVersion);
   const planningApplication = withStoryboardEdits(reuseApplication, createStoryboardEdits(pool, application.checkOwnedConversation).editStoryboard);
@@ -104,9 +106,9 @@ export async function createBackend(routes: ApiRoute[] = [], turns?: TurnComposi
     },
   }, { before: async () => { try { await media?.close(); } finally { objects?.close(); } }, after: async () => { if (!pool.ended) await pool.end(); } });
   if (turns) {
-    // Application functions that tools may call; read-workspace joins in Story 3.
-    const collaborators: AgentCollaborators = {};
-    bindNativeTurns(mastra, { model: turns.model, tools: turns.tools ?? productionTools, limits: turns.limits ?? turnLimits, collaborators });
+    // Application functions that tools may call, each over the same owned reads as the HTTP boundary.
+    const collaborators: AgentCollaborators = { readWorkspace: createWorkspaceReader(savedWork) };
+    bindNativeTurns(mastra, { model: turns.model, tools, limits: turns.limits ?? turnLimits, collaborators });
   }
   return mastra;
 }

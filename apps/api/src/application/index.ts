@@ -54,3 +54,4 @@ export { withManualSaves, type ManualSaveApplication } from './manual-saves.js';
 export { withVersionUses, type VersionUseApplication } from './version-uses.js';
 export { withSavedWork, type SavedWorkApplication, type SavedWorkReads } from './saved-reads.js';
 export { withStoryboardEdits, type StoryboardEditApplication } from './storyboard-edits.js';
+export { createWorkspaceReader, type OwnedWorkspace, type OwnedWorkspaceRead, type ReadOwnedWorkspace } from './workspace-reads.js';
