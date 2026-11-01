@@ -1,4 +1,4 @@
-const phases = ['s3.create-bucket', 's3.configure-cors', 's3.readiness-write', 's3.readiness-delete', 'saved-backend.admission', 'saved-backend.prepare', 'media.storage', 'media.sandbox', 'media.synthetic', 'media.poster'] as const;
+const phases = ['s3.create-bucket', 's3.configure-cors', 's3.readiness-write', 's3.readiness-delete', 'saved-backend.admission', 'saved-backend.prepare', 'media.storage', 'media.sandbox', 'media.synthetic', 'media.poster', 'r2.cors-preflight', 'r2.snapshot', 'r2.cleanup'] as const;
 export type FixturePhase = typeof phases[number];
 export type FixtureDiagnostic = (message: string) => void;
 

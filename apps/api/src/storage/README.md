@@ -93,3 +93,37 @@ bytes, including replayed staging PUT leaving a separate conditional immutable
 object unchanged. The 2026-11-01 MVP test scope removed it; it was never a
 media decoder, working product upload, Artifact publication or R2
 qualification claim.
+
+## Development R2 qualification (Sprint 005 Story 9)
+
+`pnpm qualify:r2` is the only run that targets real R2. It sets
+`WORKPRINT_STORAGE_TARGET=r2`, which routes the existing upload, reference and
+Library playback suites through `apps/api/test/r2-development.ts` instead of
+SeaweedFS, and allows exactly the bucket's origin through the browser network
+observer. Every other run keeps the emulator and loopback-only egress. A
+missing, tracked or malformed `outputs/r2-development.json` is **NON-PASS**,
+never a skip. The run verifies the bucket's CORS rule by preflight (the token
+cannot read or set bucket settings), removes only objects created after its own
+start-time snapshot, scans its evidence for credentials and signed-query values,
+and writes `outputs/verification/sprint-005/<sha>/r2/summary.json`. Run one
+qualification per bucket at a time.
+
+Maintainer setup, once:
+
+1. In Cloudflare R2, create a dedicated private development bucket (no public
+   access, no custom domain).
+2. Set the bucket's CORS policy to the exact browser test origins of both clones:
+   ```json
+   [{ "AllowedOrigins": ["http://127.0.0.1:4179", "http://127.0.0.1:4180", "http://127.0.0.1:4279", "http://127.0.0.1:4280"],
+      "AllowedMethods": ["GET", "PUT", "HEAD"],
+      "AllowedHeaders": ["content-type", "content-length", "x-amz-content-sha256"],
+      "ExposeHeaders": ["ETag", "Content-Length", "Content-Type", "Content-Range", "Accept-Ranges"],
+      "MaxAgeSeconds": 60 }]
+   ```
+3. Create an R2 API token with **Object Read & Write** permission scoped to that
+   bucket only. Keep its Access Key ID and Secret Access Key, and note the S3
+   endpoint `https://<account-id>.r2.cloudflarestorage.com`.
+4. In each clone, write `outputs/r2-development.json` (git-ignored, mode 600)
+   with exactly `endpoint`, `bucket`, `accessKeyId` and `secretAccessKey`.
+5. With the Auth fixture variables and ports from the sprint's baseline set, run
+   `pnpm qualify:r2`.

@@ -11,7 +11,7 @@ import { createArtifactStore, createArtifactWriters, createVersionUses, createMe
 import { createMediaSandbox, createPrivateObjectStorage } from '../src/storage/index.js';
 import { MEDIA_ARCHIVE } from '../src/storage/media/pins.js';
 import { isolatedPostgres } from './postgres.js';
-import { isolatedObjectStorage } from './object-storage.js';
+import { objectStorageTarget } from './object-storage.js';
 import { applyArtifactMigrations } from './artifact-database.js';
 import { createNativeConversation } from './native-conversations.js';
 import { qualifiedMediaFixtures } from './media-fixtures.js';
@@ -20,12 +20,12 @@ const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('h
 
 test('reference edits bind verified owned/read-only images to an immutable expected base without copying or repinning other conversations', { timeout: 120000 }, async t => {
   const db = await isolatedPostgres(); t.after(db.close);
-  const service = await isolatedObjectStorage(undefined, undefined, message => t.diagnostic(message)); t.after(service.close);
+  const service = await objectStorageTarget(undefined, undefined, message => t.diagnostic(message)); t.after(service.close);
   const dockerPath = await realpath('/usr/local/bin/docker');
   const sandbox = await createMediaSandbox({ toolchainDirectory: resolve(`outputs/toolchains/ffmpeg-${MEDIA_ARCHIVE.sha256}`), dockerPath }); t.after(() => sandbox.close());
   const pool = new Pool({ connectionString: db.servingUrl, max: 4 }), setupPool = new Pool({ connectionString: db.setupUrl, max: 1 });
   const native = new PostgresStore({ id: 'reference-image-prerequisites', connectionString: db.setupUrl, schemaName: 'mastra' });
-  const storage = createPrivateObjectStorage({ endpoint: service.endpoint, bucket: service.bucket, region: 'us-east-1', credentials: service.credentials });
+  const storage = createPrivateObjectStorage({ endpoint: service.endpoint, bucket: service.bucket, region: service.region, credentials: service.credentials });
   try {
     await native.init(); await db.grantServing(); await applyArtifactMigrations(db.setupUrl);
     const account = 'reference-edit-owner', foreign = 'reference-other-owner', builtin = 'workprint-built-in';

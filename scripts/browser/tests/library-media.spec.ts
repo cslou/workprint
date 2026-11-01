@@ -12,7 +12,7 @@ import type { query as Query } from '../../../apps/api/test/postgres.js';
 
 test.use({ trace: 'off', video: 'off' });
 test('real private image inspection and saved-video playback/download grant no approval; reference edits retain exact images through conflict and lost response', async ({ page, materialNetwork }) => {
-  test.setTimeout(240000);
+  test.setTimeout(process.env.WORKPRINT_STORAGE_TARGET === 'r2' ? 420000 : 240000);
   const { createLibraryMediaFixture } = await import(pathToFileURL(resolve('apps/api/.test-build/test/library-media-work.js')).href) as { createLibraryMediaFixture: typeof Fixture };
   const { query } = await import(pathToFileURL(resolve('apps/api/.test-build/test/postgres.js')).href) as { query: typeof Query };
   const media = await createLibraryMediaFixture(browserOrigin);
@@ -31,13 +31,13 @@ test('real private image inspection and saved-video playback/download grant no a
         await page.goto('/saved-work.html'); await page.waitForFunction(() => !!(window as unknown as { savedWorkTest?: unknown }).savedWorkTest);
         await page.evaluate(input => (window as unknown as { savedWorkTest: { configure(input: unknown): void } }).savedWorkTest.configure(input), { apiOrigin: target.origin, token: target.accessTokens[0]!, accountId: saved.accountId, conversationId: saved.conversationId });
       };
-      const videoAccess: OperationResponse<'media'>[] = [];
+      const videoAccess: OperationResponse<'media'>[] = [], received = new Map<OperationResponse<'media'>, number>();
       await page.route(url => url.origin === target.origin && [saved.image.id, saved.video.id].some(id => url.pathname === `/v1/versions/${id}/media`), async route => {
         const response = await route.fetch(); expect(response.status()).toBe(200);
         const access = await response.json() as OperationResponse<'media'>;
         if (access.poster) {
           // Playback reads browser-chosen byte ranges, then Download reads the whole object once.
-          videoAccess.push(access); materialNetwork.expectObjectTransfer(access.url, 2, 'GET', 6); materialNetwork.expectObjectTransfer(access.poster, 1, 'GET', 1);
+          videoAccess.push(access); received.set(access, Date.now()); materialNetwork.expectObjectTransfer(access.url, 2, 'GET', 6); materialNetwork.expectObjectTransfer(access.poster, 1, 'GET', 1);
         } else materialNetwork.expectObjectTransfer(access.url, 1, 'GET');
         await route.fulfill({ response });
       });
@@ -65,6 +65,14 @@ test('real private image inspection and saved-video playback/download grant no a
         const unsigned = new URL(access.url); unsigned.search = '';
         const denied = await fetch(unsigned); await denied.body?.cancel();
         expect(denied.status).toBe(403);
+        if (process.env.WORKPRINT_STORAGE_TARGET === 'r2') {
+          // Real-R2 qualification: the issued URL actually stops working at its stated expiry. Shapes only, never URLs.
+          const expiresAt = Date.parse(access.expiresAt);
+          await new Promise(done => setTimeout(done, Math.max(0, expiresAt - Date.now()) + 2000));
+          const expired = await fetch(access.url, { headers: { Range: 'bytes=0-0' } }); await expired.body?.cancel();
+          expect(expired.status).toBe(403);
+          await test.info().attach('r2-observed-shapes', { contentType: 'application/json', body: JSON.stringify({ range: { status: slice.status, contentRange: slice.headers.get('content-range'), acceptRanges: slice.headers.get('accept-ranges'), contentType: slice.headers.get('content-type') }, unsignedStatus: denied.status, expiredStatus: expired.status, observedLifetimeMs: expiresAt - (received.get(access) ?? expiresAt), playbackStatuses: [...new Set(transfers.map(response => response.status))] }) });
+        }
         await expect(page.getByText('Playing or downloading does not use this version or choose it for a Shot.', { exact: true })).toBeVisible();
       };
       await configure(); allow('GET', '/v1/library'); await page.getByRole('button', { name: 'Library', exact: true }).click();

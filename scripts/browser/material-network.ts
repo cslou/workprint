@@ -1,3 +1,5 @@
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { expect, test as base, type Request } from '@playwright/test';
 import type { OperationRequest } from '../../packages/contracts/src/index.js';
 
@@ -9,9 +11,22 @@ const redactQuery = (entries: Iterable<[string, string]>) => [...entries].map(([
 const safeURL = (input: URL) => { const url = new URL(input); url.search = new URLSearchParams(redactQuery(url.searchParams)).toString(); return url; };
 const queryKey = (entries: Iterable<[string, string]>) => JSON.stringify([...entries].sort(([a, av], [b, bv]) => a.localeCompare(b) || av.localeCompare(bv)));
 
+const loopback = ['127.0.0.1', 'localhost', '[::1]'];
+/** Only the explicit real-R2 qualification run allows one non-loopback origin: the supplied development bucket's. */
+async function qualifiedObjectOrigin(): Promise<string | null> {
+  if (process.env.WORKPRINT_STORAGE_TARGET === undefined) return null;
+  const load = (path: string) => import(pathToFileURL(resolve(`apps/api/.test-build/test/${path}.js`)).href);
+  const { storageTarget } = await load('object-storage') as typeof import('../../apps/api/test/object-storage.js');
+  if (storageTarget() !== 'r2') return null;
+  const { developmentR2Configuration } = await load('r2-development') as typeof import('../../apps/api/test/r2-development.js');
+  return new URL((await developmentR2Configuration()).endpoint).origin;
+}
+
 /** Records every HTTP request; exact operation allowances are consumed at observation, never retroactively. */
 export const test = base.extend<{ materialNetwork: MaterialNetwork }>({
   materialNetwork: [async ({ context }, use) => {
+    const qualified = await qualifiedObjectOrigin();
+    const permitted = (url: URL) => loopback.includes(url.hostname) || url.origin === qualified;
     const entries: Entry[] = [];
     const allowances: Allowance[] = [];
     const unexpected: Entry[] = [];
@@ -38,7 +53,7 @@ export const test = base.extend<{ materialNetwork: MaterialNetwork }>({
     const assertSafe = () => {
       expect(unexpected.map(entry => `${entry.method} ${entry.url.origin}${entry.url.pathname}${entry.url.search}`), 'Unexpected or repeated operation/transfer').toEqual([]);
       for (const entry of entries) {
-        expect(['127.0.0.1', 'localhost', '[::1]']).toContain(entry.url.hostname);
+        expect(permitted(entry.url), `Unexpected egress to ${entry.url.origin}`).toBe(true);
         if (!((entry.method === 'GET' && /^\/v1\/(conversations\/[^/]+\/)?generation-requests(\/[^/]+)?$/.test(entry.url.pathname)) || (entry.method === 'POST' && /^\/v1\/generation-requests\/[^/]+\/cancel$/.test(entry.url.pathname)))) expect(entry.url.pathname).not.toMatch(/generation|provider/);
         if (entry.url.pathname === '/v1/library') {
           expect(entry.method).toBe('GET');
@@ -52,7 +67,7 @@ export const test = base.extend<{ materialNetwork: MaterialNetwork }>({
     };
     context.on('request', record);
     await context.route('**/*', async route => {
-      if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(route.request().url()).hostname)) { await route.abort('blockedbyclient'); return; }
+      if (!permitted(new URL(route.request().url()))) { await route.abort('blockedbyclient'); return; }
       await route.continue();
     });
     try {

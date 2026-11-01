@@ -12,7 +12,7 @@ import { completeUpload } from '../src/artifacts/uploads/completion.js';
 import { createMediaSandbox, createPrivateObjectStorage } from '../src/storage/index.js';
 import { MEDIA_ARCHIVE } from '../src/storage/media/pins.js';
 import { isolatedPostgres } from './postgres.js';
-import { isolatedObjectStorage } from './object-storage.js';
+import { objectStorageTarget } from './object-storage.js';
 import { applyArtifactMigrations } from './artifact-database.js';
 import { createNativeConversation } from './native-conversations.js';
 import { qualifiedMediaFixtures } from './media-fixtures.js';
@@ -22,13 +22,13 @@ const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('h
 
 test('image-only upload admission refuses new and previously issued video uploads before external work', { timeout: 90000 }, async t => {
   const db = await isolatedPostgres(); t.after(db.close);
-  const service = await isolatedObjectStorage(); t.after(service.close);
+  const service = await objectStorageTarget(); t.after(service.close);
   const docker = await realpath('/usr/local/bin/docker');
   const sandbox = await createMediaSandbox({ toolchainDirectory: resolve(`outputs/toolchains/ffmpeg-${MEDIA_ARCHIVE.sha256}`), dockerPath: docker }); t.after(() => sandbox.close());
   const native = new PostgresStore({ id: 'image-only-uploads', connectionString: db.setupUrl, schemaName: 'mastra' });
   const pool = new Pool({ connectionString: db.servingUrl, max: 2 });
   const setup = new Pool({ connectionString: db.setupUrl, max: 1 });
-  const storage = createPrivateObjectStorage({ endpoint: service.endpoint, bucket: service.bucket, region: 'us-east-1', credentials: service.credentials });
+  const storage = createPrivateObjectStorage({ endpoint: service.endpoint, bucket: service.bucket, region: service.region, credentials: service.credentials });
   try {
     await native.init(); await db.grantServing(); await applyArtifactMigrations(db.setupUrl);
     const account = 'image-only-owner', conversation = (await createNativeConversation(native, account)).id;

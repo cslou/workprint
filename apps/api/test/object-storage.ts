@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { S3Client } from '@aws-sdk/client-s3';
 import { initializeObjectStorage } from './object-storage-startup.js';
+import { developmentR2Storage } from './r2-development.js';
 import type { FixtureDiagnostic } from './fixture-observation.js';
 
 // Docker Hub OCI index resolved before first use; never execute the mutable tag alone.
@@ -14,9 +15,21 @@ const digest = SEAWEED_IMAGE.slice(SEAWEED_IMAGE.indexOf('@') + 1);
 const exec = promisify(execFile);
 const docker = async (...args: string[]) => (await exec('docker', args, { timeout: 90000, maxBuffer: 1024 * 1024 })).stdout.trim();
 export type ObjectStorageFixture = Readonly<{
-  endpoint: string; bucket: string; credentials: { accessKeyId: string; secretAccessKey: string };
-  client: S3Client; foreign: S3Client; close(): Promise<void>;
+  endpoint: string; bucket: string; region: string; credentials: { accessKeyId: string; secretAccessKey: string };
+  /** Emulator only: an identity limited to another bucket. The development R2 token has no peer. */
+  client: S3Client; foreign?: S3Client; close(): Promise<void>;
 }>;
+
+/** The emulator is the default. Only the explicit qualification run selects Lou's development R2 bucket. */
+export function storageTarget(env: Readonly<Record<string, string | undefined>> = process.env): 'emulator' | 'r2' {
+  const value = env.WORKPRINT_STORAGE_TARGET;
+  if (value === undefined || value === 'emulator') return 'emulator';
+  if (value === 'r2') return 'r2';
+  throw new Error('Unknown storage target');
+}
+export async function objectStorageTarget(origins: readonly string[] = ['http://127.0.0.1:4279', 'http://127.0.0.1:4280'], diagnostic?: (message: string) => void, phaseDiagnostic?: FixtureDiagnostic): Promise<ObjectStorageFixture> {
+  return storageTarget() === 'r2' ? developmentR2Storage(origins, phaseDiagnostic) : isolatedObjectStorage(origins, diagnostic, phaseDiagnostic);
+}
 
 /** Unique private local service only; no R2 target, shared bucket or account mutation. */
 export async function isolatedObjectStorage(origins: readonly string[] = ['http://127.0.0.1:4279', 'http://127.0.0.1:4280'], diagnostic?: (message: string) => void, phaseDiagnostic?: FixtureDiagnostic): Promise<ObjectStorageFixture> {
@@ -76,7 +89,7 @@ export async function isolatedObjectStorage(origins: readonly string[] = ['http:
     const clientConfiguration = { endpoint, region: 'us-east-1', forcePathStyle: true, maxAttempts: 1, requestChecksumCalculation: 'WHEN_REQUIRED' as const, responseChecksumValidation: 'WHEN_REQUIRED' as const };
     client = new S3Client({ ...clientConfiguration, credentials }); foreign = new S3Client({ ...clientConfiguration, credentials: foreignCredentials });
     await initializeObjectStorage(client, { bucket, owner, origins }, phaseDiagnostic);
-    return { endpoint, bucket, credentials, client, foreign, close };
+    return { endpoint, bucket, region: 'us-east-1', credentials, client, foreign, close };
   } catch (error) {
     if (acquisitionStarted && diagnostic) {
       try {

@@ -11,7 +11,7 @@ import { transaction } from '../src/db/index.js';
 import { createMediaSandbox, createPrivateObjectStorage } from '../src/storage/index.js';
 import { runMediaChild } from '../src/storage/media/child.js';
 import { MEDIA_ARCHIVE } from '../src/storage/media/pins.js';
-import { isolatedObjectStorage } from './object-storage.js';
+import { objectStorageTarget } from './object-storage.js';
 import { qualifiedMediaFixtures } from './media-fixtures.js';
 import { cleanupFailedFixture, cleanupFixtureResources, observeFixturePhase } from './fixture-observation.js';
 import { prepareLibraryReuseWork } from './library-reuse-work.js';
@@ -19,14 +19,14 @@ import type { SavedWorkSetup } from './auth-built-fixture.js';
 
 /** Owned emulator and trusted generated historical media only. No video authorization/confirmation. */
 export async function createLibraryMediaFixture(browserOrigin: string, diagnostic?: (message: string) => void) {
-  let ownedService: Awaited<ReturnType<typeof isolatedObjectStorage>> | undefined;
+  let ownedService: Awaited<ReturnType<typeof objectStorageTarget>> | undefined;
   let ownedStorage: ReturnType<typeof createPrivateObjectStorage> | undefined;
   let ownedSandbox: Awaited<ReturnType<typeof createMediaSandbox>> | undefined;
   const cleanup = () => cleanupFixtureResources([() => ownedSandbox?.close(), () => ownedStorage?.close(), () => ownedService?.close()]);
   try {
-    const service = await observeFixturePhase('media.storage', async () => ownedService = await isolatedObjectStorage([browserOrigin], undefined, diagnostic), diagnostic);
+    const service = await observeFixturePhase('media.storage', async () => ownedService = await objectStorageTarget([browserOrigin], undefined, diagnostic), diagnostic);
     const media = { toolchainDirectory: resolve(`outputs/toolchains/ffmpeg-${MEDIA_ARCHIVE.sha256}`), dockerPath: await realpath('/usr/local/bin/docker') };
-    const configuration = { endpoint: service.endpoint, bucket: service.bucket, region: 'us-east-1', credentials: service.credentials };
+    const configuration = { endpoint: service.endpoint, bucket: service.bucket, region: service.region, credentials: service.credentials };
     const storage = ownedStorage = createPrivateObjectStorage(configuration);
     const sandbox = await observeFixturePhase('media.sandbox', async () => ownedSandbox = await createMediaSandbox(media), diagnostic);
     const fixtures = await observeFixturePhase('media.synthetic', () => qualifiedMediaFixtures(sandbox, media.dockerPath), diagnostic);
