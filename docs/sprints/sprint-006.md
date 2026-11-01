@@ -2,7 +2,7 @@
 
 **Date:** Start 2026-11-01, after `phase-3` (including the MVP planning docs, PR #69, and the regression gates, PRs #70–#71) merged into `main` – End after completion gates and Lou's QA
 **Goal:** On a local build, a signed-in user sends a message in a video and gets a streamed Muse Spark reply. While the reply runs, a real read-workspace tool shows its activity phrase. Stop ends the turn, the video gets a generated title in Recents, and the conversation, including tool lines, survives reload.
-**Status:** 🟡 Planning
+**Status:** 🔵 In progress
 
 ---
 
@@ -30,6 +30,13 @@
   - **Mastra knows the model.** Its 1.79.0 registry lists `meta/muse-spark-1.3` at `https://api.meta.ai/v1` (OpenAI-compatible via `@ai-sdk/openai`, key variable `META_MODEL_API_KEY`).
   - **The key is present.** The root `.env` has `META_API_KEY` and `DEFAULT_ASSISTANT_MODEL=meta/muse-spark-1.3` (set by Lou, 2026-11-01). `scripts/tasks.mjs` loads one env file (`WORKPRINT_ENV_FILE`, default `.env`). `pnpm db:local` writes `outputs/local-database.env`, and today both it and the shared test environment set `DEFAULT_ASSISTANT_MODEL=unqualified/disabled`, a chat-off placeholder from earlier sprints.
 - **Implementation spec:** `docs/specs/implementation-spec-001.md` §10 MVP plan and Phase 3 sprint packaging; backlog B-012, B-021, B-022, B-023, B-034.
+
+### Technical findings at sprint start (2026-11-01)
+A read-only code scan before Story 1 found gaps the stories must close. None changes a goal:
+- **Story 1:** server admission caps input at 8 KiB (`nativeTurnLimits.inputBytes`); `loadServerConfig` accepts any `provider/model`, including `unqualified/disabled`, and reads no key; the `completedText` guard, `TokenLimiterProcessor(64)` and `maxSteps: 1` block tool loops; Mastra 1.79.0 has no no-data stall timeout (only `totalMs`/`stepMs`/`firstChunkMs`), so the stall limit wraps the model stream; a busy send is merged into the running turn (default `ifActive: 'deliver'`), `queue-message` is admitted and contracts have no `busy` code; no scripted provider exists.
+- **Story 2:** the api-client caps input and reply text at 8 KiB and observation at 9 s (`native-transport.ts`); the first send would remount the chat (`shell.tsx` keys on the conversation id); `accountBrowserFixture` cannot take a test composition; Mastra has no regenerate API, so Retry resends (B-035); `design.md` still says typing while busy is queued.
+- **Story 3:** the api-client history validator and the history route reject non-text parts, and the stream decoder drops tool chunks.
+- **Story 5:** Memory `generateTitle` accepts a `model` and, on the durable path, runs whenever the title is empty; whether it can be bounded is checked at story start.
 
 ### Sprint-Wide Context
 - **Sprint type:** Feature
@@ -105,13 +112,13 @@ At sprint completion, run the applicable regression suite on the combined sprint
 
 #### Story 1: Muse Spark agent loop
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
-  - [ ] Follows sprint template
-  - [ ] Acceptance criteria are specific and testable
-  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
-  - [ ] Story is small enough to review and merge independently
+  - [x] Follows sprint template
+  - [x] Acceptance criteria are specific and testable
+  - [x] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
+  - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: Pass 1 (2/5): P1 the scripted provider can't hold tools, so test-tool injection was missing; P1 `live:chat` was built only here; P2s on single bad-config outcome, 32 KiB rejection, key leakage, static prompt, deadline proof and build exclusion. Pass 2 (3/5): P1 requiring the key at startup would break every test and dev boot that uses `unqualified/disabled`; P2s on the step-cap outcome, the 60 s timeout test and `live:chat` being blocked by the network guard.
   - Resolution: Added test-only tool and limit injection, the shared `live:chat` script, and the named configuration error, size, leakage, prompt-cache and build checks. Lou (2026-11-01) rejected a chat-off mode: the server always requires the model and key. The shared test environment supplies the model and a placeholder key behind the network guard; `db:local` runs take the model and key from the root `.env`, with the helper's database file layered over it. Step cap ends as failed with a notice; the timeout test overrides to 1 s; `live:chat` uses its own unguarded environment only with `--live`.
@@ -166,13 +173,13 @@ At sprint completion, run the applicable regression suite on the combined sprint
 
 #### Story 2: Send, stream and saved history
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
-  - [ ] Follows sprint template
-  - [ ] Acceptance criteria are specific and testable
-  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
-  - [ ] Story is small enough to review and merge independently
+  - [x] Follows sprint template
+  - [x] Acceptance criteria are specific and testable
+  - [x] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
+  - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: Pass 1: P2s on the Retry history result, busy/account-switch/upload tests, reload mid-turn, missing regression suites and an unneeded busy preview. Pass 2 (3/5): P2 no server signal for an active turn after reload; P2 unknown Retry mechanism in Mastra 1.79.
   - Resolution: Added the tests and regression suites; dropped the busy preview. Lou (2026-11-01) accepted no "Working…" after reload (B-027) and a possible repeated user message on Retry (B-035). Added a story-start check of Mastra's regenerate support.
@@ -222,13 +229,13 @@ At sprint completion, run the applicable regression suite on the combined sprint
 
 #### Story 3: Tool activity phrases and the read-workspace tool
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
-  - [ ] Follows sprint template
-  - [ ] Acceptance criteria are specific and testable
-  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
-  - [ ] Story is small enough to review and merge independently
+  - [x] Follows sprint template
+  - [x] Acceptance criteria are specific and testable
+  - [x] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
+  - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: Pass 1: P2s on a numeric size bound, server-sourced phrases, the tool result reaching the model and fail-closed history. Pass 2: P2 read-workspace is too fast to prove the running state; P2 "unknown tool" had two meanings; P2 `live:chat` extension had no pass condition or non-live run.
   - Resolution: Bounds set to 50 items / 16 KiB / 200 characters with a truncation flag; added the tests. The running state is proven with the gated test tool and read-workspace proves the done line; "unknown" now means a registered tool with no phrase. The extension runs against the scripted provider and has a pass/decline rule.
@@ -276,13 +283,13 @@ At sprint completion, run the applicable regression suite on the combined sprint
 
 #### Story 4: Stop
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
-  - [ ] Follows sprint template
-  - [ ] Acceptance criteria are specific and testable
-  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
-  - [ ] Story is small enough to review and merge independently
+  - [x] Follows sprint template
+  - [x] Acceptance criteria are specific and testable
+  - [x] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
+  - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: Pass 1: P2 no test that closing the page sends no Stop. Pass 2: P2 that test was an integration test of browser behaviour; P2 "saved or marked interrupted" conflicted with the browser check.
   - Resolution: The close-page check is a browser journey. Lou (2026-11-01) accepted saved partial text with the interrupted marker shown live only (B-035), so the history route is unchanged.
@@ -316,13 +323,13 @@ At sprint completion, run the applicable regression suite on the combined sprint
 
 #### Story 5: Automatic video titles
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
-  - [ ] Follows sprint template
-  - [ ] Acceptance criteria are specific and testable
-  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
-  - [ ] Story is small enough to review and merge independently
+  - [x] Follows sprint template
+  - [x] Acceptance criteria are specific and testable
+  - [x] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
+  - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: Pass 1: P2s on the title timeout and token cap, a timeout test, the heading assertion, regression and tagging title requests. Pass 2: P2 the failed-title-then-second-message case was untested.
   - Resolution: Capped at 32 tokens and 15 s with no retry; added the tests and tagging. The rule is now at most one attempt per message until a title exists, with a test for the follow-up attempt.
