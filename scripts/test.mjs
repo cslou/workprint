@@ -1,25 +1,37 @@
 import { globSync, rmSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+
+// Groups: `unit` (each package's test/unit) and `tooling` (apps/api/test/tooling) need no Docker; `integration` (the rest of apps/api/test) runs against one shared stack of Postgres, Auth and storage containers.
+const group = process.argv[2];
+if (group && !['unit', 'tooling', 'integration', 'compile'].includes(group)) throw new Error('Unknown test group');
 
 // Never discover stale emitted cases from a different branch or removed source files.
-rmSync('apps/api/.test-build', { recursive: true, force: true });
-const contracts = spawnSync('tsc', ['-p', 'packages/contracts/tsconfig.json'], { stdio: 'inherit' });
-if (contracts.status !== 0) process.exit(contracts.status ?? 1);
-const client = spawnSync('tsc', ['-p', 'packages/api-client/tsconfig.json'], { stdio: 'inherit' });
-if (client.status !== 0) process.exit(client.status ?? 1);
-const player = spawnSync('tsc', ['-p', 'packages/player/tsconfig.json'], { stdio: 'inherit' });
-if (player.status !== 0) process.exit(player.status ?? 1);
-const compile = spawnSync('tsc', ['-p', 'apps/api/tsconfig.json'], { stdio: 'inherit' });
-if (compile.status !== 0) process.exit(compile.status ?? 1);
-const group = process.argv[2];
+// The regression gate compiles once in its setup step and sets WORKPRINT_TESTS_COMPILED=1 for later groups.
+if (process.env.WORKPRINT_TESTS_COMPILED !== '1') {
+  for (const directory of ['apps/api/.test-build', 'apps/web/.test-build', 'packages/api-client/.test-build']) rmSync(directory, { recursive: true, force: true });
+  for (const project of ['packages/contracts/tsconfig.json', 'packages/api-client/tsconfig.json', 'packages/player/tsconfig.json', 'apps/api/tsconfig.json', 'packages/api-client/tsconfig.test.json', 'apps/web/tsconfig.test.json']) {
+    const compiled = spawnSync('tsc', ['-p', project], { stdio: 'inherit' });
+    if (compiled.status !== 0) process.exit(compiled.status ?? 1);
+  }
+}
 // Development fixtures need the same dependency-ordered compilation, not tests.
 if (group === 'compile') process.exit(0);
-if (group && !['smoke', 'security', 'contracts', 'ingress-qualification'].includes(group)) throw new Error('Unknown test group');
-// B-001 is explicitly deferred by the private-development scope exception.
-// Its real failing qualification is opt-in, never counted as aggregate success.
-const files = group === 'ingress-qualification'
-  ? globSync('apps/api/.test-build/**/ingress.qualification.js')
-  : globSync('apps/api/.test-build/**/*.test.js').filter((file) => !group || file.split('/').at(-1).includes(`.${group}.`));
+
+// Tests live in each package's test/ folder, never beside source; every compiled test lands in exactly one group.
+const misplaced = globSync('{apps,packages}/*/src/**/*.test.{ts,tsx}');
+if (misplaced.length) throw new Error(`Tests belong in <package>/test/, not beside source: ${misplaced.join(', ')}`);
+const compiled = globSync('{apps/api,apps/web,packages/api-client}/.test-build/**/*.test.js');
+const unit = compiled.filter(file => file.includes('/.test-build/test/unit/'));
+const tooling = compiled.filter(file => file.startsWith('apps/api/.test-build/test/tooling/'));
+const integration = compiled.filter(file => file.startsWith('apps/api/.test-build/test/') && !unit.includes(file) && !tooling.includes(file));
+const orphaned = compiled.filter(file => !unit.includes(file) && !tooling.includes(file) && !integration.includes(file));
+if (orphaned.length) throw new Error(`Tests outside a known group: ${orphaned.join(', ')}`);
+const files = group === 'unit' ? unit : group === 'tooling' ? tooling : group === 'integration' ? integration : [...unit, ...tooling, ...integration];
 if (files.length === 0) throw new Error('No tests discovered');
-const result = spawnSync(process.execPath, ['--test', '--test-concurrency=1', ...files], { stdio: 'inherit' });
-process.exit(result.status ?? 1);
+const run = [process.execPath, '--test', '--test-concurrency=1', ...files];
+// Integration files share one stack for the whole run; the launcher always removes it afterwards.
+const command = files.some(file => integration.includes(file)) ? [process.execPath, 'scripts/test-stack.mjs', ...run] : run;
+const child = spawn(command[0], command.slice(1), { stdio: 'inherit' });
+// Stay until the child (and any stack teardown) has finished, even on Ctrl-C or a closed terminal.
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => child.kill(signal));
+process.exit(await new Promise(done => child.on('exit', (code, signal) => done(code ?? (signal ? 1 : 0)))));

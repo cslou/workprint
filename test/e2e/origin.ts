@@ -1,0 +1,15 @@
+function port(value: string | undefined, fallback: number, setting: string): number {
+  if (value === undefined) return fallback;
+  if (!/^[1-9]\d{0,4}$/.test(value) || Number(value) > 65535) throw new Error(`Invalid ${setting}: expected a TCP port`);
+  return Number(value);
+}
+
+/** One loopback origin for every Node-side browser harness consumer. */
+export function browserTestSettings(env: Readonly<Record<string, string | undefined>>) {
+  const previewPort = port(env.WORKPRINT_PREVIEW_PORT, 4180, 'WORKPRINT_PREVIEW_PORT');
+  return {
+    previewPort, previewOrigin: new URL(`http://127.0.0.1:${previewPort}`).origin,
+  };
+}
+
+export const { previewPort, previewOrigin } = browserTestSettings(process.env);

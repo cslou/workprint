@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button as AriaButton } from 'react-aria-components';
-import type { ApiClient } from '@workprint/api-client';
+import type { ApiClient, UploadSession } from '@workprint/api-client';
 import { nativeConversations } from '@workprint/api-client';
 import type { OperationResponse, Proposal, Question, Version } from '@workprint/contracts';
 import type { BrowserClient } from '../api/client.js';
@@ -11,11 +11,11 @@ import { ProposalCard, proposalLines, deriveProposalDisplayFacts, type ProposalI
 import { useQuestionRead, useProposalRead, useInputVersions } from './review-reads.js';
 import './question.css';
 
-export type QuestionReviewProps = { connection: BrowserClient; scope: ReadScope | null; question: Question; proposalPrerequisite?: Proposal; workspace?: OperationResponse<'workspace'>; inputNames?: ProposalInputNames; versionPrerequisites?: readonly Version[]; draft?: ComposerDraft };
+export type QuestionReviewProps = { uploadSession?: UploadSession; onUploaded?(result: OperationResponse<'confirmUpload'>): void; connection: BrowserClient; scope: ReadScope | null; question: Question; proposalPrerequisite?: Proposal; workspace?: OperationResponse<'workspace'>; inputNames?: ProposalInputNames; versionPrerequisites?: readonly Version[]; draft?: ComposerDraft };
 export function QuestionReview(props: QuestionReviewProps) {
   return <ScopedQuestion key={JSON.stringify([props.scope?.accountId, props.scope?.conversationId])} {...props} />;
 }
-function ScopedQuestion({ connection, scope, question, proposalPrerequisite, workspace, inputNames = {}, versionPrerequisites = [], draft }: QuestionReviewProps) {
+function ScopedQuestion({ connection, scope, question, proposalPrerequisite, workspace, inputNames = {}, versionPrerequisites = [], draft, uploadSession, onUploaded }: QuestionReviewProps) {
   const client = connection.kind === 'configured' ? connection.client : null;
   const native: ApiClient['native'] = client?.native ?? nativeConversations;
   const observed = useQuestionRead(client, scope, question.id);
@@ -57,6 +57,6 @@ function ScopedQuestion({ connection, scope, question, proposalPrerequisite, wor
     <div className="wp-question-options">{current.options.map((option, index) => <AriaButton key={option.id} className="wp-question-option" isDisabled={!client || !scope?.conversationId || current.status !== 'pending' || submitting || acknowledged || (!!current.scope.proposalId && !completeProposal)} onPress={() => void answer(option.id)}><span className="wp-question-key" aria-hidden="true">{String.fromCharCode(65 + index)}</span><span>{option.label}</span></AriaButton>)}</div>
     {feedback && <p className="wp-question-feedback" role="status">{feedback}</p>}
     </>}
-    <Composer native={native} connection={connection} scope={scope} {...(draft ? { draft } : {})} docked placeholder="Pick an option, type your own answer, or ask something else…" />
+    <Composer {...(uploadSession ? { uploadSession } : {})} {...(onUploaded ? { onUploaded } : {})} native={native} connection={connection} scope={scope} {...(draft ? { draft } : {})} docked placeholder="Pick an option, type your own answer, or ask something else…" />
   </section>;
 }

@@ -1,4 +1,4 @@
-.wp-script p { margin: 0; }
+.wp-script p { margin: 0; white-space: pre-line; }
 .wp-script-shots { margin: 0; padding-left: var(--space-20); }
 .wp-script-shots li { margin: 0 0 var(--space-12); }
 .wp-script-shots li:last-child { margin-bottom: var(--space-6); }

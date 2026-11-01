@@ -1,34 +1,9 @@
 import { registerApiRoute } from '@mastra/core/server';
 import { applicationError, errorStatus, operations, type OperationName } from '@workprint/contracts';
-import { unavailableApplication } from '../application/index.js';
+import type { Application, SavedWorkApplication, ManualSaveApplication, UploadApplication } from '../application/index.js';
+import { readBody } from './body.js';
 
-async function readBody(request: Request): Promise<unknown> {
-  if (!request.body) return {};
-  if (request.method === 'GET' || !/^application\/json(?:\s*;|$)/i.test(request.headers.get('content-type') ?? '')) throw new Error('Invalid body');
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const deadline = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Body deadline')), 2000); });
-  try {
-    for (;;) {
-      const { done, value } = await Promise.race([reader.read(), deadline]);
-      if (done) break;
-      size += value.byteLength;
-      if (size > 1024 * 1024) throw new Error('Body limit');
-      chunks.push(value);
-    }
-    const bytes = new Uint8Array(size);
-    let offset = 0;
-    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-    return JSON.parse(new TextDecoder().decode(bytes));
-  } finally {
-    if (timer !== undefined) clearTimeout(timer);
-    try { await reader.cancel(); } finally { reader.releaseLock(); }
-  }
-}
-
-export const applicationRoutes = (Object.keys(operations) as OperationName[]).map((name) => {
+export const applicationRoutes = (application: Application | SavedWorkApplication | ManualSaveApplication | UploadApplication) => (Object.keys(operations) as OperationName[]).map((name) => {
   const operation = operations[name];
   return registerApiRoute(operation.path, { method: operation.method, handler: async (context) => {
     const accountId: unknown = context.get('requestContext').get('accountId');
@@ -44,7 +19,8 @@ export const applicationRoutes = (Object.keys(operations) as OperationName[]).ma
     } catch {
       return context.json(applicationError('invalid_input', 'Invalid application request'), 400);
     }
-    const result = await unavailableApplication[name]({ params: context.req.param(), query, body }, async () => ({ kind: 'verified', accountId }));
+    const result = await application.operations[name]({ params: context.req.param(), query, body }, async () => ({ kind: 'verified', accountId }));
+    if (!('error' in result)) return Response.json(result, { status: name === 'requestUpload' ? 201 : 200, ...(name === 'media' ? { headers: { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } } : {}) });
     return Response.json(result, { status: errorStatus[result.error.code] });
   } });
 });

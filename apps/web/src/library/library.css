@@ -1,3 +1,4 @@
 /* Approved demo-05 #lib-yours two-line treatment; no new banner or recovery UI. */
 .wp-library-feedback { display: grid; place-items: center; gap: var(--space-4); text-align: center; min-height: 240px; color: var(--color-text-subtle); font-size: var(--font-size-13); }
+.wp-library-feedback[data-empty] { align-content: center; }
 .wp-library-feedback b { color: var(--color-text-primary); font-size: var(--font-size-15); font-weight: var(--font-weight-semibold); }
