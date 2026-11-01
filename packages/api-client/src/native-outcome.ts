@@ -41,6 +41,7 @@ export function nativeOutcome(expectedRunId: string, onText: (part: NativeTextDe
     const data = value.data;
     if (value.type === 'finish') return chunk({ type: 'finish', runId: value.runId, payload: { stepResult: object(data) ? data.stepResult : undefined } });
     if (value.type === 'error') return error(object(data) ? data.error : undefined);
+    if (value.type === 'abort') return interrupted();
     if (object(data) && typeof data.type === 'string') {
       if (data.runId !== undefined && data.runId !== expectedRunId) return failed('invalid_response', 'Mismatched native execution identity');
       return chunk(data);

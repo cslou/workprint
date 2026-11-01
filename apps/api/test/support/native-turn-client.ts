@@ -16,8 +16,8 @@ export function nativeTurnClient(apiOrigin: string, token: string, accountId: st
   return {
     post, send,
     async newVideo() { return (await (await post('/memory/threads', { resourceId: accountId })).json() as { id: string }).id; },
-    /** Reads until the run's terminal chunk or `timeoutMs`. */
-    async turn(videoId: string, message: string, timeoutMs = 30000): Promise<ObservedTurn> {
+    /** Reads until the run's terminal chunk or `timeoutMs`; `onAccepted` gets the run id as soon as the send is accepted. */
+    async turn(videoId: string, message: string, timeoutMs = 30000, onAccepted?: (runId: string) => void): Promise<ObservedTurn> {
       const observer = new AbortController();
       const subscription = await post('/api/agents/assistant/threads/subscribe', { threadId: videoId, resourceId: accountId, withInitialHistory: false }, observer.signal);
       assert.equal(subscription.status, 200);
@@ -26,6 +26,7 @@ export function nativeTurnClient(apiOrigin: string, token: string, accountId: st
       const receipt = await sent.json() as { runId?: string; error?: unknown };
       const result: ObservedTurn = { status: sent.status, text: '', chunks: [], ...(receipt.runId ? { runId: receipt.runId } : {}), ...(receipt.error ? { error: receipt.error } : {}) };
       if (sent.status !== 200) { observer.abort(); return result; }
+      if (receipt.runId) onAccepted?.(receipt.runId);
       const reader = subscription.body!.getReader(), decoder = new TextDecoder();
       const deadline = setTimeout(() => observer.abort(), timeoutMs);
       let buffered = '';

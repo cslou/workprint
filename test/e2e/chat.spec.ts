@@ -30,7 +30,9 @@ test('a new video streams its first reply, then reload shows the saved conversat
 
   await expect(live(page).getByRole('listitem', { name: 'Assistant message' })).toHaveText('Hello');
   await expect(working(page)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeDisabled();
+  // While the agent works, Stop takes Send's place (demo-02).
+  await expect(page.getByRole('button', { name: 'Stop', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Send', exact: true })).toHaveCount(0);
   await expect(message(page)).toHaveValue('');
   await expect(message(page)).toBeFocused();
   expect(videoId(page)).toMatch(/^[0-9a-f-]{36}$/);
@@ -310,4 +312,78 @@ test('a registered tool with no phrase shows Working…', async ({ page, backend
   provider.openGate();
   await expect(line).toHaveText('Done');
   await expect(live(page).getByText('Finished', { exact: true })).toBeVisible();
+});
+
+const abortPath = '/api/agents/assistant/threads/abort';
+
+test('Stop mid-reply: Stopped within 10 s, the composer is usable, and reload shows the partial text', async ({ page, backend }) => {
+  const [account] = await backend.accounts(1);
+  const { provider } = backend;
+  provider.script({ text: ['Partial answer', ' never sent'], hold: 'mid' });
+  await signIn(page, account!);
+  await message(page).fill('Write a long reply');
+  await message(page).press('Enter');
+  await expect(live(page).getByRole('listitem', { name: 'Assistant message' })).toHaveText('Partial answer');
+  const stops: string[] = [];
+  page.on('request', request => { if (new URL(request.url()).pathname === abortPath) stops.push(request.postData() ?? ''); });
+  const clicked = Date.now();
+  // From the keyboard: Stop leaves when the turn settles, and focus returns to the message field.
+  await page.getByRole('button', { name: 'Stop', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('Stopped.', { exact: true })).toBeVisible({ timeout: 10_000 });
+  expect(Date.now() - clicked).toBeLessThan(10_000);
+  expect(stops).toHaveLength(1);
+  await expect(working(page)).toHaveCount(0);
+  await expect(message(page)).toBeFocused();
+  await message(page).fill('Next');
+  await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeEnabled();
+  expect(provider.requests).toHaveLength(1);
+
+  await page.reload();
+  await expect(saved(page).getByRole('listitem')).toHaveText(['Write a long reply', 'Partial answer']);
+  await expect(page.getByText('Stopped.', { exact: true })).toHaveCount(0);
+});
+
+test('a Stop that is never acknowledged settles within 10 s as unconfirmed, with no Retry, and never sends a second Stop', async ({ page, backend }) => {
+  const [account] = await backend.accounts(1);
+  const { provider } = backend;
+  provider.script({ text: ['Still ', 'going'], hold: 'mid' });
+  await signIn(page, account!);
+  let stops = 0;
+  // The Stop never reaches the server, so the reply keeps running there.
+  await page.route(url => url.pathname === abortPath, route => { stops++; return route.abort(); });
+  await message(page).fill('Write a long reply');
+  await message(page).press('Enter');
+  await expect(live(page).getByRole('listitem', { name: 'Assistant message' })).toHaveText('Still');
+  const clicked = Date.now();
+  await page.getByRole('button', { name: 'Stop', exact: true }).click();
+  await expect(page.getByText('We couldn’t confirm the reply stopped.', { exact: true })).toBeVisible({ timeout: 10_000 });
+  expect(Date.now() - clicked).toBeLessThan(10_000);
+  await expect(page.getByText('Stopped.', { exact: true })).toHaveCount(0);
+  await expect(live(page).getByRole('button', { name: 'Retry' })).toHaveCount(0);
+  await message(page).fill('Next');
+  await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeEnabled();
+  expect(stops).toBe(1);
+  provider.release();
+});
+
+test('closing the page mid-turn sends no Stop, and the reply is saved for when the video is reopened', async ({ page, backend }) => {
+  const [account] = await backend.accounts(1);
+  const { provider } = backend;
+  provider.script({ text: ['Kept ', 'going'], hold: 'mid' });
+  await signIn(page, account!);
+  const context = page.context();
+  const stops: string[] = [];
+  context.on('request', request => { if (new URL(request.url()).pathname === abortPath) stops.push(request.url()); });
+  await message(page).fill('Keep going without me');
+  await message(page).press('Enter');
+  await expect(live(page).getByRole('listitem', { name: 'Assistant message' })).toHaveText('Kept');
+  const video = videoId(page)!;
+  await page.close();
+  provider.release();
+  await expect.poll(async () => (await backend.read<{ messages: unknown[] }>(account!, `/memory/threads/${video}/messages?page=0&perPage=20`)).messages.length).toBe(2);
+  expect(stops).toHaveLength(0);
+  const reopened = await context.newPage();
+  await reopened.goto(`/app?conversation=${video}`);
+  await expect(saved(reopened).getByRole('listitem')).toHaveText(['Keep going without me', 'Kept going']);
 });

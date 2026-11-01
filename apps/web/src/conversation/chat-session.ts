@@ -1,6 +1,6 @@
 import { nativeTransportLimits, type ApiClient, type ClientError, type NativeMessages, type NativeObservation, type NativeThread, type NativeToolActivity, type NativeToolActivityChunk } from '@workprint/api-client';
 
-type Native = Pick<ApiClient['native'], 'createConversation' | 'subscribe' | 'sendText' | 'loadMessages'>;
+type Native = Pick<ApiClient['native'], 'createConversation' | 'subscribe' | 'sendText' | 'loadMessages' | 'stop'>;
 
 /** A run of reply text, or one tool's activity line with when this page first saw it running. */
 export type LivePart = Readonly<{ kind: 'text'; text: string } | { kind: 'activity'; activity: NativeToolActivity; startedAt?: number }>;
@@ -13,6 +13,12 @@ export type LiveTurn = Readonly<{
   state: 'streaming' | 'completed' | 'failed' | 'interrupted' | 'lost';
   /** A failed or interrupted turn offers Retry once; Retry starts a new turn. */
   retried: boolean;
+  /**
+   * Set once Stop is pressed. stopped: the server acknowledged the Stop and the turn ended interrupted.
+   * unacknowledged: the turn ended interrupted, but the server did not acknowledge this Stop.
+   * unconfirmed: this page stopped hearing the turn, so it may still be running.
+   */
+  stop?: 'stopping' | 'stopped' | 'unacknowledged' | 'unconfirmed';
 }>;
 /**
  * idle: Send available. sending: waiting for the send to be accepted. working: a turn from this page is running.
@@ -42,11 +48,15 @@ export type ChatSessionConfig = {
   onSettled?(): void;
   /** Clock for activity elapsed time; tests supply their own. */
   now?(): number;
+  /** How long after Stop the turn settles here even without an outcome; tests shorten it. */
+  stopSettleMs?: number;
 };
 
 /** Definite rejections: the server answered and the message was not accepted. Anything else is unknown. */
 const definite: ReadonlySet<ClientError['code']> = new Set(['invalid_input', 'unauthenticated', 'not_found', 'integration_failure', 'not_implemented', 'unsupported']);
 export const chatInputBytes = nativeTransportLimits.inputBytes;
+/** After Stop, the chat settles within this long even if the outcome never arrives (the story allows 10 s). */
+export const stopSettleMs = 8000;
 export const tooLong = (text: string) => new TextEncoder().encode(text).byteLength > chatInputBytes;
 /** The reply's text so far, without activity lines. */
 export const replyText = (turn: LiveTurn) => turn.parts.map(part => part.kind === 'text' ? part.text : '').join('');
@@ -81,6 +91,8 @@ export function createChatSession(config: ChatSessionConfig) {
   let state: ChatSnapshot = { phase: 'idle', turns: [], notice: null };
   let alive = true, threadId = config.conversationId, started = config.conversationId !== undefined, keys = 0;
   let observation: NativeObservation | null = null;
+  // The turn this page is watching, so Stop names its exact run. `acknowledged` is the server's answer to Stop (bounded by the client).
+  let active: { key: number; threadId: string; runId: string; settled: boolean; acknowledged?: Promise<boolean>; deadline?: ReturnType<typeof setTimeout> } | null = null;
   // A thread created for New video, adopted as the video once its first send is accepted.
   let startedThread: NativeThread | null = null;
   let pending: { text: string; fromDraft: boolean } | null = null;
@@ -126,17 +138,34 @@ export function createChatSession(config: ChatSessionConfig) {
     if (fromDraft) config.clearDraft();
     if (!started && startedThread) { started = true; config.onStarted(startedThread); }
     const key = ++keys;
+    const run: NonNullable<typeof active> = { key, threadId: id, runId: sent.value.runId, settled: false };
+    active = run;
     update({ phase: 'working', turns: [...state.turns, { key, text, parts: [], state: 'streaming', retried: false }] });
     const current = observation;
     const result = await current.consumeTurn(sent.value.runId,
       part => { if (alive) patchTurn(key, { parts: withText(partsOf(key), part.text) }); },
       activity => { if (alive) patchTurn(key, { parts: withActivity(partsOf(key), activity, now()) }); });
-    if (!alive) return 'sent';
+    if (!alive || run.settled) return 'sent';
     if (observation === current) observation = null;
-    patchTurn(key, { parts: settledParts(partsOf(key), !result.ok), state: !result.ok ? 'lost' : result.value.outcome === 'complete' ? 'completed' : result.value.outcome });
-    update({ phase: 'idle' });
-    config.onSettled?.();
+    const outcome = !result.ok ? 'lost' : result.value.outcome === 'complete' ? 'completed' : result.value.outcome;
+    const stopping = state.turns.find(turn => turn.key === key)?.stop === 'stopping';
+    if (stopping && (outcome === 'interrupted' || outcome === 'lost')) {
+      // "Stopped" needs both: the turn ended interrupted and the server acknowledged this Stop.
+      const stop = outcome === 'lost' ? 'unconfirmed' : await run.acknowledged === true ? 'stopped' : 'unacknowledged';
+      if (alive) settle(run, 'interrupted', outcome === 'lost', stop);
+    } else settle(run, outcome, !result.ok);
     return 'sent';
+  }
+
+  /** Ends this page's view of a turn once: its state, its lines, and the composer becomes available again. */
+  function settle(run: NonNullable<typeof active>, outcome: LiveTurn['state'], lost: boolean, stop?: Exclude<LiveTurn['stop'], 'stopping'>) {
+    if (run.settled) return;
+    run.settled = true; clearTimeout(run.deadline);
+    if (active === run) active = null;
+    // Without `stop`, a Stop that lost the race to a reply that ended anyway leaves the reply as it ended.
+    update({ phase: 'idle', turns: state.turns.map(turn => turn.key !== run.key ? turn
+      : { key: turn.key, text: turn.text, retried: turn.retried, parts: settledParts(turn.parts, lost), state: outcome, ...(stop ? { stop } : {}) }) });
+    config.onSettled?.();
   }
 
   /** Re-read history once: a new user message with this text means the send landed. */
@@ -165,10 +194,28 @@ export function createChatSession(config: ChatSessionConfig) {
     /** One new attempt for a failed or interrupted turn: the same text, sent again. */
     retry(key: number) {
       const turn = state.turns.find(candidate => candidate.key === key);
-      if (!turn || turn.retried || (turn.state !== 'failed' && turn.state !== 'interrupted') || state.phase !== 'idle') return Promise.resolve();
+      if (!turn || turn.retried || (turn.state !== 'failed' && turn.state !== 'interrupted') || turn.stop === 'unconfirmed' || state.phase !== 'idle') return Promise.resolve();
       // Disabled at once against double presses; given back if nothing was sent.
       patchTurn(key, { retried: true });
       return submit(turn.text, false).then(outcome => { if (outcome === 'rejected') patchTurn(key, { retried: false }); });
+    },
+    /**
+     * Stop this page's running turn by its exact run id. The chat settles when the turn ends, or after
+     * `stopSettleMs` without an outcome; closing the page or switching video never sends a Stop.
+     */
+    async stop() {
+      const run = active;
+      const turn = run && state.turns.find(candidate => candidate.key === run.key);
+      if (!alive || !run || !turn || turn.stop || state.phase !== 'working') return;
+      patchTurn(run.key, { stop: 'stopping' });
+      run.deadline = setTimeout(() => {
+        if (run.settled || !alive) return;
+        // Give up watching (observer only), never a second Stop.
+        if (active === run) close();
+        settle(run, 'interrupted', true, 'unconfirmed');
+      }, config.stopSettleMs ?? stopSettleMs);
+      run.acknowledged = config.native.stop({ threadId: run.threadId, resourceId: config.accountId, runId: run.runId }).then(result => result.ok && result.value.abortRequested);
+      await run.acknowledged;
     },
     checkAgain: () => state.phase === 'unconfirmed' ? check() : Promise.resolve(),
     /** Explicitly send the unconfirmed text again; this may duplicate the message and turn. */
@@ -181,7 +228,7 @@ export function createChatSession(config: ChatSessionConfig) {
     /** The draft changed; drop a stale too-long or not-sent notice. */
     edited() { if (state.notice === 'too_long' || state.notice === 'not_sent') update({ notice: null }); },
     /** Observer disconnect only: the server turn keeps running. Never Stop. */
-    dispose() { if (!alive) return; close(); alive = false; listeners.clear(); },
+    dispose() { if (!alive) return; clearTimeout(active?.deadline); close(); alive = false; listeners.clear(); },
   };
 }
 export type ChatSession = ReturnType<typeof createChatSession>;

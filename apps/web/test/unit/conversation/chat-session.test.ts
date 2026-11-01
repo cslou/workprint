@@ -10,8 +10,8 @@ const fail = (code: string): ClientResult<never> => ({ ok: false, error: { code,
 const page = (texts: string[]): NativeMessages => ({ messages: texts.map((text, index) => ({ id: `0000000${index}-0000-4000-8000-000000000000`, threadId: video, resourceId: account, role: 'user', createdAt: '2026-11-01T00:00:00.000Z', content: { format: 2, parts: [{ type: 'text', text }] } })), total: texts.length, page: 0, perPage: 20, hasMore: false } as unknown as NativeMessages);
 
 /** A scripted native client: each call takes the next scripted result and is counted. */
-function harness(options: { conversationId?: string; send?: ClientResult<{ runId: string; inputMessageId: string }>[]; turn?: (onText: (part: { runId: string; text: string }) => void, onActivity: (activity: NativeToolActivityChunk) => void) => Promise<ClientResult<NativeObservedTurn>>; reads?: ClientResult<NativeMessages>[]; created?: ClientResult<NativeThread>; now?: () => number } = {}) {
-  const calls = { create: 0, subscribe: 0, send: [] as string[], read: 0, closed: 0, cleared: 0, started: [] as NativeThread[], confirmed: [] as (NativeThread | null)[] };
+function harness(options: { conversationId?: string; send?: ClientResult<{ runId: string; inputMessageId: string }>[]; turn?: (onText: (part: { runId: string; text: string }) => void, onActivity: (activity: NativeToolActivityChunk) => void) => Promise<ClientResult<NativeObservedTurn>>; reads?: ClientResult<NativeMessages>[]; created?: ClientResult<NativeThread>; now?: () => number; stop?: () => Promise<ClientResult<{ runId: string; abortRequested: boolean }>>; stopSettleMs?: number } = {}) {
+  const calls = { create: 0, subscribe: 0, send: [] as string[], read: 0, closed: 0, cleared: 0, started: [] as NativeThread[], confirmed: [] as (NativeThread | null)[], stops: [] as string[] };
   const sends = [...(options.send ?? [])], reads = [...(options.reads ?? [])];
   const observation: NativeObservation = {
     consume: () => Promise.reject(new Error('unused')),
@@ -23,11 +23,12 @@ function harness(options: { conversationId?: string; send?: ClientResult<{ runId
     subscribe: async () => { calls.subscribe++; return { ok: true, value: observation }; },
     sendText: async input => { calls.send.push(input!.message); return sends.shift() ?? { ok: true, value: { runId: `run-${calls.send.length}`, inputMessageId: `input-${calls.send.length}` } }; },
     loadMessages: async () => { calls.read++; return reads.shift() ?? { ok: true, value: page([]) }; },
+    stop: async input => { calls.stops.push(input!.runId); return options.stop ? options.stop() : { ok: true, value: { runId: input!.runId, abortRequested: true } }; },
   } as ChatSessionConfig['native'];
   const session = createChatSession({
     native, accountId: account, ...(options.conversationId ? { conversationId: options.conversationId } : {}),
     knownMessageIds: () => new Set(), clearDraft: () => { calls.cleared++; },
-    onStarted: value => { calls.started.push(value); }, onConfirmed: value => { calls.confirmed.push(value); }, ...(options.now ? { now: options.now } : {}),
+    onStarted: value => { calls.started.push(value); }, onConfirmed: value => { calls.confirmed.push(value); }, ...(options.now ? { now: options.now } : {}), ...(options.stopSettleMs ? { stopSettleMs: options.stopSettleMs } : {}),
   });
   return { session, calls };
 }
@@ -153,6 +154,102 @@ test('a lost turn leaves its running line running, without a clock, because it m
   const [part] = session.getSnapshot().turns[0]!.parts;
   assert.ok(part?.kind === 'activity');
   assert.equal(part.activity.state, 'running'); assert.equal(part.startedAt, undefined);
+});
+
+/** A turn that streams 'Part' and then waits until the test ends it. */
+function heldTurn() {
+  let end!: (result: ClientResult<NativeObservedTurn>) => void;
+  const ended = new Promise<ClientResult<NativeObservedTurn>>(resolve => { end = resolve; });
+  return { end, turn: async (onText: (part: { runId: string; text: string }) => void) => { onText({ runId: 'run-1', text: 'Part' }); return ended; } };
+}
+const settled = (session: { getSnapshot(): { phase: string } }) => new Promise<void>(resolve => { const poll = () => session.getSnapshot().phase === 'idle' ? resolve() : setTimeout(poll, 5); poll(); });
+
+test('Stop names the exact run once; an acknowledged Stop that ends the turn shows Stopped and allows one Retry', async () => {
+  const held = heldTurn();
+  const { session, calls } = harness({ conversationId: video, turn: held.turn });
+  const sending = session.send('Long one');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(session.getSnapshot().phase, 'working');
+  const stopping = session.stop(); void session.stop();
+  assert.equal(session.getSnapshot().turns[0]!.stop, 'stopping');
+  await stopping;
+  held.end({ ok: true, value: { outcome: 'interrupted', runId: 'run-1' } });
+  await sending;
+  const turn = session.getSnapshot().turns[0]!;
+  assert.deepEqual([turn.state, turn.stop, replyText(turn), session.getSnapshot().phase], ['interrupted', 'stopped', 'Part', 'idle']);
+  assert.deepEqual(calls.stops, ['run-1']);
+  await session.retry(turn.key);
+  assert.deepEqual(calls.send, ['Long one', 'Long one']);
+});
+
+test('a Stop the server does not acknowledge is unacknowledged when the turn still ends interrupted, and offers one Retry', async () => {
+  const held = heldTurn();
+  const { session, calls } = harness({ conversationId: video, turn: held.turn, stop: async () => ({ ok: true, value: { runId: 'run-1', abortRequested: false } }) });
+  const sending = session.send('Long one');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  // The stream may end before the acknowledgment arrives; the outcome waits for it.
+  held.end({ ok: true, value: { outcome: 'interrupted', runId: 'run-1' } });
+  await session.stop(); await sending;
+  assert.deepEqual([session.getSnapshot().turns[0]!.state, session.getSnapshot().turns[0]!.stop], ['interrupted', 'unacknowledged']);
+  await session.retry(session.getSnapshot().turns[0]!.key);
+  assert.deepEqual(calls.send, ['Long one', 'Long one']);
+});
+
+test('a turn lost while stopping is unconfirmed with no Retry; one that fails while stopping shows as failed', async () => {
+  const held = heldTurn();
+  const { session, calls } = harness({ conversationId: video, turn: held.turn });
+  const sending = session.send('Long one');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const stopping = session.stop();
+  held.end(fail('transport_failure'));
+  await stopping; await sending;
+  const lost = session.getSnapshot().turns[0]!;
+  assert.deepEqual([lost.state, lost.stop, session.getSnapshot().phase], ['interrupted', 'unconfirmed', 'idle']);
+  await session.retry(lost.key);
+  assert.deepEqual(calls.send, ['Long one'], 'it may still be running');
+
+  const failing = heldTurn();
+  const second = harness({ conversationId: video, turn: failing.turn });
+  const again = second.session.send('Long one');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const stopped = second.session.stop();
+  failing.end({ ok: true, value: { outcome: 'failed', runId: 'run-1', reason: 'error' } });
+  await stopped; await again;
+  const failed = second.session.getSnapshot().turns[0]!;
+  assert.deepEqual([failed.state, failed.stop], ['failed', undefined]);
+});
+
+test('without an outcome the chat settles after the Stop deadline, stops watching, and ignores a late result', async () => {
+  const held = heldTurn();
+  const { session, calls } = harness({ conversationId: video, turn: held.turn, stopSettleMs: 40, stop: () => new Promise(() => {}) });
+  const sending = session.send('Long one');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  void session.stop();
+  await settled(session);
+  assert.deepEqual([session.getSnapshot().turns[0]!.state, session.getSnapshot().turns[0]!.stop], ['interrupted', 'unconfirmed']);
+  assert.equal(calls.closed, 1);
+  held.end({ ok: true, value: { outcome: 'complete', runId: 'run-1', assistantMessageId: 'a' } });
+  await sending;
+  assert.equal(session.getSnapshot().turns[0]!.state, 'interrupted');
+  assert.deepEqual(calls.stops, ['run-1'], 'never a second Stop');
+});
+
+test('a Stop that loses the race to a finished reply leaves the reply completed; dispose never sends a Stop', async () => {
+  const held = heldTurn();
+  const { session, calls } = harness({ conversationId: video, turn: held.turn });
+  const sending = session.send('Quick one');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  await session.stop();
+  held.end({ ok: true, value: { outcome: 'complete', runId: 'run-1', assistantMessageId: 'a' } });
+  await sending;
+  assert.deepEqual([session.getSnapshot().turns[0]!.state, session.getSnapshot().turns[0]!.stop], ['completed', undefined]);
+  const other = heldTurn();
+  const second = harness({ conversationId: video, turn: other.turn });
+  void second.session.send('Leave');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  second.session.dispose();
+  assert.deepEqual(second.calls.stops, []);
+  assert.deepEqual(calls.stops, ['run-1']);
 });
 
 test('after dispose, late reply text and results change nothing', async () => {

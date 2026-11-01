@@ -82,6 +82,36 @@ try {
   await toolStep('tool', 'test-echo', ['Use the test-echo tool to echo the text "workprint-live", then tell me what it returned.', 'Call the test-echo tool now with text "workprint-live". Do not answer before calling it.'], { text: 'workprint-live' }, 'It returned workprint-live.');
   await toolStep('read-workspace', 'read-workspace', ['Check our progress on this video.', 'Call the read-workspace tool now to check our progress on this video. Do not answer before calling it.'], {}, 'Nothing is saved yet.');
 
+  await step('stop', async () => {
+    if (!live) provider.script({ text: ['Partial', ' never sent'], hold: 'mid' });
+    const video = await client.newVideo();
+    let accepted;
+    const runId = new Promise(resolve => { accepted = resolve; });
+    const turn = client.turn(video, 'Write forty numbered lines about planning a short film, one sentence each.', timeoutMs, accepted);
+    const id = await runId;
+    // Live: let the reply start; scripted: wait for the held step.
+    if (live) await new Promise(resolve => setTimeout(resolve, 1500)); else await provider.held();
+    const started = Date.now();
+    const response = await client.post('/api/agents/assistant/threads/abort', { threadId: video, resourceId: user.id, expectedRunId: id, clearPendingSignals: false });
+    const acknowledgedMs = Date.now() - started;
+    assert.equal(response.status, 200, `Stop answered ${response.status}`);
+    const { aborted } = await response.json();
+    const ended = await turn;
+    const reason = ended.terminal?.payload?.stepResult?.reason;
+    const interrupted = ended.terminal?.type === 'abort' || reason === 'abort';
+    if (live) {
+      // A real model that finished before the Stop arrived is a timing finding, not a failure.
+      assert.ok(interrupted || completed(ended), `turn neither stopped nor completed: ${ended.terminal?.type ?? 'no terminal chunk'}`);
+    } else {
+      // Scripted, the reply is held, so the Stop must land and end the turn.
+      assert.equal(aborted, true, 'Stop not acknowledged');
+      assert.ok(interrupted, `turn not interrupted: ${ended.terminal?.type ?? 'no terminal chunk'}`);
+    }
+    assert.ok(acknowledgedMs < 5000, `Stop acknowledged after ${acknowledgedMs} ms`);
+    shapes.stop = sanitize(ended.chunks);
+    return { aborted, interrupted, acknowledgedMs, settledMs: Date.now() - started };
+  });
+
   if (live) {
     const directory = 'apps/api/test/support/fixtures';
     mkdirSync(directory, { recursive: true });
