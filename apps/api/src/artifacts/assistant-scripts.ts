@@ -49,7 +49,8 @@ export function createAssistantScripts(pool: Pool, checkOwnedConversation: Owned
         if (current) await client.query("UPDATE artifacts.conversation_uses SET version_id=$1,state='draft' WHERE owner_id=$2 AND use_id=$3", [version.id, account, useId]);
         else {
           const count = (await client.query<{ count: number }>('SELECT count(*)::int AS count FROM artifacts.conversation_uses WHERE owner_id=$1 AND conversation_id=$2', [account, conversation])).rows[0]!.count;
-          if (count >= 100) throw new ArtifactError('invalid_input');
+          // The video's use limit is not the script's fault: report it as unavailable, not invalid.
+          if (count >= 100) throw new ArtifactError('integration_failure');
           await client.query("INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state) VALUES($1,$2,$3,$4,$5,'script','draft')", [account, conversation, useId, version.id, binding]);
         }
         return { version, use: useSchema.parse({ id: useId, versionId: version.id, binding, state: 'draft' }) };

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { Pool } from 'pg';
 import { PostgresStore } from '@mastra/pg';
 import type { Version } from '@workprint/contracts';
-import { createArtifactStore, createArtifactWriters, createVersionUses } from '../../src/artifacts/index.js';
+import { createArtifactStore, createArtifactWriters, createAssistantScripts, createVersionUses } from '../../src/artifacts/index.js';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
 import { createNativeConversation } from '../support/native-conversations.js';
 import { query } from '../support/postgres.js';
@@ -60,5 +60,12 @@ test('test-only sealed built-ins are readable and independently reusable but imm
     assert.equal(continuation.nextCursor, null);
     const fresh = await store.library(first, { kind: 'script', limit: 100 });
     assert.ok(fresh.items.some(item => item.latestVersion.id === late.id), 'An explicit fresh read observes the newly sealed source');
+    // The assistant may adapt a built-in script in use: its save starts the account's own script, on the same use.
+    const used = (await store.workspace(first, ca.id)).script!.use!.id;
+    const adapted = await createAssistantScripts(pool, check).save(first, ca.id, { baseVersionId: example.id, content: script('An adapted example action.') });
+    assert.notEqual(adapted.version.artifactId, example.artifactId); assert.equal(adapted.version.revision, 1); assert.equal(adapted.version.createdBy, 'assistant');
+    assert.equal(adapted.use.id, used); assert.equal(adapted.use.state, 'draft');
+    assert.equal((await store.workspace(first, ca.id)).script?.version.id, adapted.version.id);
+    assert.deepEqual((await store.history(first, example.artifactId)).items.map(value => value.id), [example.id], 'The built-in gains no version');
   } finally { await native.close(); if (!pool.ended) await pool.end(); await setup.close(); await db.close(); }
 });

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { Pool } from 'pg';
-import { createArtifactStore, createAssistantScripts } from '../../src/artifacts/index.js';
+import { createArtifactStore, createAssistantScripts, createVersionUses } from '../../src/artifacts/index.js';
 import { createAssistantScriptSaver } from '../../src/application/index.js';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
 import { accountBrowserFixture } from '../support/account-browser-fixture.js';
@@ -169,6 +169,8 @@ test('update-script saves the video\'s current script as a draft, and never over
 
   const video = await client(owner).newVideo(), otherVideo = await client(owner).newVideo(), foreignVideo = await client(other).newVideo();
   let first = '', second = '';
+  /** The video's script: its version, the version its use points at, and the use's state. */
+  const current = async (video: string) => { const work = (await store.workspace(owner.id, video)).script; return [work?.version.id, work?.use?.versionId, work?.use?.state]; };
 
   await t.test('a video with no script gets version 1, created by the assistant and used as a draft', async () => {
     const { turn, lines, result } = await updateScript(owner, video, { baseVersionId: null, script: script('Mara swims across the lake.') });
@@ -196,7 +198,7 @@ test('update-script saves the video\'s current script as a draft, and never over
     const { lines, result } = await updateScript(owner, video, { baseVersionId: first, script: script('Mara stops.') });
     assert.ok('saved' in result && !result.saved && result.reason === 'stale', JSON.stringify(result));
     assert.deepEqual(lines.at(-1), ['Updating the script…', 'done', 'Not saved: the script changed']);
-    assert.equal(await versions(owner.id, video), 2); assert.equal((await store.workspace(owner.id, video)).script?.version.id, second);
+    assert.equal(await versions(owner.id, video), 2); assert.deepEqual(await current(video), [second, second, 'draft']);
   });
 
   await t.test('a base from another account or another video is not found and saves nothing', async () => {
@@ -208,7 +210,7 @@ test('update-script saves the video\'s current script as a draft, and never over
       assert.ok('saved' in result && !result.saved && result.reason === 'not_found', JSON.stringify(result));
       assert.deepEqual(lines.at(-1), ['Updating the script…', 'done', 'Not saved: script not found']);
     }
-    assert.equal(await versions(owner.id, video), 2); assert.equal((await store.workspace(owner.id, video)).script?.version.id, second);
+    assert.equal(await versions(owner.id, video), 2); assert.deepEqual(await current(video), [second, second, 'draft']);
     assert.ok(!JSON.stringify(provider.requests).includes('Private.'));
   });
 
@@ -216,7 +218,7 @@ test('update-script saves the video\'s current script as a draft, and never over
     const { lines, result } = await updateScript(owner, video, { baseVersionId: second, script: script('Mara waves.', 'Nobody') });
     assert.ok('error' in result, JSON.stringify(result));
     assert.deepEqual(lines.at(-1), ['Updating the script…', 'done', 'Not saved: the script isn’t valid']);
-    assert.equal(await versions(owner.id, video), 2);
+    assert.equal(await versions(owner.id, video), 2); assert.deepEqual(await current(video), [second, second, 'draft']);
   });
 
   await t.test('scope comes from the run: a missing video, or a base this video does not use, is not found', async () => {
@@ -225,6 +227,7 @@ test('update-script saves the video\'s current script as a draft, and never over
     assert.deepEqual(await saveScript(owner.id, unscripted, { baseVersionId: second, content: script('Moved.') }), { kind: 'not_found' });
     assert.deepEqual(await saveScript(other.id, video, { baseVersionId: second, content: script('Taken.') }), { kind: 'not_found' });
     assert.equal(await versions(owner.id, unscripted), 0); assert.equal(await versions(owner.id, video), 2);
+    assert.deepEqual(await current(unscripted), [undefined, undefined, undefined]); assert.deepEqual(await current(video), [second, second, 'draft']);
   });
 
   await t.test('two first saves at once make exactly one script; the other is stale', async () => {
@@ -234,5 +237,13 @@ test('update-script saves the video\'s current script as a draft, and never over
     assert.equal(await versions(owner.id, fresh), 1);
     const uses = await pool.query('SELECT 1 FROM artifacts.conversation_uses WHERE owner_id=$1 AND conversation_id=$2 AND purpose=$3', [owner.id, fresh, 'script']);
     assert.equal(uses.rowCount, 1);
+  });
+
+  await t.test('the base is the version in use: after Use this version on v1, v2 is stale and v1 saves version 3', async () => {
+    await createVersionUses(pool, check).useVersion(owner.id, video, { operationId: randomUUID(), versionId: first, purpose: 'script' });
+    assert.deepEqual(await saveScript(owner.id, video, { baseVersionId: second, content: script('Mara turns back.') }), { kind: 'stale' });
+    const third = await saveScript(owner.id, video, { baseVersionId: first, content: script('Mara floats.') });
+    assert.ok(third.kind === 'saved' && third.revision === 3, JSON.stringify(third));
+    assert.equal(await versions(owner.id, video), 3); assert.deepEqual(await current(video), [third.versionId, third.versionId, 'draft']);
   });
 });
