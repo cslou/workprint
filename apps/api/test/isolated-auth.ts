@@ -5,6 +5,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { AuthFixtureResources } from './auth-fixture-resources.js';
 import { isolatedPostgres, query } from './postgres.js';
 import { capturedRecoveryLink } from './auth-mail.js';
+import { failFixtureAcquisition, type AcquisitionPhase } from './fixture-diagnostics.js';
 
 // Installed official Supabase CLI images, pinned by observed immutable RepoDigest.
 // Mailpit provenance: github.com/axllent/mailpit, MIT, Supabase public ECR mirror v1.31.3.
@@ -64,13 +65,16 @@ export async function isolatedAuth(options: { lifetimeMs?: number; jwtExpirySeco
     await writeFile(file, contents, { flag: 'wx', mode: 0o600 }); files.set(file, contents);
   };
   const active = () => { if (expired || closing) throw new Error('Isolated Auth fixture is closed or expired'); };
+  let phase: AcquisitionPhase = 'auth-acquisition';
   try {
     await savePrivate(join(directory, 'owner.private.json'), { owner: resources.owner, kind: 'isolated-auth-fixture' });
     await resources.createNetwork();
     database = await isolatedPostgres({ network: { name: resources.edgeNetworkName, owner: resources.owner } });
     await resources.attachPrivate(database.containerId, database.owner, 'database');
     // GoTrue owns every table/migration; standalone deployment supplies its empty namespace.
+    phase = 'auth-storage';
     await query(database.adminUrl, 'CREATE SCHEMA auth AUTHORIZATION postgres');
+    phase = 'auth-acquisition';
     const dbUrl = new URL(database.adminUrl); dbUrl.hostname = 'database'; dbUrl.port = '5432'; dbUrl.searchParams.set('search_path', 'auth');
     const secret = randomBytes(48).toString('hex');
     const anonKey = jwt('anon', secret), serviceKey = jwt('service_role', secret);
@@ -98,6 +102,7 @@ export async function isolatedAuth(options: { lifetimeMs?: number; jwtExpirySeco
       GOTRUE_MAILER_URLPATHS_CONFIRMATION: '/auth/v1/verify', GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: '/auth/v1/verify', GOTRUE_MAILER_URLPATHS_INVITE: '/auth/v1/verify',
     });
     await savePrivate(privateFile, { owner: resources.owner, url, anonKey, serviceKey, mailUrl, signingSecret: secret, hostPid: process.pid, networkId: resources.networkId, edgeNetworkId: resources.edgeNetworkId, database: { containerId: database.containerId, owner: database.owner }, containers: resources.containerIds });
+    phase = 'auth-mail-readiness';
     const deadline = Date.now() + 45000;
     for (;;) {
       let ready = false;
@@ -130,7 +135,8 @@ export async function isolatedAuth(options: { lifetimeMs?: number; jwtExpirySeco
     };
     return { url, anonKey, serviceKey, mailUrl, privateFile, containerIds: [...resources.containerIds, database.containerId], networkId: resources.networkId, networkIds: [resources.networkId, resources.edgeNetworkId], pauseAuthUpstream: () => resources.pauseOwned(auth), resumeAuthUpstream: () => resources.resumeOwned(auth), proxyLogsContain: (privateValue: string) => resources.logsContain(gatewayId, privateValue), request, createAccount, recoveryLink, close };
   } catch (error) {
-    try { await close(); } catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Isolated Auth acquisition and cleanup failed', { cause: cleanupError }); }
-    throw error;
+    const owned = resources.containerIds.map(containerId => ({ owner: resources.owner, containerId }));
+    if (database) owned.push({ owner: database.owner, containerId: database.containerId });
+    return failFixtureAcquisition(error, phase, owned, close);
   }
 }
