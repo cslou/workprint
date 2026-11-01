@@ -23,6 +23,8 @@ export function useVersionMedia(client: ApiClient | null, scope: ReadScope | nul
   const scopeKey = JSON.stringify([scope?.accountId ?? null, scope?.conversationId ?? null]);
   const identity = JSON.stringify([versionId, scopeKey]);
   const [held, setHeld] = useState<{ identity: string; client: ApiClient; value: MediaSource } | null>(null);
+  // A scope or version change forgets held access, so returning never recovers an earlier URL.
+  useEffect(() => { setHeld(null); }, [identity, client]);
   useEffect(() => {
     if (state.kind !== 'settled') return;
     setHeld(client && state.result.ok && Date.parse(state.result.value.expiresAt) > Date.now() ? { identity, client, value: state.result.value } : null);

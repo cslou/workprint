@@ -57,7 +57,10 @@ function ClipViewer({ connection, scope, version, caption, binding, currentUse, 
 export function PrivateClip({ connection, scope, version }: { connection: BrowserClient; scope: ReadScope | null; version: Version }) {
   const media = useVersionMedia(connection.kind === 'configured' ? connection.client : null, scope, version.id, true);
   const settled = media.state.kind === 'settled' ? media.state.result : null;
-  const source = media.source;
+  // Access must describe this exact version's verified media, as for owned image previews.
+  const measured = media.source?.measured, expected = 'media' in version ? version.media : null;
+  const matches = !!measured && !!expected && measured.width === expected.width && measured.height === expected.height && measured.durationMs === expected.durationMs && measured.hasAudio === expected.hasAudio;
+  const source = matches ? media.source : null;
   return <>
     {source ? <ClipPlayer source={{ sourceId: version.id, url: source.url, ...(source.poster === undefined ? {} : { posterUrl: source.poster }), ...(source.measured.durationMs === undefined ? {} : { durationMs: source.measured.durationMs }) }} /> : <ClipEmpty>{media.state.kind === 'loading' ? copy.loading : media.expired ? copy.failed : settled && !settled.ok ? failureCopy(settled.error.code) : copy.failed}</ClipEmpty>}
     {source && version.kind === 'video' ? <ClipDownload key={JSON.stringify([version.id, scope?.accountId ?? null, scope?.conversationId ?? null])} url={source.url} version={version} /> : null}
@@ -112,7 +115,6 @@ function ClipPlayer({ source }: { source: PlayerSource }) {
   const position = Math.min(snapshot.positionMs, duration || snapshot.positionMs);
   const progress = duration > 0 ? Math.min(100, (position / duration) * 100) : 0;
   const playing = snapshot.status === 'playing';
-  useEffect(() => { if (snapshot.status === 'failed') player.current?.dispose(); }, [snapshot.status]);
   return <div className="wp-clip-surface" data-ready={ready ? 'true' : 'false'} data-player-status={snapshot.status}>
     <video ref={media} className="wp-clip-media" playsInline preload="metadata" aria-label="Video" />
     {ready ? <>

@@ -4,7 +4,7 @@ import type { OperationResponse } from '../../../packages/contracts/src/index.js
 type Harness = { mediaTest: { configure(input: unknown): void; source(id: string, input?: Record<string, unknown>): OperationResponse<'media'>; release(index: number, result: unknown): void; pending(): string[]; requested(): string[]; commands(): string[]; switchScope(account: string): void } };
 type Method = 'configure' | 'pending' | 'requested' | 'commands' | 'switchScope';
 const call = (page: Page, method: Method, ...args: unknown[]) => page.evaluate(([method, args]) => ((window as unknown as Harness).mediaTest[method] as (...input: unknown[]) => unknown)(...args), [method, args] as const);
-const release = (page: Page, index: number, url: string) => page.evaluate(([index, url]) => { const value = (window as unknown as Harness).mediaTest; value.release(index, { ok: true, value: value.source('video-v2', { url, expiresAt: new Date(Date.now() + 60_000).toISOString() }) }); }, [index, url] as const);
+const release = (page: Page, index: number, url: string) => page.evaluate(([index, url]) => { const value = (window as unknown as Harness).mediaTest; value.release(index, { ok: true, value: value.source('video-v2', { url, expiresAt: new Date(Date.now() + 60_000).toISOString(), measured: { width: 1280, height: 720, durationMs: 5100 } }) }); }, [index, url] as const);
 const open = async (page: Page) => {
   await page.clock.install();
   await page.goto('/media.html');
@@ -59,13 +59,23 @@ test('reacquired access keeps one player and carries the exact clip position and
   expect(await call(page, 'commands')).toEqual([]);
 });
 
-test('download refuses bytes that do not match the exact version and scope changes tear the clip down', async ({ page }) => {
+test('access for other media is refused; download refuses bytes that do not match the exact version; scope changes tear the clip down', async ({ page }) => {
   await open(page);
-  await release(page, 0, '/fixtures/clip.webm');
+  // Measured facts that differ from the exact version never reach the player.
+  await page.evaluate(() => { const value = (window as unknown as Harness).mediaTest; value.release(0, { ok: true, value: value.source('video-v2') }); });
+  await expect(page.locator('.wp-clip-note')).toHaveText('This video could not be loaded. Nothing was changed.');
+  await expect(media(page)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'View Shot 1 version 2', exact: true }).click();
+  await expect.poll(() => call(page, 'pending')).toEqual(['video-v2', 'video-v2']);
+  // A signed-shaped loopback URL reaches the reader, which rejects the served WebM type and length for this MP4 version.
+  await release(page, 1, `${new URL(page.url()).origin}/fixtures/clip.webm?X-Amz-Signature=control`);
   await expect(page.locator('.wp-clip-surface[data-ready="true"]')).toHaveCount(1);
   let downloads = 0;
   page.on('download', () => { downloads += 1; });
+  const transfer = page.waitForRequest(request => request.url().endsWith('X-Amz-Signature=control') && request.resourceType() === 'fetch');
   await page.getByRole('button', { name: 'Download', exact: true }).click();
+  await transfer;
   await expect(page.getByText('This video could not be downloaded. Nothing was changed.', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Download', exact: true })).toBeEnabled();
   expect(downloads).toBe(0);

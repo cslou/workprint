@@ -26,7 +26,9 @@ async function readPrivateObject(value:string,signal:AbortSignal,policy:Policy):
 export function readPrivateImage(value:string,signal:AbortSignal):Promise<ClientResult<Blob>>{
   return readPrivateObject(value,signal,{types:['image/png','image/jpeg'],maxBytes:MAX_UPLOAD_IMAGE_BYTES,timeoutMs:10000,slots:images});
 }
+/** Downloads tolerate links as slow as 128 KiB/s after a 60 s allowance. */
+export const privateVideoDeadlineMs=(byteSize:number)=>60000+Math.ceil(byteSize/131072)*1000;
 /** One exact-version video download at a time; the bytes must match the version's measured type and size. */
 export function readPrivateVideo(value:string,signal:AbortSignal,expected:{contentType:string;byteSize:number}):Promise<ClientResult<Blob>>{
-  return readPrivateObject(value,signal,{types:[expected.contentType],maxBytes:MAX_UPLOAD_VIDEO_BYTES,exactBytes:expected.byteSize,timeoutMs:60000,slots:downloads});
+  return readPrivateObject(value,signal,{types:[expected.contentType],maxBytes:MAX_UPLOAD_VIDEO_BYTES,exactBytes:expected.byteSize,timeoutMs:privateVideoDeadlineMs(expected.byteSize),slots:downloads});
 }
