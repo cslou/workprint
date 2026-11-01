@@ -19,7 +19,13 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
     - a long overall turn deadline that covers a video tool's 30-minute poll (B-025)
     - short per-model-call deadlines
     - an output cap large enough for a full script
-    - a step cap (for example 20 steps) so a looping agent stops
+    - a step cap so a looping agent stops
+  - Limits agreed with Lou on 2026-11-01:
+    - input up to 32 KiB
+    - output up to 8,192 tokens
+    - at most 100 steps per turn
+    - a 35-minute overall turn deadline
+    - 60 seconds per model call
   - One active turn per video, with no queue in the MVP (B-026 is Later). While the agent is busy, the composer says so and Send is unavailable; it is not silently dropped.
   - Configuration:
     - The root `.env` holds `META_API_KEY`. Mastra documents `META_MODEL_API_KEY` for its `meta/` provider.
@@ -38,9 +44,15 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
   - `apps/api/src/mastra/config.ts`: model admission.
   - [Meta models](https://dev.meta.ai/docs/models): model IDs. API base `https://api.meta.ai/v1`, with OpenAI-compatible Responses and Chat Completions APIs.
 
+### B-034 — Name the video automatically
+- Problem: Recents shows every video as "Untitled video", because native title generation is off (`apps/api/src/agent/mastra/native-text-memory.ts` sets `generateTitle: false`).
+- Outcome: After the first accepted message, the video gets a short title generated from it. The title shows in Recents and as the history heading, and survives reload. Pass: send a first message, and Recents shows a meaningful title instead of "Untitled video".
+- Constraint: One extra bounded model call per new video, made once. A failed title call leaves "Untitled video" and never blocks or fails the chat turn. Lou approved this on 2026-11-01.
+- References: Mastra Memory `generateTitle`; B-012.
+
 ### B-021 — Stream replies and show tool activity in the chat
 - Problem: Without streaming, a long agent turn looks frozen. demo-02 also shows tool steps as they happen ("Writing the script… Wrote the script · 3 shots"), which B-012's text-only plan does not cover.
-- Outcome: Reply text appears as it streams, and each tool call shows a short in-progress line and then a done line. The chat shows sending, streaming, completed, interrupted and failed states honestly. Switching video or account mid-stream drops the late events, so nothing renders in the wrong video. Pass: a reply with a tool call streams text and shows the tool line live; reload shows the saved result.
+- Outcome: Reply text appears as it streams, and each tool call shows a short in-progress line and then a done line. The chat shows sending, streaming, completed, interrupted and failed states honestly. Failed and interrupted states stay simple and familiar, like ChatGPT's (Lou, 2026-11-01): an inline notice under the affected message, with the draft kept. Any retry is an explicit user action, never automatic. Switching video or account mid-stream drops the late events, so nothing renders in the wrong video. Pass: a reply with a tool call streams text and shows the tool line live; reload shows the saved result.
 - Constraint:
   - Each tool supplies its own short in-progress and done labels; for example, update-script returns "3 shots".
   - Long tools show elapsed time, for example "Generating video… 2 min" (B-025).
