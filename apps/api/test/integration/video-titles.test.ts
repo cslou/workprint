@@ -43,8 +43,8 @@ test('each video is named once from an accepted message, a failed title never hu
     await turn(video, 'A short film about a night swim at the lake');
     await titleSettled(video, 'A night swim at the lake where the old boathouse leans into');
     assert.equal(provider.titleRequests.length, 1);
-    const body = provider.titleRequests[0]!.body as { max_tokens?: number; messages: { role: string; content: unknown }[] };
-    assert.equal(body.max_tokens, 32);
+    const body = provider.titleRequests[0]!.body as { max_tokens?: number; reasoning_effort?: string; messages: { role: string; content: unknown }[] };
+    assert.equal(body.max_tokens, 1024); assert.equal(body.reasoning_effort, 'minimal');
     assert.deepEqual(body.messages, [{ role: 'system', content: titleInstructions }, { role: 'user', content: 'A short film about a night swim at the lake' }]);
     assert.equal(provider.requests.length, 1, 'turn requests exclude the title request');
     // The title is written alone: the started mark Recents lists by survives it.

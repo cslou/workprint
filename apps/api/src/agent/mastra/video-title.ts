@@ -1,5 +1,5 @@
 import type { MastraCompositeStore } from '@mastra/core/storage';
-import type { NativeTurnModel } from './model.js';
+import { titleProviderOptions, type NativeTurnModel, type TitleProviderOptions } from './model.js';
 
 /** The title call's only instructions; also how a scripted provider tells a title request from a turn. */
 export const titleInstructions = 'Name this short video from the filmmaker’s message in at most six words. Reply with the title only, no quotes.';
@@ -10,6 +10,7 @@ type StreamPart = { type: string; delta?: unknown; finishReason?: unknown };
 type StreamCall = (options: {
   prompt: readonly ({ role: 'system'; content: string } | { role: 'user'; content: readonly { type: 'text'; text: string }[] })[];
   maxOutputTokens: number;
+  providerOptions: TitleProviderOptions;
   abortSignal: AbortSignal;
 }) => Promise<{ stream: ReadableStream<StreamPart> }>;
 
@@ -37,6 +38,7 @@ export type NameVideo = (accountId: string, videoId: string, message: string) =>
 export function createVideoTitler(model: NativeTurnModel, storage: MastraCompositeStore, limits: VideoTitleLimits): NameVideo {
   const naming = new Set<string>();
   const doStream = (model as unknown as { doStream: StreamCall }).doStream.bind(model);
+  const providerOptions = titleProviderOptions(model);
   return async (accountId, videoId, message) => {
     if (naming.has(videoId)) return;
     naming.add(videoId);
@@ -54,7 +56,8 @@ export function createVideoTitler(model: NativeTurnModel, storage: MastraComposi
       if (!thread || thread.resourceId !== accountId || thread.title?.trim()) return;
       const { stream } = await bounded(doStream({
         prompt: [{ role: 'system', content: titleInstructions }, { role: 'user', content: [{ type: 'text', text: message }] }],
-        maxOutputTokens: limits.titleTokens, abortSignal: deadline.signal,
+        // A title needs no deliberation; the model's lowest qualified effort keeps it to about a second.
+        maxOutputTokens: limits.titleTokens, providerOptions, abortSignal: deadline.signal,
       }));
       reader = stream.getReader();
       let text = '', finishReason: unknown;
