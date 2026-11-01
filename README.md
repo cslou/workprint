@@ -34,7 +34,7 @@ These are implemented module responsibilities, not claims of working business op
 | `apps/api/src/mastra/server.ts`, `shutdown.ts` | Shared app-owned entry: official Hono adapter, trusted composition hooks, one loopback listener, workers, startup recovery and one bounded signal-driven drain/shutdown. |
 | `apps/api/src/mastra/{admission,ingress,body}.ts` | Catalog/CORS/header-Auth admission and one bounded JSON reader; trusted identity and readable raw-byte handoff before native context creation. |
 | `apps/api/src/mastra/native-navigation.ts` | Only qualified native thread create/list/read/message reads, with verified-resource ownership and bounded native responses. |
-| `scripts/browser/e2e` | Playwright end-to-end journeys against the real signed-in app, sharing one isolated backend per run. |
+| `test/e2e` | Playwright end-to-end journeys against the real signed-in app, sharing one isolated backend per run. |
 
 Backend ownership reads are declared by `application/`, implemented by `agent/mastra/` through native storage, and supplied by backend `mastra/` composition. Application code imports neither native integration subtree. Ownership has no separate public route; the four implemented saved-work reads consume the collaborator through the application/domain boundary.
 
@@ -144,7 +144,7 @@ pnpm test:browser
 pnpm audit
 ```
 
-The suite is deliberately small for the MVP (trimmed 2026-11-01). `check` runs strict TypeScript (including the browser journeys), ESLint and dependency-cruiser. Unit tests sit next to their modules (`apps/api/src`, `apps/web/src`, `packages/api-client/test`); `test:unit` runs them without Docker. `test:integration` runs the Docker-backed tests in `apps/api/test/{integration,http,tooling}`, whose fixtures live in `apps/api/test/support`; `test` runs both groups. `test:browser` runs eight end-to-end journeys in `scripts/browser/e2e` against one API and built app: sign-in and sign-out, password recovery, Recents, manual saves, image upload, Library attach, Shot choice and Library video playback. Both Docker-backed commands share one [test stack](#shared-test-stack-test-only) per run; no private fixture files or hosted project are needed.
+The suite is deliberately small for the MVP (trimmed 2026-11-01). `check` runs strict TypeScript (including the browser journeys), ESLint and dependency-cruiser. Tests live in each package's `test/` folder, never under `src/` (the runner refuses test files there). Unit tests are in `apps/api/test/unit`, `apps/web/test/unit` and `packages/api-client/test/unit`, mirroring `src` paths; `test:unit` runs them without Docker. `test:integration` runs the Docker-backed tests in `apps/api/test/{integration,http,tooling}`, whose fixtures live in `apps/api/test/support`; `test` runs both groups. `test:browser` runs eight end-to-end journeys in the root `test/e2e` (they span the web app, API and stack) against one API and built app: sign-in and sign-out, password recovery, Recents, manual saves, image upload, Library attach, Shot choice and Library video playback. Both Docker-backed commands share one [test stack](#shared-test-stack-test-only) per run; no private fixture files or hosted project are needed.
 
 `WORKPRINT_PREVIEW_PORT` selects the end-to-end app's loopback port (default 4180); use distinct ports and `WORKPRINT_BROWSER_OUTPUT` directories for simultaneous checkouts.
 
