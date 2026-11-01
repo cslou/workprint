@@ -113,7 +113,13 @@ export class AccountOwner {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
     const refresh = url.searchParams.get('grant_type') === 'refresh_token';
     const userRead = url.pathname.endsWith('/user') && (init?.method ?? 'GET') === 'GET' && read;
-    if (refresh && this.blocked && !this.operation) throw new DOMException('Account access is fenced', 'AbortError');
+    if (refresh && this.blocked && !this.operation) {
+      // A locked tab never refreshes. At startup, answer the SDK's initial refresh with a local,
+      // non-retryable rejection: a thrown error reads as a network failure, and the SDK then
+      // retries with backoff for about 30 seconds while the page waits on "Checking your session".
+      if (this.initializing) return new Response(JSON.stringify({ code: 'workprint_access_fenced', message: 'Account access is locked in this browser' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+      throw new DOMException('Account access is fenced', 'AbortError');
+    }
     if (refresh && this.state.account && !this.blocked) this.set({ screen: 'refreshing', busy: true });
     const signals = [AbortSignal.timeout(5000), ...(init?.signal ? [init.signal] : []), ...(userRead ? [read.abort.signal] : [])];
     try {
