@@ -28,7 +28,7 @@
     - `test/e2e/` at the repo root for browser journeys
   - **One shared test stack per run** (PR #67, `scripts/test-stack.mjs`, `apps/api/test/support/test-stack.ts`).
   - **Mastra knows the model.** Its 1.79.0 registry lists `meta/muse-spark-1.3` at `https://api.meta.ai/v1` (OpenAI-compatible via `@ai-sdk/openai`, key variable `META_MODEL_API_KEY`).
-  - **The key is present.** The root `.env` has `META_API_KEY`. `DEFAULT_ASSISTANT_MODEL` is present but empty, which currently fails startup. `scripts/tasks.mjs` loads one env file (`WORKPRINT_ENV_FILE`, default `.env`), and `pnpm db:local` writes `outputs/local-database.env` with `DEFAULT_ASSISTANT_MODEL=unqualified/disabled`.
+  - **The key is present.** The root `.env` has `META_API_KEY`. `DEFAULT_ASSISTANT_MODEL` is present but empty, which currently fails startup. `scripts/tasks.mjs` loads one env file (`WORKPRINT_ENV_FILE`, default `.env`). `pnpm db:local` writes `outputs/local-database.env`, and today both it and the shared test environment set `DEFAULT_ASSISTANT_MODEL=unqualified/disabled`, a chat-off placeholder from earlier sprints.
 - **Implementation spec:** `docs/specs/implementation-spec-001.md` §10 MVP plan and Phase 3 sprint packaging; backlog B-012, B-021, B-022, B-023, B-034.
 
 ### Sprint-Wide Context
@@ -64,7 +64,7 @@
   - §8.1 start or resume work: New video, Recents, opening history, sign-out scope clearing.
   - §8.7 Stop and recover: exact-turn Stop, observer disconnect.
   - Composer draft and upload behaviour.
-  - Local dev and test-stack server startup (`pnpm dev`, shared test environment), which must keep booting with chat off.
+  - Local dev and test-stack server startup (`pnpm dev`, `pnpm db:local`, shared test environment), which now supply the real model name and, in tests, a placeholder key.
 - **New flows introduced:** Real browser text chat with Muse Spark:
   - send, then stream
   - tool activity lines
@@ -113,14 +113,13 @@ At sprint completion, run the applicable regression suite on the combined sprint
   - [ ] Ready for Lou
 - **Planning review:**
   - Findings: Pass 1 (2/5): P1 the scripted provider can't hold tools, so test-tool injection was missing; P1 `live:chat` was built only here; P2s on single bad-config outcome, 32 KiB rejection, key leakage, static prompt, deadline proof and build exclusion. Pass 2 (3/5): P1 requiring the key at startup would break every test and dev boot that uses `unqualified/disabled`; P2s on the step-cap outcome, the 60 s timeout test and `live:chat` being blocked by the network guard.
-  - Resolution: Added test-only tool and limit injection, the shared `live:chat` script, and the named configuration error, size, leakage, prompt-cache and build checks. Kept `unqualified/disabled` as a valid chat-off value so existing setups boot unchanged, with browser boot added to regression. Step cap ends as failed with a notice; the timeout test overrides to 1 s; `live:chat` uses its own unguarded environment.
+  - Resolution: Added test-only tool and limit injection, the shared `live:chat` script, and the named configuration error, size, leakage, prompt-cache and build checks. Lou (2026-11-01) rejected a chat-off mode: the server always requires the model and key. The test setups and `pnpm db:local` supply the model and a placeholder key behind the network guard, and local runs layer the database file over the root `.env`. Step cap ends as failed with a notice; the timeout test overrides to 1 s; `live:chat` uses its own unguarded environment only with `--live`.
 - **As a** user, **I want** the backend to run a real Muse Spark agent loop that can call tools, **so that** chat produces real replies.
 - **Dependencies:** `chore/mvp-backlog` merged into `phase-3`.
 - **Acceptance criteria:**
-  - [ ] **Real composition binds the model.** The server composition (`apps/api/src/mastra/server.ts` → `createBackend`) binds the model from `DEFAULT_ASSISTANT_MODEL`, with the key mapped explicitly from `META_API_KEY`. Two values are valid:
-    - `meta/muse-spark-1.3`: chat on; `META_API_KEY` required.
-    - `unqualified/disabled`: chat off; native turns are unavailable and zero provider requests are made. The shared test environment (`apps/api/test/support/environment.ts`) and `pnpm db:local` (`local-database.ts`) keep using it unchanged.
-  - [ ] **Bad configuration makes no calls.** `meta/muse-spark-1.3` without `META_API_KEY`, an empty or unsupported model, or a `test/`, `mock/` or `fake/` model makes `loadServerConfig` throw `Invalid or missing server configuration: <NAME>`, so the server does not start and makes zero provider requests. The key never appears in logs, errors or browser config.
+  - [ ] **Real composition binds the model.** The server composition (`apps/api/src/mastra/server.ts` → `createBackend`) always binds the model from `DEFAULT_ASSISTANT_MODEL`, accepting only `meta/muse-spark-1.3` for the MVP, with the key mapped explicitly from `META_API_KEY`. There is no chat-off mode (Lou, 2026-11-01): the `unqualified/disabled` value is removed from the configuration, the test setups and the README.
+  - [ ] **Test and helper setups use the real configuration shape.** The shared test environment (`apps/api/test/support/environment.ts`) sets `DEFAULT_ASSISTANT_MODEL=meta/muse-spark-1.3` and a placeholder `META_API_KEY`; its existing network guard still blocks every non-loopback call, so no test can reach Meta. `pnpm db:local` (`local-database.ts`) stops writing a model line; its file holds only database settings.
+  - [ ] **Bad configuration makes no calls.** A missing `META_API_KEY`, an empty or unsupported model, or a `test/`, `mock/` or `fake/` model makes `loadServerConfig` throw `Invalid or missing server configuration: <NAME>`, so the server does not start and makes zero provider requests. The key never appears in logs, errors or browser config.
   - [ ] **One agent loop with a tool registry.** The agent takes its tools from a registry (one directory per tool, `apps/api/src/agent/tools/<tool>/`) and runs up to 100 steps.
     - Limits: 32 KiB input at route admission, 32,768 output tokens per model call, a 120 s no-data stall limit per model call, a 35-minute overall turn deadline. The limits live in one exported limits object.
     - Zero automatic provider retries and no model fallback.
@@ -131,7 +130,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
   - [ ] **Tool folders stay framework-neutral.** A dependency-cruiser rule forbids `apps/api/src/agent/tools/` from importing `apps/api/src/agent/mastra/`, `apps/api/src/mastra/` or `@mastra/*`; `pnpm check` enforces it.
   - [ ] **One composition seam.** `createBackend` passes `bindNativeTurns` one collaborator object: the application functions tools call, the tool registry and the limits. Production passes the real registry and limits. There is no module-level registry that tests change at runtime.
   - [ ] **Test-only tool injection.** Through that seam, the test-only composition (`apps/api/test/support/`) can register extra tools and override limits. The tools are: a gated tool that runs until the test releases it and observes its abort signal; a tool with a unique phrase and done summary; and a registered tool with no phrase. Production registers only real tools and the real limits. Stories 3 and 4 use this.
-  - [ ] **Chat can be turned on for a local or QA build.** `scripts/tasks.mjs` gains an optional `WORKPRINT_SECRETS_FILE` (for example the root `.env`). After the primary env file loads, it reads only `DEFAULT_ASSISTANT_MODEL` and `META_API_KEY` from that file and sets them for the API child; an empty value counts as unset, and a value already set in the shell still wins. Every other key in that file (for example `MINIMAX_API_KEY`) is ignored. So `WORKPRINT_ENV_FILE=outputs/local-database.env WORKPRINT_SECRETS_FILE=.env pnpm dev` and the QA host run with chat on, and the key never appears in a command argument, log line or another file. Lou sets `DEFAULT_ASSISTANT_MODEL=meta/muse-spark-1.3` in the root `.env`.
+  - [ ] **One layered env for local and QA runs.** `scripts/tasks.mjs` loads the root `.env` (model, key and other settings), then the file named by `WORKPRINT_ENV_FILE`, if any, on top of it. Precedence: shell, then `WORKPRINT_ENV_FILE`, then root `.env`. So `WORKPRINT_ENV_FILE=outputs/local-database.env pnpm dev` and the QA host take the database from the helper file and the model and key from `.env`, and the key never appears in a command argument, log line or another file. The README's local-run section is updated to match. Lou sets `DEFAULT_ASSISTANT_MODEL=meta/muse-spark-1.3` in the root `.env`.
   - [ ] **The live check confirms real behaviour.** `pnpm live:chat --live` (`scripts/live/chat.mjs`) starts the built API through the test-only composition, with real Muse Spark and a test-only echo tool. In live mode it uses its own environment with only the Meta key mapped and no network guard; it never reuses the guarded test-environment fixture. It sends a few synthetic messages, including one that triggers the tool, and confirms the real stream, tool-call and finish shapes. It also confirms Meta accepts the 32,768 output cap and records time to the first chunk, so the 120 s stall limit can be tuned. Sanitized observed shapes are saved as test fixtures, and the run is recorded in the PR. Without `--live`, the script runs the same steps against the scripted provider: it removes `META_API_KEY` and `META_MODEL_API_KEY` from the child environment, turns on the loopback network guard, passes each step on the scripted outcome, and fails if any non-loopback request is attempted. Stories 3–5 extend the script; only Story 1 and Sprint Completion run `--live`.
 - **Functional verification:**
   - [ ] Integration tests in `apps/api/test/integration/agent-loop.test.ts`, run against the built server with the scripted provider:
@@ -142,15 +141,15 @@ At sprint completion, run the applicable regression suite on the combined sprint
     - [ ] The system prompt and tool list are byte-identical across two turns (protects prompt caching).
     - [ ] Provider error, timeout and an incomplete stream each end with a typed failure and no retry (provider request count asserted). The stall case holds the stream mid-reply with the stall limit overridden to 1 s in the test composition. A stream that keeps sending chunks past that time is not cut off.
     - [ ] A second send while busy is rejected with zero extra provider requests.
-  - [ ] Unit test for `WORKPRINT_SECRETS_FILE` in `scripts/tasks.mjs`: only the two named keys reach the API child; an empty value does not override `unqualified/disabled`; a shell value wins; other keys in the file are not passed.
-  - [ ] A `pnpm dev`-style boot with `WORKPRINT_SECRETS_FILE` and a sentinel key: the sentinel never appears in server logs or the browser config.
+  - [ ] Unit test for env layering in `scripts/tasks.mjs`: with a root `.env` holding the model and a sentinel key and an override file holding `DATABASE_URL`, the API child receives the model, the key and the override file's `DATABASE_URL`; an override-file value replaces the root `.env` value; a shell value beats both.
+  - [ ] A `pnpm dev`-style boot with that layering and the sentinel key: the sentinel never appears in server logs or the browser config.
   - [ ] `pnpm live:chat` (scripted, the default) passes with zero non-loopback requests.
   - [ ] `pnpm check`: a fixture import of `@mastra/core` from `agent/tools/` fails the new dependency rule (verified once, not kept).
-  - [ ] Unit tests for configuration (`apps/api/test/unit/mastra/config.security.test.ts`): `unqualified/disabled` loads with no key; `meta/muse-spark-1.3` without a key, or a bad model, throws the named configuration error; the error text and captured server logs never contain the key value. The browser public config contains no key (existing `tooling/web-bundle` sentinel check, with the key added as a sentinel).
+  - [ ] Unit tests for configuration (`apps/api/test/unit/mastra/config.security.test.ts`): `meta/muse-spark-1.3` with a key loads; a missing key, an empty model, `unqualified/disabled` or another unsupported model throws the named configuration error; the error text and captured server logs never contain the key value. The browser public config contains no key (existing `tooling/web-bundle` sentinel check, with the key added as a sentinel).
   - [ ] `pnpm live:chat --live` passes once, and the result is recorded.
 - **Regression verification:**
-  - [ ] `pnpm test:integration`, including `conversation-ownership`, `http/admission` and `http/native-navigation`: ownership, foreign threads and route admission are unchanged, and every existing suite still boots with `unqualified/disabled`.
-  - [ ] `pnpm test:browser`: the existing journeys still boot and pass with chat off.
+  - [ ] `pnpm test:integration`, including `conversation-ownership`, `http/admission` and `http/native-navigation`: ownership, foreign threads and route admission are unchanged, and every existing suite boots with the model and placeholder key and makes zero non-loopback requests.
+  - [ ] `pnpm test:browser`: the existing journeys still boot and pass with the model and placeholder key.
   - [ ] `pnpm check`: the `production-no-tests` dependency rule keeps `apps/api/src` from importing `apps/api/test/support/` (scripted provider, test composition, test tools), and the API build compiles only `apps/api/src` (`apps/api/tsconfig.build.json`). `tooling/web-bundle` and `web-files` keep test code and keys out of the web bundle.
 - **Editorial/design verification:** N/A — no UI change.
 - **Manual-only behavior verification:** N/A — the live check is scripted.
@@ -181,7 +180,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
 - **Acceptance criteria:**
   - [ ] **The composer sends.** It sends through `native.sendText` with the verified scope, then streams the reply text into the conversation as it arrives.
   - [ ] **Keyboard behaviour.** Enter sends once; Shift+Enter inserts a newline; Enter during IME composition does not send. Whitespace-only input is never sent. Input over 32 KiB is blocked in the composer with a short message, and the draft is kept.
-  - [ ] **New video stays client-only until the first accepted send.** The first accepted send creates the native thread, whose id becomes the video id (`/app?conversation=<id>`, listed in Recents). If the first send fails, no video appears in Recents and the draft is kept. If its outcome is unknown, the draft is kept and Send stays blocked with "We couldn't confirm your message was sent". The client re-reads that thread's history once: if the message is there, it is shown and the video may appear in Recents. If not, the outcome is still unknown: the notice stays, with "Check again" (another history read) and an explicit "Send anyway" (which may create a duplicate message and turn). It never resends automatically.
+  - [ ] **New video stays client-only until the first accepted send.** The first accepted send creates the native thread, whose id becomes the video id (`/app?conversation=<id>`, listed in Recents). If the first send fails, no video appears in Recents and the draft is kept. If its outcome is unknown, the draft is kept and Send stays blocked with "We couldn't confirm your message was sent". The client re-reads that thread's history once: if the message is there, it is shown and the video may appear in Recents. If not, the outcome is still unknown: the notice stays, with "Check again" (another history read; finding the message behaves exactly like the first re-read finding it) and an explicit "Send anyway" (which may create a duplicate message and turn). It never resends automatically.
   - [ ] **States:** sending, streaming, completed, interrupted and failed.
     - Failed and interrupted show a simple ChatGPT-like inline notice under the affected message, using the approved previews.
     - Retry is an explicit button, never automatic. It makes exactly one new attempt. If native memory can regenerate a reply for the saved user message, Retry does that. Otherwise Retry resends the same text, and history may show the user message twice (accepted by Lou, 2026-11-01; cleanup is B-035).
@@ -208,7 +207,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
   - [ ] `pnpm test:browser`: the `navigation`, `auth`, `uploads` and `saves` journeys still pass. History anchoring, the upload draft and sign-out scope clearing are unchanged.
   - [ ] `http/native-navigation` and `integration/conversation-ownership`: thread listing, paging and ownership are unchanged, apart from the intended hiding of threads with no accepted message.
 - **Editorial/design verification:**
-  - Inert previews of the failed and interrupted states at 1440 and 390 widths (busy reuses demo-02's "Working… · Stop"), in `docs/design/chat-states/`, approved under delegation before implementation. Lou ratifies at QA.
+  - Inert previews of the failed, interrupted and unconfirmed-send ("Check again" / "Send anyway") states at 1440 and 390 widths (busy reuses demo-02's "Working… · Stop"), in `docs/design/chat-states/`, approved under delegation before implementation. Lou ratifies at QA.
   - Copy never claims a message was delivered or stopped when that is unknown.
 - **Manual-only behavior verification:** N/A — automated.
 - **Planned commits:**
@@ -361,7 +360,7 @@ After all implementation stories are complete, perform this checklist before spr
     - title: a non-empty title of at most 60 characters is saved;
     - Stop: a Stop mid-reply settles within 10 s.
     Any other failure is a non-pass, fixed before integration.
-  - [ ] Then a QA build for Lou with chat on (root `.env` model and key passed as in Story 1).
+  - [ ] Then a QA build for Lou using the layered env from Story 1 (model and key from the root `.env`).
 - [ ] Fold the new chat flow into spec §8.1 and §8.7 (send, stream, tool lines, Stop, titles) before integration.
 - [ ] Record results and unresolved issues in a brief `## Final Review`.
 
