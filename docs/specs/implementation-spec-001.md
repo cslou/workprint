@@ -143,7 +143,8 @@ repository-root/
 │   └── api/
 │       └── src/
 │           ├── agent/             # Assistant guidance, context and capabilities
-│           │   └── mastra/        # Native Agent/tool/conversation integration
+│           │   ├── tools/         # One directory per tool: schema, phrase, execute over injected collaborators (framework-neutral)
+│           │   └── mastra/        # Native Agent/tool/conversation integration; turns the tool registry into native tools
 │           ├── application/       # Shared cross-domain use-case coordination
 │           ├── mastra/            # Backend entry, HTTP and workflow adapters
 │           ├── artifacts/         # Creative work, versions, approvals and reuse
@@ -480,7 +481,7 @@ Every criterion is observable and maps to the goals; functional and relevant reg
 - [ ] **SC6 (G6):** Exact human-approved batch traceability, fresh approval for material changes, server-configured model defaults that cannot retarget approved work; no spending-cap/reservation criterion.
 - [ ] **SC7 (G5/G7):** Actual built-server kill/restart/reconnect cases around dispatch, submission, finalization and report acknowledgment; no replay or duplicate results/approval effects.
 - [ ] **SC8 (G8):** Expected per-attempt assistant/background/media usage with provenance/unknowns; genuine repeated calls separate; logs free of secrets/private content.
-- [ ] **Deployed-release gate (hosted G1 and all enabled flows):** under separately granted production/live-call authorization, the exact reviewed MVP is implemented, verified and deployed to its intended hosting, deployment-specific smoke checks pass and the operating/recovery handoff is complete. An undeployed build, missing authorization or unrun required check is non-pass. B-031 owns this gate.
+- [ ] **Deployed-release gate (hosted G1 and all enabled flows):** under separately granted production/live-call authorization, the exact reviewed MVP is implemented, verified and deployed to its intended hosting, deployment-specific smoke checks pass and the operating/recovery handoff is complete. An undeployed build, missing authorization or unrun required check is non-pass. Before public exposure, paid-call authorization (B-030) and spending limits (B-033) are resolved or explicitly re-decided. B-031 owns this gate.
 
 Common release gates: selected native package-set qualification with actual built server/Postgres; authorized sanitized real-provider response evidence; Supabase/R2 qualification; ownership/route/cleanup safeguards; documented tested input/concurrency/timeout/shutdown bounds; desktop/narrow keyboard/focus/loading/empty/failure/interruption checks; relevant automated and application-repository regression suites. No fixed account-capacity, full accessibility certification, zero-downtime or exactly-once-provider claim is inferred.
 
@@ -588,7 +589,7 @@ Tools call application/domain functions in process, never application HTTP route
 - **Storyboard:** textual Shot Definitions, ordered Storyboard Panels and image Frames remain different things. Preserve stable Shot/Panel identities, intended state progression and neighbouring context. The agent asks for review (B-014) at the skill's checkpoints rather than assuming approval.
 - **Generation:** prepare a concise production brief and the exact provider prompt, settings and reference order. Technical validation produces a candidate, never creative approval, a chosen clip or a finished-film claim. No automatic provider/model substitution or paid replacement request.
 - **Production:** map Shot intent to supported video conditioning (MiniMax V2: a first and optionally a last frame) and explain limitations candidly.
-- Local YAML/JSON/HTML layouts, shell flags, spend-limit fields, handoff packages and local sequential orchestration are not hosted requirements. Implement guidance through the supported Mastra agent instructions and tool descriptions; a Markdown filename is not proof the guidance is loaded or followed. Authority checks belong in tool and domain code, not only in prompts.
+- Local YAML/JSON/HTML layouts, shell flags, spend-limit fields, handoff packages and local sequential orchestration are not hosted requirements. Implement guidance through the supported Mastra agent instructions and tool descriptions; a Markdown filename is not proof the guidance is loaded or followed. Authority checks belong in tool and domain code, not only in prompts: every id a tool takes from model arguments or the browser resolves to an exact version owned by the trusted account and video, or returns not-found.
 
 #### Existing skills and helper reuse map
 

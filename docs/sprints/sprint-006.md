@@ -28,7 +28,7 @@
     - `test/e2e/` at the repo root for browser journeys
   - **One shared test stack per run** (PR #67, `scripts/test-stack.mjs`, `apps/api/test/support/test-stack.ts`).
   - **Mastra knows the model.** Its 1.79.0 registry lists `meta/muse-spark-1.3` at `https://api.meta.ai/v1` (OpenAI-compatible via `@ai-sdk/openai`, key variable `META_MODEL_API_KEY`).
-  - **The keys are present.** The root `.env` has `META_API_KEY` and `DEFAULT_ASSISTANT_MODEL`.
+  - **The key is present.** The root `.env` has `META_API_KEY`. `DEFAULT_ASSISTANT_MODEL` is present but empty, which currently fails startup. `scripts/tasks.mjs` loads one env file (`WORKPRINT_ENV_FILE`, default `.env`), and `pnpm db:local` writes `outputs/local-database.env` with `DEFAULT_ASSISTANT_MODEL=unqualified/disabled`.
 - **Implementation spec:** `docs/specs/implementation-spec-001.md` §10 MVP plan and Phase 3 sprint packaging; backlog B-012, B-021, B-022, B-023, B-034.
 
 ### Sprint-Wide Context
@@ -126,19 +126,23 @@ At sprint completion, run the applicable regression suite on the combined sprint
     - Zero automatic provider retries and no model fallback.
     - Reaching the 100-step cap ends the turn as failed, with the notice "Stopped after too many steps."
     - The system prompt is static text in the agent module, with no state or timestamps.
-  - [ ] **The model must really finish.** The existing `completedText` guard is adapted so a tool-call step counts as a valid step end. An incomplete provider end still never counts as completion.
+  - [ ] **The model must really finish.** The existing `completedText` guard is adapted so a tool-call step counts as a valid step end. A turn is completed only when its final step ends with a normal stop; a tool-call end at the step cap means failed. An incomplete provider end still never counts as completion.
   - [ ] **One active turn per video.** A send while a turn is active returns a typed `busy` error and starts no model call.
-  - [ ] **Test-only tool injection.** The test-only composition (`apps/api/test/support/`) can register extra tools and override limits. The tools are: a gated tool that runs until the test releases it and observes its abort signal; a tool with a unique phrase and done summary; and a registered tool with no phrase. Production registers only real tools and the real limits. Stories 3 and 4 use this.
-  - [ ] **The live check confirms real behaviour.** `pnpm live:chat` (`scripts/live/chat.mjs`) starts the built API through the test-only composition, with real Muse Spark and a test-only echo tool. It uses its own environment with the real key mapped and no network guard; it never reuses the guarded test-environment fixture. It sends a few synthetic messages, including one that triggers the tool, and confirms the real stream, tool-call and finish shapes. It also confirms Meta accepts the 32,768 output cap and records time to the first chunk, so the 120 s stall limit can be tuned. Sanitized observed shapes are saved as test fixtures, and the run is recorded in the PR. Stories 3–5 extend the script; only Story 1 and Sprint Completion run it live.
+  - [ ] **One composition seam.** `createBackend` passes `bindNativeTurns` one collaborator object: the application functions tools call, the tool registry and the limits. Production passes the real registry and limits. There is no module-level registry that tests change at runtime.
+  - [ ] **Test-only tool injection.** Through that seam, the test-only composition (`apps/api/test/support/`) can register extra tools and override limits. The tools are: a gated tool that runs until the test releases it and observes its abort signal; a tool with a unique phrase and done summary; and a registered tool with no phrase. Production registers only real tools and the real limits. Stories 3 and 4 use this.
+  - [ ] **Chat can be turned on for a local or QA build.** With `DEFAULT_ASSISTANT_MODEL=meta/muse-spark-1.3` and `META_API_KEY` in the process environment, they take precedence over the env file loaded by `scripts/tasks.mjs`, so `pnpm dev` and the QA host run with chat on next to `pnpm db:local`. The key is passed from the root `.env` without printing or copying it into another file. Lou sets `DEFAULT_ASSISTANT_MODEL` in the root `.env`.
+  - [ ] **The live check confirms real behaviour.** `pnpm live:chat` (`scripts/live/chat.mjs`) starts the built API through the test-only composition, with real Muse Spark and a test-only echo tool. It uses its own environment with the real key mapped and no network guard; it never reuses the guarded test-environment fixture. It sends a few synthetic messages, including one that triggers the tool, and confirms the real stream, tool-call and finish shapes. It also confirms Meta accepts the 32,768 output cap and records time to the first chunk, so the 120 s stall limit can be tuned. Sanitized observed shapes are saved as test fixtures, and the run is recorded in the PR. It also has a scripted mode (`pnpm live:chat --scripted`) that runs the same steps against the scripted provider with no key, where each step passes on the scripted outcome. Stories 3–5 extend the script; only Story 1 and Sprint Completion run it live.
 - **Functional verification:**
   - [ ] Integration tests in `apps/api/test/integration/agent-loop.test.ts`, run against the built server with the scripted provider:
     - [ ] Text reply and two-turn history: the second request contains the first turn's saved text.
-    - [ ] A tool call runs and its result reaches the next step. A loop that keeps calling tools ends at the step cap as failed with "Stopped after too many steps." (cap overridden to 3 in the test composition).
-    - [ ] The output-token cap and step cap reach the provider request; the stall limit and overall deadline are asserted on the exported limits object passed to the agent (not by waiting 35 minutes).
+    - [ ] A tool call runs and its result reaches the next step. A loop that keeps calling tools ends at the step cap as failed with "Stopped after too many steps." (cap overridden to 3 in the test composition; exactly 3 provider requests).
+    - [ ] The output-token cap reaches the provider request. The 100-step cap, stall limit and overall deadline are asserted on the limits object passed through the composition seam (not by waiting 35 minutes).
     - [ ] An input over 32 KiB is rejected at admission with zero provider requests.
     - [ ] The system prompt and tool list are byte-identical across two turns (protects prompt caching).
     - [ ] Provider error, timeout and an incomplete stream each end with a typed failure and no retry (provider request count asserted). The stall case holds the stream mid-reply with the stall limit overridden to 1 s in the test composition. A stream that keeps sending chunks past that time is not cut off.
     - [ ] A second send while busy is rejected with zero extra provider requests.
+  - [ ] Unit test: process-environment model and key take precedence over the loaded env file in `scripts/tasks.mjs`.
+  - [ ] `pnpm live:chat --scripted` passes.
   - [ ] Unit tests for configuration (`apps/api/test/unit/mastra/config.security.test.ts`): `unqualified/disabled` loads with no key; `meta/muse-spark-1.3` without a key, or a bad model, throws the named configuration error; the error text and captured server logs never contain the key value. The browser public config contains no key (existing `tooling/web-bundle` sentinel check, with the key added as a sentinel).
   - [ ] `pnpm live:chat` passes once, and the result is recorded.
 - **Regression verification:**
@@ -151,6 +155,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
   1. `Feat(agent): Bind Muse Spark with a tool loop` — configuration, binding, limits and registry.
   2. `Test(agent): Add scripted provider and loop tests` — fake provider, integration tests and the live-check script.
 - **Technical notes:**
+  - Tool directories (`agent/tools/<tool>/`) hold framework-neutral definitions: schema, phrase, done summary and an execute function over injected collaborators. `agent/mastra` turns the registry into native Mastra tools.
   - Confirm in the installed 1.79.0 typings how to set the output cap (`max_tokens`) and a no-data stall timeout rather than a total request timeout. If only a total timeout exists, reset it on each received chunk.
   - Confirm in the installed 1.79.0 typings how to pass `{ id: 'meta/muse-spark-1.3', apiKey }` (and a base URL for the test-only composition) to the Mastra model router.
   - The scripted provider is reached only through a test-only composition under `apps/api/test/support/` that calls `createBackend(..., model)`. Production has no URL override.
@@ -173,7 +178,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
 - **Acceptance criteria:**
   - [ ] **The composer sends.** It sends through `native.sendText` with the verified scope, then streams the reply text into the conversation as it arrives.
   - [ ] **Keyboard behaviour.** Enter sends once; Shift+Enter inserts a newline; Enter during IME composition does not send. Whitespace-only input is never sent. Input over 32 KiB is blocked in the composer with a short message, and the draft is kept.
-  - [ ] **New video stays client-only until the first accepted send.** The first accepted send creates the native thread, whose id becomes the video id (`/app?conversation=<id>`, listed in Recents). If the first send fails or its outcome is unknown, no visible video appears in Recents and the draft is kept.
+  - [ ] **New video stays client-only until the first accepted send.** The first accepted send creates the native thread, whose id becomes the video id (`/app?conversation=<id>`, listed in Recents). If the first send fails, no video appears in Recents and the draft is kept. If its outcome is unknown, the draft is kept, Send stays blocked with "We couldn't confirm your message was sent", and the client re-reads that thread's history once: if the message is there, it is shown and the video may appear in Recents; if not, Send becomes available again. It never resends automatically.
   - [ ] **States:** sending, streaming, completed, interrupted and failed.
     - Failed and interrupted show a simple ChatGPT-like inline notice under the affected message, using the approved previews.
     - Retry is an explicit button, never automatic. It makes exactly one new attempt. If native memory can regenerate a reply for the saved user message, Retry does that. Otherwise Retry resends the same text, and history may show the user message twice (accepted by Lou, 2026-11-01; cleanup is B-035).
@@ -189,6 +194,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
     - [ ] Reload shows the same messages; Recents lists the video.
     - [ ] Shift+Enter and whitespace-only input send nothing (provider request count asserted).
     - [ ] A failed first send creates no Recents entry and keeps the draft.
+    - [ ] A lost first-send acknowledgment (the response dropped after the server accepts) shows the unconfirmed notice, makes no second send, and after the history re-read shows the message once, with one video in Recents.
     - [ ] Provider failure mid-stream shows the failed notice. Retry makes exactly one more provider request, and after a reload history ends with one completed reply (a repeated user message is allowed).
     - [ ] Switching video mid-stream shows no late text in the other video. Signing out mid-stream and back in as another account shows none of the first account's reply.
     - [ ] An image upload finishing during a stream in the same video keeps the chat mounted and the draft intact.
@@ -228,6 +234,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
   - [ ] **read-workspace (B-023).** A `read-workspace` tool in `apps/api/src/agent/tools/read-workspace/` reads the video's saved work through the existing owned workspace reads, scoped from trusted context.
     - Listing mode returns a compact list: names, kinds, exact version ids and short text (at most 200 characters per item), with at most 50 items and 16 KiB in total, plus a truncation flag.
     - Item mode fetches one item in full.
+    - It calls one in-process application read that takes the trusted account and video (from `apps/api/src/application/saved-reads.ts`, or a narrow addition there), never the HTTP-shaped boundary or the `artifacts` domain directly. The size projection lives in the tool directory.
     - A foreign or missing id returns not-found without disclosure.
   - [ ] **Activity phrases.** Each tool defines its activity phrase in its own directory. read-workspace's is "Getting up to date on our progress…".
     - While a tool runs, the chat shows its phrase with elapsed time.
@@ -239,7 +246,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
     - Text-only history is unchanged.
     - Unsupported parts still fail closed rather than showing partial history.
 - **Functional verification:**
-  - [ ] The extended `live:chat` script runs once against the scripted provider (no live call) and passes.
+  - [ ] `pnpm live:chat --scripted` passes with the read-workspace step.
   - [ ] Integration tests run read-workspace against real saved work for two accounts: correct listing, item fetch, foreign-id not-found, and the 50-item / 16 KiB / 200-character bounds with the truncation flag.
   - [ ] Integration test: the history route with tool parts returns only the safe activity fields; no arguments or results are present. A message with an unsupported part (neither text nor tool activity) still makes the route fail closed with the existing error.
   - [ ] Browser journey (extends `chat.spec.ts`):
@@ -260,6 +267,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
 - **Technical notes:**
   - First confirm on 1.79.0 that native Memory saves tool-call parts with the assistant message, and which stream chunk types carry tool calls and results.
   - The phrase reaches the browser through a server-owned path: in the observed stream, and in the safe history part. It is not a web-side table.
+  - One function exported from `agent` projects tool parts to the safe activity fields and looks up phrases. Both the stream adapter (`mastra/native-turns.ts`) and the history route (`mastra/native-navigation.ts`) use it, so redaction is written once.
   - The `live:chat` read-workspace step passes when an explicit request ("Check our progress on this video") produces a read-workspace call. If the model declines, rephrase once; a second decline is recorded as a finding, not a sprint failure.
 
 #### Story 4: Stop
@@ -291,7 +299,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
   - [ ] Browser journey (extends `chat.spec.ts`):
     - [ ] Stop mid-reply → interrupted notice within 10 s → composer usable → reload shows the saved partial text.
     - [ ] Closing the page mid-turn sends no `threads/abort` request, and the turn completes (its reply is in history on reopening).
-  - [ ] The extended `live:chat` script runs once against the scripted provider and passes.
+  - [ ] `pnpm live:chat --scripted` passes with the Stop step.
 - **Regression verification:**
   - [ ] Story 2–3 journey cases still pass.
   - [ ] `pnpm test:integration`: native ownership and admission are unchanged; Stop on a foreign thread affects nothing.
@@ -321,7 +329,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
   - [ ] **The title shows everywhere it should.** Recents and the sr-only history heading show it, and it survives reload.
   - [ ] **A failure never hurts the chat.** If the title call fails or times out, the video keeps "Untitled video", and the chat turn is unaffected. While a video has no title, each later accepted message makes at most one title attempt; once a title is saved, no further attempts are made.
 - **Functional verification:**
-  - [ ] The extended `live:chat` script runs once against the scripted provider and passes.
+  - [ ] `pnpm live:chat --scripted` passes with the title step.
   - [ ] Integration test with the scripted provider: the first message produces exactly one title request and a saved title; the second message makes no title request. A failing title call, and a title call held past 15 s (timeout overridden to 1 s in the test composition), each leave the title empty and the turn completed. After a failed title, the next message makes exactly one title attempt.
   - [ ] The scripted provider tags title requests separately, so Stories 1–4's provider-request counts exclude them.
   - [ ] Browser journey (extends `chat.spec.ts`): after the first reply, Recents shows the scripted title, the history heading's accessible name is that title, and both persist after reload.
@@ -335,7 +343,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
   2. `Test(agent): Cover title generation` — also extends `live:chat` with a title step.
 - **Technical notes:**
   - Prefer Mastra Memory's `generateTitle`. `native-text-memory.ts` currently sets it to `false`.
-  - If the built-in option cannot be bounded (one call, timeout, no retry) on 1.79.0, make one explicit bounded call after the first accepted turn instead.
+  - If the built-in option cannot be bounded (one call, timeout, no retry) on 1.79.0, make one explicit bounded call after an accepted turn instead. That call lives in `agent/mastra` next to `native-text-memory.ts`; composition only triggers it through the injected collaborator.
 
 ### Sprint Completion
 
@@ -350,7 +358,7 @@ After all implementation stories are complete, perform this checklist before spr
     - title: a non-empty title of at most 60 characters is saved;
     - Stop: a Stop mid-reply settles within 10 s.
     Any other failure is a non-pass, fixed before integration.
-  - [ ] Then a QA build for Lou.
+  - [ ] Then a QA build for Lou with chat on (root `.env` model and key passed as in Story 1).
 - [ ] Fold the new chat flow into spec §8.1 and §8.7 (send, stream, tool lines, Stop, titles) before integration.
 - [ ] Record results and unresolved issues in a brief `## Final Review`.
 
