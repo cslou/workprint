@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { titleInstructions } from '../../src/agent/index.js';
 
 /** One scripted model response. Steps are consumed in order, one per provider request. */
 export type ScriptedStep = {
@@ -21,15 +22,25 @@ export type ScriptedStep = {
 
 export type RecordedRequest = { path: string; body: Record<string, unknown> };
 
+/** A video-title request: its first message is the title call's fixed instructions. */
+const isTitleRequest = (body: Record<string, unknown>) => {
+  const [first] = Array.isArray(body.messages) ? body.messages as { role?: unknown; content?: unknown }[] : [];
+  return first?.role === 'system' && first.content === titleInstructions;
+};
+
 /**
  * Loopback OpenAI-compatible chat-completions server for tests. It streams scripted text and tool
  * calls, can hold a step until released, and records every request. It also serves `/gate`, which
  * a test tool calls and which stays open until `openGate()`, so tests can hold a running tool.
+ * Title requests have their own script and record, so turn scripts and request counts never include
+ * them; an unscripted title request fails, which leaves the video untitled.
  */
 export async function scriptedProvider() {
   const steps: ScriptedStep[] = [];
   const requests: RecordedRequest[] = [];
   const unscripted: RecordedRequest[] = [];
+  const titleSteps: ScriptedStep[] = [];
+  const titleRequests: RecordedRequest[] = [];
   let toolCalls = 0;
   let releaseHold: (() => void) | undefined, holdReached: (() => void) | undefined;
   let held = new Promise<void>(resolve => { holdReached = resolve; });
@@ -87,6 +98,12 @@ export async function scriptedProvider() {
       }
       let body: Record<string, unknown> = {};
       try { body = JSON.parse(raw) as Record<string, unknown>; } catch { /* recorded as empty */ }
+      if (isTitleRequest(body)) {
+        titleRequests.push({ path, body });
+        const titleStep = titleSteps.shift() ?? { status: 500 };
+        respond(request, response, titleStep).catch(() => response.destroy());
+        return;
+      }
       const step = steps.shift();
       if (!step) { unscripted.push({ path, body }); response.writeHead(500).end(); return; }
       requests.push({ path, body });
@@ -103,6 +120,9 @@ export async function scriptedProvider() {
     script(...next: ScriptedStep[]) { steps.push(...next); },
     requests,
     unscripted,
+    /** Script the next title responses; without one, a title request fails. */
+    scriptTitle(...next: ScriptedStep[]) { titleSteps.push(...next); },
+    titleRequests,
     /** Resolves when a step reaches its hold point. */
     held: () => held,
     release() { releaseHold?.(); releaseHold = undefined; },
@@ -110,7 +130,7 @@ export async function scriptedProvider() {
     openGate() { gate.open(); },
     /** Clears scripts, records and gates between tests. */
     reset() {
-      steps.length = 0; requests.length = 0; unscripted.length = 0;
+      steps.length = 0; requests.length = 0; unscripted.length = 0; titleSteps.length = 0; titleRequests.length = 0;
       releaseHold?.(); releaseHold = undefined;
       gate.open(); gate = newGate();
     },

@@ -104,6 +104,22 @@ export function useNativeNavigation(connection: BrowserClient, accountId: string
     });
     remember(thread.id); void list();
   };
-  return { history, recents, quick, dialog, started, scope, startNew, list, open, adopt, earlier, openRecents, dismiss() { setDialog(null); } };
+  /**
+   * A turn in the open video ended: re-list Recents, and while the video is untitled re-read it, so a title
+   * generated from its message appears in the history heading. Never moves focus or reloads messages.
+   */
+  const settled = async () => {
+    if (!client || !accountId) return;
+    void list();
+    const shown = history;
+    if (!shown || shown.kind !== 'ready' || shown.thread?.title?.trim()) return;
+    const revision = selection.current, request = controller();
+    try {
+      const thread = await client.loadConversation({ id: shown.id, resourceId: accountId }, { signal: request.signal });
+      if (!current(revision) || !thread.ok) return;
+      setHistory(previous => previous && previous.id === shown.id ? { ...previous, thread: thread.value } : previous);
+    } finally { requests.current.delete(request); }
+  };
+  return { history, recents, quick, dialog, started, scope, startNew, list, open, adopt, settled, earlier, openRecents, dismiss() { setDialog(null); } };
 }
 export type NativeNavigationState = ReturnType<typeof useNativeNavigation>;

@@ -6,6 +6,7 @@ import type { AgentCollaborators, AgentTool } from '../tools/index.js';
 import type { NativeTurnModel } from './model.js';
 import { createNativeTextMemory } from './native-text-memory.js';
 import { withStallLimit } from './stall-limit.js';
+import { createVideoTitler, type NameVideo } from './video-title.js';
 import { nativeTools } from './tools.js';
 
 export const nativeAssistantId = 'assistant';
@@ -25,8 +26,9 @@ export const systemPrompt = [
   'Never claim a tool\'s result before it has finished, and never invent saved work you have not read.',
 ].join('\n');
 
-// The tool registry bound to each Mastra instance, so stream and history redaction use the same phrases.
-const bindings = new WeakMap<Mastra, readonly AgentTool[]>();
+// What each Mastra instance was bound with: its tools, so stream and history redaction use the same phrases,
+// and its video titler.
+const bindings = new WeakMap<Mastra, { tools: readonly AgentTool[]; nameVideo: NameVideo }>();
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 
 /**
@@ -68,13 +70,18 @@ export function bindNativeTurns(mastra: Mastra, turns: NativeTurns) {
     },
     durable: { cleanupTimeoutMs: limits.cleanupMs },
   }));
-  bindings.set(mastra, turns.tools);
+  bindings.set(mastra, { tools: turns.tools, nameVideo: createVideoTitler(turns.model, storage, limits) });
 }
 
 export function hasNativeTurns(mastra: Mastra) { return bindings.has(mastra); }
 
 /** The tools bound to this instance; none when turns are not bound. */
-export function nativeToolRegistry(mastra: Mastra): readonly AgentTool[] { return bindings.get(mastra) ?? []; }
+export function nativeToolRegistry(mastra: Mastra): readonly AgentTool[] { return bindings.get(mastra)?.tools ?? []; }
+
+/** After an accepted send: name the video from its message if it has no title yet. Never rejects. */
+export function nameVideo(mastra: Mastra, accountId: string, videoId: string, message: string): Promise<void> {
+  return bindings.get(mastra)?.nameVideo(accountId, videoId, message) ?? Promise.resolve();
+}
 
 /** The thread's active run in this process, if any. One active turn per video. */
 export function activeNativeRun(mastra: Mastra, accountId: string, videoId: string): string | undefined {

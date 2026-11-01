@@ -76,6 +76,7 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
     clearDraft: () => live.current.setComposerText(''),
     onStarted: thread => live.current.navigation?.adopt(thread),
     onConfirmed: (thread, page) => { const current = live.current.navigation, saved = thread ?? current?.history?.thread; if (saved) current?.adopt(saved, page); },
+    onSettled: () => { void live.current.navigation?.settled(); },
   }) : null);
   useLayoutEffect(() => () => chat?.dispose(), [chat]);
   const chatState = useChatSnapshot(chat);
