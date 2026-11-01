@@ -13,9 +13,32 @@ export function applyUsedVersion(workspace: OperationResponse<'workspace'>, resu
   if (use.binding.purpose === 'storyboard' && version.kind === 'storyboard') {
     const parsed = savedStoryboardContentSchema.safeParse(version.content);
     if (!parsed.success) return workspace;
-    // The current backend supports planning reuse only, not Panel/Shot decisions.
-    const shots = parsed.data.shots.map(shot => ({ ...shot, panels: shot.panels.map(panel => ({ ...panel, candidateImageVersions: [], approvedImageVersionId: null })), chosenVideoVersionId: null }));
+    // Panel/Shot decisions are bound by Shot/Panel identity, so the server keeps them for identities the new plan retains.
+    const known = new Map(workspace.storyboard.shots.map(shot => [shot.shotId, shot]));
+    const shots = parsed.data.shots.map(shot => {
+      const previous = known.get(shot.shotId);
+      return { ...shot, panels: shot.panels.map(panel => {
+        const kept = previous?.panels.find(item => item.panelId === panel.panelId);
+        return { ...panel, candidateImageVersions: kept?.candidateImageVersions ?? [], approvedImageVersionId: kept?.approvedImageVersionId ?? null };
+      }), chosenVideoVersionId: previous?.chosenVideoVersionId ?? null, ...(previous?.candidateVideoVersions ? { candidateVideoVersions: previous.candidateVideoVersions } : {}) };
+    });
     return { ...workspace, storyboard: { work, shots }, selectionRevision };
   }
+  const binding = use.binding;
+  const include = (versions: readonly Version[]) => versions.some(item => item.id === version.id) ? [...versions] : [...versions, version];
+  if (binding.purpose === 'shot_video' && version.kind === 'video') {
+    const shots = workspace.storyboard.shots.map(shot => shot.shotId !== binding.shotId ? shot : { ...shot, chosenVideoVersionId: version.id, candidateVideoVersions: include(shot.candidateVideoVersions ?? []) });
+    return { ...workspace, storyboard: { ...workspace.storyboard, shots }, selectionRevision };
+  }
+  if (binding.purpose === 'panel_image' && version.kind === 'image') {
+    const shots = workspace.storyboard.shots.map(shot => shot.shotId !== binding.shotId ? shot : { ...shot, panels: shot.panels.map(panel => panel.panelId !== binding.panelId ? panel : { ...panel, approvedImageVersionId: version.id, candidateImageVersions: include(panel.candidateImageVersions) }) });
+    return { ...workspace, storyboard: { ...workspace.storyboard, shots }, selectionRevision };
+  }
   return workspace;
+}
+
+/** Apply confirmed receipts in server commit order: a higher selection revision committed later.
+ * Equal revisions (unrelated uses, no-op re-choices) keep their arrival order. */
+export function applyUsedEffects(workspace: OperationResponse<'workspace'>, effects: readonly { result: OperationResponse<'useVersion'>; version: Version }[]): OperationResponse<'workspace'> {
+  return [...effects].sort((a, b) => a.result.selectionRevision - b.result.selectionRevision).reduce((current, effect) => applyUsedVersion(current, effect.result, effect.version), workspace);
 }

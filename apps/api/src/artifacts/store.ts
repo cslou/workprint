@@ -115,10 +115,12 @@ export function createArtifactStore(pool: Pool, checkOwnedConversation: Ownershi
     const planning = board && board.version.kind === 'storyboard' ? savedStoryboardContentSchema.parse(board.version.content) : null;
     // Every exact image bound to a Panel is a candidate; only an explicit human use approves one.
     const images = (shotId: string, panelId: string) => work.filter(item => item.use.binding.purpose === 'panel_image' && item.use.binding.shotId === shotId && item.use.binding.panelId === panelId);
+    const videos = (shotId: string) => work.filter(item => item.use.binding.purpose === 'shot_video' && item.use.binding.shotId === shotId);
     const response: OperationResponse<'workspace'> = { script, assets: work.filter(item => item.use.binding.purpose === 'reference'),
       storyboard: { work: board, shots: planning?.shots.map(shot => ({ ...shot, panels: shot.panels.map(panel => ({ ...panel,
         candidateImageVersions: images(shot.shotId, panel.panelId).map(item => item.version),
-        approvedImageVersionId: images(shot.shotId, panel.panelId).find(item => item.use.state === 'approved')?.version.id ?? null })), chosenVideoVersionId: null })) ?? [] },
+        approvedImageVersionId: images(shot.shotId, panel.panelId).find(item => item.use.state === 'approved')?.version.id ?? null })),
+        chosenVideoVersionId: videos(shot.shotId).find(item => item.use.state === 'approved')?.version.id ?? null, candidateVideoVersions: videos(shot.shotId).map(item => item.version) })) ?? [] },
       videos: [], pendingQuestion: null, activeWork: [], selectionRevision: revision };
     if (Buffer.byteLength(JSON.stringify(response)) > workspaceResponseBytes) throw new ArtifactError('integration_failure');
     return response;

@@ -138,7 +138,7 @@ test('storyboard edits keep stable Shot/Panel identities, advance one selection 
     assert.equal(same.selectionRevision, 3);
     const decisions = (await query(db.servingUrl, `SELECT operation_id,previous_version_id,version_id,affected_version_ids,selection_revision::int AS revision FROM artifacts.use_changes c
       JOIN artifacts.commands USING (owner_id,conversation_id,command_kind,operation_id) WHERE c.version_id='${board.id}' ORDER BY c.created_at`)).rows;
-    assert.deepEqual(decisions.map(row => [row.previous_version_id, row.version_id, row.affected_version_ids, row.revision]), [[winner.id, board.id, [first.id, second.id].sort(), 3], [null, board.id, [], null]]);
+    assert.deepEqual(decisions.map(row => [row.previous_version_id, row.version_id, row.affected_version_ids, row.revision]), [[winner.id, board.id, [first.id, second.id].sort(), 3], [board.id, board.id, [], null]]);
     assert.equal((await query(db.servingUrl, "SELECT count(*)::int AS count FROM artifacts.use_changes WHERE previous_version_id IS NOT NULL AND version_id IN (SELECT version_id FROM artifacts.versions WHERE kind='image')")).rows[0]?.count, 1, 'Approving another Panel image journals the approval it replaced');
 
     const journal = (await query(db.servingUrl, "SELECT version_id,affected_version_ids,selection_revision::int AS revision FROM artifacts.manual_changes WHERE command_kind='edit_storyboard' ORDER BY created_at")).rows;

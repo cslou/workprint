@@ -4,7 +4,7 @@ import type { Admission } from './admission.js';
 
 type Authenticate = () => Promise<Admission>;
 type UseVersion = (account: string, conversation: string, input: OperationRequest<'useVersion'>['body']) => Promise<OperationResponse<'useVersion'>>;
-/** Authenticated human use only; Shot-video choice keeps its unavailable boundary. */
+/** Authenticated human exact-version use, including Panel-image and Shot-video choices. */
 export function withVersionUses<T extends { operations: Record<OperationName, (input: unknown, authenticate: Authenticate) => Promise<ErrorEnvelope | OperationResponse<OperationName>>> }>(base: T, useVersion: UseVersion) {
   return { ...base, operations: { ...base.operations,
     useVersion: async (input: unknown, authenticate: Authenticate): Promise<OperationResponse<'useVersion'> | ErrorEnvelope> => {
@@ -13,7 +13,6 @@ export function withVersionUses<T extends { operations: Record<OperationName, (i
       if (admission.kind === 'unavailable') return applicationError('integration_failure', 'Authentication unavailable');
       const parsed = operations.useVersion.request.safeParse(input);
       if (!parsed.success) return applicationError('invalid_input', 'Invalid application request');
-      if (parsed.data.body.purpose === 'shot_video') return applicationError('not_implemented', 'This operation is not implemented');
       try {
         const result = await useVersion(admission.accountId, parsed.data.params.id, parsed.data.body);
         if (!operations.useVersion.response.safeParse(result).success) return applicationError('integration_failure', 'Saved work unavailable');

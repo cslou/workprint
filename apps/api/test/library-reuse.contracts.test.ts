@@ -64,7 +64,7 @@ test('built Library reuse pins exact independent uses without copies, implicit l
       assert.ok(!wrong.ok); assert.equal(wrong.error.code, 'invalid_input');
     }
     const future = await client.useVersion({ params: original.params, query: {}, body: { operationId: randomUUID(), versionId: saved.script.id, purpose: 'shot_video', shotId: 'station-shot' } });
-    assert.ok(!future.ok); assert.equal(future.error.code, 'not_implemented', 'Story 5 must not enable Shot choice');
+    assert.ok(!future.ok); assert.equal(future.error.code, 'invalid_input', 'A Script version can never become a Shot-video choice');
     const latest = await client.library({ params: {}, query: { kind: 'script', limit: 1 }, body: {} });
     assert.ok(latest.ok); assert.equal(latest.value.items[0]?.latestVersion.id, newer.value.version.id);
     assert.equal(Object.hasOwn(latest.value.items[0]!, 'state'), false, 'Library summaries have no conversation-specific approval state');
