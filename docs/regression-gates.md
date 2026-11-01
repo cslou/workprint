@@ -11,11 +11,11 @@ Workprint's map for the harness regression command contract. `.checks/regression
 | deep | delivery merge | standard, then integration and browser journeys on one shared stack, then `scripts/audit.mjs` | 1200 s | 138 s |
 | full, routine | — | not configured; exits 2 | — | — |
 
-Each budget includes a 90 s cleanup reserve. A step that ends without failing but has something to report prints a `GATE-NOTICE:` line. The gate prints that line again in its summary, and it must appear in the report.
+Hooks run these through each clone's `git config --local core.hooksPath <harness root>/githooks` (per clone, not committed). Each budget includes a 90 s cleanup reserve. Don't run `pnpm test:*` by hand during a gate run; it rebuilds the shared test build. A step that ends without failing but has something to report prints a `GATE-NOTICE:` line. The gate prints that line again in its summary, and it must appear in the report.
 
 ## Merge targets
 
-Run `.checks/pre-merge.sh --base <base> --head <sha>` once GitHub shows the new head.
+Run `.checks/pre-merge.sh --base <base> --head <40-hex sha>` with a clean tracked tree, once GitHub shows the new head.
 
 | Base | Class | Tier |
 |---|---|---|
