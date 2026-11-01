@@ -11,7 +11,7 @@ const page = (texts: string[]): NativeMessages => ({ messages: texts.map((text, 
 
 /** A scripted native client: each call takes the next scripted result and is counted. */
 function harness(options: { conversationId?: string; send?: ClientResult<{ runId: string; inputMessageId: string }>[]; turn?: (onText: (part: { runId: string; text: string }) => void, onActivity: (activity: NativeToolActivityChunk) => void) => Promise<ClientResult<NativeObservedTurn>>; reads?: ClientResult<NativeMessages>[]; created?: ClientResult<NativeThread>; now?: () => number; stop?: () => Promise<ClientResult<{ runId: string; abortRequested: boolean }>>; stopSettleMs?: number } = {}) {
-  const calls = { create: 0, subscribe: 0, send: [] as string[], read: 0, closed: 0, cleared: 0, started: [] as NativeThread[], confirmed: [] as (NativeThread | null)[], stops: [] as string[] };
+  const calls = { create: 0, subscribe: 0, send: [] as string[], read: 0, closed: 0, cleared: 0, started: [] as NativeThread[], confirmed: [] as (NativeThread | null)[], stops: [] as string[], toolsDone: 0, settled: 0 };
   const sends = [...(options.send ?? [])], reads = [...(options.reads ?? [])];
   const observation: NativeObservation = {
     consume: () => Promise.reject(new Error('unused')),
@@ -28,7 +28,8 @@ function harness(options: { conversationId?: string; send?: ClientResult<{ runId
   const session = createChatSession({
     native, accountId: account, ...(options.conversationId ? { conversationId: options.conversationId } : {}),
     knownMessageIds: () => new Set(), clearDraft: () => { calls.cleared++; },
-    onStarted: value => { calls.started.push(value); }, onConfirmed: value => { calls.confirmed.push(value); }, ...(options.now ? { now: options.now } : {}), ...(options.stopSettleMs ? { stopSettleMs: options.stopSettleMs } : {}),
+    onStarted: value => { calls.started.push(value); }, onConfirmed: value => { calls.confirmed.push(value); },
+    onToolDone: () => { calls.toolsDone++; }, onSettled: () => { calls.settled++; }, ...(options.now ? { now: options.now } : {}), ...(options.stopSettleMs ? { stopSettleMs: options.stopSettleMs } : {}),
   });
   return { session, calls };
 }
@@ -143,6 +144,30 @@ test('tool activity lines sit in order between the reply text, move on in place,
     'Let me look', ['a', 'done', 'Read 2 saved items', 1000], ['b', 'incomplete', undefined, 4000], 'Found it',
   ]);
   assert.equal(replyText(turn), 'Let me lookFound it');
+});
+
+test('each finished tool asks once for a workspace re-read, and so does every ended turn', async () => {
+  const line = (toolCallId: string, state: NativeToolActivityChunk['state']): NativeToolActivityChunk => ({ runId: 'r', toolCallId, tool: 'update-script', phrase: 'Updating the script…', state, ...(state === 'done' ? { summary: 'Saved version 1' } : {}) });
+  const outcomes: ClientResult<NativeObservedTurn>[] = [
+    { ok: true, value: { outcome: 'complete', runId: 'r', assistantMessageId: 'a' } },
+    { ok: true, value: { outcome: 'failed', runId: 'r', reason: 'error' } },
+    { ok: true, value: { outcome: 'interrupted', runId: 'r' } },
+    fail('transport_failure'),
+  ];
+  let seen = 0;
+  const { session, calls } = harness({ conversationId: video, turn: async (_onText, onActivity) => {
+    if (seen === 0) {
+      onActivity(line('a', 'running')); onActivity(line('a', 'done')); onActivity(line('a', 'done'));
+      onActivity(line('b', 'running')); onActivity(line('b', 'failed')); onActivity(line('c', 'done'));
+    }
+    return outcomes[seen++]!;
+  } });
+  await session.send('Write it');
+  assert.equal(calls.toolsDone, 2, 'a and c finished; a repeated done line and a failed tool ask nothing');
+  assert.equal(calls.settled, 1);
+  for (const text of ['Again', 'Once more', 'Last']) await session.send(text);
+  assert.equal(calls.settled, 4, 'completed, failed, interrupted and lost each end once');
+  assert.equal(calls.toolsDone, 2);
 });
 
 test('a lost turn leaves its running line running, without a clock, because it may still finish', async () => {
