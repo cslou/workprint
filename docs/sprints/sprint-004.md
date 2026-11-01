@@ -604,7 +604,7 @@ The Final Verification Story runs all applicable sprint functional verification 
   - serial journeys: 20/20
 
   Per Lou's MVP direction, visual/screenshot, auth-evidence and ingress qualification and non-crucial specs were removed (see QA decisions above). Their earlier results are history, not current gates.
-- **Human QA:** Lou ran QA on the fresh build: public entry, sign-in, Recents and skeletons, centred welcome, New video, populated history, sign-out and Back, and recovery from a locked tab. Result: pass. Lou also ratified the delegated designs for Stories 8–10 at QA.
+- **Human QA:** Lou ran QA on the fresh build: public entry, sign-in, Recents and skeletons, centred welcome, New video, populated history, sign-out and Back, and recovery from a locked tab. Result: pass. Explicit ratification of the delegated Story 8–10 designs has not been recorded separately; it was requested from Lou alongside the integration merge command.
 - **Unresolved issues, all P2 and deferred:**
   - Auth `retryRestore` after an init failure.
   - A fence-key exit notice can show "session ended" in other tabs.
