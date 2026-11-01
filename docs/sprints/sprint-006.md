@@ -1,6 +1,6 @@
 # Sprint 006 — Chat
 
-**Date:** Start after the MVP planning branch (`chore/mvp-backlog`) merges into `phase-3` (PRs #67 and #68 are already in) – End after completion gates and Lou's QA
+**Date:** Start 2026-11-01, after `phase-3` (including the MVP planning docs, PR #69, and the regression gates, PRs #70–#71) merged into `main` – End after completion gates and Lou's QA
 **Goal:** On a local build, a signed-in user sends a message in a video and gets a streamed Muse Spark reply. While the reply runs, a real read-workspace tool shows its activity phrase. Stop ends the turn, the video gets a generated title in Recents, and the conversation, including tool lines, survives reload.
 **Status:** 🟡 Planning
 
@@ -9,7 +9,7 @@
 ## Handoff
 
 ### Project Context
-- **Repo:** `/Users/lou/projects/workprint`. Branch `sprint-006` from integrated `phase-3`; story branches from `sprint-006`.
+- **Repo:** `/Users/lou/projects/workprint`. Branch `sprint-006` from `main`; story branches from `sprint-006`.
 - **Tech stack:**
   - Strict TypeScript, React with React Aria, Vite.
   - Mastra 1.79.0 (`@mastra/core`, `@mastra/memory` 1.39.0, `@mastra/pg` 1.32.0), served through the app-owned `@mastra/hono` 1.7.21 entry.
@@ -28,7 +28,7 @@
     - `test/e2e/` at the repo root for browser journeys
   - **One shared test stack per run** (PR #67, `scripts/test-stack.mjs`, `apps/api/test/support/test-stack.ts`).
   - **Mastra knows the model.** Its 1.79.0 registry lists `meta/muse-spark-1.3` at `https://api.meta.ai/v1` (OpenAI-compatible via `@ai-sdk/openai`, key variable `META_MODEL_API_KEY`).
-  - **The key is present.** The root `.env` has `META_API_KEY`. `DEFAULT_ASSISTANT_MODEL` is present but empty, which currently fails startup. `scripts/tasks.mjs` loads one env file (`WORKPRINT_ENV_FILE`, default `.env`). `pnpm db:local` writes `outputs/local-database.env`, and today both it and the shared test environment set `DEFAULT_ASSISTANT_MODEL=unqualified/disabled`, a chat-off placeholder from earlier sprints.
+  - **The key is present.** The root `.env` has `META_API_KEY` and `DEFAULT_ASSISTANT_MODEL=meta/muse-spark-1.3` (set by Lou, 2026-11-01). `scripts/tasks.mjs` loads one env file (`WORKPRINT_ENV_FILE`, default `.env`). `pnpm db:local` writes `outputs/local-database.env`, and today both it and the shared test environment set `DEFAULT_ASSISTANT_MODEL=unqualified/disabled`, a chat-off placeholder from earlier sprints.
 - **Implementation spec:** `docs/specs/implementation-spec-001.md` §10 MVP plan and Phase 3 sprint packaging; backlog B-012, B-021, B-022, B-023, B-034.
 
 ### Sprint-Wide Context
@@ -91,7 +91,8 @@ At sprint completion, run the applicable regression suite on the combined sprint
 
 **Sprint specifics:**
 - **Per change:** run only the targeted tests for that change.
-- **Suites:** `pnpm check`, `pnpm build`, `pnpm test:unit`, `pnpm test:integration` and `pnpm test:browser`, through the shared test stack (PR #67).
+- **Suites:** `pnpm check`, `pnpm build`, `pnpm test:unit`, `pnpm test:tooling` (Docker-free build and dev-task tests in `apps/api/test/tooling`), `pnpm test:integration` and `pnpm test:browser`, through the shared test stack (PR #67).
+- **Gates** ([regression gates](../regression-gates.md)): every commit runs quick and every push runs standard. Story merges into `sprint-006` run standard through `.checks/pre-merge.sh`; the `sprint-006` → `main` merge runs deep. Don't run `pnpm test:*` by hand while a gate runs.
 - **Live check:** one small script, `pnpm live:chat`. By default it runs scripted (fake provider, placeholder key, network guarded). Only `pnpm live:chat --live` makes a handful of real Muse Spark calls. It is never part of the default suites. The live mode runs in Story 1 and once at Sprint Completion.
 - **Logs:** redirect full logs to ignored files under `outputs/verification/sprint-006/<sha>/`, and report only results and paths.
 - **Design:**
@@ -115,7 +116,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
   - Findings: Pass 1 (2/5): P1 the scripted provider can't hold tools, so test-tool injection was missing; P1 `live:chat` was built only here; P2s on single bad-config outcome, 32 KiB rejection, key leakage, static prompt, deadline proof and build exclusion. Pass 2 (3/5): P1 requiring the key at startup would break every test and dev boot that uses `unqualified/disabled`; P2s on the step-cap outcome, the 60 s timeout test and `live:chat` being blocked by the network guard.
   - Resolution: Added test-only tool and limit injection, the shared `live:chat` script, and the named configuration error, size, leakage, prompt-cache and build checks. Lou (2026-11-01) rejected a chat-off mode: the server always requires the model and key. The shared test environment supplies the model and a placeholder key behind the network guard; `db:local` runs take the model and key from the root `.env`, with the helper's database file layered over it. Step cap ends as failed with a notice; the timeout test overrides to 1 s; `live:chat` uses its own unguarded environment only with `--live`.
 - **As a** user, **I want** the backend to run a real Muse Spark agent loop that can call tools, **so that** chat produces real replies.
-- **Dependencies:** `chore/mvp-backlog` merged into `phase-3`.
+- **Dependencies:** None (the planning docs are on `main`).
 - **Acceptance criteria:**
   - [ ] **Real composition binds the model.** The server composition (`apps/api/src/mastra/server.ts` → `createBackend`) always binds the model from `DEFAULT_ASSISTANT_MODEL`, accepting only `meta/muse-spark-1.3` for the MVP, with the key mapped explicitly from `META_API_KEY`. There is no chat-off mode (Lou, 2026-11-01): the `unqualified/disabled` value is removed from the configuration, the test setups and the README.
   - [ ] **Test and helper setups use the real configuration shape.** The shared test environment (`apps/api/test/support/environment.ts`) sets `DEFAULT_ASSISTANT_MODEL=meta/muse-spark-1.3` and a placeholder `META_API_KEY`; its existing network guard still blocks every non-loopback call, so no test can reach Meta. `pnpm db:local` (`local-database.ts`) stops writing a model line; its file holds only database settings.
@@ -130,7 +131,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
   - [ ] **Tool folders stay framework-neutral.** A dependency-cruiser rule forbids `apps/api/src/agent/tools/` from importing `apps/api/src/agent/mastra/`, `apps/api/src/mastra/` or `@mastra/*`; `pnpm check` enforces it.
   - [ ] **One composition seam.** `createBackend` passes `bindNativeTurns` one collaborator object: the application functions tools call, the tool registry and the limits. Production passes the real registry and limits. There is no module-level registry that tests change at runtime.
   - [ ] **Test-only tool injection.** Through that seam, the test-only composition (`apps/api/test/support/`) can register extra tools and override limits. The tools are: a gated tool that runs until the test releases it and observes its abort signal; a tool with a unique phrase and done summary; and a registered tool with no phrase. Production registers only real tools and the real limits. Stories 3 and 4 use this.
-  - [ ] **One layered env for local and QA runs.** For `dev`, `start` and `db:prepare`, `scripts/tasks.mjs` loads the file named by `WORKPRINT_ENV_FILE` (if any) first, then `.env` in the current working directory. Node's `loadEnvFile` never overwrites a set value, so precedence is shell, then `WORKPRINT_ENV_FILE`, then `.env`. `build` still loads no env file. Full layering is intended: a local run uses the developer's whole `.env` (Auth, storage, provider keys), with the helper file overriding only the database settings. So `WORKPRINT_ENV_FILE=outputs/local-database.env pnpm dev` and the QA host take the database from the helper file and the model and key from `.env`, and the key never appears in a command argument, log line or another file. The README's local-run section is updated to match, and its sentence that `db:local` runs never use the private `.env` is removed. Lou sets `DEFAULT_ASSISTANT_MODEL=meta/muse-spark-1.3` in the root `.env`.
+  - [ ] **One layered env for local and QA runs.** For `dev`, `start` and `db:prepare`, `scripts/tasks.mjs` loads the file named by `WORKPRINT_ENV_FILE` (if any) first, then `.env` in the current working directory. Node's `loadEnvFile` never overwrites a set value, so precedence is shell, then `WORKPRINT_ENV_FILE`, then `.env`. `build` still loads no env file. Full layering is intended: a local run uses the developer's whole `.env` (Auth, storage, provider keys), with the helper file overriding only the database settings. So `WORKPRINT_ENV_FILE=outputs/local-database.env pnpm dev` and the QA host take the database from the helper file and the model and key from `.env`, and the key never appears in a command argument, log line or another file. The README's local-run section is updated to match, and its sentence that `db:local` runs never use the private `.env` is removed. Lou has set `DEFAULT_ASSISTANT_MODEL=meta/muse-spark-1.3` in the root `.env`.
   - [ ] **The live check confirms real behaviour.** `pnpm live:chat --live` (`scripts/live/chat.mjs`) starts the built API through the test-only composition, with real Muse Spark and a test-only echo tool. In live mode it uses its own environment with only the Meta key mapped and no network guard; it never reuses the guarded test-environment fixture. It sends a few synthetic messages, including one that triggers the tool, and confirms the real stream, tool-call and finish shapes. It also confirms Meta accepts the 32,768 output cap and records time to the first chunk, so the 120 s stall limit can be tuned. Sanitized observed shapes are saved as test fixtures, and the run is recorded in the PR. Without `--live`, the script runs the same steps against the scripted provider: it replaces `META_API_KEY` with the same placeholder the shared test environment uses, removes `META_MODEL_API_KEY` and `MINIMAX_API_KEY`, turns on the loopback network guard, passes each step on the scripted outcome, and fails if any non-loopback request is attempted. Stories 3–5 extend the script; only Story 1 and Sprint Completion run `--live`.
 - **Functional verification:**
   - [ ] Integration tests in `apps/api/test/integration/agent-loop.test.ts`, run against the built server with the scripted provider:
@@ -141,16 +142,16 @@ At sprint completion, run the applicable regression suite on the combined sprint
     - [ ] The system prompt and tool list are byte-identical across two turns (protects prompt caching).
     - [ ] Provider error, timeout and an incomplete stream each end with a typed failure and no retry (provider request count asserted). The stall case holds the stream mid-reply with the stall limit overridden to 1 s in the test composition. A stream that keeps sending chunks past that time is not cut off.
     - [ ] A second send while busy is rejected with zero extra provider requests.
-  - [ ] Unit test for env layering in `scripts/tasks.mjs` (`apps/api/test/tooling/tasks.test.ts`, temp working directory with fixture files): with a `.env` holding the model, a sentinel key and `DATABASE_URL`/`MIGRATION_DATABASE_URL`, and an override file holding different database URLs, the `dev`, `start` and `db:prepare` children receive the model, the key and the override file's database URLs; a shell value beats both; `build` loads neither file; a canary key in the repo's own `.env` never reaches the child.
+  - [ ] Tooling test for env layering in `scripts/tasks.mjs` (`apps/api/test/tooling/tasks.test.ts`, run by `pnpm test:tooling`, temp working directory with fixture files): with a `.env` holding the model, a sentinel key and `DATABASE_URL`/`MIGRATION_DATABASE_URL`, and an override file holding different database URLs, the `dev`, `start` and `db:prepare` children receive the model, the key and the override file's database URLs; a shell value beats both; `build` loads neither file; a canary key in the repo's own `.env` never reaches the child.
   - [ ] A `pnpm dev`-style boot with that layering and the sentinel key: the sentinel never appears in server logs or the browser config.
   - [ ] `pnpm live:chat` (scripted, the default) passes with zero non-loopback requests.
   - [ ] `pnpm check`: a fixture import of `@mastra/core` from `agent/tools/` fails the new dependency rule (verified once, not kept).
-  - [ ] Unit tests for configuration (`apps/api/test/unit/mastra/config.security.test.ts`): `meta/muse-spark-1.3` with a key loads; a missing key, an empty model, `unqualified/disabled` or another unsupported model throws the named configuration error; the error text and captured server logs never contain the key value. The browser public config contains no key (existing `tooling/web-bundle` sentinel check, with the key added as a sentinel).
+  - [ ] Unit tests for configuration (`apps/api/test/unit/mastra/config.security.test.ts`): `meta/muse-spark-1.3` with a key loads; a missing key, an empty model, `unqualified/disabled` or another unsupported model throws the named configuration error; the error text and captured server logs never contain the key value. The browser public config contains no key (existing `tooling/web-bundle` sentinel check in `pnpm test:tooling`, with the key added as a sentinel).
   - [ ] `pnpm live:chat --live` passes once, and the result is recorded.
 - **Regression verification:**
   - [ ] `pnpm test:integration`, including `conversation-ownership`, `http/admission` and `http/native-navigation`: ownership, foreign threads and route admission are unchanged, and every existing suite boots with the model and placeholder key and makes zero non-loopback requests.
   - [ ] `pnpm test:browser`: the existing journeys still boot and pass with the model and placeholder key.
-  - [ ] `pnpm check`: the `production-no-tests` dependency rule keeps `apps/api/src` from importing `apps/api/test/support/` (scripted provider, test composition, test tools), and the API build compiles only `apps/api/src` (`apps/api/tsconfig.build.json`). `tooling/web-bundle` and `web-files` keep test code and keys out of the web bundle.
+  - [ ] `pnpm check`: the `production-no-tests` dependency rule keeps `apps/api/src` from importing `apps/api/test/support/` (scripted provider, test composition, test tools), and the API build compiles only `apps/api/src` (`apps/api/tsconfig.build.json`). `tooling/web-bundle` and `web-files` (`pnpm test:tooling`) keep test code and keys out of the web bundle.
 - **Editorial/design verification:** N/A — no UI change.
 - **Manual-only behavior verification:** N/A — the live check is scripted.
 - **Planned commits:**
@@ -352,7 +353,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
 After all implementation stories are complete, perform this checklist before sprint integration. This is a completion step, not a separate story.
 
 - [ ] Confirm all stories met their acceptance criteria using recorded implementation and verification evidence.
-- [ ] Run the applicable regression suite on the combined sprint branch: `pnpm check`, `pnpm build`, `pnpm test:unit`, `pnpm test:integration` and `pnpm test:browser`. Also run `pnpm audit`, which may report only B-004/B-008.
+- [ ] Run the applicable regression suite on the combined sprint branch: the deep gate, `.checks/regression.sh --tier=deep` (check, unit, build, tooling, integration and browser on one shared stack, then audit). The audit blocks only on high or critical advisories; moderate ones are reported as the existing B-002/B-004/B-008 non-pass. If the head is unchanged, this run is also the `sprint-006` → `main` pre-merge evidence; don't run it twice.
 - [ ] Run any planned cross-story checks not covered by that suite:
   - [ ] `pnpm live:chat --live` once on the combined head with real Muse Spark. Each step passes when:
     - send: a streamed reply completes;
