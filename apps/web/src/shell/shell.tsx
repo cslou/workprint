@@ -19,8 +19,8 @@ import { Composer } from '../conversation/composer.js';
 import { QuestionReview } from '../conversation/question.js';
 import { useWorkspace } from './workspace.js';
 import { WorkspaceReadPlaceholder } from './workspace-placeholder.js';
-import { CreateFeedback, NativeHistory, RecentRows, Recents } from './native-views.js';
-import { SkeletonRows } from '../ui/skeleton.js';
+import { NativeHistory, RecentRows, Recents } from './native-views.js';
+import { SkeletonRows, usePlaceholder } from '../ui/skeleton.js';
 import { Welcome } from './welcome.js';
 import type { NativeNavigationState } from './use-native-navigation.js';
 import './shell.css';
@@ -49,18 +49,19 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
   const native = connection.kind === 'configured' ? connection.client.native : nativeConversations;
   const runNative = async (action: 'new' | 'recents') => {
     if (!session && onAccountOpen && connection.kind === 'configured') { onAccountOpen(); return; }
-    if (navigation) { setSurface(null); if (action === 'new') await navigation.create(); else navigation.openRecents(); return; }
+    if (navigation) { setSurface(null); if (action === 'new') navigation.startNew(); else navigation.openRecents(); return; }
     const method = { new: 'createConversation', recents: 'listConversations' } as const;
     await native[method[action]]();
     setSurface(action);
   };
   const accountName = session?.name ?? 'Account';
   const nav = (popup = false) => <>
-    <AriaButton className={`wp-nav-item${navigation?.history || navigation && popup ? '' : ' current'}`} isDisabled={navigation?.createState === 'pending'} onPress={() => void runNative('new')}><svg className="wp-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>New video</AriaButton>
+    <AriaButton className={`wp-nav-item${navigation?.history || navigation && popup ? '' : ' current'}`} onPress={() => void runNative('new')}><svg className="wp-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>New video</AriaButton>
     <AriaButton className="wp-nav-item wp-library-nav" onPress={() => setSurface('library')}><svg className="wp-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="4" height="16" rx="1" /><rect x="9" y="4" width="4" height="16" rx="1" /><path d="m15.5 5.2 3.8-1 3 15.6-3.8.9Z" /></svg>Library</AriaButton>
   </>;
   const quick = navigation?.quick ?? (navigation?.history?.thread ? [navigation.history.thread] : []);
-  const recent = <><AriaButton className="wp-nav-label" onPress={() => void runNative('recents')}>Recents</AriaButton>{navigation && session ? <>{quick.length > 0 && (navigation.quick !== null || navigation.recents.value || navigation.recents.failed) && <RecentRows threads={quick} navigation={navigation} compact />}{navigation.quick === null && !navigation.recents.value && !navigation.recents.failed && <><p className="wp-sr-only" role="status">Loading Recents…</p><SkeletonRows count={4} compact /></>}{navigation.recents.failed && !navigation.recents.value && <p className="wp-recents-empty">Recents couldn’t be loaded.</p>}{navigation.recents.value && !quick.length && <p className="wp-recents-empty">No videos yet.</p>}</> : <p className="wp-recents-empty">No videos yet.</p>}</>;
+  const sidebarPlaceholder = usePlaceholder(!!navigation && navigation.quick === null && !navigation.recents.value && !navigation.recents.failed);
+  const recent = <><AriaButton className="wp-nav-label" onPress={() => void runNative('recents')}>Recents</AriaButton>{navigation && session ? sidebarPlaceholder.active ? <>{sidebarPlaceholder.visible && <p className="wp-sr-only" role="status">Loading Recents…</p>}<SkeletonRows count={4} compact visible={sidebarPlaceholder.visible} /></> : <>{quick.length > 0 && <RecentRows threads={quick} navigation={navigation} compact />}{navigation.recents.failed && !navigation.recents.value && <p className="wp-recents-empty">Recents couldn’t be loaded.</p>}{navigation.recents.value && !quick.length && <p className="wp-recents-empty">No videos yet.</p>}</> : <p className="wp-recents-empty">No videos yet.</p>}</>;
   const account = <AriaButton className="wp-account" onPress={() => { if (onAccountOpen) { setSurface(null); onAccountOpen(); } else setSurface('account'); }}><span className="wp-avatar" aria-hidden="true">{session ? session.name.slice(0, 1).toUpperCase() : ''}</span><span>{accountName}</span></AriaButton>;
   const projection = workspace.kind === 'settled' && workspace.result.ok ? workspace.result.value : null;
   const content = projection ? workspaceContent?.(projection) : undefined;
@@ -82,7 +83,6 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
     <ModalOverlay className="wp-modal-overlay" isOpen={shown !== null} onOpenChange={(open) => { if (!open) dismiss(); }} isDismissable><Modal className={`wp-modal${navigation && (navigation.dialog || shown === 'navigation') ? ' wp-native-dialog' : ''}`}><Dialog className="wp-dialog"><div className="wp-dialog-head" ref={dialogHead}><Heading slot="title">{title}</Heading><Button variant="icon" aria-label="Close" autoFocus onPress={dismiss}>×</Button></div>
       {shown === 'navigation' && (navigation && session ? <div className="wp-owned-navigation"><div className="wp-navigation-dialog wp-owned-navigation-links">{nav(true)}</div><h3>Recents</h3><Recents navigation={navigation} embedded onActivate={() => setSurface(null)} /><div className="wp-navigation-dialog wp-owned-navigation-account">{account}</div></div> : <div className="wp-navigation-dialog">{nav()}{recent}{account}</div>)}
       {navigation?.dialog === 'recents' && <Recents navigation={navigation} />}
-      {navigation?.dialog === 'new' && <CreateFeedback navigation={navigation} />}
       {surface === 'account' && <div className="wp-session-content"><p><b>{session?.name ?? 'Not signed in'}</b></p>{session ? <div className="wp-session-actions"><Button variant="secondary" onPress={() => setSurface('account-unavailable')}>Sign out</Button><Button variant="secondary" onPress={() => setSurface('account-unavailable')}>Switch account</Button></div> : <><p>Sign-in is not available yet.</p><div className="wp-session-actions"><Button isDisabled size="choose">Sign in</Button></div></>}</div>}
       {surface === 'account-unavailable' && <p className="wp-session-message" role="status">Account actions are not available yet. Nothing about your session has changed.</p>}
       {!navigation && (surface === 'new' || surface === 'recents') && <div className="wp-session-content" role="status">{nativeCopy[surface].map((line) => <p key={line}>{line}</p>)}</div>}

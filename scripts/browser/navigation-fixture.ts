@@ -38,14 +38,6 @@ export function allowHistory(network: MaterialNetwork, api: string, accountId: s
 export function allowList(network: MaterialNetwork, api: string, resourceId: string, page = 0, count = 1) {
   network.expectOperations({ origin: api, method: 'GET', path: '/memory/threads', query: { resourceId, page: String(page), perPage: '6' }, count });
 }
-export async function allowCreates(page: Page, network: MaterialNetwork, api: string, count: number) {
-  network.expectOperations({ origin: api, method: 'POST', path: '/memory/threads', query: {}, count });
-  await page.route('**/memory/threads', async route => {
-    const response = await privateForward(route); const thread = await response.json() as { id: string };
-    network.expectOperations({ origin: api, method: 'GET', path: `/v1/conversations/${thread.id}/workspace`, query: {}, count: 1 });
-    await privateFulfill(route, { response });
-  });
-}
 export async function observeNavigation(page: Page) {
   await page.route('**/src/api/runtime.ts', route => privateFulfill(route, { contentType: 'text/javascript', body: `
 import {createConfiguredBrowserClient as original} from '/src/api/runtime.ts?navigation-observation-original';

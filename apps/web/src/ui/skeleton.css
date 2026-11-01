@@ -13,4 +13,4 @@
 .wp-skeleton-lines > .wp-skeleton-bar:nth-child(4n + 2) { width: 100%; }
 .wp-skeleton-lines > .wp-skeleton-bar:nth-child(4n + 3) { width: 85%; }
 .wp-skeleton-lines > .wp-skeleton-bar:nth-child(4n) { width: 60%; }
-.wp-skeleton-title { width: 40%; max-width: calc(20 * var(--space-12)); height: calc(var(--space-12) + var(--space-2)); margin: var(--space-4) 0; }
+.wp-skeleton-reserved { visibility: hidden; }
