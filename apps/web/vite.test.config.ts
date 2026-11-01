@@ -22,7 +22,7 @@ export default defineConfig({
   build: { rollupOptions: { input: fileURLToPath(new URL('./test/library.html', import.meta.url)) } },
   server: { host: '127.0.0.1', port: browserPort, strictPort: true, fs: { strict: true, allow: [web, fileURLToPath(new URL('../../packages/api-client/dist/', import.meta.url)), fileURLToPath(new URL('../../packages/contracts/dist/', import.meta.url)), fileURLToPath(new URL('../../packages/player/dist/', import.meta.url)), fileURLToPath(new URL('../../node_modules/', import.meta.url))] } },
   plugins: [{ name: 'tracked-design-references', configureServer(server) {
-    for (const [prefix, base] of [['/references', design], ['/navigation-references', resolve(web, 'test/navigation-reference')]] as const) server.middlewares.use(prefix, async (req, res, next) => {
+    for (const [prefix, base] of [['/references', design]] as const) server.middlewares.use(prefix, async (req, res, next) => {
       try {
         const path = await realpath(resolve(base, `.${decodeURIComponent((req.url ?? '').split('?')[0] ?? '')}`));
         const type = new Map([['.html', 'text/html'], ['.css', 'text/css'], ['.svg', 'image/svg+xml']]).get(extname(path));
