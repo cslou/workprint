@@ -48,7 +48,7 @@ function assistantPart(part: StoredPart, tools: readonly AgentTool[]) {
 }
 
 /** Qualified native wire shapes over supported native storage only; no Agent or second store. */
-export function nativeNavigationRoutes(storage: Pick<MastraCompositeStore, 'getStore'>, checkOwned: CheckOwnedConversation, tools: readonly AgentTool[] = []) {
+export function nativeNavigationRoutes(storage: Pick<MastraCompositeStore, 'getStore'>, checkOwned: CheckOwnedConversation, tools: readonly AgentTool[]) {
   const route = (method: 'GET' | 'POST', path: string, action: (context: Context, accountId: string, memory: MemoryStorage) => Promise<Response>) => registerApiRoute(path, { method, handler: async context => {
     const accountId: unknown = context.get('requestContext').get('accountId');
     if (typeof accountId !== 'string') return failure(context, 401, 'unauthenticated', 'Authentication required');

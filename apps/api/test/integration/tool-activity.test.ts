@@ -84,7 +84,7 @@ test('read-workspace reads only the run\'s own saved work, within bounds, and on
     assert.ok(result.found && result.mode === 'listing');
     assert.equal(result.total, 51); assert.equal(result.truncated, true);
     assert.ok(result.items.length > 0 && result.items.length <= 50, String(result.items.length));
-    assert.ok(Buffer.byteLength(JSON.stringify(result)) <= 16 * 1024 + 64, 'listing bytes (plus the found/mode envelope)');
+    assert.ok(Buffer.byteLength(JSON.stringify(result)) <= 16 * 1024, 'the whole tool result');
     for (const item of result.items) { assert.ok(item.text.length <= 200); assert.ok(item.name.length <= 200); }
   });
 
@@ -118,6 +118,17 @@ test('read-workspace reads only the run\'s own saved work, within bounds, and on
     for (const secret of [mara.id, 'long grey coat', 'step-start', 'toolInvocation', 'args']) assert.ok(!JSON.stringify(body).includes(secret), secret);
 
     const memory = await fixture.native.getStore('memory');
+    // Stored tool states the scripted runs above don't produce: a tool that threw, one never answered, an invented tool, and reasoning.
+    const states = await client(owner).newVideo();
+    const invocation = (toolCallId: string, toolName: string, state: string) => ({ type: 'tool-invocation', toolInvocation: { state, toolCallId, toolName, args: { secret: 'arg' }, ...(state === 'output-error' ? { errorText: 'secret error' } : {}) } });
+    await memory!.saveMessages({ messages: [{ id: randomUUID(), threadId: states, resourceId: owner.id, role: 'assistant', createdAt: new Date(), content: { format: 2, parts: [
+      { type: 'reasoning', reasoning: 'secret thought', details: [] }, invocation('c1', 'read-workspace', 'output-error'), invocation('c2', 'test-gated', 'call'), invocation('c3', 'invented-tool', 'result'), { type: 'text', text: 'After' },
+    ] as never } }] });
+    const projected = await history(owner, states);
+    assert.equal(projected.status, 200);
+    assert.deepEqual(projected.body.messages[0]!.content.parts.map(part => [part.type, part.tool, part.state]), [['tool-activity', 'read-workspace', 'failed'], ['tool-activity', 'test-gated', 'incomplete'], ['text', undefined, undefined]]);
+    assert.doesNotMatch(JSON.stringify(projected.body), /secret|invented/);
+
     await memory!.saveMessages({ messages: [{ id: randomUUID(), threadId: otherVideo, resourceId: owner.id, role: 'assistant', createdAt: new Date(), content: { format: 2, parts: [{ type: 'data-private', data: { secret: 'never shown' } }] } }] });
     const unknown = await history(owner, otherVideo);
     assert.equal(unknown.status, 503); assert.ok(!JSON.stringify(unknown.body).includes('never shown'));

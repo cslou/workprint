@@ -144,6 +144,17 @@ test('tool activity lines sit in order between the reply text, move on in place,
   assert.equal(replyText(turn), 'Let me lookFound it');
 });
 
+test('a lost turn leaves its running line running, without a clock, because it may still finish', async () => {
+  const { session } = harness({ conversationId: video, now: () => 5, turn: async (_onText, onActivity) => {
+    onActivity({ runId: 'r', toolCallId: 'a', tool: 'read-workspace', phrase: 'Getting up to date on our progress…', state: 'running' });
+    return fail('transport_failure');
+  } });
+  await session.send('Check');
+  const [part] = session.getSnapshot().turns[0]!.parts;
+  assert.ok(part?.kind === 'activity');
+  assert.equal(part.activity.state, 'running'); assert.equal(part.startedAt, undefined);
+});
+
 test('after dispose, late reply text and results change nothing', async () => {
   let push!: (text: string) => void, finish!: () => void;
   const { session, calls } = harness({ conversationId: video, turn: onText => new Promise(resolve => { push = text => onText({ runId: 'r', text }); finish = () => resolve({ ok: true, value: { outcome: 'complete', runId: 'r', assistantMessageId: 'a' } }); }) });

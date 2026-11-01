@@ -47,6 +47,7 @@ function safeEvent(value: unknown, registry: readonly AgentTool[]): Chunk | null
   if (type === 'chunk') { const inner = safeNativeChunk(data, registry, runId); return inner ? { type, runId, data: inner } : null; }
   if (type === 'finish') return { type, runId, data: { stepResult: safeStep(object(data) ? data.stepResult : undefined) } };
   if (type === 'error') return { type, runId, data: { error: safeError(object(data) ? data.error : undefined) } };
+  if (type === 'abort') return { type, runId };
   return null;
 }
 
@@ -55,7 +56,11 @@ export function sanitizeNativeStream(body: ReadableStream<Uint8Array>, registry:
   const decoder = new TextDecoder(), encoder = new TextEncoder();
   let buffered = '';
   const emit = (event: string, controller: TransformStreamDefaultController<Uint8Array>) => {
-    const data = event.split(/\r?\n/).filter(line => line.startsWith('data:')).map(line => line.slice(line.startsWith('data: ') ? 6 : 5)).join('\n');
+    if (event.length > maximumEventCharacters) throw new Error('Native stream event too large');
+    const lines = event.split(/\r?\n/).filter(Boolean);
+    // Comments carry no data; keep them, since heartbeats keep an idle connection open.
+    if (lines.length && lines.every(line => line.startsWith(':'))) { controller.enqueue(encoder.encode(`${lines.join('\n')}\n\n`)); return; }
+    const data = lines.filter(line => line.startsWith('data:')).map(line => line.slice(line.startsWith('data: ') ? 6 : 5)).join('\n');
     if (!data) return;
     let value: unknown;
     try { value = JSON.parse(data); } catch { return; }
@@ -64,11 +69,19 @@ export function sanitizeNativeStream(body: ReadableStream<Uint8Array>, registry:
   };
   return body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
     transform(chunk, controller) {
-      buffered += decoder.decode(chunk, { stream: true });
-      const events = buffered.split(/\r?\n\r?\n/);
-      buffered = events.pop() ?? '';
+      const text = decoder.decode(chunk, { stream: true });
+      // Search only the new text (plus a separator's width of the old), so a long event is scanned once.
+      const from = Math.max(0, buffered.length - 3);
+      buffered += text;
+      const separator = /\r?\n\r?\n/g;
+      separator.lastIndex = from;
+      let start = 0;
+      for (let match = separator.exec(buffered); match; match = separator.exec(buffered)) {
+        emit(buffered.slice(start, match.index), controller);
+        start = match.index + match[0].length;
+      }
+      buffered = buffered.slice(start);
       if (buffered.length > maximumEventCharacters) throw new Error('Native stream event too large');
-      for (const event of events) emit(event, controller);
     },
     flush(controller) {
       buffered += decoder.decode();

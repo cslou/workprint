@@ -23,7 +23,7 @@ export const readWorkspaceTool = defineTool({
   execute: async (input, { scope, collaborators }): Promise<ReadWorkspaceResult> => {
     const read = await collaborators.readWorkspace(scope.accountId, scope.videoId);
     if (read.kind !== 'found') return { found: false, reason: read.kind };
-    if (input.versionId === undefined) return { found: true, mode: 'listing', ...listWorkspace(read.workspace) };
+    if (input.versionId === undefined) { const envelope = { found: true, mode: 'listing' } as const; return { ...envelope, ...listWorkspace(read.workspace, envelope) }; }
     const item = workspaceItem(read.workspace, input.versionId);
     // A foreign, missing or unused version looks the same: not found.
     return item ? { found: true, mode: 'item', item } : { found: false, reason: 'not_found' };

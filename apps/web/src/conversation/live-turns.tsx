@@ -19,7 +19,7 @@ export function LiveTurns({ turns, canRetry, onRetry }: { turns: readonly LiveTu
     return [
       <li key={`${turn.key}-user`} className="wp-saved-user" aria-label="Your message"><span>{turn.text}</span></li>,
       ...(turn.parts.length || notice ? [<li key={`${turn.key}-reply`} className="wp-saved-assistant" aria-label="Assistant message" aria-busy={turn.state === 'streaming'}>
-        {turn.parts.map((part, index) => part.kind === 'text' ? <p key={index}>{part.text}</p> : <ActivityLine key={part.activity.toolCallId} activity={part.activity} startedAt={part.startedAt} />)}
+        {turn.parts.map((part, index) => part.kind === 'text' ? <p key={index}>{part.text}</p> : <ActivityLine key={part.activity.toolCallId} activity={part.activity} {...(part.startedAt !== undefined ? { startedAt: part.startedAt } : {})} />)}
         {notice && <div className="wp-turn-notice"><p role="status">{notice}</p>{retry && <Button variant="secondary" isDisabled={!canRetry} onPress={() => onRetry(turn.key)}>Retry</Button>}</div>}
       </li>] : []),
     ];

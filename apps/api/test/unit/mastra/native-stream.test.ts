@@ -13,7 +13,7 @@ async function sanitize(text: string, size = 7) {
   const bytes = new TextEncoder().encode(text);
   const source = new ReadableStream<Uint8Array>({ start(controller) { for (let at = 0; at < bytes.length; at += size) controller.enqueue(bytes.slice(at, at + size)); controller.close(); } });
   const out = await new Response(sanitizeNativeStream(source, registry)).text();
-  return { out, events: out.split('\n\n').filter(Boolean).map(event => JSON.parse(event.replace(/^data: /, '')) as Record<string, unknown>) };
+  return { out, events: out.split('\n\n').filter(event => event && !event.startsWith(':')).map(event => JSON.parse(event.replace(/^data: /, '')) as Record<string, unknown>) };
 }
 
 test('only allowlisted chunks leave, re-framed, with tool calls as activity lines', async () => {
@@ -58,18 +58,27 @@ test('errors keep a class name and a safe message; our step limit keeps its noti
   ]);
 });
 
-test('run observation events are sanitized inside their envelope; malformed events and comments are dropped', async () => {
-  const { events } = await sanitize(`: keep-alive\r\n\r\ndata: not json\r\n\r\n${sse([
+test('run observation events are sanitized inside their envelope; malformed events are dropped and comments kept', async () => {
+  const { out, events } = await sanitize(`: heartbeat\r\n\r\ndata: not json\r\n\r\n${sse([
     { type: 'chunk', runId, data: { type: 'text-delta', payload: { text: 'ok' } } },
     { type: 'chunk', runId, data: { type: 'step-start', payload: { request: 'secret' } } },
     { type: 'finish', runId, data: { stepResult: { reason: 'stop', messageId: 'm1', usage: 'secret' } } },
     { type: 'error', runId, data: { error: { name: 'MastraTimeoutError', message: 'secret' } } },
+    { type: 'abort', runId, data: { reason: 'secret' } },
   ])}`);
+  assert.ok(out.startsWith(': heartbeat\n\n'), 'heartbeat kept');
   assert.deepEqual(events, [
     { type: 'chunk', runId, data: { type: 'text-delta', runId, payload: { text: 'ok' } } },
     { type: 'finish', runId, data: { stepResult: { reason: 'stop', messageId: 'm1' } } },
     { type: 'error', runId, data: { error: { name: 'MastraTimeoutError', message: 'The reply failed.' } } },
+    { type: 'abort', runId },
   ]);
+});
+
+test('an event over 16 MiB ends the stream, whether it arrives in one read or many', async () => {
+  const huge = `data: ${JSON.stringify({ type: 'text-delta', runId, payload: { text: 'x'.repeat(16 * 1024 * 1024) } })}\n\n`;
+  await assert.rejects(sanitize(huge, huge.length), /too large/);
+  await assert.rejects(sanitize(huge, 1024 * 1024), /too large/);
 });
 
 test('only an event-stream success is re-framed; JSON answers pass unchanged', async () => {

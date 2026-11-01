@@ -13,9 +13,15 @@ export function createWorkspaceReader(reads: Pick<SavedWorkReads, 'workspace'>):
   return async (accountId, videoId) => {
     try {
       const workspace = await reads.workspace(accountId, videoId);
-      return operations.workspace.response.safeParse(workspace).success ? { kind: 'found', workspace } : { kind: 'unavailable' };
+      const parsed = operations.workspace.response.safeParse(workspace);
+      if (parsed.success) return { kind: 'found', workspace };
+      // Field paths only: never saved values or identities.
+      console.error('Workspace read rejected by its contract', { paths: parsed.error.issues.slice(0, 5).map(issue => issue.path.join('.')) });
+      return { kind: 'unavailable' };
     } catch (error) {
-      return error instanceof ArtifactError && error.code === 'not_found' ? { kind: 'not_found' } : { kind: 'unavailable' };
+      if (error instanceof ArtifactError && error.code === 'not_found') return { kind: 'not_found' };
+      console.error('Workspace read failed', { name: error instanceof Error ? error.name : 'unknown', ...(error instanceof ArtifactError ? { code: error.code } : {}) });
+      return { kind: 'unavailable' };
     }
   };
 }

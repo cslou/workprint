@@ -68,14 +68,17 @@ export function workspaceEntries(workspace: OwnedWorkspace): Entry[] {
   return entries;
 }
 
-/** A compact listing within the item, byte and text bounds; `truncated` says items were left out. */
-export function listWorkspace(workspace: OwnedWorkspace): WorkspaceListing {
+/**
+ * A compact listing within the item, byte and text bounds; `truncated` says items were left out.
+ * The byte bound covers the whole tool result the model receives, including its envelope.
+ */
+export function listWorkspace(workspace: OwnedWorkspace, envelope: Readonly<Record<string, unknown>> = {}): WorkspaceListing {
   const entries = workspaceEntries(workspace);
   const listing: WorkspaceListing = { items: [], total: entries.length, truncated: false };
   for (const entry of entries) {
     const item: WorkspaceItem = { name: clip(entry.name), kind: entry.version.kind, versionId: entry.version.id, use: entry.use, state: entry.state, text: summary(entry.version) };
     const next = { ...listing, items: [...listing.items, item], truncated: true };
-    if (listing.items.length >= listingBounds.items || Buffer.byteLength(JSON.stringify(next)) > listingBounds.bytes) { listing.truncated = true; break; }
+    if (listing.items.length >= listingBounds.items || Buffer.byteLength(JSON.stringify({ ...envelope, ...next })) > listingBounds.bytes) { listing.truncated = true; break; }
     listing.items.push(item);
   }
   return listing;
