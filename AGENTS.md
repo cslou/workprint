@@ -1,7 +1,7 @@
 # Workprint Agent Guide
 
 See [README.md](README.md) for orientation.
-Verification gates (tiers, merge targets, budgets): [docs/regression-gates.md](docs/regression-gates.md).
+Verification gates (tiers, deep merge bases, budgets): [docs/regression-gates.md](docs/regression-gates.md).
 
 ## Repository context
 
