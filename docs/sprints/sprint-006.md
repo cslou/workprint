@@ -34,12 +34,12 @@
 - **Sprint type:** Feature
 - **Shared context:**
   - **Model:** Muse Spark `muse-spark-1.3`, configured as `DEFAULT_ASSISTANT_MODEL=meta/muse-spark-1.3`. Map `META_API_KEY` explicitly on the server; never print it.
-  - **Limits (Lou, 2026-11-01):**
+  - **Limits (Lou, 2026-11-01; output cap and per-call deadline revised the same day):**
     - input up to 32 KiB
-    - output up to 8,192 tokens
+    - output up to 32,768 tokens per model call, including reasoning tokens (Meta: "Reasoning tokens count toward your output-token budget")
     - at most 100 steps per turn
     - a 35-minute overall turn deadline
-    - 60 s per model call
+    - a model call fails if no data arrives for 120 s (a stall limit, not a total duration, so slow reasoning and long replies are not cut off)
   - **One active turn per video,** with no queue. The composer shows the agent is busy, and the server rejects a second send.
   - **Prompt caching:** the system prompt and tool list stay static (no workspace state, no timestamps), so Meta's automatic prefix caching holds.
   - **Tool rules:**
@@ -121,22 +121,22 @@ At sprint completion, run the applicable regression suite on the combined sprint
     - `unqualified/disabled`: chat off; native turns are unavailable and zero provider requests are made. The shared test environment (`apps/api/test/support/environment.ts`) and `pnpm db:local` (`local-database.ts`) keep using it unchanged.
   - [ ] **Bad configuration makes no calls.** `meta/muse-spark-1.3` without `META_API_KEY`, an empty or unsupported model, or a `test/`, `mock/` or `fake/` model makes `loadServerConfig` throw `Invalid or missing server configuration: <NAME>`, so the server does not start and makes zero provider requests. The key never appears in logs, errors or browser config.
   - [ ] **One agent loop with a tool registry.** The agent takes its tools from a registry (one directory per tool, `apps/api/src/agent/tools/<tool>/`) and runs up to 100 steps.
-    - Limits: 32 KiB input at route admission, 8,192 output tokens, 60 s per model call, a 35-minute overall turn deadline. The limits live in one exported limits object.
+    - Limits: 32 KiB input at route admission, 32,768 output tokens per model call, a 120 s no-data stall limit per model call, a 35-minute overall turn deadline. The limits live in one exported limits object.
     - Zero automatic provider retries and no model fallback.
     - Reaching the 100-step cap ends the turn as failed, with the notice "Stopped after too many steps."
     - The system prompt is static text in the agent module, with no state or timestamps.
   - [ ] **The model must really finish.** The existing `completedText` guard is adapted so a tool-call step counts as a valid step end. An incomplete provider end still never counts as completion.
   - [ ] **One active turn per video.** A send while a turn is active returns a typed `busy` error and starts no model call.
   - [ ] **Test-only tool injection.** The test-only composition (`apps/api/test/support/`) can register extra tools and override limits. The tools are: a gated tool that runs until the test releases it and observes its abort signal; a tool with a unique phrase and done summary; and a registered tool with no phrase. Production registers only real tools and the real limits. Stories 3 and 4 use this.
-  - [ ] **The live check confirms real behaviour.** `pnpm live:chat` (`scripts/live/chat.mjs`) starts the built API through the test-only composition, with real Muse Spark and a test-only echo tool. It uses its own environment with the real key mapped and no network guard; it never reuses the guarded test-environment fixture. It sends a few synthetic messages, including one that triggers the tool, and confirms the real stream, tool-call and finish shapes. Sanitized observed shapes are saved as test fixtures, and the run is recorded in the PR. Stories 3–5 extend the script; only Story 1 and Sprint Completion run it live.
+  - [ ] **The live check confirms real behaviour.** `pnpm live:chat` (`scripts/live/chat.mjs`) starts the built API through the test-only composition, with real Muse Spark and a test-only echo tool. It uses its own environment with the real key mapped and no network guard; it never reuses the guarded test-environment fixture. It sends a few synthetic messages, including one that triggers the tool, and confirms the real stream, tool-call and finish shapes. It also confirms Meta accepts the 32,768 output cap and records time to the first chunk, so the 120 s stall limit can be tuned. Sanitized observed shapes are saved as test fixtures, and the run is recorded in the PR. Stories 3–5 extend the script; only Story 1 and Sprint Completion run it live.
 - **Functional verification:**
   - [ ] Integration tests in `apps/api/test/integration/agent-loop.test.ts`, run against the built server with the scripted provider:
     - [ ] Text reply and two-turn history: the second request contains the first turn's saved text.
     - [ ] A tool call runs and its result reaches the next step. A loop that keeps calling tools ends at the step cap as failed with "Stopped after too many steps." (cap overridden to 3 in the test composition).
-    - [ ] The output-token cap and step cap reach the provider request; the per-call and overall deadlines are asserted on the exported limits object passed to the agent (not by waiting 35 minutes).
+    - [ ] The output-token cap and step cap reach the provider request; the stall limit and overall deadline are asserted on the exported limits object passed to the agent (not by waiting 35 minutes).
     - [ ] An input over 32 KiB is rejected at admission with zero provider requests.
     - [ ] The system prompt and tool list are byte-identical across two turns (protects prompt caching).
-    - [ ] Provider error, timeout and an incomplete stream each end with a typed failure and no retry (provider request count asserted). The timeout case overrides the per-call limit to 1 s in the test composition.
+    - [ ] Provider error, timeout and an incomplete stream each end with a typed failure and no retry (provider request count asserted). The stall case holds the stream mid-reply with the stall limit overridden to 1 s in the test composition. A stream that keeps sending chunks past that time is not cut off.
     - [ ] A second send while busy is rejected with zero extra provider requests.
   - [ ] Unit tests for configuration (`config.security.test.ts`): `unqualified/disabled` loads with no key; `meta/muse-spark-1.3` without a key, or a bad model, throws the named configuration error; the error text and captured server logs never contain the key value. The browser public config contains no key (existing `tooling/web-bundle` sentinel check, with the key added as a sentinel).
   - [ ] `pnpm live:chat` passes once, and the result is recorded.
@@ -150,6 +150,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
   1. `Feat(agent): Bind Muse Spark with a tool loop` — configuration, binding, limits and registry.
   2. `Test(agent): Add scripted provider and loop tests` — fake provider, integration tests and the live-check script.
 - **Technical notes:**
+  - Confirm in the installed 1.79.0 typings how to set the output cap (`max_tokens`) and a no-data stall timeout rather than a total request timeout. If only a total timeout exists, reset it on each received chunk.
   - Confirm in the installed 1.79.0 typings how to pass `{ id: 'meta/muse-spark-1.3', apiKey }` (and a base URL for the test-only composition) to the Mastra model router.
   - The scripted provider is reached only through a test-only composition under `apps/api/test/support/` that calls `createBackend(..., model)`. Production has no URL override.
   - Check how the durable agent's `sendMessage` with `ifIdle: { behavior: 'wake' }` behaves on a busy thread. If it would queue as a signal, reject the send in pre-Mastra admission instead.

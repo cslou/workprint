@@ -17,15 +17,15 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
   - The key stays server-only.
   - Raise the current turn limits deliberately rather than removing them:
     - a long overall turn deadline that covers a video tool's 30-minute poll (B-025)
-    - short per-model-call deadlines
+    - a stall deadline per model call
     - an output cap large enough for a full script
     - a step cap so a looping agent stops
-  - Limits agreed with Lou on 2026-11-01:
+  - Limits agreed with Lou on 2026-11-01 (output cap and per-call deadline revised the same day after checking Meta's reasoning docs):
     - input up to 32 KiB
-    - output up to 8,192 tokens
+    - output up to 32,768 tokens per model call, including reasoning tokens (Meta counts them toward the output limit); if Meta rejects that value, use the largest it accepts
     - at most 100 steps per turn
     - a 35-minute overall turn deadline
-    - 60 seconds per model call
+    - a model call fails if no data arrives for 120 seconds (a stall limit, not a total duration; it leaves room for reasoning before the first chunk)
   - One active turn per video, with no queue in the MVP (B-026 is Later). While the agent is busy, the composer says so and Send is unavailable; it is not silently dropped.
   - Configuration:
     - The root `.env` holds `META_API_KEY`. Mastra documents `META_MODEL_API_KEY` for its `meta/` provider.
