@@ -14,12 +14,8 @@ if (compile.status !== 0) process.exit(compile.status ?? 1);
 const group = process.argv[2];
 // Development fixtures need the same dependency-ordered compilation, not tests.
 if (group === 'compile') process.exit(0);
-if (group && !['smoke', 'security', 'contracts', 'ingress-qualification'].includes(group)) throw new Error('Unknown test group');
-// B-001 is explicitly deferred by the private-development scope exception.
-// Its real failing qualification is opt-in, never counted as aggregate success.
-const files = group === 'ingress-qualification'
-  ? globSync('apps/api/.test-build/**/ingress.qualification.js')
-  : globSync('apps/api/.test-build/**/*.test.js').filter((file) => !group || file.split('/').at(-1).includes(`.${group}.`));
+if (group) throw new Error('Unknown test group');
+const files = globSync('apps/api/.test-build/**/*.test.js');
 if (files.length === 0) throw new Error('No tests discovered');
 const result = spawnSync(process.execPath, ['--test', '--test-concurrency=1', ...files], { stdio: 'inherit' });
 process.exit(result.status ?? 1);

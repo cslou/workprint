@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { promisify } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { Client } from 'pg';
+import { failFixtureAcquisition } from './fixture-diagnostics.js';
 
 const exec = promisify(execFile);
 // Immutable multi-platform image; never uses or resets a developer's Supabase stack.
@@ -114,9 +115,6 @@ export async function isolatedPostgres(options: { network?: { name: string; owne
       },
     };
   } catch (error) {
-    try { await close(); } catch (cleanupError) {
-      throw new AggregateError([error, cleanupError], 'Postgres fixture acquisition/setup failed and owned cleanup failed', { cause: cleanupError });
-    }
-    throw error;
+    return failFixtureAcquisition(error, 'postgres-acquisition', id ? [{ owner, containerId: id }] : [], close);
   }
 }

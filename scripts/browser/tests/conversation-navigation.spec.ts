@@ -9,7 +9,7 @@ test('explicit New video creates native identity and empty history without enabl
   try {
     const user = await f.auth.createAccount();
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
-    await page.goto(origin); await account(page); await signIn(page, user.email, user.password);
+    await page.goto(origin + '/app'); await account(page); await signIn(page, user.email, user.password);
     await expect(page.getByRole('dialog')).not.toBeVisible();
     materialNetwork.expectOperations({ origin: f.application!.apiOrigin, method: 'POST', path: '/memory/threads', query: {}, count: 1 });
     await page.route('**/memory/threads', async route => {
@@ -111,11 +111,11 @@ test('native selection survives real SDK refresh and reconnect; revoked refresh 
     materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'refresh_token' }, count: 1 });
     const rejected = page.waitForResponse(response => new URL(response.url()).searchParams.get('grant_type') === 'refresh_token');
     await page.clock.fastForward(30000); expect((await rejected).status()).toBeGreaterThanOrEqual(400);
-    await expect(page.getByRole('dialog')).toContainText('Your session couldn’t be refreshed.');
+    await expect(page.locator('.wp-auth-card')).toContainText('Your session couldn’t be refreshed.');
     await expect(page.getByText('Persisted native refresh text', { exact: true })).not.toBeVisible();
     await expect(page.getByText(saved.title!, { exact: true })).not.toBeVisible();
     expect(new URL(page.url()).searchParams.get('conversation')).toBeNull();
-    await page.keyboard.press('Escape'); await expect(draft).toHaveValue('');
+    await page.keyboard.press('Escape'); await expect(draft).toHaveCount(0);
     expect(materialNetwork.entries.filter(entry => entry.url.pathname.startsWith('/memory/'))).toHaveLength(nativeCalls);
     expect(await f.application!.snapshot()).toBe(snapshot);
   } finally { await f.close(); }

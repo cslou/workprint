@@ -1,4 +1,5 @@
 import type { Page, Locator, Route } from '@playwright/test';
+import { browserOrigin, previewOrigin, previewPort } from './origin.js';
 import { expect } from './material-network.js';
 import { pathToFileURL } from 'node:url';
 import { resolve, join } from 'node:path';
@@ -55,17 +56,18 @@ export async function privateFulfill(route: Route, options: Parameters<Route['fu
 export async function privateFill(field: Locator, value: string) {
   try { await field.fill(value); } catch { throw new Error('Private account field could not be filled'); }
 }
-export const origin = 'http://127.0.0.1:4180';
+export const origin = previewOrigin;
 export async function fixture(page: Page, backend = false, options: Parameters<typeof Auth.isolatedAuth>[0] = {}, mode: 'development' | 'built' = 'development') {
   const vacant = createServer();
   try {
-    await new Promise<void>((resolve, reject) => { vacant.once('error', reject); vacant.listen(4180, '127.0.0.1', resolve); });
-  } catch (error) { throw new Error('Account frontend port 4180 is unavailable; refusing another listener', { cause: error }); }
+    await new Promise<void>((resolve, reject) => { vacant.once('error', reject); vacant.listen(previewPort, '127.0.0.1', resolve); });
+  } catch (error) { throw new Error(`Account frontend port ${previewPort} is unavailable; refusing another listener`, { cause: error }); }
   finally { if (vacant.listening) await new Promise<void>(resolve => vacant.close(() => resolve())); }
   const authModule = await import(pathToFileURL(resolve('apps/api/.test-build/test/isolated-auth.js')).href) as typeof Auth;
   const processes = await import(pathToFileURL(resolve('apps/api/.test-build/test/process.js')).href) as typeof Processes;
-  const application = backend ? await (await import(pathToFileURL(resolve('apps/api/.test-build/test/account-browser-fixture.js')).href) as typeof AccountFixture).accountBrowserFixture(options) : undefined;
-  const auth = application?.auth ?? await authModule.isolatedAuth(options);
+  const authOptions = { ...options, browserOrigins: [browserOrigin, origin] };
+  const application = backend ? await (await import(pathToFileURL(resolve('apps/api/.test-build/test/account-browser-fixture.js')).href) as typeof AccountFixture).accountBrowserFixture(authOptions, origin) : undefined;
+  const auth = application?.auth ?? await authModule.isolatedAuth(authOptions);
   let frontend: Awaited<ReturnType<typeof processes.start>> | undefined;
   let buildDirectory: string | undefined;
   let closing: Promise<void> | undefined;
@@ -95,7 +97,7 @@ export async function fixture(page: Page, backend = false, options: Parameters<t
       buildDirectory = join(logs, 'private-frontend');
       await processes.command('pnpm', ['--filter', '@workprint/web', 'exec', 'vite', 'build', '--config', 'vite.config.ts', '--outDir', buildDirectory], { cwd: process.cwd(), env, log: join(logs, 'frontend-build.log') });
     }
-    frontend = await processes.start('pnpm', ['--filter', '@workprint/web', 'exec', 'vite', ...(mode === 'built' ? ['preview', '--outDir', buildDirectory!] : []), '--config', 'vite.config.ts', '--host', '127.0.0.1', '--port', '4180', '--strictPort'], {
+    frontend = await processes.start('pnpm', ['--filter', '@workprint/web', 'exec', 'vite', ...(mode === 'built' ? ['preview', '--outDir', buildDirectory!] : []), '--config', 'vite.config.ts', '--host', '127.0.0.1', '--port', String(previewPort), '--strictPort'], {
       cwd: process.cwd(), env, log: join(logs, 'frontend.log'),
     });
     let exited: number | undefined;
@@ -114,6 +116,12 @@ export async function fixture(page: Page, backend = false, options: Parameters<t
   }
 }
 export async function account(page: Page, name = 'Account') {
+  if (name === 'Account' && !await page.locator('.wp-shell').count()) {
+    if (new URL(page.url()).pathname === '/') await page.goto(origin + '/sign-in');
+    const signInAction = page.getByRole('button', { name: /^(Back to sign in|Sign in)$/ });
+    if (!await page.getByLabel('Email', { exact: true }).count() && await signInAction.count()) await signInAction.click();
+    return;
+  }
   if (page.viewportSize()!.width <= 820) await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByRole('button', { name, exact: true }).click();
 }

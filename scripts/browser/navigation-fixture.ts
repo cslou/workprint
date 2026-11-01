@@ -26,7 +26,7 @@ export function allowSignIn(network: MaterialNetwork, authOrigin: string) {
 }
 export async function enter(page: Page, network: MaterialNetwork, fixture: Fixture, user: { email: string; password: string }, id?: string) {
   allowSignIn(network, fixture.auth.url);
-  await page.goto(origin + (id ? '?conversation=' + id : '')); await account(page); await signIn(page, user.email, user.password);
+  await page.goto(origin + '/app' + (id ? '?conversation=' + id : '')); await account(page); await signIn(page, user.email, user.password);
   await expect(page.getByRole('dialog')).not.toBeVisible();
 }
 export function allowHistory(network: MaterialNetwork, api: string, accountId: string, id: string, count = 1, readWorkspace = true) {
