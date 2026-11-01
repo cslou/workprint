@@ -8,7 +8,9 @@ const failure = (code: string) => code === 'unauthenticated' ? 'Sign-in required
 
 /** Scope-owned local choices, not a scheduler/store. Close stops observation, never rolls back uses. */
 export function createLibrarySelection(config: { getClient(): VersionUseClient | null; /** Read at use time: a New video gets its id on its first accepted send, without remounting. */ getConversationId(): string | undefined; onUsed?(result: OperationResponse<'useVersion'>, version: Version): void }) {
-  const entries = new Map<string, { choice: LibraryChoice; command: ExactVersionUse }>();
+  const entries = new Map<string, { choice: LibraryChoice; conversationId: string | undefined; command: ExactVersionUse }>();
+  // A choice picked on a New video before its first accepted send has no video id yet; attach rebuilds it once the id exists.
+  const pickedUse = (id: string, choice: LibraryChoice) => createExactVersionUse({ client: { useVersion: (command, options) => { const client = config.getClient(); return client ? client.useVersion(command, options) : Promise.resolve({ ok: false, error: { code: 'transport_failure', message: 'Library connection unavailable' } }); } }, command: { params: { id: config.getConversationId() ?? '' }, query: {}, body: { ...(choice.binding ?? { purpose: 'reference' as const }), operationId: crypto.randomUUID(), versionId: id } } });
   const direct = new Map<string, ExactVersionUse>();
   const roles = new Map<string, string>();
   const inspections = new Map<string, InspectionTarget>();
@@ -24,13 +26,15 @@ export function createLibrarySelection(config: { getClient(): VersionUseClient |
     else if (choice && entries.size < 1000) {
       const captured = structuredClone(choice);
       if (new TextEncoder().encode(JSON.stringify([...state.choices, captured])).byteLength > 4 * 1024 * 1024) return;
-      entries.set(id, { choice: captured, command: createExactVersionUse({ client: { useVersion: (command, options) => { const client = config.getClient(); return client ? client.useVersion(command, options) : Promise.resolve({ ok: false, error: { code: 'transport_failure', message: 'Library connection unavailable' } }); } }, command: { params: { id: config.getConversationId() ?? '' }, query: {}, body: { ...(captured.binding ?? { purpose: 'reference' as const }), operationId: crypto.randomUUID(), versionId: id } } }) });
+      entries.set(id, { choice: captured, conversationId: config.getConversationId(), command: pickedUse(id, captured) });
     }
     attached = 0; total = 0; update({ phase: 'idle', feedback: null });
   };
   const attach = async () => {
     if (!alive || state.phase === 'pending' || entries.size === 0 || !config.getClient() || !config.getConversationId()) return;
     const current = ++generation;
+    const conversationId = config.getConversationId();
+    for (const [id, entry] of entries) if (entry.conversationId === undefined) { entry.command.dispose(); entries.set(id, { choice: entry.choice, conversationId, command: pickedUse(id, entry.choice) }); }
     if (total === 0) total = entries.size;
     const sequence = [...entries.values()].sort((a, b) => a.choice.order - b.choice.order);
     update({ phase: 'pending', feedback: null });
@@ -56,7 +60,7 @@ export function createLibrarySelection(config: { getClient(): VersionUseClient |
     roleFor(id: string) { return roles.get(id) ?? ''; },
     setRole(id: string, role: string) { if (alive && (roles.has(id) || roles.size < 1000)) roles.set(id, role); },
     exactUse(version: Pick<Version, 'id'>, binding: OperationResponse<'useVersion'>['use']['binding']) {
-      const key = JSON.stringify([version.id, binding]);
+      const key = JSON.stringify([config.getConversationId() ?? '', version.id, binding]);
       let command = direct.get(key);
       if (!command) {
         if (direct.size >= 1000) {
