@@ -177,9 +177,9 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 - Constraint:
   - No background workflow in the MVP. The user cannot chat during generation, which is accepted (Lou, 2026-11-01); queueing is B-026.
   - Never resubmit a paid task to recover. An uncertain submission with no task id is marked failed with an unknown outcome.
-  - If the 35-minute turn deadline (B-012) ends a poll, the saved task stays resumable, the same as after Stop; the record keeps its running status.
+  - When Stop, the 35-minute turn deadline (B-012) or the poll's own 30-minute deadline ends a poll, the record moves to a distinct `interrupted` state: the task id is kept and nothing is resubmitted. The Videos tab shows it as stopped waiting, not running. A later generate-video call, or the agent asked to resume it, polls that saved task again while MiniMax still allows queries (7 days). A server restart resumes only records still `running`, never `interrupted` ones.
   - MiniMax result URLs are time-limited and may carry credentials, so never persist or log them; query the task again for a fresh URL. Tasks are queryable only for 7 days.
-  - The Videos tab shows the record's saved status (queued, running, done, failed) after a reload, with no invented progress.
+  - The Videos tab shows the record's saved status (queued, running, interrupted, done, failed) after a reload, with no invented progress.
 - References:
   - `~/projects/animation-studio/.pi/skills/generate-video/SKILL.md` (submit → save manifest → poll → download → validate, plus `--resume-manifest`).
   - `references/minimax-video-v2.md`.
