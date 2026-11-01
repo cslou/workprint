@@ -134,17 +134,20 @@ Account browser tests use only disposable accounts on the shared test stack's Au
 
 ## Verification
 
+Run the gates through `.checks/regression.sh --tier=quick|standard|deep` (commit, push and merge-to-main tiers); [regression gates](docs/regression-gates.md) lists each tier's checks, budgets and merge-target classes. The underlying commands are:
+
 ```sh
 pnpm check
 pnpm build
 pnpm test:unit
+pnpm test:tooling
 pnpm test:integration
 pnpm exec playwright install chromium
 pnpm test:browser
 pnpm audit
 ```
 
-The suite is deliberately small for the MVP (trimmed 2026-11-01). `check` runs strict TypeScript (including the browser journeys), ESLint and dependency-cruiser. Tests live in each package's `test/` folder, never under `src/` (the runner refuses test files there). Unit tests are in `apps/api/test/unit`, `apps/web/test/unit` and `packages/api-client/test/unit`, mirroring `src` paths; `test:unit` runs them without Docker. `test:integration` runs the Docker-backed tests in `apps/api/test/{integration,http,tooling}`, whose fixtures live in `apps/api/test/support`; `test` runs both groups. `test:browser` runs eight end-to-end journeys in the root `test/e2e` (they span the web app, API and stack) against one API and built app: sign-in and sign-out, password recovery, Recents, manual saves, image upload, Library attach, Shot choice and Library video playback. Both Docker-backed commands share one [test stack](#shared-test-stack-test-only) per run; no private fixture files or hosted project are needed.
+The suite is deliberately small for the MVP (trimmed 2026-11-01). `check` runs strict TypeScript (including the browser journeys), ESLint and dependency-cruiser. Tests live in each package's `test/` folder, never under `src/` (the runner refuses test files there). Unit tests are in `apps/api/test/unit`, `apps/web/test/unit` and `packages/api-client/test/unit`, mirroring `src` paths; `test:unit` runs them without Docker, as does `test:tooling` for the build and dev-task tests in `apps/api/test/tooling`. `test:integration` runs the Docker-backed tests in `apps/api/test/{integration,http}`, whose fixtures live in `apps/api/test/support`; `test` runs all three groups. `test:browser` runs eight end-to-end journeys in the root `test/e2e` (they span the web app, API and stack) against one API and built app: sign-in and sign-out, password recovery, Recents, manual saves, image upload, Library attach, Shot choice and Library video playback. Both Docker-backed commands share one [test stack](#shared-test-stack-test-only) per run; no private fixture files or hosted project are needed.
 
 `WORKPRINT_PREVIEW_PORT` selects the end-to-end app's loopback port (default 4180); use distinct ports and `WORKPRINT_BROWSER_OUTPUT` directories for simultaneous checkouts.
 
