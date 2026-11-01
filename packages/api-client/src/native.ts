@@ -1,11 +1,12 @@
 import { MastraClient, type CreateMemoryThreadResponse, type ListMemoryThreadsResponse, type ListMemoryThreadMessagesResponse } from '@mastra/client-js';
 import { readJsonResponse } from './response.js';
+import { isHistoryPart, type NativeHistoryPart } from './native-activity.js';
 import type { CallOptions, ClientError, ClientResult } from './types.js';
 
 export type NativeThread = CreateMemoryThreadResponse;
 type BoundedPage = { page: number; perPage: number; total: number; hasMore: boolean };
 export type NativeThreads = Omit<ListMemoryThreadsResponse, keyof BoundedPage> & BoundedPage;
-type WireMessage = Omit<ListMemoryThreadMessagesResponse['messages'][number], 'createdAt'> & { createdAt: string };
+type WireMessage = Omit<ListMemoryThreadMessagesResponse['messages'][number], 'createdAt' | 'content'> & { createdAt: string; content: { format: 2; parts: NativeHistoryPart[] } };
 export type NativeMessages = Omit<ListMemoryThreadMessagesResponse, keyof BoundedPage | 'messages'> & BoundedPage & { messages: WireMessage[] };
 export type NativeNavigation = {
   createConversation(input?: { resourceId: string }, options?: CallOptions): Promise<ClientResult<NativeThread>>;
@@ -63,6 +64,6 @@ export function createNativeNavigation(config: { baseUrl: string; getAccessToken
     createConversation: (input, options) => call(input, options, async (_, fetcher) => (await fetcher(config.baseUrl + '/memory/threads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) })).json(), (value): value is NativeThread => thread(value) && value.resourceId === input?.resourceId),
     listConversations: (input, options) => call(input, options, client => client.listMemoryThreads(input), (value): value is NativeThreads => !!input && page(value, input) && Array.isArray(value.threads) && value.threads.length <= input.perPage && value.threads.every(item => thread(item) && item.resourceId === input.resourceId) && new Set(value.threads.map(item => item.id)).size === value.threads.length),
     loadConversation: (input, options) => call(input, options, client => client.getMemoryThread({ threadId: input!.id }).get(), (value): value is NativeThread => thread(value) && value.id === input?.id && value.resourceId === input.resourceId),
-    loadMessages: (input, options) => call(input, options, client => client.listThreadMessages(input!.id, { resourceId: input!.resourceId, page: input!.page, perPage: input!.perPage }), (value): value is NativeMessages => !!input && page(value, input) && Array.isArray(value.messages) && value.messages.length <= input.perPage && value.messages.every(message => object(message) && uuid(message.id) && typeof message.createdAt === 'string' && message.threadId === input.id && message.resourceId === input.resourceId && ['user', 'assistant'].includes(String(message.role)) && object(message.content) && message.content.format === 2 && Array.isArray(message.content.parts) && message.content.parts.every(part => object(part) && part.type === 'text' && typeof part.text === 'string')) && new Set(value.messages.map(message => message.id)).size === value.messages.length),
+    loadMessages: (input, options) => call(input, options, client => client.listThreadMessages(input!.id, { resourceId: input!.resourceId, page: input!.page, perPage: input!.perPage }), (value): value is NativeMessages => !!input && page(value, input) && Array.isArray(value.messages) && value.messages.length <= input.perPage && value.messages.every(message => object(message) && uuid(message.id) && typeof message.createdAt === 'string' && message.threadId === input.id && message.resourceId === input.resourceId && ['user', 'assistant'].includes(String(message.role)) && object(message.content) && message.content.format === 2 && Array.isArray(message.content.parts) && message.content.parts.every(isHistoryPart)) && new Set(value.messages.map(message => message.id)).size === value.messages.length),
   };
 }

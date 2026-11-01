@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { ClientResult, NativeMessages, NativeObservation, NativeObservedTurn, NativeThread } from '@workprint/api-client';
-import { createChatSession, sendsOnEnter, tooLong, type ChatSessionConfig } from '../../../src/conversation/chat-session.js';
+import type { ClientResult, NativeMessages, NativeObservation, NativeObservedTurn, NativeThread, NativeToolActivityChunk } from '@workprint/api-client';
+import { createChatSession, replyText, sendsOnEnter, tooLong, type ChatSessionConfig } from '../../../src/conversation/chat-session.js';
 
 const account = '22222222-2222-4222-8222-222222222222';
 const video = '11111111-1111-4111-8111-111111111111';
@@ -10,12 +10,12 @@ const fail = (code: string): ClientResult<never> => ({ ok: false, error: { code,
 const page = (texts: string[]): NativeMessages => ({ messages: texts.map((text, index) => ({ id: `0000000${index}-0000-4000-8000-000000000000`, threadId: video, resourceId: account, role: 'user', createdAt: '2026-11-01T00:00:00.000Z', content: { format: 2, parts: [{ type: 'text', text }] } })), total: texts.length, page: 0, perPage: 20, hasMore: false } as unknown as NativeMessages);
 
 /** A scripted native client: each call takes the next scripted result and is counted. */
-function harness(options: { conversationId?: string; send?: ClientResult<{ runId: string; inputMessageId: string }>[]; turn?: (onText: (part: { runId: string; text: string }) => void) => Promise<ClientResult<NativeObservedTurn>>; reads?: ClientResult<NativeMessages>[]; created?: ClientResult<NativeThread> } = {}) {
+function harness(options: { conversationId?: string; send?: ClientResult<{ runId: string; inputMessageId: string }>[]; turn?: (onText: (part: { runId: string; text: string }) => void, onActivity: (activity: NativeToolActivityChunk) => void) => Promise<ClientResult<NativeObservedTurn>>; reads?: ClientResult<NativeMessages>[]; created?: ClientResult<NativeThread>; now?: () => number } = {}) {
   const calls = { create: 0, subscribe: 0, send: [] as string[], read: 0, closed: 0, cleared: 0, started: [] as NativeThread[], confirmed: [] as (NativeThread | null)[] };
   const sends = [...(options.send ?? [])], reads = [...(options.reads ?? [])];
   const observation: NativeObservation = {
     consume: () => Promise.reject(new Error('unused')),
-    consumeTurn: (runId, onText) => options.turn ? options.turn(onText) : (onText({ runId, text: 'Hello' }), onText({ runId, text: ' there' }), Promise.resolve({ ok: true, value: { outcome: 'complete', runId, assistantMessageId: 'a' } })),
+    consumeTurn: (runId, onText, onActivity) => options.turn ? options.turn(onText, onActivity ?? (() => {})) : (onText({ runId, text: 'Hello' }), onText({ runId, text: ' there' }), Promise.resolve({ ok: true, value: { outcome: 'complete', runId, assistantMessageId: 'a' } })),
     close: () => { calls.closed++; },
   };
   const native: ChatSessionConfig['native'] = {
@@ -27,7 +27,7 @@ function harness(options: { conversationId?: string; send?: ClientResult<{ runId
   const session = createChatSession({
     native, accountId: account, ...(options.conversationId ? { conversationId: options.conversationId } : {}),
     knownMessageIds: () => new Set(), clearDraft: () => { calls.cleared++; },
-    onStarted: value => { calls.started.push(value); }, onConfirmed: value => { calls.confirmed.push(value); },
+    onStarted: value => { calls.started.push(value); }, onConfirmed: value => { calls.confirmed.push(value); }, ...(options.now ? { now: options.now } : {}),
   });
   return { session, calls };
 }
@@ -45,7 +45,7 @@ test('a New video send creates the thread, streams the reply and adopts the vide
   await session.send('Hi');
   assert.deepEqual(calls.send, ['Hi']); assert.equal(calls.create, 1); assert.equal(calls.cleared, 1);
   assert.deepEqual(calls.started, [thread]);
-  assert.deepEqual(session.getSnapshot().turns.map(turn => [turn.text, turn.reply, turn.state]), [['Hi', 'Hello there', 'completed']]);
+  assert.deepEqual(session.getSnapshot().turns.map(turn => [turn.text, replyText(turn), turn.state]), [['Hi', 'Hello there', 'completed']]);
   assert.equal(session.getSnapshot().phase, 'idle');
   await session.send('Again');
   assert.equal(calls.create, 1, 'the same video'); assert.equal(calls.started.length, 1);
@@ -101,7 +101,7 @@ test('a reply that fails offers one Retry, which sends the same text once withou
   const { session, calls } = harness({ conversationId: video, turn: async onText => { onText({ runId: 'r', text: 'Part' }); return ++attempt === 1 ? { ok: true, value: { outcome: 'failed', runId: 'r', reason: 'error' } } : { ok: true, value: { outcome: 'complete', runId: 'r', assistantMessageId: 'a' } }; } });
   await session.send('Please');
   const failed = session.getSnapshot().turns[0]!;
-  assert.equal(failed.state, 'failed'); assert.equal(failed.reply, 'Part');
+  assert.equal(failed.state, 'failed'); assert.equal(replyText(failed), 'Part');
   await session.retry(failed.key); await session.retry(failed.key);
   assert.deepEqual(calls.send, ['Please', 'Please']); assert.equal(calls.cleared, 1);
   assert.deepEqual(session.getSnapshot().turns.map(turn => [turn.state, turn.retried]), [['failed', true], ['completed', false]]);
@@ -127,14 +127,42 @@ test('a Retry that is rejected outright is given back', async () => {
   assert.deepEqual(calls.send, ['Please', 'Please']);
 });
 
+test('tool activity lines sit in order between the reply text, move on in place, and never stay running', async () => {
+  const line = (toolCallId: string, state: NativeToolActivityChunk['state'], summary?: string): NativeToolActivityChunk => ({ runId: 'r', toolCallId, tool: 'read-workspace', phrase: 'Getting up to date on our progress…', state, ...(summary ? { summary } : {}) });
+  let clock = 1000;
+  const { session } = harness({ conversationId: video, now: () => clock, turn: async (onText, onActivity) => {
+    onText({ runId: 'r', text: 'Let me ' }); onText({ runId: 'r', text: 'look' });
+    onActivity(line('a', 'running')); clock = 4000; onActivity(line('b', 'running')); onActivity(line('a', 'done', 'Read 2 saved items'));
+    onText({ runId: 'r', text: 'Found it' });
+    return { ok: true, value: { outcome: 'interrupted', runId: 'r' } };
+  } });
+  await session.send('Check');
+  const turn = session.getSnapshot().turns[0]!;
+  assert.deepEqual(turn.parts.map(part => part.kind === 'text' ? part.text : [part.activity.toolCallId, part.activity.state, part.activity.summary, part.startedAt]), [
+    'Let me look', ['a', 'done', 'Read 2 saved items', 1000], ['b', 'incomplete', undefined, 4000], 'Found it',
+  ]);
+  assert.equal(replyText(turn), 'Let me lookFound it');
+});
+
+test('a lost turn leaves its running line running, without a clock, because it may still finish', async () => {
+  const { session } = harness({ conversationId: video, now: () => 5, turn: async (_onText, onActivity) => {
+    onActivity({ runId: 'r', toolCallId: 'a', tool: 'read-workspace', phrase: 'Getting up to date on our progress…', state: 'running' });
+    return fail('transport_failure');
+  } });
+  await session.send('Check');
+  const [part] = session.getSnapshot().turns[0]!.parts;
+  assert.ok(part?.kind === 'activity');
+  assert.equal(part.activity.state, 'running'); assert.equal(part.startedAt, undefined);
+});
+
 test('after dispose, late reply text and results change nothing', async () => {
   let push!: (text: string) => void, finish!: () => void;
   const { session, calls } = harness({ conversationId: video, turn: onText => new Promise(resolve => { push = text => onText({ runId: 'r', text }); finish = () => resolve({ ok: true, value: { outcome: 'complete', runId: 'r', assistantMessageId: 'a' } }); }) });
   const sending = session.send('Hi');
   await new Promise(resolve => setImmediate(resolve));
   push('Early');
-  assert.equal(session.getSnapshot().turns[0]?.reply, 'Early'); assert.equal(session.getSnapshot().phase, 'working');
+  assert.equal(replyText(session.getSnapshot().turns[0]!), 'Early'); assert.equal(session.getSnapshot().phase, 'working');
   session.dispose(); push(' late'); finish(); await sending;
-  assert.equal(session.getSnapshot().turns[0]?.reply, 'Early'); assert.equal(session.getSnapshot().phase, 'working');
+  assert.equal(replyText(session.getSnapshot().turns[0]!), 'Early'); assert.equal(session.getSnapshot().phase, 'working');
   assert.equal(calls.closed, 1);
 });

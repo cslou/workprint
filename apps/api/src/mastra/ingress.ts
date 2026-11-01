@@ -5,6 +5,8 @@ import { verifyAccount } from './auth.js';
 import { loadServerConfig } from './config.js';
 import { readIntake } from './body.js';
 import { createAdmissionPolicy, decorateCors } from './admission.js';
+import { nativeToolRegistry } from '../agent/index.js';
+import { sanitizedNativeResponse } from './native-stream.js';
 import { nativeTurnRoutes, isNativeTurnRoute, nativeTurnAdmission, nativeTurnBody, type AdmittedSend } from './native-turns.js';
 
 const verifiedAccountKey = 'workprintVerifiedIngressAccount';
@@ -83,6 +85,8 @@ export function createIngress(mastra: Mastra): MiddlewareHandler<{ Bindings: Htt
         return invalid();
       }
       await next();
+      // Native turn streams leave only through the allowlist: no request bodies, tool payloads or raw errors.
+      if (isNativeTurnRoute(context)) context.res = sanitizedNativeResponse(context.res, nativeToolRegistry(mastra));
       if (admittedSend && context.res.status === 200) {
         // The message is accepted either way; a missed mark only keeps the video out of Recents.
         try { await admittedSend.accepted(); }

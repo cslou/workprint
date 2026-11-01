@@ -25,7 +25,8 @@ export const systemPrompt = [
   'Never claim a tool\'s result before it has finished, and never invent saved work you have not read.',
 ].join('\n');
 
-const bindings = new WeakSet<Mastra>();
+// The tool registry bound to each Mastra instance, so stream and history redaction use the same phrases.
+const bindings = new WeakMap<Mastra, readonly AgentTool[]>();
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 
 /**
@@ -67,10 +68,13 @@ export function bindNativeTurns(mastra: Mastra, turns: NativeTurns) {
     },
     durable: { cleanupTimeoutMs: limits.cleanupMs },
   }));
-  bindings.add(mastra);
+  bindings.set(mastra, turns.tools);
 }
 
 export function hasNativeTurns(mastra: Mastra) { return bindings.has(mastra); }
+
+/** The tools bound to this instance; none when turns are not bound. */
+export function nativeToolRegistry(mastra: Mastra): readonly AgentTool[] { return bindings.get(mastra) ?? []; }
 
 /** The thread's active run in this process, if any. One active turn per video. */
 export function activeNativeRun(mastra: Mastra, accountId: string, videoId: string): string | undefined {

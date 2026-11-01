@@ -1,12 +1,14 @@
-import { nativeTransportLimits, type ApiClient, type ClientError, type NativeMessages, type NativeObservation, type NativeThread } from '@workprint/api-client';
+import { nativeTransportLimits, type ApiClient, type ClientError, type NativeMessages, type NativeObservation, type NativeThread, type NativeToolActivity, type NativeToolActivityChunk } from '@workprint/api-client';
 
 type Native = Pick<ApiClient['native'], 'createConversation' | 'subscribe' | 'sendText' | 'loadMessages'>;
 
-/** One turn sent from this page: the user's text and the reply as it streams. */
+/** A run of reply text, or one tool's activity line with when this page first saw it running. */
+export type LivePart = Readonly<{ kind: 'text'; text: string } | { kind: 'activity'; activity: NativeToolActivity; startedAt?: number }>;
+/** One turn sent from this page: the user's text and the reply as it streams, in the order it arrived. */
 export type LiveTurn = Readonly<{
   key: number;
   text: string;
-  reply: string;
+  parts: readonly LivePart[];
   /** failed: the server ended the turn with an error. lost: this page stopped receiving it; it may still finish. */
   state: 'streaming' | 'completed' | 'failed' | 'interrupted' | 'lost';
   /** A failed or interrupted turn offers Retry once; Retry starts a new turn. */
@@ -38,12 +40,36 @@ export type ChatSessionConfig = {
   onConfirmed(thread: NativeThread | null, page: NativeMessages): void;
   /** A turn from this page ended. */
   onSettled?(): void;
+  /** Clock for activity elapsed time; tests supply their own. */
+  now?(): number;
 };
 
 /** Definite rejections: the server answered and the message was not accepted. Anything else is unknown. */
 const definite: ReadonlySet<ClientError['code']> = new Set(['invalid_input', 'unauthenticated', 'not_found', 'integration_failure', 'not_implemented', 'unsupported']);
 export const chatInputBytes = nativeTransportLimits.inputBytes;
 export const tooLong = (text: string) => new TextEncoder().encode(text).byteLength > chatInputBytes;
+/** The reply's text so far, without activity lines. */
+export const replyText = (turn: LiveTurn) => turn.parts.map(part => part.kind === 'text' ? part.text : '').join('');
+
+/** Appends streamed text, extending the last text run. */
+function withText(parts: readonly LivePart[], text: string): LivePart[] {
+  const last = parts.at(-1);
+  return last?.kind === 'text' ? [...parts.slice(0, -1), { kind: 'text', text: last.text + text }] : [...parts, { kind: 'text', text }];
+}
+/** Adds a tool's line, or moves its existing line on (running → done or failed). */
+function withActivity(parts: readonly LivePart[], chunk: NativeToolActivityChunk, now: number): LivePart[] {
+  const activity: NativeToolActivity = { toolCallId: chunk.toolCallId, tool: chunk.tool, phrase: chunk.phrase, state: chunk.state, ...(chunk.summary !== undefined ? { summary: chunk.summary } : {}) };
+  const index = parts.findIndex(part => part.kind === 'activity' && part.activity.toolCallId === activity.toolCallId);
+  if (index < 0) return [...parts, { kind: 'activity', activity, startedAt: now }];
+  return parts.map((part, at) => at === index && part.kind === 'activity' ? { ...part, activity } : part);
+}
+/**
+ * A turn the server ended leaves no line running. A lost turn may still be running, so its lines stay
+ * running but stop counting time: this page no longer watches them.
+ */
+const settledParts = (parts: readonly LivePart[], lost: boolean): LivePart[] => parts.map(part => part.kind !== 'activity' || part.activity.state !== 'running' ? part
+  : lost ? { kind: 'activity', activity: part.activity } : { ...part, activity: { ...part.activity, state: 'incomplete' } });
+
 /** Enter sends; Shift+Enter is a newline; an Enter that confirms an IME composition is neither. */
 export const sendsOnEnter = (key: { key: string; shiftKey: boolean; isComposing: boolean; keyCode: number }) => key.key === 'Enter' && !key.shiftKey && !key.isComposing && key.keyCode !== 229;
 
@@ -64,6 +90,8 @@ export function createChatSession(config: ChatSessionConfig) {
   const patchTurn = (key: number, patch: Partial<LiveTurn>) => update({ turns: state.turns.map(turn => turn.key === key ? { ...turn, ...patch } : turn) });
   const close = () => { observation?.close(); observation = null; };
   const known = () => new Set([...config.knownMessageIds(), ...sentIds]);
+  const now = config.now ?? Date.now;
+  const partsOf = (key: number) => state.turns.find(turn => turn.key === key)?.parts ?? [];
 
   /** `rejected`: nothing was sent. Otherwise the send was accepted or its outcome is unknown. */
   async function submit(text: string, fromDraft: boolean): Promise<'rejected' | 'sent'> {
@@ -98,12 +126,14 @@ export function createChatSession(config: ChatSessionConfig) {
     if (fromDraft) config.clearDraft();
     if (!started && startedThread) { started = true; config.onStarted(startedThread); }
     const key = ++keys;
-    update({ phase: 'working', turns: [...state.turns, { key, text, reply: '', state: 'streaming', retried: false }] });
+    update({ phase: 'working', turns: [...state.turns, { key, text, parts: [], state: 'streaming', retried: false }] });
     const current = observation;
-    const result = await current.consumeTurn(sent.value.runId, part => { if (alive) patchTurn(key, { reply: (state.turns.find(turn => turn.key === key)?.reply ?? '') + part.text }); });
+    const result = await current.consumeTurn(sent.value.runId,
+      part => { if (alive) patchTurn(key, { parts: withText(partsOf(key), part.text) }); },
+      activity => { if (alive) patchTurn(key, { parts: withActivity(partsOf(key), activity, now()) }); });
     if (!alive) return 'sent';
     if (observation === current) observation = null;
-    patchTurn(key, { state: !result.ok ? 'lost' : result.value.outcome === 'complete' ? 'completed' : result.value.outcome });
+    patchTurn(key, { parts: settledParts(partsOf(key), !result.ok), state: !result.ok ? 'lost' : result.value.outcome === 'complete' ? 'completed' : result.value.outcome });
     update({ phase: 'idle' });
     config.onSettled?.();
     return 'sent';
