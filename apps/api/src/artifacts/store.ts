@@ -9,6 +9,7 @@ import { ArtifactError } from './errors.js';
 import { boundedPage } from './paging.js';
 import { publishVersion } from './publication.js';
 import { requireReferenceMedia } from './references.js';
+import { selectionRevision } from './selection.js';
 
 type OwnershipCheck = (account: string, conversation: string) => Promise<{ kind: 'owned' | 'not_found' } | { kind: 'unavailable'; reason: 'native_storage' }>;
 type Kind = Version['kind'];
@@ -94,9 +95,14 @@ export function createArtifactStore(pool: Pool, checkOwnedConversation: Ownershi
   };
   const workspace = async (account: string, conversation: string): Promise<OperationResponse<'workspace'>> => {
     await owned(account, conversation);
-    const rows = (await pool.query<Row & { use_id: string; binding: unknown; state: string }>(`SELECT ${columns},u.use_id,u.binding,u.state
-      FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.version_owner_id AND v.version_id=u.version_id
-      WHERE u.owner_id=$1 AND u.conversation_id=$2 ORDER BY u.created_at,u.use_id LIMIT 101`, [account, conversation])).rows;
+    // One snapshot: the projected uses and selection revision always describe the same committed state.
+    const { rows, revision } = await transaction(pool, async client => {
+      await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY');
+      const rows = (await client.query<Row & { use_id: string; binding: unknown; state: string }>(`SELECT ${columns},u.use_id,u.binding,u.state
+        FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.version_owner_id AND v.version_id=u.version_id
+        WHERE u.owner_id=$1 AND u.conversation_id=$2 ORDER BY u.created_at,u.use_id LIMIT 101`, [account, conversation])).rows;
+      return { rows, revision: await selectionRevision(client, account, conversation) };
+    });
     if (rows.length > 100) throw new ArtifactError('integration_failure');
     await authorize(account, rows);
     const work = rows.map(row => {
@@ -107,9 +113,13 @@ export function createArtifactStore(pool: Pool, checkOwnedConversation: Ownershi
     const script = work.find(item => item.use.binding.purpose === 'script') ?? null;
     const board = work.find(item => item.use.binding.purpose === 'storyboard') ?? null;
     const planning = board && board.version.kind === 'storyboard' ? savedStoryboardContentSchema.parse(board.version.content) : null;
+    // Every exact image bound to a Panel is a candidate; only an explicit human use approves one.
+    const images = (shotId: string, panelId: string) => work.filter(item => item.use.binding.purpose === 'panel_image' && item.use.binding.shotId === shotId && item.use.binding.panelId === panelId);
     const response: OperationResponse<'workspace'> = { script, assets: work.filter(item => item.use.binding.purpose === 'reference'),
-      storyboard: { work: board, shots: planning?.shots.map(shot => ({ ...shot, panels: shot.panels.map(panel => ({ ...panel, candidateImageVersions: [], approvedImageVersionId: null })), chosenVideoVersionId: null })) ?? [] },
-      videos: [], pendingQuestion: null, activeWork: [], selectionRevision: 0 };
+      storyboard: { work: board, shots: planning?.shots.map(shot => ({ ...shot, panels: shot.panels.map(panel => ({ ...panel,
+        candidateImageVersions: images(shot.shotId, panel.panelId).map(item => item.version),
+        approvedImageVersionId: images(shot.shotId, panel.panelId).find(item => item.use.state === 'approved')?.version.id ?? null })), chosenVideoVersionId: null })) ?? [] },
+      videos: [], pendingQuestion: null, activeWork: [], selectionRevision: revision };
     if (Buffer.byteLength(JSON.stringify(response)) > workspaceResponseBytes) throw new ArtifactError('integration_failure');
     return response;
   };
