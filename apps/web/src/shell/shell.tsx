@@ -67,14 +67,16 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
   useEffect(() => () => librarySelection.dispose(), [librarySelection]);
   const native = connection.kind === 'configured' ? connection.client.native : nativeConversations;
   // One chat per scope. Its callbacks read the current navigation; unmounting disposes it, so late events go nowhere.
-  const live = useRef({ navigation, setComposerText }); live.current = { navigation, setComposerText };
+  const live = useRef({ navigation, setComposerText, refresh: workspace.refresh }); live.current = { navigation, setComposerText, refresh: workspace.refresh };
   const [chat] = useState<ChatSession | null>(() => navigation && session && connection.kind === 'configured' ? createChatSession({
     native, accountId: session.accountId, ...(navigation.history ? { conversationId: navigation.history.id } : {}),
     knownMessageIds: () => new Set(live.current.navigation?.history?.messages.map(message => message.id)),
     clearDraft: () => live.current.setComposerText(''),
     onStarted: thread => live.current.navigation?.adopt(thread),
     onConfirmed: (thread, page) => { const current = live.current.navigation, saved = thread ?? current?.history?.thread; if (saved) current?.adopt(saved, page); },
-    onSettled: () => { void live.current.navigation?.settled(); },
+    // The assistant's tools can save work: re-read the workspace after each one and when the turn ends.
+    onToolDone: () => live.current.refresh(),
+    onSettled: () => { void live.current.navigation?.settled(); live.current.refresh(); },
   }) : null);
   useLayoutEffect(() => () => chat?.dispose(), [chat]);
   const chatState = useChatSnapshot(chat);
