@@ -161,7 +161,7 @@ Three stories is deliberate (Lou, 2026-11-02): the earlier "assistant script sav
     - Its phrase is "Updating the script…".
     - Its done summary reports the saved version number, for example "Saved version 3". No script text goes in the summary.
     - A refusal still ends the activity line as done, with no script text, so Story 3's re-read runs: "Not saved: the script changed" (stale), "Not saved: script not found" (not-found) or "Not saved: the script isn't valid" (invalid content).
-    - Every save that moves or creates the script use increments the video's selection revision, as human uses do.
+    - A save doesn't change the video's selection revision. Human script saves and uses don't change it either: only storyboard order and shot-video changes do. (Corrected at Story 2 review: the plan said agent saves would increment it "as human uses do", which they don't.)
     - The base id is the only model-supplied id. It resolves only through a query scoped to the account and video. If the run's video doesn't own it, the result is not-found. If the video owns it but it isn't the current script version, the result is stale.
     - The description carries the writing guidance adapted from `~/projects/animation-studio/.pi/skills/create-scene-script/SKILL.md`: scene adaptation, the order of action and dialogue, and speakers. It does not port that skill's YAML format or file workflow.
   - [ ] **Validation.** Content is validated by the same `savedScriptContentSchema` as manual saves. Invalid content returns a tool error the model can read, and nothing is saved.
@@ -177,7 +177,6 @@ Three stories is deliberate (Lou, 2026-11-02): the earlier "assistant script sav
     - **Stale base:** a base id that is an earlier owned version creates no new version, leaves the use unchanged, and the tool result says stale. The line ends done with "Not saved: the script changed".
     - **Foreign base:** a base id owned by another account or another video returns not-found, with no new version and the use unchanged. The line ends done with "Not saved: script not found".
     - **Invalid content:** no write, a tool error the model can read, and the line ends done with "Not saved: the script isn't valid".
-    - The first and next saves each assert that the workspace `selectionRevision` went up.
     - **Scope:** the chat route already rejects another account's video, so this case calls `saveAssistantScript` directly with a scope for a missing video, and with a scope for a video of the same account other than the base's. Pass: not-found, with zero new versions and no use change.
     - **Concurrent first saves:** two parallel `saveAssistantScript(..., null)` calls give exactly one artifact and one use, and the other call returns stale.
     - Pass: every case asserts the version count and the use's version id and state.
@@ -189,12 +188,19 @@ Three stories is deliberate (Lou, 2026-11-02): the earlier "assistant script sav
 - **Planned commits:**
   1. `Feat(artifacts): Save assistant script versions`, covering the application function and the domain write.
   2. `Feat(agent): Add update-script tool`, covering the tool, its registration, the description and the integration cases.
-  3. `Test(agent): Add update-script live step`, which extends `scripts/live/chat.mjs` with a step that runs only in `--live` at completion.
+  3. `Test(agent): Add update-script live step`, which extends `scripts/live/chat.mjs` with an update-script step. It runs in scripted mode for the story's regression run and against Muse Spark in `--live` at completion.
 - **Technical notes:**
   - Reuse `publishVersion` (`artifacts/publication.ts`) with `createdBy: 'assistant'`. Its existing `baseVersionId` check gives the stale refusal at the version level. Move or insert the `conversation_uses` row in the same transaction, using `FOR UPDATE` on the current use, like `writers.ts` does.
   - For a `null` base: if a script use exists, refuse as stale. Otherwise create the artifact and use. Two concurrent first saves must not both create a script: lock on the conversation, or use a unique per-conversation script-use constraint if one exists, and check before adding one.
   - The tool's model-facing input must not include account or video ids.
   - Read-workspace already returns the script's exact version id, which the agent uses as the base.
+- **Recorded deviations (PR #80, accepted at review 4/5):**
+  - **The base is the version in use, not the newest revision.** After "Use this version" on v1 while v2 exists, a save on v1 makes v3 and a save on v2 is stale. The use row is locked and checked instead of `publishVersion`'s latest-revision check. This matches "the current script version" in the AC.
+  - **Not found means another artifact, not another video.** A base that isn't a version of the script artifact the video uses is not found. A version of that artifact saved from another video is stale. Only the refusal message differs.
+  - **A built-in script in use** is adapted into a new owned script at v1, on the same use, as a draft. The built-in gains no version.
+  - **The use limit** (100 per video) reports "saving is unavailable".
+  - **No command journal.** Assistant saves write no `artifacts.commands` or `manual_changes` row. Nothing reads them yet. Backlog B-036 records this before later tools rely on the journal.
+  - **Seam name.** It's `SaveAssistantScript(accountId, videoId, { content, baseVersionId })`, built by `createAssistantScriptSaver`.
 
 #### Story 3: Script tab updates when the agent saves (B-024)
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
@@ -211,12 +217,12 @@ Three stories is deliberate (Lou, 2026-11-02): the earlier "assistant script sav
 - **As a** creator, **I want** the Script tab to show the agent's new script as soon as it is saved, **so that** I don't have to reload, and I don't lose an edit I'm typing.
 - **Dependencies:** Story 1 (shell owns tab assembly) and Story 2 (a saving tool exists)
 - **Acceptance criteria:**
-  - [ ] **Re-read triggers.** The open video's workspace is re-read once each time a tool activity line reaches done, and once when the turn settles, whatever the outcome. Reads are for the same account and video only; a late result after a switch is dropped.
+  - [ ] **Re-read triggers.** The open video's workspace is re-read once each time a tool activity line reaches done, and once when the turn settles, whatever the outcome. Reads are for the same account and video only; a late result after a switch is dropped. While an editor is open, a re-read waits and runs once when the editor closes, as a deferred "Use this version" already does, so saved work never changes under a draft. (Added at Story 3.)
   - [ ] **Shows the new version.** After the agent's `update-script` finishes, the Script tab's main view shows the new version's text without a reload. This holds on an empty video, which goes from the empty state to the script, and on a video with a script, where Version history lists the earlier version.
   - [ ] **Unsaved edit survives.** If the user has the script open in the manual editor with unsaved text, the re-read doesn't replace or clear that text. Pressing Save offers the existing "Latest saved version · Continue with my text" review against the agent's version.
   - [ ] **Newest wins.** The user's confirmed save and use effects in `useWorkspace` still merge over a re-read, but only while they are newer. An own effect is dropped once the re-read covers it:
-    - A use effect ("Use this version") is dropped once a re-read's `selectionRevision` is at or above the one `useVersion` returned. The version number is not the key.
-    - A save effect, which creates a newer revision and returns no `selectionRevision`, is dropped once the re-read's current script revision is at or above it.
+    - Each effect records the refresh count when it was confirmed. A re-read records the count that started it. An effect confirmed before a re-read started is already committed, so that re-read covers it and the effect is dropped. An effect confirmed during or after it is kept.
+    - (Corrected at Story 2 review: the plan keyed use effects on `selectionRevision`, but script uses never advance it, human or agent.)
     - If the user saves and then the agent saves, the tab shows the agent's version.
     - If the user picks "Use this version" on v1 while a re-read is in flight, the tab keeps v1.
 - **Functional verification:**
@@ -225,14 +231,14 @@ Three stories is deliberate (Lou, 2026-11-02): the earlier "assistant script sav
     2. The user opens the manual editor and types without saving, then sends a message. Turn 2 saves v2 on the v1 base. Pass:
        - the textarea still holds the typed text;
        - Save shows the latest-version review against v2;
-       - Version history lists v1;
-       - after the user cancels the edit, the main view shows v2's text.
+       - Version history already lists v2 while the tab stays on the edit's base;
+       - after the user cancels the edit, the main view shows v2's text and Version history lists v1.
   - [ ] Unit cases:
     - `chat-session.test.ts`: `onToolDone` fires once per tool that reaches done. `onSettled` fires once for each of completed, failed, interrupted and lost.
     - `apps/web/test/unit/shell/` (a new file), with three cases:
-      - a late `refresh()` result for a previous scope is dropped;
+      - a late read result for a previous scope or client is dropped, and a failed re-read keeps the shown value;
       - a user save followed by a re-read whose script has a higher revision shows the agent's version;
-      - a "Use this version" on v1 followed by a stale re-read still shows v1.
+      - a "Use this version" on v1 followed by a stale re-read still shows v1, and a re-read started after it shows the agent's later version.
 - **Regression verification:**
   - [ ] The existing `chat.spec.ts` journeys and `saves.spec.ts` pass in the same targeted browser run: chat states, Stop, titles, manual save and conflict. The existing `apps/web/test/unit/api/paged-read.test.ts` passes, because `useScopedRead` changes.
 - **Editorial/design verification:** N/A — no new visual state. The existing editor review and tool line are reused.
