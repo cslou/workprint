@@ -289,12 +289,6 @@ Deprioritized: everything here waits until the Next items are done (Lou, 2026-11
 - Constraint: Approved on 2026-10-31 as a temporary private/local exception. Audit stays NON-PASS. It gates shared/public deployment.
 - References: [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249); `docs/sprints/sprint-004.md` and `sprint-005.md` safety decisions.
 
-### B-005 — Retire test pages
-- Problem: The default Vite dev server serves `apps/web/test/*.html` mounts and fixtures. The exposure is development and loopback only, and production builds exclude them.
-- Outcome: No test pages remain, so no dev server serves them.
-- Work: the branch `chore/phase-3-test-cleanup` deletes every `apps/web/test` page as part of the MVP test trim. Close this item when that branch merges into `phase-3`.
-- References: PR #23; `apps/web/vite.config.ts` `server.fs.allow`.
-
 ### B-006 — Move workspace tab assembly to the shell
 - Context: The PR #26 review also raised two visual-test findings (the spacing canary and duplicate pair helpers). Both are obsolete, because the MVP test trim deleted those suites.
 - Problem: `apps/web/src/materials/panel.tsx` assembles the workspace tabs and decides tab preservation, so the shell's tab lifecycle sits inside the materials feature.

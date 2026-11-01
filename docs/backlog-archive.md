@@ -2,6 +2,14 @@
 
 Convention: `docs/conventions/backlog-management.md` (selected harness root; AGENTS.md §12)
 
+### B-005 — Retire test pages
+- Problem: The default Vite dev server served `apps/web/test/*.html` mounts and fixtures (development and loopback only; production builds excluded them).
+- Outcome: No test pages remain, so no dev server serves them.
+- Work: [PR #66](https://github.com/cslou/workprint/pull/66) "Phase-3 test clean-up and e2e journeys" deleted the pages; PR #68 moved the remaining unit tests into `apps/web/test/unit/`.
+- Closed: 2026-11-01
+- Resolution: Done
+- Evidence: On `phase-3` at `c83bacf`, `apps/web/test/` holds only `unit/`, and the only web HTML entry is `apps/web/index.html`.
+
 ### B-002 — Clear the inherited deepmerge audit advisory
 - Context: `pnpm audit` reported GHSA-gcqx-w48m-w2h4 (low) on `deepmerge` 4.3.1. It was reached only through the Mastra CLI build tooling: `mastra` → `@mastra/deployer` → `@rollup/plugin-node-resolve`.
 - Outcome: `pnpm audit` no longer reports the advisory, through a durable dependency change.

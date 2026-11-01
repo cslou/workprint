@@ -1,6 +1,6 @@
 # Sprint 006 — Chat
 
-**Date:** Start after PR #67 (shared test stack) and the MVP planning branch (`chore/mvp-backlog`) merge into `phase-3` – End after completion gates and Lou's QA
+**Date:** Start after the MVP planning branch (`chore/mvp-backlog`) merges into `phase-3` (PRs #67 and #68 are already in) – End after completion gates and Lou's QA
 **Goal:** On a local build, a signed-in user sends a message in a video and gets a streamed Muse Spark reply. While the reply runs, a real read-workspace tool shows its activity phrase. Stop ends the turn, the video gets a generated title in Recents, and the conversation, including tool lines, survives reload.
 **Status:** 🟡 Planning
 
@@ -22,10 +22,11 @@
   - **The client methods exist:** `@workprint/api-client` has `sendText`, `queueText`, `subscribe`/`consume` and exact-turn `stop`.
   - **The composer is not connected.** It calls `native.sendText()` with no input and shows "Sending messages is not available yet".
   - **History is text-only.** `GET /memory/threads/:threadId/messages` throws "Unsupported native history" on any non-text part, so tool calls would break history.
-  - **Chat tests are gone.** The MVP test cleanup (PRs #65/#66) deleted every chat/turn test. Tests now live in three places:
-    - unit tests beside the code
-    - `apps/api/test/{http,integration}` for API tests
-    - `scripts/browser/e2e/` journeys for browser tests
+  - **Chat tests are gone.** The MVP test cleanup (PRs #65–#68) deleted every chat/turn test. Tests now live in three places:
+    - `<package>/test/unit/` for unit tests (for example `apps/api/test/unit/mastra/config.security.test.ts`)
+    - `apps/api/test/{http,integration,tooling,support}` for API tests
+    - `test/e2e/` at the repo root for browser journeys
+  - **One shared test stack per run** (PR #67, `scripts/test-stack.mjs`, `apps/api/test/support/test-stack.ts`).
   - **Mastra knows the model.** Its 1.79.0 registry lists `meta/muse-spark-1.3` at `https://api.meta.ai/v1` (OpenAI-compatible via `@ai-sdk/openai`, key variable `META_MODEL_API_KEY`).
   - **The keys are present.** The root `.env` has `META_API_KEY` and `DEFAULT_ASSISTANT_MODEL`.
 - **Implementation spec:** `docs/specs/implementation-spec-001.md` §10 MVP plan and Phase 3 sprint packaging; backlog B-012, B-021, B-022, B-023, B-034.
@@ -90,7 +91,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
 
 **Sprint specifics:**
 - **Per change:** run only the targeted tests for that change.
-- **Suites:** `pnpm check`, `pnpm build`, `pnpm test:unit`, `pnpm test:integration` and `pnpm test:browser`, through the shared test stack from PR #67.
+- **Suites:** `pnpm check`, `pnpm build`, `pnpm test:unit`, `pnpm test:integration` and `pnpm test:browser`, through the shared test stack (PR #67).
 - **Live check:** one small script, `pnpm live:chat`, makes a handful of real Muse Spark calls. It is never part of the default suites. It runs in Story 1 and once at Sprint Completion.
 - **Logs:** redirect full logs to ignored files under `outputs/verification/sprint-006/<sha>/`, and report only results and paths.
 - **Design:**
@@ -114,7 +115,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
   - Findings: Pass 1 (2/5): P1 the scripted provider can't hold tools, so test-tool injection was missing; P1 `live:chat` was built only here; P2s on single bad-config outcome, 32 KiB rejection, key leakage, static prompt, deadline proof and build exclusion. Pass 2 (3/5): P1 requiring the key at startup would break every test and dev boot that uses `unqualified/disabled`; P2s on the step-cap outcome, the 60 s timeout test and `live:chat` being blocked by the network guard.
   - Resolution: Added test-only tool and limit injection, the shared `live:chat` script, and the named configuration error, size, leakage, prompt-cache and build checks. Kept `unqualified/disabled` as a valid chat-off value so existing setups boot unchanged, with browser boot added to regression. Step cap ends as failed with a notice; the timeout test overrides to 1 s; `live:chat` uses its own unguarded environment.
 - **As a** user, **I want** the backend to run a real Muse Spark agent loop that can call tools, **so that** chat produces real replies.
-- **Dependencies:** PR #67 merged into `phase-3`.
+- **Dependencies:** `chore/mvp-backlog` merged into `phase-3`.
 - **Acceptance criteria:**
   - [ ] **Real composition binds the model.** The server composition (`apps/api/src/mastra/server.ts` → `createBackend`) binds the model from `DEFAULT_ASSISTANT_MODEL`, with the key mapped explicitly from `META_API_KEY`. Two values are valid:
     - `meta/muse-spark-1.3`: chat on; `META_API_KEY` required.
@@ -138,7 +139,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
     - [ ] The system prompt and tool list are byte-identical across two turns (protects prompt caching).
     - [ ] Provider error, timeout and an incomplete stream each end with a typed failure and no retry (provider request count asserted). The stall case holds the stream mid-reply with the stall limit overridden to 1 s in the test composition. A stream that keeps sending chunks past that time is not cut off.
     - [ ] A second send while busy is rejected with zero extra provider requests.
-  - [ ] Unit tests for configuration (`config.security.test.ts`): `unqualified/disabled` loads with no key; `meta/muse-spark-1.3` without a key, or a bad model, throws the named configuration error; the error text and captured server logs never contain the key value. The browser public config contains no key (existing `tooling/web-bundle` sentinel check, with the key added as a sentinel).
+  - [ ] Unit tests for configuration (`apps/api/test/unit/mastra/config.security.test.ts`): `unqualified/disabled` loads with no key; `meta/muse-spark-1.3` without a key, or a bad model, throws the named configuration error; the error text and captured server logs never contain the key value. The browser public config contains no key (existing `tooling/web-bundle` sentinel check, with the key added as a sentinel).
   - [ ] `pnpm live:chat` passes once, and the result is recorded.
 - **Regression verification:**
   - [ ] `pnpm test:integration`, including `conversation-ownership`, `http/admission` and `http/native-navigation`: ownership, foreign threads and route admission are unchanged, and every existing suite still boots with `unqualified/disabled`.
@@ -183,7 +184,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
   - [ ] **Reload shows the saved conversation,** with message order and text intact.
   - [ ] **Reload during an active turn** (accepted by Lou, 2026-11-01): the page shows the saved history as loaded, with no "Working…", no live text and no Stop. A send attempted while the turn still runs gets `busy` and keeps the draft. The finished reply appears on a later reload. Re-attaching is B-027.
 - **Functional verification:**
-  - [ ] Browser journey `scripts/browser/e2e/chat.spec.ts` against the real built stack with the scripted provider:
+  - [ ] Browser journey `test/e2e/chat.spec.ts` against the real built stack with the scripted provider:
     - [ ] New video → type → Enter → streamed text appears incrementally → completed.
     - [ ] Reload shows the same messages; Recents lists the video.
     - [ ] Shift+Enter and whitespace-only input send nothing (provider request count asserted).
