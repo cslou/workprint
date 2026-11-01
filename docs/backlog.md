@@ -224,7 +224,13 @@ Deprioritized: everything here waits until the Next items are done (Lou, 2026-11
 ### B-027 — Reconnect to an in-progress reply after reload
 - Problem: Sprint 006 Story 3 planned re-attaching to a still-running turn after a reload or reconnect, inside the native three-second replay window. The MVP shows the saved result instead.
 - Outcome: A reload during streaming re-attaches to the same turn without resending, or honestly reports the reply's state as unknown once the replay window has passed. Closing the view never sends Stop.
-- References: Former Sprint 006 plan, Story 3.
+- MVP behaviour (Sprint 006, accepted by Lou 2026-11-01): after a reload mid-reply the page shows saved history with no "Working…", live text or Stop; a send gets `busy`; the finished reply appears on a later reload.
+- References: Former Sprint 006 plan, Story 3; Sprint 006 Story 2.
+
+### B-035 — Clean history for retried and stopped replies
+- Problem: In Sprint 006, Retry may resend the user's message if Mastra 1.79 cannot regenerate a reply, so history can show the message twice. A stopped reply is marked interrupted only live; after a reload it shows as plain partial text. Lou accepted both for the MVP (2026-11-01).
+- Outcome: After a Retry, history shows the user message once with the completed reply. A stopped reply keeps an "interrupted" marker after reload, returned safely by the history route.
+- References: Sprint 006 Stories 2 and 4.
 
 ### B-028 — Questions survive a server restart mid-continuation
 - Problem: Sprint 007 Story 2 planned a durable, recoverable hand-off from a saved answer to the agent's continuation, proven by killing and restarting the server. The MVP passes the answer back as the next message (B-014).
