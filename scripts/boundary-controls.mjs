@@ -19,6 +19,8 @@ const pairs = [
   ['web-shared-no-features', 'apps/web/src/api', 'apps/web/src/uploads'],
   ['packages-no-apps', 'packages/contracts/src', `${api}db`],
   ['production-no-tests', `${api}mastra`, 'apps/api/test'],
+  ['agent-tools-framework-neutral', `${api}agent/tools`, `${api}agent/mastra`],
+  ['agent-tools-framework-neutral', `${api}agent/tools`, `${api}mastra`],
   ['player-only-web-consumer', `${api}db`, 'packages/player/src'],
 ];
 
@@ -53,6 +55,7 @@ for (const [rule, sourceDir, targetDir] of pairs) {
   probe(rule, [[source, `import './${imported}';\n`], [target, 'export {};\n']]);
 }
 probe('browser-no-node', [['apps/web/src/boundary-control-node.ts', "import 'node:fs';\n"]]);
+probe('agent-tools-framework-neutral', [[`${api}agent/tools/boundary-control-mastra.ts`, "import '@mastra/core';\n"]]);
 probe('no-cycles', [
   [`${api}db/boundary-control-a.ts`, "import './boundary-control-b.ts';\n"],
   [`${api}db/boundary-control-b.ts`, "import './boundary-control-a.ts';\n"],

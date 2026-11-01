@@ -1,33 +1,47 @@
 import type { Mastra } from '@mastra/core';
 import type { Context } from 'hono';
-import { createOwnedConversationCheck, hasNativeTurns, nativeAssistantId, nativeTurnLimits } from '../agent/index.js';
+import { activeNativeRun, createOwnedConversationCheck, hasNativeTurns, nativeAssistantId, turnLimits } from '../agent/index.js';
 import { nativeControlRoutes, nativeRunAdmission } from './native-run-admission.js';
 
 export const nativeTurnRoutes = [...['send-message', 'threads/subscribe'].map(tail => ({ method: 'POST' as const, path: `/api/agents/${nativeAssistantId}/${tail}` })), ...nativeControlRoutes];
 export const isNativeTurnRoute = (context: Context) => nativeTurnRoutes.some(route => route.path === context.req.path && route.method === context.req.method);
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 const uuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+const isSend = (context: Context) => context.req.path === `/api/agents/${nativeAssistantId}/send-message`;
+
+/**
+ * The admitted send body, with a busy thread's message discarded rather than merged into the running turn.
+ * Admission already rejects a busy video and holds it until the send starts; this is defence in depth.
+ */
+export function nativeTurnBody(context: Context, body: unknown, bytes: Uint8Array<ArrayBuffer> | undefined): Uint8Array<ArrayBuffer> | undefined {
+  return isSend(context) && object(body) ? new TextEncoder().encode(JSON.stringify({ ...body, ifActive: { behavior: 'discard' } })) : bytes;
+}
+
+/** An admitted send holds its video until the native send settles; `release` must run once it has. */
+export type AdmittedSend = { release: () => void };
 
 /** Closed pre-native admission. Body resource is a stale-scope precondition, never ownership authority. */
 export function nativeTurnAdmission(mastra: Mastra) {
+  // Videos whose admitted send has not yet started its native run, so two sends cannot both pass the busy check.
+  const starting = new Set<string>();
   const storage = mastra.getStorage();
   const checkOwned = storage ? createOwnedConversationCheck(storage) : undefined;
   const admitRun = nativeRunAdmission(mastra, checkOwned);
-  return async (context: Context, accountId: string, body: unknown) => {
+  return async (context: Context, accountId: string, body: unknown): Promise<Response | AdmittedSend | undefined> => {
     if (context.req.path.endsWith('/observe')) return admitRun(context, accountId, body);
-    const fail = (status: 400 | 404 | 503, code: string, message: string) => context.json({ error: { code, message } }, status);
+    const fail = (status: 400 | 404 | 409 | 503, code: string, message: string) => context.json({ error: { code, message } }, status);
     const invalid = () => fail(400, 'invalid_input', 'Invalid native request');
     const unavailable = () => fail(503, 'integration_failure', 'Native turns unavailable');
     context.header('Cache-Control', 'no-store');
     const stopping = context.req.path.endsWith('/threads/abort');
-    const send = context.req.path.endsWith('/send-message') || context.req.path.endsWith('/queue-message');
+    const send = isSend(context);
     const keys = stopping ? ['threadId', 'resourceId', 'expectedRunId', 'clearPendingSignals'] : send ? ['threadId', 'resourceId', 'message', 'ifIdle'] : ['threadId', 'resourceId', 'withInitialHistory'];
     if (new URL(context.req.url).search || !object(body) || Object.keys(body).some(key => !keys.includes(key)) || body.resourceId !== accountId) return invalid();
     if (!uuid(body.threadId)) return fail(404, 'not_found', 'Not found');
     if (stopping) {
       if (!uuid(body.expectedRunId) || (body.clearPendingSignals !== undefined && body.clearPendingSignals !== false)) return invalid();
     } else if (send) {
-      if (typeof body.message !== 'string' || !body.message.trim() || Buffer.byteLength(body.message, 'utf8') > nativeTurnLimits.inputBytes) return invalid();
+      if (typeof body.message !== 'string' || !body.message.trim() || Buffer.byteLength(body.message, 'utf8') > turnLimits.inputBytes) return invalid();
       if (body.ifIdle !== undefined && (!object(body.ifIdle) || Object.keys(body.ifIdle).length !== 1 || body.ifIdle.behavior !== 'wake')) return invalid();
     } else if (body.withInitialHistory !== undefined && body.withInitialHistory !== false) {
       // Saved history has its own bounded, privacy-filtered read interface. No raw native metadata here.
@@ -40,7 +54,12 @@ export function nativeTurnAdmission(mastra: Mastra) {
       if (context.req.raw.signal.aborted || !owned || owned.kind === 'unavailable') return unavailable();
       if (owned.kind !== 'owned') return fail(404, 'not_found', 'Not found');
       if (!hasNativeTurns(mastra)) return unavailable();
-      return undefined;
+      // One active turn per video; there is no queue.
+      if (!send) return undefined;
+      const videoId = body.threadId;
+      if (starting.has(videoId) || activeNativeRun(mastra, accountId, videoId)) return fail(409, 'busy', 'The agent is still working on the last message.');
+      starting.add(videoId);
+      return { release: () => { starting.delete(videoId); } };
     } catch { return unavailable(); }
     finally { clearTimeout(timer); }
   };

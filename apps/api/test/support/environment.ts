@@ -7,6 +7,8 @@ import { command } from './process.js';
 
 export const root = process.cwd();
 export const sentinel = 'workprint-harmless-secret-sentinel';
+/** Stands in for the Meta key in every test process; the network guard keeps it off the network. */
+export const placeholderMetaKey = 'workprint-placeholder-meta-key';
 
 export async function environment() {
   const logs = await mkdtemp(join(tmpdir(), 'workprint-foundation-'));
@@ -24,7 +26,9 @@ export async function environment() {
     MASTRA_TELEMETRY_DISABLED: '1',
     MASTRA_OFFLINE: '1',
     MASTRA_SKIP_DOTENV: '1',
-    DEFAULT_ASSISTANT_MODEL: 'unqualified/disabled',
+    // The real model name: tests swap the provider, never switch chat off.
+    DEFAULT_ASSISTANT_MODEL: 'meta/muse-spark-1.3',
+    META_API_KEY: placeholderMetaKey,
     SUPABASE_SECRET_KEY: sentinel,
     // Health-only fixtures never call Auth. Protected admission has its own real target.
     SUPABASE_URL: 'http://127.0.0.1:1',
@@ -40,3 +44,17 @@ export async function environment() {
     },
   };
 }
+
+export type TestEnvironment = Awaited<ReturnType<typeof environment>>;
+
+/**
+ * Unguarded environment for `pnpm live:chat --live` only: the same allowlist as `environment()`, but the
+ * real Meta key and no network guard. Never used by the default suites.
+ */
+export async function liveEnvironment(metaApiKey: string): Promise<TestEnvironment> {
+  const guarded = await environment();
+  const env: NodeJS.ProcessEnv = { ...guarded.env, META_API_KEY: metaApiKey };
+  delete env.NODE_OPTIONS;
+  return { env, logs: guarded.logs, async noNetwork() { /* live calls are the point */ } };
+}
+

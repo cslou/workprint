@@ -3,8 +3,13 @@ import { existsSync, rmSync } from 'node:fs';
 
 const task = process.argv[2];
 if (!['build', 'dev', 'start', 'db:prepare'].includes(task)) throw new Error('Unknown task');
-const envFile = process.env.WORKPRINT_ENV_FILE ?? '.env';
-if (task !== 'build' && existsSync(envFile)) process.loadEnvFile(envFile);
+// Layered env: the shell wins, then WORKPRINT_ENV_FILE, then .env (loadEnvFile never overwrites a set value).
+// build loads neither. A named override file must exist, so a typo can't silently fall back to .env alone.
+if (task !== 'build') {
+  const override = process.env.WORKPRINT_ENV_FILE;
+  if (override !== undefined && !existsSync(override)) throw new Error(`WORKPRINT_ENV_FILE not found: ${override}`);
+  for (const file of [override, '.env']) if (file !== undefined && existsSync(file)) process.loadEnvFile(file);
+}
 const env = {
   ...process.env,
   MASTRA_TELEMETRY_DISABLED: '1',

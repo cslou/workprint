@@ -5,7 +5,7 @@ import { verifyAccount } from './auth.js';
 import { loadServerConfig } from './config.js';
 import { readIntake } from './body.js';
 import { createAdmissionPolicy, decorateCors } from './admission.js';
-import { nativeTurnRoutes, isNativeTurnRoute, nativeTurnAdmission } from './native-turns.js';
+import { nativeTurnRoutes, isNativeTurnRoute, nativeTurnAdmission, nativeTurnBody, type AdmittedSend } from './native-turns.js';
 
 const verifiedAccountKey = 'workprintVerifiedIngressAccount';
 
@@ -54,6 +54,7 @@ export function createIngress(mastra: Mastra): MiddlewareHandler<{ Bindings: Htt
     };
     outgoing?.on('close', closed);
     if (outgoing?.destroyed) closed();
+    let admittedSend: AdmittedSend | undefined;
     try {
       const identity = await verifyAccount(context.req.header('Authorization'), auth);
       if (cancellation.signal.aborted) return invalid();
@@ -62,15 +63,21 @@ export function createIngress(mastra: Mastra): MiddlewareHandler<{ Bindings: Htt
       if (getHasBody) return invalid();
       context.set(verifiedAccountKey, identity.accountId);
       try {
-        const { bytes, body } = await readIntake(context.req.raw);
+        const intake = await readIntake(context.req.raw);
+        let { bytes } = intake;
         if (cancellation.signal.aborted) return invalid();
         if (isNativeTurnRoute(context)) {
-          const rejected = await admitTurn(context, identity.accountId, body);
-          if (rejected) return rejected;
+          const admitted = await admitTurn(context, identity.accountId, intake.body);
+          if (admitted instanceof Response) return admitted;
+          admittedSend = admitted;
           if (cancellation.signal.aborted) return invalid();
+          bytes = nativeTurnBody(context, intake.body, bytes);
         }
+        const headers = new Headers(context.req.raw.headers);
+        // An admitted native body may be rewritten; its framing must describe the bytes handed on.
+        if (bytes !== intake.bytes) headers.set('content-length', String(bytes?.byteLength ?? 0));
         context.req.raw = new Request(context.req.raw, {
-          body: bytes ?? null, signal: AbortSignal.any([context.req.raw.signal, cancellation.signal]),
+          body: bytes ?? null, headers, signal: AbortSignal.any([context.req.raw.signal, cancellation.signal]),
         });
       } catch {
         return invalid();
@@ -79,6 +86,8 @@ export function createIngress(mastra: Mastra): MiddlewareHandler<{ Bindings: Htt
       if (origin) decorateCors(context, origin);
       return context.res;
     } finally {
+      // Runs once the native send has settled (or admission ended early), freeing the video for the next send.
+      admittedSend?.release();
       outgoing?.off('close', closed);
     }
   };
