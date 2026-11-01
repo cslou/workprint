@@ -14,6 +14,7 @@ export default defineConfig({
   outputDir: resolve(process.env.WORKPRINT_BROWSER_OUTPUT ?? `outputs/verification/sprint-003/${revision}${dirty ? '-working' : ''}`),
   timeout: 30_000,
   expect: { timeout: 5000 },
+  // Component specs run in parallel; backend-booting journeys pass --workers=1.
   fullyParallel: false,
   workers: 1,
   retries: 0,
