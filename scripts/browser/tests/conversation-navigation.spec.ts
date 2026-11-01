@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../material-network.js';
-import { fixture, account, signIn, origin, privateForward, privateFulfill } from '../account-fixture.js';
-import { allowCreates, allowHistory, allowList, enter, holdRealResponse, observeNavigation, settledFrames } from '../navigation-fixture.js';
+import { fixture } from '../account-fixture.js';
+import { allowHistory, allowList, enter, holdRealResponse, observeNavigation, settledFrames } from '../navigation-fixture.js';
 
 /** The welcome heading and composer form one group centred in the main column (not across the sidebar). */
 async function expectCentredOpening(page: Page) {
@@ -9,44 +9,34 @@ async function expectCentredOpening(page: Page) {
   await expect(main).toHaveAttribute('data-layout', 'opening');
   const [area, welcome, composer] = await Promise.all([main.boundingBox(), page.locator('.wp-welcome').boundingBox(), page.locator('.wp-opening-composer').boundingBox()]);
   const top = welcome!.y, bottom = composer!.y + composer!.height;
-  const head = await page.locator('.wp-history-head').count() ? await page.locator('.wp-history-head').boundingBox() : null;
-  const start = head ? head.y + head.height : area!.y;
-  expect(Math.abs((top + bottom) / 2 - (start + area!.y + area!.height) / 2)).toBeLessThan(32);
+  expect(Math.abs((top + bottom) / 2 - (area!.y + area!.height / 2))).toBeLessThan(32);
   expect(Math.abs(composer!.x + composer!.width / 2 - (area!.x + area!.width / 2))).toBeLessThan(2);
 }
 
 // This first case is driven against the unchanged serving/browser implementation for a functional red.
-test('explicit New video creates native identity and empty history without enabling Send', async ({ page, materialNetwork }) => {
+test('New video is client-only: it returns to the centred opening without creating a conversation', async ({ page, materialNetwork }) => {
   test.setTimeout(120000);
   const f = await fixture(page, true, {}, 'built');
   try {
     const user = await f.auth.createAccount();
-    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
-    allowList(materialNetwork, f.application!.apiOrigin, user.id);
-    await page.goto(origin + '/app'); await account(page); await signIn(page, user.email, user.password);
-    await expect(page.getByRole('dialog')).not.toBeVisible();
-    await expectCentredOpening(page);
-    materialNetwork.expectOperations({ origin: f.application!.apiOrigin, method: 'POST', path: '/memory/threads', query: {}, count: 1 });
-    await page.route('**/memory/threads', async route => {
-      const response = await privateForward(route); const thread = await response.json() as { id: string };
-      materialNetwork.expectOperations({ origin: f.application!.apiOrigin, method: 'GET', path: `/v1/conversations/${thread.id}/workspace`, query: {}, count: 1 });
-      await privateFulfill(route, { response });
-    });
+    const saved = await f.application!.saveNative(user.id, [{ role: 'user', text: 'Existing saved text' }], 'Existing video');
+    allowHistory(materialNetwork, f.application!.apiOrigin, user.id, saved.id);
+    await enter(page, materialNetwork, f, user, saved.id);
+    await expect(page.getByRole('list', { name: 'Saved messages' })).toHaveText('Existing saved text');
+    await expect(page.locator('main.wp-main')).toHaveAttribute('data-layout', 'thread');
+    const snapshot = await f.application!.snapshot();
     await page.getByRole('button', { name: 'New video', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'What would you like to make?', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Untitled video', exact: true })).toBeFocused();
+    expect(new URL(page.url()).searchParams.has('conversation')).toBe(false);
     await expectCentredOpening(page);
     await page.setViewportSize({ width: 390, height: 560 });
-    const heading = page.getByRole('heading', { name: 'What would you like to make?', exact: true });
-    expect((await heading.boundingBox())!.y).toBeGreaterThanOrEqual((await page.locator('.wp-history-head').boundingBox())!.y);
     await page.getByRole('textbox', { name: 'Message', exact: true }).focus(); await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeInViewport();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.setViewportSize({ width: 1440, height: 900 });
-    const id = new URL(page.url()).searchParams.get('conversation'); expect(id).toMatch(/^[0-9a-f-]{36}$/);
-    const snapshot = await f.application!.snapshot();
     await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Do not send native work');
     await page.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.getByText('Sending messages is not available yet. Your message is kept.', { exact: true })).toBeVisible();
+    expect(materialNetwork.entries.filter(entry => entry.method === 'POST' && entry.url.pathname.startsWith('/memory/'))).toEqual([]);
     expect(await f.application!.snapshot()).toBe(snapshot);
   } finally { await f.close(); }
 });
@@ -59,6 +49,8 @@ test('workspace entry reads Recents once and shows placeholders, not empty copy,
     await observeNavigation(page);
     // Record from the first document render whether the opening welcome ever appears during restore.
     await page.addInitScript(() => { const w = window as unknown as { welcomeSeen: boolean }; w.welcomeSeen = false; new MutationObserver(() => { if (document.querySelector('.wp-welcome') && location.pathname === '/app') w.welcomeSeen = true; }).observe(document, { childList: true, subtree: true }); });
+    // Record when the sidebar placeholder is inserted (space reserved), painted and removed.
+    await page.addInitScript(() => { const w = window as unknown as { skeleton: Record<string, number> }; w.skeleton = {}; new MutationObserver(() => { const el = document.querySelector('.wp-sidebar .wp-skeleton-rows'), now = performance.now(); if (el) { w.skeleton.inserted ??= now; if (!el.classList.contains('wp-skeleton-reserved')) w.skeleton.shown ??= now; } else if (w.skeleton.shown !== undefined) w.skeleton.gone ??= now; }).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] }); });
     const list = await holdRealResponse(page, '**/memory/threads?*');
     const history = await holdRealResponse(page, `**/memory/threads/${saved.id}/messages?*`);
     allowHistory(materialNetwork, f.application!.apiOrigin, user.id, saved.id);
@@ -69,6 +61,13 @@ test('workspace entry reads Recents once and shows placeholders, not empty copy,
     await expect(recents).toHaveAttribute('aria-busy', 'true');
     await expect(recents.getByText('No videos yet.', { exact: true })).toHaveCount(0);
     await expect(recents.getByText('Loading Recents…', { exact: true })).toHaveAttribute('role', 'status');
+    // Release Recents as soon as the placeholder is painted: it must stay for its minimum rather than flicker away.
+    list.release(); await list.done;
+    await expect(recents.getByRole('button', { name: 'Skeleton seeded scene', exact: true })).toBeVisible();
+    await expect(placeholders).toHaveCount(0); await expect(recents).toHaveAttribute('aria-busy', 'false');
+    const timing = await page.evaluate(() => (window as unknown as { skeleton: Record<string, number> }).skeleton);
+    expect(timing.shown! - timing.inserted!).toBeGreaterThanOrEqual(240);
+    expect(timing.gone! - timing.shown!).toBeGreaterThanOrEqual(440);
     await expect(page.locator('.wp-native-history .wp-skeleton-lines')).toBeVisible();
     const main = page.locator('main.wp-main');
     await expect(main).toHaveAttribute('data-layout', 'thread');
@@ -76,9 +75,6 @@ test('workspace entry reads Recents once and shows placeholders, not empty copy,
     await expect(page.getByRole('heading', { name: 'Untitled video', exact: true })).toHaveCount(0);
     await page.keyboard.press('Tab'); await page.keyboard.press('Tab');
     expect(await page.evaluate(() => !!document.activeElement?.closest('.wp-skeleton-rows, .wp-skeleton-lines'))).toBe(false);
-    list.release(); await list.done;
-    await expect(recents.getByRole('button', { name: 'Skeleton seeded scene', exact: true })).toBeVisible();
-    await expect(placeholders).toHaveCount(0); await expect(recents).toHaveAttribute('aria-busy', 'false');
     history.release(); await history.done;
     await expect(page.getByRole('list', { name: 'Saved messages' })).toHaveText('Skeleton restored text');
     await expect(page.locator('.wp-skeleton-lines')).toHaveCount(0);
@@ -90,23 +86,15 @@ test('workspace entry reads Recents once and shows placeholders, not empty copy,
   } finally { await f.close(); }
 });
 
-test('real browser creates beyond one page and traverses owned Recents with focus and exact persisted reload', async ({ page, materialNetwork }) => {
+test('real browser traverses more than one page of owned Recents with focus and exact persisted reload', async ({ page, materialNetwork }) => {
   test.setTimeout(180000);
   const f = await fixture(page, true);
   try {
     const user = await f.auth.createAccount(), other = await f.auth.createAccount();
     for (let i = 0; i < 6; i++) await f.application!.saveNative(user.id, [{ role: 'user', text: `Seeded exact text ${i}` }], `Saved scene ${i}`);
     await f.application!.saveNative(other.id, [{ role: 'user', text: 'Foreign text never shown' }], 'Other account private title');
+    for (let i = 0; i < 8; i++) await f.application!.saveNative(user.id, [{ role: 'user', text: `Later text ${i}` }], `Later scene ${i}`);
     await enter(page, materialNetwork, f, user);
-    await allowCreates(page, materialNetwork, f.application!.apiOrigin, 8);
-    const created = new Set<string>();
-    for (let i = 0; i < 8; i++) {
-      await page.getByRole('button', { name: 'New video', exact: true }).click();
-      await expect(page.getByRole('heading', { name: 'What would you like to make?', exact: true })).toBeVisible();
-      await expect(page.getByRole('heading', { name: 'Untitled video', exact: true })).toBeFocused();
-      created.add(new URL(page.url()).searchParams.get('conversation')!);
-    }
-    expect(created.size).toBe(8);
     allowList(materialNetwork, f.application!.apiOrigin, user.id);
     const opener = page.getByRole('button', { name: 'Recents', exact: true }); await opener.focus(); await page.keyboard.press('Enter');
     const dialog = page.getByRole('dialog');
@@ -138,7 +126,7 @@ test('real browser creates beyond one page and traverses owned Recents with focu
     await page.reload(); await expect(page.getByRole('heading', { name, exact: true })).toBeFocused();
     await expect(page.getByRole('list', { name: 'Saved messages' })).toHaveText('Seeded exact text 5');
     expect(await f.application!.snapshot()).toBe(before);
-    expect(materialNetwork.entries.filter(entry => entry.method === 'POST' && entry.url.pathname === '/memory/threads')).toHaveLength(8);
+    expect(materialNetwork.entries.filter(entry => entry.method === 'POST' && entry.url.pathname === '/memory/threads')).toHaveLength(0);
   } finally { await f.close(); }
 });
 

@@ -5,7 +5,6 @@ import type { BrowserClient } from '../api/client.js';
 type Message = NativeMessages['messages'][number];
 export type HistoryState = { id: string; thread: NativeThread | null; messages: Message[]; kind: 'loading' | 'ready' | 'error' | 'unavailable'; page: number; hasMore: boolean; earlier: 'idle' | 'loading' | 'error' };
 export type RecentsState = { value: NativeThreads | null; pending: boolean; failed: boolean; target: number };
-export type CreateState = 'idle' | 'pending' | 'rejected' | 'unknown';
 const failureKind = (error: ClientError) => error.code === 'not_found' ? 'unavailable' as const : 'error' as const;
 const loading = (id: string, thread: NativeThread | null = null): HistoryState => ({ id, thread, messages: [], kind: 'loading', page: 0, hasMore: false, earlier: 'idle' });
 const validId = (id: string | null) => id && /^[0-9a-f-]{36}$/i.test(id) ? id : null;
@@ -19,9 +18,8 @@ export function useNativeNavigation(connection: BrowserClient, accountId: string
   const [history, setHistory] = useState<HistoryState | null>(() => restoreId ? loading(restoreId) : null);
   const [recents, setRecents] = useState<RecentsState>({ value: null, pending: false, failed: false, target: 0 });
   const [quick, setQuick] = useState<NativeThread[] | null>(null);
-  const [createState, setCreateState] = useState<CreateState>('idle');
-  const [dialog, setDialog] = useState<'recents' | 'new' | null>(null);
-  const active = useRef(true), selection = useRef(0), intent = useRef(0), listing = useRef(0), creating = useRef(false);
+  const [dialog, setDialog] = useState<'recents' | null>(null);
+  const active = useRef(true), selection = useRef(0), intent = useRef(0), listing = useRef(0);
   const requests = useRef(new Set<AbortController>());
   const client = connection.kind === 'configured' ? connection.client.native : null;
   const controller = () => { const value = new AbortController(); requests.current.add(value); return value; };
@@ -64,19 +62,13 @@ export function useNativeNavigation(connection: BrowserClient, accountId: string
     } finally { requests.current.delete(request); }
   };
   const openRecents = () => { if (!client || !accountId) { signIn(); return; } intent.current++; setDialog('recents'); void list(); };
-  const create = async () => {
+  // New video is client-only: it returns to the opening composer without writing anything.
+  // The native thread (whose id is the video id) is created by the first accepted send.
+  const startNew = () => {
     if (!client || !accountId) { signIn(); return; }
-    if (creating.current) return;
-    creating.current = true; const revision = selection.current, presentation = ++intent.current, request = controller(); setCreateState('pending'); setDialog('new');
-    try {
-      const result = await client.createConversation({ resourceId: accountId }, { signal: request.signal });
-      if (!current(revision) || intent.current !== presentation) return;
-      if (!result.ok) { setCreateState(['invalid_input', 'unauthenticated', 'forbidden', 'not_found', 'not_implemented'].includes(result.error.code) ? 'rejected' : 'unknown'); return; }
-      selection.current++; setCreateState('idle'); setDialog(null); remember(result.value.id);
-      setHistory({ id: result.value.id, thread: result.value, messages: [], kind: 'ready', page: 0, hasMore: false, earlier: 'idle' });
-      setQuick(previous => [result.value, ...(previous ?? []).filter(thread => thread.id !== result.value.id)].slice(0, 6));
-      listing.current++; setRecents({ value: null, pending: false, failed: false, target: 0 });
-    } finally { creating.current = false; requests.current.delete(request); if (active.current) setCreateState(value => value === 'pending' ? 'idle' : value); }
+    intent.current++; selection.current++;
+    setDialog(null); setHistory(null);
+    const url = new URL(location.href); url.searchParams.delete('conversation'); window.history.replaceState(null, '', url);
   };
   const earlier = async () => {
     if (!client || !accountId || !history || history.kind !== 'ready' || history.earlier === 'loading' || !history.hasMore) return;
@@ -93,6 +85,6 @@ export function useNativeNavigation(connection: BrowserClient, accountId: string
       });
     } finally { requests.current.delete(request); }
   };
-  return { history, recents, quick, createState, dialog, create, list, open, earlier, openRecents, dismiss() { if (dialog === 'new') intent.current++; setDialog(null); } };
+  return { history, recents, quick, dialog, startNew, list, open, earlier, openRecents, dismiss() { setDialog(null); } };
 }
 export type NativeNavigationState = ReturnType<typeof useNativeNavigation>;
