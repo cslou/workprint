@@ -402,6 +402,14 @@ These are intended functional product flows, not claims that the Phase 1 foundat
 - **Result:** creator understands current work and next action.
 - **Failure/recovery:** use Supabase's standard password-reset flow; incorrect credentials and invalid/expired reset links give actionable feedback without creating an account. Authentication/session-refresh/loading failures preserve saved work and settle loading. Sign-in/out uses the qualified Auth interface; refreshing credentials or reconnecting never resubmits commands or paid requests.
 
+**Chat (Sprint 006, implemented):**
+- **Send:** a message of at most 32 KiB is sent as one Muse Spark turn. A New video's native thread is created by its first accepted send, without remounting the chat. Recents lists a video only once a send is accepted.
+- **One turn per video:** while a turn runs, Stop replaces Send, and a second send (another tab, say) is rejected as busy with the draft kept. Nothing queues.
+- **Stream:** the reply streams as safe text and tool-activity events only. Each tool shows its phrase with elapsed time, then a done summary or "didn't finish"; a tool without a phrase shows "Working…". History keeps the same lines in order with the text and fails closed on an unknown part.
+- **Tools:** read-workspace reads only the run's own account and video, within 50 items, 16 KiB and 200 characters per text.
+- **Outcomes:** a turn ends completed, failed (Retry once, which resends; B-035), interrupted, or lost (this page stopped hearing it; no Retry). An unconfirmed send re-reads history before offering Check again or Send anyway, and never resends on its own.
+- **Titles:** after an accepted send to an untitled video, one bounded model call names it from that message: minimal reasoning effort, 1,024 tokens, a 15 s deadline and no retry. The title is cut to 60 characters and saved alone, after the started mark. A failure leaves "Untitled video", and the next message tries once more.
+
 ### 8.2 Bring or reuse material
 
 - **Actor/trigger:** pasted text, supported image/video upload, or Library selection.
@@ -451,6 +459,12 @@ These are intended functional product flows, not claims that the Phase 1 foundat
 - **Data changed:** interruption/cancellation outcomes and reconciliation of persisted background work.
 - **Result:** ongoing/completed/cancelled/uncertain work is distinguishable.
 - **Failure/recovery:** server restart may interrupt normal reasoning; recovery cannot duplicate paid submissions/results. Cancellation may not stop charges; cancelled work cannot publish late results.
+
+**Chat Stop (Sprint 006, implemented):**
+- **Exact turn:** Stop sends the exact-turn abort with the run id this page captured, once per turn. A delayed Stop for an earlier run is a no-op, another account's Stop is not found, and a running tool receives the abort signal.
+- **Notices:** "Stopped." shows only when the server acknowledged the Stop and the turn ended interrupted. If the reply ended but the Stop went unacknowledged, it shows "We couldn't confirm the reply stopped." with Retry once. If this page lost the reply, or nothing ended within about 8 s, it shows the same copy with no Retry; the chat stops watching and never sends a second Stop.
+- **Saved text:** partial text is saved. History shows it as plain text with no marker (B-035).
+- **Not a Stop:** closing the page, switching video or signing out disconnects the observer only, and the turn finishes on the server. Copy never claims the provider stopped work or charges.
 
 **Operator release/redeploy case (deferred, B-031):** after separate authorization, deploy the reviewed build/configuration and prepare application/native stores through supported setup mechanisms, then verify the actual deployed URLs with bounded Auth/private-media/export and separately authorized AI smoke checks. Record build/target identity, actual results and operating instructions. This changes deployed configuration/schemas through §7's controlled procedure, not product authority or signup policy. Startup/shutdown/redeploy preserves saved work and task identities with one executing backend. On failure, report the real state and stop/recover without destructive reset or blind resubmission; missing authorization/checks cannot be called a completed release.
 
