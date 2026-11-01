@@ -18,6 +18,9 @@ import type { StoryboardPrerequisites } from '../storyboard/presentation.js';
 import type { VideoPrerequisites } from '../videos/videos.js';
 import { WorkspaceVideos } from './workspace-videos.js';
 import { Composer } from '../conversation/composer.js';
+import { createChatSession, type ChatSession } from '../conversation/chat-session.js';
+import { useChatSnapshot } from '../conversation/use-chat.js';
+import { LiveTurns } from '../conversation/live-turns.js';
 import { QuestionReview } from '../conversation/question.js';
 import { useWorkspace } from './workspace.js';
 import { WorkspaceReadPlaceholder } from './workspace-placeholder.js';
@@ -36,7 +39,8 @@ const nativeCopy = { new: ['New video is not available yet.', 'No conversation w
 export function Shell(props: ShellProps) {
   const [uploadSession] = useState(() => createUploadSession());
   useLayoutEffect(() => () => uploadSession.dispose(), [uploadSession]);
-  return <DraftGuard key={JSON.stringify([props.session?.accountId ?? null, props.conversationId ?? null])}><ScopedShell uploadSession={uploadSession} {...props} /></DraftGuard>;
+  // An owned shell re-scopes when the user opens or starts a video, not when a new video's first send saves it.
+  return <DraftGuard key={JSON.stringify([props.session?.accountId ?? null, props.navigation ? props.navigation.scope : props.conversationId ?? null])}><ScopedShell uploadSession={uploadSession} {...props} /></DraftGuard>;
 }
 function ScopedShell({ navigation, onAccountOpen, connection, session, conversationId, workspaceContent, materialPrerequisites, storyboardPrerequisites, videoPrerequisites, libraryPrerequisites, uploadSession }: ShellProps & { uploadSession: UploadSession }) {
   const [surface, setSurface] = useState<Surface>(null);
@@ -60,9 +64,24 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
   const libraryConnection = useRef(connection); libraryConnection.current = connection;
   // A restored thread qualifies the workspace scope without remounting; read its current receipt handler.
   const libraryUsed = useRef(workspace.onUsed); libraryUsed.current = workspace.onUsed;
-  const [librarySelection] = useState(() => createLibrarySelection({ getClient: () => libraryConnection.current.kind === 'configured' ? libraryConnection.current.client : null, ...(conversationId ? { conversationId } : {}), onUsed: (result, version) => libraryUsed.current(result, version) }));
+  const libraryConversation = useRef(conversationId); libraryConversation.current = conversationId;
+  const [librarySelection] = useState(() => createLibrarySelection({ getClient: () => libraryConnection.current.kind === 'configured' ? libraryConnection.current.client : null, getConversationId: () => libraryConversation.current, onUsed: (result, version) => libraryUsed.current(result, version) }));
   useEffect(() => () => librarySelection.dispose(), [librarySelection]);
   const native = connection.kind === 'configured' ? connection.client.native : nativeConversations;
+  // One chat per scope. Its callbacks read the current navigation; unmounting disposes it, so late events go nowhere.
+  const live = useRef({ navigation, setComposerText }); live.current = { navigation, setComposerText };
+  const [chat] = useState<ChatSession | null>(() => navigation && session && connection.kind === 'configured' ? createChatSession({
+    native, accountId: session.accountId, ...(navigation.history ? { conversationId: navigation.history.id } : {}),
+    knownMessageIds: () => new Set(live.current.navigation?.history?.messages.map(message => message.id)),
+    clearDraft: () => live.current.setComposerText(''),
+    onStarted: thread => live.current.navigation?.adopt(thread),
+    onConfirmed: (thread, page) => { const current = live.current.navigation, saved = thread ?? current?.history?.thread; if (saved) current?.adopt(saved, page); },
+  }) : null);
+  useLayoutEffect(() => () => chat?.dispose(), [chat]);
+  const chatState = useChatSnapshot(chat);
+  // Send once the open video's saved history is shown, so the reply lands after it and a re-read can tell old from new.
+  const sendBlocked = !!navigation?.history && navigation.history.kind !== 'ready';
+  const liveTurns = <LiveTurns turns={chatState.turns} canRetry={chatState.phase === 'idle'} onRetry={key => void chat?.retry(key)} />;
   const runNative = async (action: 'new' | 'recents') => {
     if (!session && onAccountOpen && connection.kind === 'configured') { onAccountOpen(); return; }
     if (navigation) { setSurface(null); if (action === 'new') navigation.startNew(); else navigation.openRecents(); return; }
@@ -90,9 +109,9 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
         <div className="wp-nav-list">{nav()}<span className="wp-menu"><Button variant="secondary" onPress={() => { setSurface('navigation'); if (navigation && session) void navigation.list(); }}>Menu</Button></span></div>
         <div className="wp-recents" aria-busy={!!navigation?.recents.pending || sidebarPlaceholder.active}>{recent}</div><div className="wp-sidebar-spacer" />{account}
       </nav>
-      <main ref={main} className="wp-main" data-layout={!navigation?.history || navigation.history.kind === 'ready' && navigation.history.messages.length === 0 ? 'opening' : 'thread'} aria-label={navigation?.history ? 'Conversation' : 'New video'} aria-busy={navigation?.history ? navigation.history.kind === 'loading' : workspace.kind === 'loading'}>
-        {navigation?.history ? <NativeHistory state={navigation.history} navigation={navigation} /> : <div className="wp-thread"><Welcome owned={!!(navigation && session)} /></div>}
-        {workspace.kind === 'settled' && workspace.result.ok && workspace.result.value.pendingQuestion ? <QuestionReview uploadSession={uploadSession} onUploaded={workspace.onUploaded} connection={connection} scope={scope} question={workspace.result.value.pendingQuestion} workspace={workspace.result.value} draft={draft} /> : <Composer uploadSession={uploadSession} onUploaded={workspace.onUploaded} native={native} draft={draft} connection={connection} scope={scope} />}
+      <main ref={main} className="wp-main" data-layout={!chatState.turns.length && (!navigation?.history || navigation.history.kind === 'ready' && navigation.history.messages.length === 0) ? 'opening' : 'thread'} aria-label={navigation?.history ? 'Conversation' : 'New video'} aria-busy={navigation?.history ? navigation.history.kind === 'loading' : workspace.kind === 'loading'}>
+        {navigation?.history ? <NativeHistory state={navigation.history} navigation={navigation} live={chatState.turns.length ? liveTurns : null} /> : <div className="wp-thread"><Welcome owned={!!(navigation && session)} /></div>}
+        {workspace.kind === 'settled' && workspace.result.ok && workspace.result.value.pendingQuestion ? <QuestionReview uploadSession={uploadSession} onUploaded={workspace.onUploaded} connection={connection} scope={scope} question={workspace.result.value.pendingQuestion} workspace={workspace.result.value} draft={draft} /> : <Composer uploadSession={uploadSession} onUploaded={workspace.onUploaded} native={native} chat={chat} sendBlocked={sendBlocked} draft={draft} connection={connection} scope={scope} />}
       </main>
       <aside className="wp-workspace" aria-label="This video"><MaterialPanel connection={connection} scope={scope} workspace={projection} onSaved={workspace.onSaved} {...(projection ? { additionalContent: { storyboard: <Storyboard connection={connection} scope={scope} workspace={projection} onSaved={workspace.onSaved} onUsed={workspace.onUsed} {...(storyboardPrerequisites ? { prerequisites: storyboardPrerequisites } : {})} />, videos: <WorkspaceVideos connection={connection} scope={scope} workspace={projection} onUsed={workspace.onUsed} {...(videoPrerequisites ? { videoPrerequisites } : {})} /> } } : {})} {...(materialPrerequisites ? { prerequisites: materialPrerequisites } : {})} placeholder={placeholder} selectedKey={tab} onSelectionChange={(key) => setTab(key as WorkspaceTab)} {...(content === undefined ? {} : { contentOverride: content })} /></aside>
     </div>

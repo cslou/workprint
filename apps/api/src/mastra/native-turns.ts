@@ -2,6 +2,7 @@ import type { Mastra } from '@mastra/core';
 import type { Context } from 'hono';
 import { activeNativeRun, createOwnedConversationCheck, hasNativeTurns, nativeAssistantId, turnLimits } from '../agent/index.js';
 import { nativeControlRoutes, nativeRunAdmission } from './native-run-admission.js';
+import { markConversationStarted } from './started-conversations.js';
 
 export const nativeTurnRoutes = [...['send-message', 'threads/subscribe'].map(tail => ({ method: 'POST' as const, path: `/api/agents/${nativeAssistantId}/${tail}` })), ...nativeControlRoutes];
 export const isNativeTurnRoute = (context: Context) => nativeTurnRoutes.some(route => route.path === context.req.path && route.method === context.req.method);
@@ -17,8 +18,11 @@ export function nativeTurnBody(context: Context, body: unknown, bytes: Uint8Arra
   return isSend(context) && object(body) ? new TextEncoder().encode(JSON.stringify({ ...body, ifActive: { behavior: 'discard' } })) : bytes;
 }
 
-/** An admitted send holds its video until the native send settles; `release` must run once it has. */
-export type AdmittedSend = { release: () => void };
+/**
+ * An admitted send holds its video until the native send settles; `release` must run once it has.
+ * `accepted` runs after the native send was accepted, before the response leaves, so Recents lists the video.
+ */
+export type AdmittedSend = { accepted: () => Promise<void>; release: () => void };
 
 /** Closed pre-native admission. Body resource is a stale-scope precondition, never ownership authority. */
 export function nativeTurnAdmission(mastra: Mastra) {
@@ -59,7 +63,14 @@ export function nativeTurnAdmission(mastra: Mastra) {
       const videoId = body.threadId;
       if (starting.has(videoId) || activeNativeRun(mastra, accountId, videoId)) return fail(409, 'busy', 'The agent is still working on the last message.');
       starting.add(videoId);
-      return { release: () => { starting.delete(videoId); } };
+      return {
+        accepted: async () => {
+          const memory = await storage?.getStore('memory');
+          if (!memory) throw new Error('Native memory unavailable');
+          await markConversationStarted(memory, videoId, accountId);
+        },
+        release: () => { starting.delete(videoId); },
+      };
     } catch { return unavailable(); }
     finally { clearTimeout(timer); }
   };

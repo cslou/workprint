@@ -355,6 +355,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
   2. `Test(agent): Cover title generation` — also extends `live:chat` with a title step.
 - **Technical notes:**
   - Default to one explicit bounded call after an accepted turn while the title is empty. Mastra Memory's `generateTitle` (set to `false` in `native-text-memory.ts`) is a first-turn namer on 1.79.0, so use it only if it can be bounded (one call, timeout, no retry) and also retries on a later message while the title is empty. That call lives in `agent/mastra` next to `native-text-memory.ts`; composition only triggers it through the injected collaborator.
+  - Recents lists a video only when its thread metadata has `workprintStarted` (Story 2, PR #73). Save the title without dropping that key: write the title alone (`patchThread` with `title` only), never metadata copied from an earlier read. Mastra's durable `generateTitle` writes `metadata: currentThread.metadata` from a read taken before the turn, so if it is used, a test must show the video is still listed afterwards.
 
 ### Sprint Completion
 

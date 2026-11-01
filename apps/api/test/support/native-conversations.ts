@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { MastraCompositeStore } from '@mastra/core/storage';
 import type { MastraDBMessage } from '@mastra/core/agent';
+import { startedConversation } from '../../src/mastra/started-conversations.js';
 
 /** Test-only native conversation fixture; callers own isolated Postgres and teardown. */
 export async function createNativeConversation(
@@ -14,7 +15,8 @@ export async function createNativeConversation(
   const now = new Date();
   const thread = await memory.saveThread({ thread: {
     id: randomUUID(), resourceId: accountId, title,
-    metadata: {}, createdAt: now, updatedAt: now,
+    // Saved messages stand for accepted sends, so such a thread is listed like a started video.
+    metadata: messages.length ? { ...startedConversation } : {}, createdAt: now, updatedAt: now,
   } });
   if (messages.length) {
     await memory.saveMessages({ messages: messages.map((message, index): MastraDBMessage => ({

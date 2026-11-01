@@ -16,6 +16,7 @@ test('native facade bounds actual HTTP/token/stream faults and releases resource
     assert.equal(request.headers.cookie, undefined);
     if (mode === 'hold') return;
     if (mode === 'json-held') { response.writeHead(200, { 'Content-Type': 'application/json' }); response.write('{'); return; }
+    if (mode === 'busy') { response.writeHead(409, { 'Content-Type': 'application/json' }); response.end(JSON.stringify({ error: { code: 'busy', message: 'The agent is still working on the last message.' } })); return; }
     if (mode === 'rejected') { response.writeHead(503, { 'Content-Type': 'application/json' }); response.end(JSON.stringify({ error: { code: 'integration_failure', message: 'Native turns unavailable' } })); return; }
     if (mode === 'bad-ack') { response.writeHead(200, { 'Content-Type': 'application/json' }); response.end(JSON.stringify({ accepted: true, runId: executionId, signal: { id: executionId, type: 'user', contents: 'Text' } })); return; }
     if (mode === 'control-stop-good' || mode === 'control-stop-bad') { response.writeHead(200, { 'Content-Type': 'application/json' }); response.end(JSON.stringify(mode === 'control-stop-good' ? { aborted: false } : { cancelled: true })); return; }
@@ -24,7 +25,7 @@ test('native facade bounds actual HTTP/token/stream faults and releases resource
       const messageId = '44444444-4444-4444-8444-444444444444';
       const start = { type: 'chunk', runId: executionId, data: { type: 'start', runId: mode === 'control-mismatch' ? messageId : executionId, payload: { messageId } } };
       const delta = { type: 'chunk', runId: executionId, data: { type: 'text-delta', runId: executionId, payload: { text: 'Exact control text' } } };
-      const finish = { type: 'finish', runId: executionId, data: { stepResult: { reason: mode === 'control-interrupted' ? 'abort' : 'stop', messageId } } };
+      const finish = { type: 'finish', runId: executionId, data: { stepResult: { reason: mode === 'control-interrupted' ? 'abort' : mode === 'control-length' ? 'length' : 'stop', messageId } } };
       const events = mode === 'control-missing-start' ? [finish] : mode === 'control-incomplete' ? [start, delta] : mode === 'control-error' ? [start, { type: 'error', runId: executionId, data: { error: { name: 'PrivateInternalError', message: 'private-error-marker' } } }] : [start, delta, finish];
       response.end(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')); return;
     }
@@ -37,6 +38,7 @@ test('native facade bounds actual HTTP/token/stream faults and releases resource
   const address = server.address(); assert.ok(address && typeof address !== 'string');
   const baseUrl = `http://127.0.0.1:${address.port}`;
   const client = createApiClient({ baseUrl, getAccessToken: async () => 'synthetic-fault-only-bearer', timeoutMs: 120 });
+  const wireClient = createApiClient({ baseUrl, getAccessToken: async () => 'synthetic-fault-only-bearer', timeoutMs: 10000 });
   const released = async () => {
     const deadline = Date.now() + 1500;
     while (openResponses) { assert.ok(Date.now() < deadline, 'HTTP response must release'); await delay(10); }
@@ -49,7 +51,8 @@ test('native facade bounds actual HTTP/token/stream faults and releases resource
   });
   for (const fault of ['stream-held', 'wire-large', 'wire-at', 'wrong-type', 'eof']) await t.test(`${fault} cannot be reported as a successful native completion`, async () => {
     mode = fault; const before = requests;
-    const subscription = await client.native.subscribe(scope);
+    // Streaming the 16 MiB wire bound takes longer than the short fault deadline.
+    const subscription = await (fault.startsWith('wire') ? wireClient : client).native.subscribe(scope);
     if (fault === 'wrong-type') { assert.equal(subscription.ok, false); if (!subscription.ok) assert.equal(subscription.error.code, 'invalid_response'); }
     else {
       assert.ok(subscription.ok);
@@ -62,16 +65,33 @@ test('native facade bounds actual HTTP/token/stream faults and releases resource
     }
     await released(); assert.equal(requests - before, 1);
   });
-  await t.test('default observation deadline is finite and closes a real stalled HTTP stream', async () => {
+  await t.test('turn bounds match the server: 32 KiB input, and observation outlasts the 35-minute turn deadline', async () => {
+    assert.equal(nativeTransportLimits.inputBytes, 32 * 1024);
+    assert.equal(nativeTransportLimits.observationMs, 36 * 60_000);
+    const before = requests;
+    const over = await client.native.sendText({ ...scope, message: 'a'.repeat(32 * 1024 + 1) });
+    assert.ok(!over.ok && over.error.code === 'invalid_input');
+    mode = 'bad-ack';
+    const at = await client.native.sendText({ ...scope, message: 'a'.repeat(32 * 1024) });
+    assert.ok(!at.ok && at.error.code === 'invalid_response', 'a 32 KiB message is sent');
+    await released(); assert.equal(requests - before, 1);
+  });
+  await t.test('the observation deadline is finite and closes a real stalled HTTP stream', async () => {
     mode = 'stream-held'; const before = requests;
-    const native = createApiClient({ baseUrl, getAccessToken: async () => 'synthetic-fault-only-bearer' }).native;
+    const native = createApiClient({ baseUrl, getAccessToken: async () => 'synthetic-fault-only-bearer', timeoutMs: 400 }).native;
     const subscription = await native.subscribe(scope); assert.ok(subscription.ok);
     const started = performance.now(); let watchdog: ReturnType<typeof setTimeout> | undefined;
     try {
-      const result = await Promise.race([subscription.value.consume(executionId, () => {}), new Promise<never>((_, reject) => { watchdog = setTimeout(() => reject(new Error('Independent observation watchdog exceeded')), 12000); })]);
+      const result = await Promise.race([subscription.value.consume(executionId, () => {}), new Promise<never>((_, reject) => { watchdog = setTimeout(() => reject(new Error('Independent observation watchdog exceeded')), 3000); })]);
       assert.equal(result.ok, false); if (!result.ok) assert.equal(result.error.code, 'timed_out');
-      assert.ok(performance.now() - started >= 8800 && performance.now() - started < 10500);
+      assert.ok(performance.now() - started >= 350 && performance.now() - started < 1500);
     } finally { clearTimeout(watchdog); subscription.value.close(); }
+    await released(); assert.equal(requests - before, 1);
+  });
+  await t.test('a busy video rejects the send with a typed busy error', async () => {
+    mode = 'busy'; const before = requests;
+    const result = await client.native.sendText({ ...scope, message: 'Text' });
+    assert.ok(!result.ok); assert.equal(result.error.code, 'busy');
     await released(); assert.equal(requests - before, 1);
   });
   await t.test('matched HTTP rejection and aliased execution/message acknowledgment remain typed failures', async () => {
@@ -92,11 +112,14 @@ test('native facade bounds actual HTTP/token/stream faults and releases resource
     const closed = await second.value.consume(executionId, () => {}); assert.equal(closed.ok, false); if (!closed.ok) assert.equal(closed.error.code, 'cancelled');
     await released(); assert.ok(paths.slice(before).every(path => !path.includes('/abort') && !path.includes('/stop')));
   });
-  for (const fault of ['control-complete', 'control-interrupted', 'control-missing-start', 'control-incomplete', 'control-mismatch', 'control-error']) await t.test(`exact native event decoding: ${fault}`, async () => {
+  for (const fault of ['control-complete', 'control-interrupted', 'control-missing-start', 'control-incomplete', 'control-mismatch', 'control-error', 'control-length']) await t.test(`exact native event decoding: ${fault}`, async () => {
     mode = fault; const before = requests, observation = await client.native.observeTurn({ runId: executionId }); assert.ok(observation.ok);
     let text = ''; const result = await observation.value.consume(part => { text += part.text; }); observation.value.close();
     if (fault === 'control-complete' || fault === 'control-interrupted') { assert.ok(result.ok); assert.equal(result.value.outcome, fault === 'control-complete' ? 'complete' : 'interrupted'); assert.equal(text, 'Exact control text'); }
-    else { assert.ok(!result.ok); assert.equal(result.error.code, fault === 'control-error' ? 'integration_failure' : 'invalid_response'); assert.ok(!JSON.stringify(result).includes('private-error-marker')); }
+    // A server error ends the turn as a failed outcome, without its private detail; a broken stream is a client failure.
+    else if (fault === 'control-error' || fault === 'control-length') { assert.deepEqual(result, { ok: true, value: { outcome: 'failed', runId: executionId, reason: 'error' } }); }
+    else { assert.ok(!result.ok); assert.equal(result.error.code, 'invalid_response'); }
+    assert.ok(!JSON.stringify(result).includes('private-error-marker'));
     await released(); assert.equal(requests - before, 1);
   });
   await t.test('native Stop acknowledgment does not fabricate cancellation or accept another response shape', async () => {

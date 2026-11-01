@@ -83,6 +83,11 @@ export function createIngress(mastra: Mastra): MiddlewareHandler<{ Bindings: Htt
         return invalid();
       }
       await next();
+      if (admittedSend && context.res.status === 200) {
+        // The message is accepted either way; a missed mark only keeps the video out of Recents.
+        try { await admittedSend.accepted(); }
+        catch (error) { console.error('Started video mark failed', { name: error instanceof Error ? error.name : 'unknown' }); }
+      }
       if (origin) decorateCors(context, origin);
       return context.res;
     } finally {

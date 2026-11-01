@@ -7,7 +7,7 @@ type State = Readonly<{ choices: readonly LibraryChoice[]; phase: 'idle' | 'pend
 const failure = (code: string) => code === 'unauthenticated' ? 'Sign-in required to attach from your Library. Nothing was attached.' : code === 'not_implemented' ? 'Attaching from your Library is not available yet. Nothing was attached.' : 'Nothing was attached. Your existing attachments are unchanged.';
 
 /** Scope-owned local choices, not a scheduler/store. Close stops observation, never rolls back uses. */
-export function createLibrarySelection(config: { getClient(): VersionUseClient | null; conversationId?: string; onUsed?(result: OperationResponse<'useVersion'>, version: Version): void }) {
+export function createLibrarySelection(config: { getClient(): VersionUseClient | null; /** Read at use time: a New video gets its id on its first accepted send, without remounting. */ getConversationId(): string | undefined; onUsed?(result: OperationResponse<'useVersion'>, version: Version): void }) {
   const entries = new Map<string, { choice: LibraryChoice; command: ExactVersionUse }>();
   const direct = new Map<string, ExactVersionUse>();
   const roles = new Map<string, string>();
@@ -24,12 +24,12 @@ export function createLibrarySelection(config: { getClient(): VersionUseClient |
     else if (choice && entries.size < 1000) {
       const captured = structuredClone(choice);
       if (new TextEncoder().encode(JSON.stringify([...state.choices, captured])).byteLength > 4 * 1024 * 1024) return;
-      entries.set(id, { choice: captured, command: createExactVersionUse({ client: { useVersion: (command, options) => { const client = config.getClient(); return client ? client.useVersion(command, options) : Promise.resolve({ ok: false, error: { code: 'transport_failure', message: 'Library connection unavailable' } }); } }, command: { params: { id: config.conversationId ?? '' }, query: {}, body: { ...(captured.binding ?? { purpose: 'reference' as const }), operationId: crypto.randomUUID(), versionId: id } } }) });
+      entries.set(id, { choice: captured, command: createExactVersionUse({ client: { useVersion: (command, options) => { const client = config.getClient(); return client ? client.useVersion(command, options) : Promise.resolve({ ok: false, error: { code: 'transport_failure', message: 'Library connection unavailable' } }); } }, command: { params: { id: config.getConversationId() ?? '' }, query: {}, body: { ...(captured.binding ?? { purpose: 'reference' as const }), operationId: crypto.randomUUID(), versionId: id } } }) });
     }
     attached = 0; total = 0; update({ phase: 'idle', feedback: null });
   };
   const attach = async () => {
-    if (!alive || state.phase === 'pending' || entries.size === 0 || !config.getClient() || !config.conversationId) return;
+    if (!alive || state.phase === 'pending' || entries.size === 0 || !config.getClient() || !config.getConversationId()) return;
     const current = ++generation;
     if (total === 0) total = entries.size;
     const sequence = [...entries.values()].sort((a, b) => a.choice.order - b.choice.order);
@@ -69,7 +69,7 @@ export function createLibrarySelection(config: { getClient(): VersionUseClient |
           const client = config.getClient();
           const result = client ? await client.useVersion(input, options) : { ok: false as const, error: { code: 'transport_failure' as const, message: 'Library connection unavailable' } };
           return result;
-        } }, command: { params: { id: config.conversationId ?? '' }, query: {}, body: { ...binding, operationId: crypto.randomUUID(), versionId: version.id } } });
+        } }, command: { params: { id: config.getConversationId() ?? '' }, query: {}, body: { ...binding, operationId: crypto.randomUUID(), versionId: version.id } } });
         if (!atCapacity) direct.set(key, command);
       }
       return command;

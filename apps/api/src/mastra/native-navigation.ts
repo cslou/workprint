@@ -4,6 +4,7 @@ import type { MastraCompositeStore, MemoryStorage } from '@mastra/core/storage';
 import type { Context } from 'hono';
 import type { CheckOwnedConversation } from '../application/index.js';
 import { readBody } from './body.js';
+import { startedConversation } from './started-conversations.js';
 
 const maximumResponseBytes = 1024 * 1024;
 const maximumPage = 1000;
@@ -65,7 +66,7 @@ export function nativeNavigationRoutes(storage: Pick<MastraCompositeStore, 'getS
     }),
     route('GET', '/memory/threads', async (context, accountId, memory) => {
       const page = pagination(context, 6, accountId); if (!page) return invalid(context);
-      const result = await memory.listThreads({ ...page, filter: { resourceId: accountId }, orderBy: { field: 'createdAt', direction: 'DESC' } });
+      const result = await memory.listThreads({ ...page, filter: { resourceId: accountId, metadata: { ...startedConversation } }, orderBy: { field: 'createdAt', direction: 'DESC' } });
       return json(context, { threads: result.threads.map(threadView), total: result.total, page: result.page, perPage: result.perPage, hasMore: result.hasMore });
     }),
     route('GET', '/memory/threads/:threadId', async (context, accountId, memory) => {
@@ -83,15 +84,18 @@ export function nativeNavigationRoutes(storage: Pick<MastraCompositeStore, 'getS
       const expected = Math.min(page.perPage, Math.max(0, result.total - page.page * page.perPage));
       if (result.messages.length !== expected) return unavailable(context);
       // Never expose private metadata, system instructions or tool payloads as browser state.
-      const messages = result.messages.map(message => {
-        const parts = message.content.parts;
+      const messages = result.messages.flatMap(message => {
+        // A failed reply keeps its error part in storage; the browser sees only the text that streamed.
+        const stored = message.content.parts;
+        const parts = message.role === 'assistant' ? stored?.filter(part => part.type !== 'error') : stored;
+        if (message.role === 'assistant' && stored?.length && !parts?.length) return [];
         const signal = message.content.metadata?.signal;
         const userSignal = message.role === 'signal' && message.type === 'user' && signal !== null && typeof signal === 'object' &&
           'id' in signal && signal.id === message.id && 'type' in signal && signal.type === 'user' && 'tagName' in signal && signal.tagName === 'user';
         // Presentation role only: preserve the native input signal/message ID, never alias execution IDs.
         const role = userSignal ? 'user' : message.role;
         if (!['user', 'assistant'].includes(role) || message.threadId !== id || message.resourceId !== accountId || !parts || parts.some(part => part.type !== 'text')) throw new Error('Unsupported native history');
-        return { id: message.id, threadId: id, resourceId: accountId, role, createdAt: message.createdAt, content: { format: 2, parts: parts.map(part => ({ type: 'text', text: 'text' in part ? part.text : '' })) } };
+        return [{ id: message.id, threadId: id, resourceId: accountId, role, createdAt: message.createdAt, content: { format: 2, parts: parts.map(part => ({ type: 'text', text: 'text' in part ? part.text : '' })) } }];
       });
       return json(context, { messages, total: result.total, page: result.page, perPage: result.perPage, hasMore: result.hasMore, uiMessages: null });
     }),
