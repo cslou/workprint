@@ -109,3 +109,30 @@ test('recovery callback strips secrets and password update requires a fresh sign
     await signIn(page, user.email, user.nextPassword); await expect(page).toHaveURL(origin + '/app');
   } finally { await f.close(); }
 });
+
+test('a locked tab with an expired stored session reaches sign-in promptly instead of waiting on refresh backoff', async ({ page, materialNetwork }) => {
+  test.setTimeout(90000); const f = await fixture(page, true);
+  try {
+    await watchWorkspace(page); const user = await f.auth.createAccount();
+    await page.goto(origin + '/sign-in');
+    materialNetwork.expectOperations({ origin: f.auth.url, method: 'POST', path: '/auth/v1/token', query: { grant_type: 'password' }, count: 1 }, { origin: f.auth.url, method: 'GET', path: '/auth/v1/user', query: {}, count: 1 });
+    allowList(materialNetwork, f.application!.apiOrigin, user.id);
+    await signIn(page, user.email, user.password);
+    await expect(page.getByRole('button', { name: 'New video', exact: true })).toBeVisible();
+    // Another tab's sign-out or failed refresh leaves this browser locked while the stored session expires.
+    await page.evaluate(() => {
+      const nonce = crypto.randomUUID(); localStorage.setItem('workprint.auth-access-fenced', nonce); localStorage.setItem('workprint.auth-intent', nonce);
+      const session = JSON.parse(localStorage.getItem('workprint.auth')!) as { expires_at: number }; session.expires_at = Math.floor(Date.now() / 1000) - 60;
+      localStorage.setItem('workprint.auth', JSON.stringify(session));
+    });
+    // A pending reset verifier keeps the slower retryable path: the SDK's removal would also delete it.
+    await page.evaluate(() => localStorage.setItem('workprint.auth-code-verifier', '"pending-reset"'));
+    await page.reload(); await page.waitForTimeout(3000);
+    expect(await page.evaluate(() => localStorage.getItem('workprint.auth-code-verifier'))).toBe('"pending-reset"');
+    await page.evaluate(() => localStorage.removeItem('workprint.auth-code-verifier'));
+    // The strict ledger also proves the locked tab sends no refresh or user read to Auth.
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible({ timeout: 5000 });
+    await noWorkspace(page);
+  } finally { await f.close(); }
+});
