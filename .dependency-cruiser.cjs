@@ -18,6 +18,8 @@ const rules = [
   { name: 'application-no-native', from: { path: '^apps/api/src/application/' }, to: { path: '^apps/api/src/(agent|mastra|bootstrap)/|(^|/)node_modules/@mastra/' } },
   { name: 'mechanics-no-upward', from: { path: '^apps/api/src/(db|storage|model-catalog)/' }, to: { path: '^apps/api/src/(application|agent|mastra|bootstrap|artifacts|generation|exports|usage)/' } },
   { name: 'agent-no-bootstrap', from: { path: '^apps/api/src/agent/' }, to: { path: '^apps/api/src/(mastra|bootstrap)/' } },
+  // Tool definitions stay framework-neutral; agent/mastra adapts them to native tools.
+  { name: 'agent-tools-framework-neutral', from: { path: '^apps/api/src/agent/tools/' }, to: { path: '^apps/api/src/(agent/mastra|mastra)/|(^|/)node_modules/@mastra/' } },
   { name: 'domains-no-composition', from: { path: `^apps/api/src/(${domains.join('|')})/` }, to: { path: '^apps/api/src/(application|agent|mastra|bootstrap)/|(^|/)node_modules/@mastra/' } },
   ...domains.map((owner) => ({ name: `${owner}-no-peers`, from: { path: `^apps/api/src/${owner}/` }, to: { path: `^apps/api/src/(${domains.filter((peer) => peer !== owner).join('|')})/` } })),
   ...owners.map((owner) => ({ name: `${owner}-public-interface`, from: { path: '^apps/api/src/', pathNot: `^apps/api/src/${owner}/` }, to: { path: `^apps/api/src/${owner}/`, pathNot: `^apps/api/src/${owner}/index\\.ts$` } })),

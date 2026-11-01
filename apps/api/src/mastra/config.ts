@@ -1,4 +1,5 @@
 import { databaseUrl } from '../db/index.js';
+import { assistantModels } from '../agent/index.js';
 import { loadSupabaseConfig } from './auth.js';
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -7,12 +8,13 @@ function invalid(name: string): never {
   throw new Error(`Invalid or missing server configuration: ${name}`);
 }
 
-/** Syntax/admission only. No model resolution, SDK, credentials or provider calls. */
+/** Admission only: no model resolution or provider calls. The key is returned for explicit mapping, never echoed. */
 export function loadServerConfig(env: Environment) {
   const connectionString = databaseUrl(env.DATABASE_URL, 'DATABASE_URL');
-  const model = env.DEFAULT_ASSISTANT_MODEL;
-  if (!model || !/^[a-z][a-z0-9-]*\/[a-zA-Z0-9][a-zA-Z0-9._/-]*$/.test(model) ||
-    /^(test|mock|fake)\//i.test(model)) invalid('DEFAULT_ASSISTANT_MODEL');
+  const model = assistantModels.find(value => value === env.DEFAULT_ASSISTANT_MODEL);
+  if (!model) invalid('DEFAULT_ASSISTANT_MODEL');
+  const apiKey = env.META_API_KEY;
+  if (!apiKey || !/^[\x21-\x7e]{8,4096}$/.test(apiKey)) invalid('META_API_KEY');
   const port = env.PORT ?? '4111';
   if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) invalid('PORT');
   if (env.MIGRATION_DATABASE_URL) invalid('MIGRATION_DATABASE_URL must not enter the serving process');
@@ -27,5 +29,5 @@ export function loadServerConfig(env: Environment) {
       browserOrigin = url.origin;
     } catch { invalid('WORKPRINT_BROWSER_ORIGIN'); }
   }
-  return { connectionString, model, port: Number(port), supabase: loadSupabaseConfig(env), browserOrigin };
+  return { connectionString, assistant: { model, apiKey }, port: Number(port), supabase: loadSupabaseConfig(env), browserOrigin };
 }
