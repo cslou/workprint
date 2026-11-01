@@ -339,6 +339,51 @@ test('a registered tool with no phrase shows Working…', async ({ page, backend
   await expect(live(page).getByText('Finished', { exact: true })).toBeVisible();
 });
 
+const scriptOf = (action: string) => ({ schemaVersion: 1, scenes: [{ heading: { setting: 'exterior', location: 'Mountain lake', time: 'night' }, characters: ['Mara'], script: [{ action }] }] });
+
+test('the assistant\'s script saves show in the Script tab without a reload, and never replace an open edit', async ({ page, backend }) => {
+  const [account] = await backend.accounts(1);
+  const { provider } = backend;
+  const panel = page.getByRole('tabpanel');
+  const first = 'Mara swims across the dark lake.', second = 'Mara swims faster as the far shore appears.', mine = 'Mara floats and looks at the stars.';
+  provider.script({ toolCalls: [{ name: 'update-script', args: { baseVersionId: null, script: scriptOf(first) } }] }, { text: ['I saved the script.'] });
+  await signIn(page, account!);
+  await message(page).fill('Write the script');
+  await message(page).press('Enter');
+  await expect(live(page).getByText('Saved version 1', { exact: true })).toBeVisible();
+  await expect(panel).toContainText(first);
+  await expect(working(page)).toHaveCount(0);
+
+  // The editor is open with unsaved text when the assistant saves version 2 on version 1.
+  const video = videoId(page)!;
+  const { script } = await backend.read<{ script: { version: { id: string } } }>(account!, `/v1/conversations/${video}/workspace`);
+  await page.getByRole('button', { name: 'Edit What happens', exact: true }).click();
+  const editor = page.getByRole('textbox', { name: 'What happens' });
+  await editor.fill(mine);
+  provider.script({ toolCalls: [{ name: 'update-script', args: { baseVersionId: script.version.id, script: scriptOf(second) } }] }, { text: ['Version 2 is saved.'] });
+  await message(page).fill('Make her swim faster');
+  await message(page).press('Enter');
+  await expect(live(page).getByText('Saved version 2', { exact: true })).toBeVisible();
+  await expect(working(page)).toHaveCount(0);
+  await expect(editor).toHaveValue(mine);
+
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(panel).toContainText('A newer version was saved. Your unsaved text is retained.');
+  await page.getByRole('button', { name: 'Review latest version', exact: true }).click();
+  await expect(panel).toContainText('Latest saved version · Version 2');
+  await expect(panel).toContainText(second);
+  await expect(editor).toHaveValue(mine);
+  // The tab stays on the edit's base, version 1, until the edit closes; history already has version 2.
+  await page.locator('.wp-version-history summary').click();
+  await expect(page.getByRole('button', { name: 'View version 2', exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  await expect(panel).toContainText(second);
+  await expect(panel).not.toContainText(first);
+  await expect(page.getByRole('button', { name: 'View version 1', exact: true })).toBeVisible();
+});
+
 const abortPath = '/api/agents/assistant/threads/abort';
 
 test('Stop mid-reply: Stopped within 10 s, the composer is usable, and reload shows the partial text', async ({ page, backend }) => {
