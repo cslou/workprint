@@ -12,7 +12,7 @@ import type { query as Query } from '../../../apps/api/test/postgres.js';
 
 test.use({ trace: 'off', video: 'off' });
 test('real private image inspection and saved-video playback/download grant no approval; reference edits retain exact images through conflict and lost response', async ({ page, materialNetwork }) => {
-  test.setTimeout(240000);
+  test.setTimeout(300000);
   const { createLibraryMediaFixture } = await import(pathToFileURL(resolve('apps/api/.test-build/test/library-media-work.js')).href) as { createLibraryMediaFixture: typeof Fixture };
   const { query } = await import(pathToFileURL(resolve('apps/api/.test-build/test/postgres.js')).href) as { query: typeof Query };
   const media = await createLibraryMediaFixture(browserOrigin);
@@ -32,12 +32,21 @@ test('real private image inspection and saved-video playback/download grant no a
         await page.evaluate(input => (window as unknown as { savedWorkTest: { configure(input: unknown): void } }).savedWorkTest.configure(input), { apiOrigin: target.origin, token: target.accessTokens[0]!, accountId: saved.accountId, conversationId: saved.conversationId });
       };
       const videoAccess: OperationResponse<'media'>[] = [];
+      const refreshedAt: number[] = [];
+      let token = target.accessTokens[0]!;
+      // Fixture sessions are short-lived; across the expiry wait the owner supplies a current token, as a refreshed session would.
+      const renew = async () => {
+        token = (await target.refreshAccessTokens())[0]!;
+        await page.evaluate(value => (window as unknown as { savedWorkTest: { rotateToken(token: string): void } }).savedWorkTest.rotateToken(value), token);
+      };
       await page.route(url => url.origin === target.origin && [saved.image.id, saved.video.id].some(id => url.pathname === `/v1/versions/${id}/media`), async route => {
         const response = await route.fetch(); expect(response.status()).toBe(200);
         const access = await response.json() as OperationResponse<'media'>;
         if (access.poster) {
           // Playback reads browser-chosen byte ranges, then Download reads the whole object once.
-          videoAccess.push(access); materialNetwork.expectObjectTransfer(access.url, 2, 'GET', 6); materialNetwork.expectObjectTransfer(access.poster, 1, 'GET', 1);
+          // A pre-expiry refresh must reload the same paused source at least once (ranges stay bounded by the optional allowance).
+          const refresh = videoAccess.length > 0; if (refresh) refreshedAt.push(Date.now());
+          videoAccess.push(access); materialNetwork.expectObjectTransfer(access.url, refresh ? 1 : 2, 'GET', 6); materialNetwork.expectObjectTransfer(access.poster, 1, 'GET', 1);
         } else materialNetwork.expectObjectTransfer(access.url, 1, 'GET');
         await route.fulfill({ response });
       });
@@ -66,11 +75,23 @@ test('real private image inspection and saved-video playback/download grant no a
         const denied = await fetch(unsigned); await denied.body?.cancel();
         expect(denied.status).toBe(403);
         await expect(page.getByText('Playing or downloading does not use this version or choose it for a Shot.', { exact: true })).toBeVisible();
+        // Actual emulator expiry: the mounted clip reacquires the same exact version before expiry, then the first grant stops working.
+        await renew();
+        await expect.poll(() => videoAccess.length, { timeout: 70000 }).toBe(2);
+        expect(refreshedAt[0]!, 'Reacquired before the held grant expired').toBeLessThan(Date.parse(access.expiresAt));
+        expect(videoAccess[1]!.url).not.toBe(access.url);
+        await expect(page.locator('.wp-clip-surface[data-ready="true"]')).toHaveCount(1);
+        await new Promise(done => setTimeout(done, Math.max(0, Date.parse(access.expiresAt) - Date.now())));
+        // The emulator judges expiry by its own clock; poll briefly instead of assuming no skew.
+        await expect.poll(async () => { const expired = await fetch(access.url, { headers: { Range: 'bytes=0-0' } }); await expired.body?.cancel(); return expired.status; }, { timeout: 15000 }).toBe(403);
+        await expect(page.locator('.wp-clip-surface[data-ready="true"]')).toHaveCount(1);
+        await renew();
       };
       await configure(); allow('GET', '/v1/library'); await page.getByRole('button', { name: 'Library', exact: true }).click();
       for (const version of [saved.image, saved.video]) {
         assert.ok('media' in version);
-        allow('GET', `/v1/versions/${version.id}`); allow('GET', `/v1/versions/${version.id}/media`);
+        // The video's second media read is its pre-expiry refresh while the clip stays mounted.
+        allow('GET', `/v1/versions/${version.id}`); allow('GET', `/v1/versions/${version.id}/media`, {}, version.kind === 'video' ? 2 : 1);
         const tile = page.locator(`[data-page-id="${version.artifactId}"]`).locator('..');
         await tile.getByRole('button', { name: /^Inspect / }).click();
         if (version.kind === 'video') await playAndDownload(version.media.byteSize);
@@ -95,7 +116,7 @@ test('real private image inspection and saved-video playback/download grant no a
       await expect(page.getByRole('button', { name: 'Remove Unspecified view', exact: true })).toBeVisible();
       assert.ok('content' in saved.reference);
       const original = saved.reference.content as { subject: Record<string, unknown> };
-      const newer = await fetch(`${target.origin}/v1/conversations/${saved.conversationId}/versions`, { method: 'POST', headers: { Authorization: `Bearer ${target.accessTokens[0]}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ operationId: randomUUID(), artifactId: saved.reference.artifactId, kind: 'reference', baseVersionId: saved.reference.id, dependencies: [], content: { ...original, subject: { ...original.subject, description: 'A concurrent saved description.' } } }) });
+      const newer = await fetch(`${target.origin}/v1/conversations/${saved.conversationId}/versions`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ operationId: randomUUID(), artifactId: saved.reference.artifactId, kind: 'reference', baseVersionId: saved.reference.id, dependencies: [], content: { ...original, subject: { ...original.subject, description: 'A concurrent saved description.' } } }) });
       expect(newer.status).toBe(200); await newer.body?.cancel();
       const path = `/v1/conversations/${saved.conversationId}/versions`, commands: OperationRequest<'saveVersion'>['body'][] = [];
       await page.route(url => url.origin === target.origin && url.pathname === path, async route => {
