@@ -52,7 +52,7 @@ test('default dev and production build expose no interchangeable test compositio
     }] });
   `], { cwd: web, env, log: join(fixture.logs, 'web-build.log') });
   const testRoot = await realpath(join(web, 'test'));
-  const serverHelpers = await Promise.all(['native-conversations.ts', 'built-server.ts', 'auth-built-fixture.ts', 'auth-server.ts', 'isolated-auth.ts', 'auth-fixture-resources.ts', 'auth-mail.ts', 'account-browser-fixture.ts', 'saved-work.ts', 'manual-saved-work.ts', 'library-reuse-work.ts', 'library-media-work.ts', 'object-storage.ts', 'postgres.ts'].map(file => realpath(resolve('apps/api/test', file))));
+  const serverHelpers = await Promise.all(['native-conversations.ts', 'built-server.ts', 'auth-built-fixture.ts', 'auth-server.ts', 'isolated-auth.ts', 'auth-fixture-resources.ts', 'auth-mail.ts', 'account-browser-fixture.ts', 'saved-work.ts', 'manual-saved-work.ts', 'library-reuse-work.ts', 'library-media-work.ts', 'object-storage.ts', 'postgres.ts', 'media-fixtures.ts', 'fixture-observation.ts'].map(file => realpath(resolve('apps/api/test', file))));
   const graph = JSON.parse(await readFile(inputsFile, 'utf8')) as { inputs: string[]; inlineLimit: number | null };
   expect(graph.inputs.length).toBeGreaterThan(0);
   for (const input of new Set(graph.inputs)) {
