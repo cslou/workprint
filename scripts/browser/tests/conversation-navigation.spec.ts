@@ -1,6 +1,6 @@
 import { test, expect } from '../material-network.js';
 import { fixture, account, signIn, origin, privateForward, privateFulfill } from '../account-fixture.js';
-import { allowCreates, allowHistory, allowList, enter, settledFrames } from '../navigation-fixture.js';
+import { allowCreates, allowHistory, allowList, enter, holdRealResponse, observeNavigation, settledFrames } from '../navigation-fixture.js';
 
 // This first case is driven against the unchanged serving/browser implementation for a functional red.
 test('explicit New video creates native identity and empty history without enabling Send', async ({ page, materialNetwork }) => {
@@ -26,6 +26,36 @@ test('explicit New video creates native identity and empty history without enabl
     await page.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.getByText('Sending messages is not available yet. Your message is kept.', { exact: true })).toBeVisible();
     expect(await f.application!.snapshot()).toBe(snapshot);
+  } finally { await f.close(); }
+});
+
+test('workspace entry reads Recents once and shows placeholders, not empty copy, until real reads settle', async ({ page, materialNetwork }) => {
+  test.setTimeout(120000); const f = await fixture(page, true);
+  try {
+    const user = await f.auth.createAccount();
+    const saved = await f.application!.saveNative(user.id, [{ role: 'user', text: 'Skeleton restored text' }], 'Skeleton seeded scene');
+    await observeNavigation(page);
+    const list = await holdRealResponse(page, '**/memory/threads?*');
+    const history = await holdRealResponse(page, `**/memory/threads/${saved.id}/messages?*`);
+    allowHistory(materialNetwork, f.application!.apiOrigin, user.id, saved.id);
+    await enter(page, materialNetwork, f, user, saved.id);
+    await list.seen; await history.seen;
+    const recents = page.locator('.wp-sidebar .wp-recents'), placeholders = recents.locator('.wp-skeleton-rows');
+    await expect(placeholders).toBeVisible(); await expect(placeholders).toHaveAttribute('aria-hidden', 'true');
+    await expect(recents).toHaveAttribute('aria-busy', 'true');
+    await expect(recents.getByText('No videos yet.', { exact: true })).toHaveCount(0);
+    await expect(recents.getByText('Loading Recents…', { exact: true })).toHaveAttribute('role', 'status');
+    await expect(page.locator('.wp-native-history .wp-skeleton-lines')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Untitled video', exact: true })).toHaveCount(0);
+    await page.keyboard.press('Tab'); await page.keyboard.press('Tab');
+    expect(await page.evaluate(() => !!document.activeElement?.closest('.wp-skeleton-rows, .wp-skeleton-lines'))).toBe(false);
+    list.release(); await list.done;
+    await expect(recents.getByRole('button', { name: 'Skeleton seeded scene', exact: true })).toBeVisible();
+    await expect(placeholders).toHaveCount(0); await expect(recents).toHaveAttribute('aria-busy', 'false');
+    history.release(); await history.done;
+    await expect(page.getByRole('list', { name: 'Saved messages' })).toHaveText('Skeleton restored text');
+    await expect(page.locator('.wp-skeleton-lines')).toHaveCount(0);
+    expect(await page.evaluate(() => (window as unknown as { navigationCalls: { started: Record<string, number> } }).navigationCalls.started.listConversations)).toBe(1);
   } finally { await f.close(); }
 });
 

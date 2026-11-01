@@ -20,6 +20,7 @@ import { QuestionReview } from '../conversation/question.js';
 import { useWorkspace } from './workspace.js';
 import { WorkspaceReadPlaceholder } from './workspace-placeholder.js';
 import { CreateFeedback, NativeHistory, RecentRows, Recents } from './native-views.js';
+import { SkeletonRows } from '../ui/skeleton.js';
 import type { NativeNavigationState } from './use-native-navigation.js';
 import './shell.css';
 
@@ -59,7 +60,7 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
     <AriaButton className="wp-nav-item wp-library-nav" onPress={() => setSurface('library')}><svg className="wp-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="4" height="16" rx="1" /><rect x="9" y="4" width="4" height="16" rx="1" /><path d="m15.5 5.2 3.8-1 3 15.6-3.8.9Z" /></svg>Library</AriaButton>
   </>;
   const quick = navigation?.quick ?? (navigation?.history?.thread ? [navigation.history.thread] : []);
-  const recent = <><AriaButton className="wp-nav-label" onPress={() => void runNative('recents')}>Recents</AriaButton>{navigation && session ? <>{quick.length > 0 && <RecentRows threads={quick} navigation={navigation} compact />}{navigation.recents.pending && !quick.length && <p className="wp-recents-empty">Loading Recents…</p>}{navigation.recents.failed && !navigation.recents.value && <p className="wp-recents-empty">Recents couldn’t be loaded.</p>}{navigation.recents.value && !quick.length && <p className="wp-recents-empty">No videos yet.</p>}</> : <p className="wp-recents-empty">No videos yet.</p>}</>;
+  const recent = <><AriaButton className="wp-nav-label" onPress={() => void runNative('recents')}>Recents</AriaButton>{navigation && session ? <>{quick.length > 0 && <RecentRows threads={quick} navigation={navigation} compact />}{!quick.length && !navigation.recents.value && !navigation.recents.failed && <><p className="wp-sr-only" role="status">Loading Recents…</p><SkeletonRows count={4} compact /></>}{navigation.recents.failed && !navigation.recents.value && <p className="wp-recents-empty">Recents couldn’t be loaded.</p>}{navigation.recents.value && !quick.length && <p className="wp-recents-empty">No videos yet.</p>}</> : <p className="wp-recents-empty">No videos yet.</p>}</>;
   const account = <AriaButton className="wp-account" onPress={() => { if (onAccountOpen) { setSurface(null); onAccountOpen(); } else setSurface('account'); }}><span className="wp-avatar" aria-hidden="true">{session ? session.name.slice(0, 1).toUpperCase() : ''}</span><span>{accountName}</span></AriaButton>;
   const projection = workspace.kind === 'settled' && workspace.result.ok ? workspace.result.value : null;
   const content = projection ? workspaceContent?.(projection) : undefined;
@@ -70,7 +71,7 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
       <nav className="wp-sidebar" aria-label="Workprint">
         <div className="wp-brand"><span className="wp-mark">a</span><span>Workprint</span></div>
         <div className="wp-nav-list">{nav()}<span className="wp-menu"><Button variant="secondary" onPress={() => { setSurface('navigation'); if (navigation && session) void navigation.list(); }}>Menu</Button></span></div>
-        <div className="wp-recents">{recent}</div><div className="wp-sidebar-spacer" />{account}
+        <div className="wp-recents" aria-busy={!!navigation?.recents.pending}>{recent}</div><div className="wp-sidebar-spacer" />{account}
       </nav>
       <main className="wp-main" aria-label={navigation?.history ? 'Conversation' : 'New video'} aria-busy={navigation?.history ? navigation.history.kind === 'loading' : workspace.kind === 'loading'}>
         {navigation?.history ? <NativeHistory state={navigation.history} navigation={navigation} /> : <div className="wp-thread"><div className="wp-welcome"><h1>What would you like to make?</h1><p className="wp-lead">{welcomeLead}</p><div className="wp-hints" aria-label="Things that help">{[navigation && session ? 'Who’s in it' : "Who's in it", 'Where it happens', 'What happens', 'Anything they say', 'Look or mood'].map((hint) => <span key={hint}>{hint}</span>)}</div><p className="wp-aside-note">Have photos of the people or places? You can attach them now or later.</p></div></div>}

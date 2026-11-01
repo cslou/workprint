@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 import { Button as AriaButton } from 'react-aria-components';
 import type { NativeThread } from '@workprint/api-client';
 import { Button } from '../ui/controls.js';
+import { SkeletonLines, SkeletonRows } from '../ui/skeleton.js';
 import { HistoryScroll } from './history-scroll.js';
 import type { HistoryState, NativeNavigationState } from './use-native-navigation.js';
 import './native-views.css';
@@ -15,7 +16,7 @@ export function Recents({ navigation, embedded = false, onActivate = () => {} }:
   const heading = useRef<HTMLParagraphElement>(null);
   useLayoutEffect(() => { if (value && !pending && !failed) heading.current?.focus(); }, [value, pending, failed]);
   return <div className="wp-native-recents" aria-busy={pending}>
-    {!value && pending && <p role="status">Loading Recents…</p>}
+    {!value && !failed && <><p className="wp-sr-only" role="status">Loading Recents…</p><SkeletonRows count={6} /></>}
     {!value && failed && <><p role="status">Recents couldn’t be loaded. Check your connection and try again.</p><div className="wp-native-actions"><Button variant="secondary" onPress={() => void navigation.list(target)}>Try again</Button></div></>}
     {value && <>
       {value.threads.length ? <><p className="wp-native-range" ref={heading} tabIndex={-1} role="status">{`Videos ${value.page * value.perPage + 1}–${value.page * value.perPage + value.threads.length}`}</p><RecentRows threads={value.threads} navigation={navigation} onActivate={onActivate} /></> : <p role="status">No videos yet.</p>}
@@ -40,9 +41,9 @@ export function NativeHistory({ state, navigation }: { state: HistoryState; navi
   }, [state.id, state.kind]);
   const earlier = () => { void navigation.earlier(); };
   return <>
-    {state.kind !== 'unavailable' && <header className="wp-history-head"><h1 ref={title} tabIndex={-1}>{threadTitle(state.thread)}</h1><p>Conversation history</p></header>}
+    {state.kind !== 'unavailable' && <header className="wp-history-head"><h1 ref={title} tabIndex={-1}>{state.kind === 'loading' && !state.thread ? <><span className="wp-sr-only">Loading conversation</span><i className="wp-skeleton-bar wp-skeleton-title" aria-hidden="true" /></> : threadTitle(state.thread)}</h1><p>Conversation history</p></header>}
     <div className="wp-thread wp-native-history" ref={scroller} aria-label="Conversation history" aria-busy={state.kind === 'loading'}><HistoryScroll scroller={scroller} rows={state.messages} loading={state.earlier === 'loading'}>
-      {state.kind === 'loading' && <p className="wp-history-state" role="status">Loading conversation…</p>}
+      {state.kind === 'loading' && <><p className="wp-sr-only" role="status">Loading conversation…</p><SkeletonLines count={4} /></>}
       {state.kind === 'unavailable' && <div className="wp-history-state"><p role="status">This conversation isn’t available.</p><div className="wp-native-actions"><Button variant="secondary" onPress={navigation.openRecents}>Recents</Button></div></div>}
       {state.kind === 'error' && <div className="wp-history-state"><p role="status">This conversation couldn’t be loaded. Check your connection and try again.</p><div className="wp-native-actions"><Button variant="secondary" onPress={() => void navigation.open(state.id, state.thread)}>Try again</Button><Button variant="secondary" onPress={navigation.openRecents}>Recents</Button></div></div>}
       {state.kind === 'ready' && (state.messages.length === 0 ? <p className="wp-history-state" role="status">No messages yet.</p> : <>

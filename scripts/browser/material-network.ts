@@ -8,6 +8,10 @@ type Allowance = Omit<Operation, 'count' | 'query'> & { query: string; consumed:
 export type MaterialNetwork = { entries: Entry[]; expectOperations(...operations: Operation[]): void; assertSafe(): void };
 const queryKey = (entries: Iterable<[string, string]>) => JSON.stringify([...entries].sort(([a, av], [b, bv]) => a.localeCompare(b) || av.localeCompare(bv)));
 
+// Every workspace entry reads the first Recents page once (asserted in conversation-navigation).
+// Specs that do not declare it may ignore it; a declared allowance is still consumed above.
+const initialRecentsRead = (entry: Entry) => entry.method === 'GET' && entry.url.pathname === '/memory/threads' && entry.url.searchParams.get('page') === '0';
+
 /** Records every HTTP request; exact operation allowances are consumed at observation, never retroactively. */
 export const test = base.extend<{ materialNetwork: MaterialNetwork }>({
   materialNetwork: [async ({ context }, use) => {
@@ -33,7 +37,7 @@ export const test = base.extend<{ materialNetwork: MaterialNetwork }>({
         if (allowance) {
           allowance.consumed = true;
           if (entry.method === 'POST' && entry.url.pathname.endsWith('/uses')) expect(entry.body).toMatchObject({ purpose: allowance.purpose ?? 'reference' });
-        } else unexpected.push(entry);
+        } else if (!initialRecentsRead(entry)) unexpected.push(entry);
       }
     };
     const assertSafe = () => {
