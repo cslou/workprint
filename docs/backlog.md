@@ -93,6 +93,8 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 
 ## Later
 
+Deprioritized: everything here waits until B-012 to B-020 are done (Lou, 2026-11-01). Nothing here is ranked.
+
 ### B-011 — Recover an initially failed workspace read
 - Problem: If the first workspace read fails, a later successful image upload cannot show its new Assets row, because no loaded base exists to add it to. The user must reload. A minor issue (P2) from the PR #41 re-review.
 - Outcome: A failed first read can recover with one bounded re-read, without replaying saves or keeping another account's data. Pass: failed first read → successful upload → the Assets row appears without a reload.
