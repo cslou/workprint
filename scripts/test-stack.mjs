@@ -24,14 +24,22 @@ if (process.env.WORKPRINT_TEST_STACK) process.exit(await run(process.env));
 
 const { startTestStack } = await import(pathToFileURL(resolve('apps/api/.test-build/test/support/test-stack.js')).href);
 const previewPort = process.env.WORKPRINT_PREVIEW_PORT ?? '4180';
-// Stop requests during startup still release whatever was acquired.
-let interrupted = false;
-const interrupt = () => { interrupted = true; };
+// Stop requests during startup abort it at the next step; startup releases whatever was acquired.
+const startup = new AbortController();
+const interrupt = () => startup.abort();
 for (const signal of signals) process.on(signal, interrupt);
-const stack = await startTestStack({ browserOrigins: [`http://127.0.0.1:${previewPort}`] });
+let stack;
+try {
+  stack = await startTestStack({ browserOrigins: [`http://127.0.0.1:${previewPort}`], signal: startup.signal });
+} catch (error) {
+  // Only a clean abort; a failed release still surfaces as the startup error.
+  if (error !== startup.signal.reason) throw error;
+  console.error('Test stack startup interrupted; acquired resources were released');
+  process.exit(1);
+}
 let status = 1;
 try {
-  if (!interrupted) status = await run({ ...process.env, WORKPRINT_TEST_STACK: stack.file });
+  if (!startup.signal.aborted) status = await run({ ...process.env, WORKPRINT_TEST_STACK: stack.file });
 } finally {
   await stack.close();
 }

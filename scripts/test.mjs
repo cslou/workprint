@@ -6,10 +6,13 @@ const group = process.argv[2];
 if (group && !['unit', 'tooling', 'integration', 'compile'].includes(group)) throw new Error('Unknown test group');
 
 // Never discover stale emitted cases from a different branch or removed source files.
-for (const directory of ['apps/api/.test-build', 'apps/web/.test-build', 'packages/api-client/.test-build']) rmSync(directory, { recursive: true, force: true });
-for (const project of ['packages/contracts/tsconfig.json', 'packages/api-client/tsconfig.json', 'packages/player/tsconfig.json', 'apps/api/tsconfig.json', 'packages/api-client/tsconfig.test.json', 'apps/web/tsconfig.test.json']) {
-  const compiled = spawnSync('tsc', ['-p', project], { stdio: 'inherit' });
-  if (compiled.status !== 0) process.exit(compiled.status ?? 1);
+// The regression gate compiles once in its setup step and sets WORKPRINT_TESTS_COMPILED=1 for later groups.
+if (process.env.WORKPRINT_TESTS_COMPILED !== '1') {
+  for (const directory of ['apps/api/.test-build', 'apps/web/.test-build', 'packages/api-client/.test-build']) rmSync(directory, { recursive: true, force: true });
+  for (const project of ['packages/contracts/tsconfig.json', 'packages/api-client/tsconfig.json', 'packages/player/tsconfig.json', 'apps/api/tsconfig.json', 'packages/api-client/tsconfig.test.json', 'apps/web/tsconfig.test.json']) {
+    const compiled = spawnSync('tsc', ['-p', project], { stdio: 'inherit' });
+    if (compiled.status !== 0) process.exit(compiled.status ?? 1);
+  }
 }
 // Development fixtures need the same dependency-ordered compilation, not tests.
 if (group === 'compile') process.exit(0);

@@ -134,7 +134,7 @@ Account browser tests use only disposable accounts on the shared test stack's Au
 
 ## Verification
 
-Run the gates through `.checks/regression.sh --tier=quick|standard|deep` (commit, push and merge-to-main tiers); [regression gates](docs/regression-gates.md) lists each tier's checks, budgets and merge-target classes. The underlying commands are:
+Run the gates through `.checks/regression.sh --tier=quick|standard|deep`: quick on commit, standard on push and story-target merges, deep on delivery-target merges. [Regression gates](docs/regression-gates.md) lists each tier's checks, budgets and merge-target classes. The underlying commands are below; bare `pnpm audit` fails while the reported moderate advisories exist, whereas the gate blocks only on high and critical ones.
 
 ```sh
 pnpm check

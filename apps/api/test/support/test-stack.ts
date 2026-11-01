@@ -71,7 +71,8 @@ async function startAuthProxy(origins: readonly string[]) {
  * One shared stack per test run: Postgres, GoTrue, Mailpit and S3 storage (four containers), plus media fixtures generated once.
  * Tests isolate through their own database, accounts and object keys. Returns the private stack file path for child processes.
  */
-export async function startTestStack(options: { browserOrigins: readonly string[] }) {
+// An aborted signal stops startup at the next step and releases whatever was already acquired.
+export async function startTestStack(options: { browserOrigins: readonly string[]; signal?: AbortSignal }) {
   if (!options.browserOrigins.length || options.browserOrigins.some(value => {
     try { const url = new URL(value); return url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.origin !== value; }
     catch { return true; }
@@ -88,13 +89,19 @@ export async function startTestStack(options: { browserOrigins: readonly string[
   })();
   // The owner's later close() returns this same promise and reports any cleanup failure.
   const lifetime = setTimeout(() => { close().catch(() => undefined); }, stackLifetimeMs); lifetime.unref();
+  const proceed = () => options.signal?.throwIfAborted();
   try {
+    proceed();
     await mkdir(directory, { recursive: true, mode: 0o700 }); cleanups.push(() => rm(directory, { recursive: true, force: true }));
     const proxy = await startAuthProxy(options.browserOrigins); cleanups.push(proxy.close);
+    proceed();
     const storage = await isolatedObjectStorage(options.browserOrigins); cleanups.push(storage.close);
+    proceed();
     cleanups.push(() => resources.closeNetwork());
     await resources.createNetwork();
+    proceed();
     const database = await isolatedPostgres({ network: { name: resources.edgeNetworkName, owner: resources.owner } }); cleanups.push(database.close);
+    proceed();
     await resources.attachPrivate(database.containerId, database.owner, 'database');
     // GoTrue owns every table/migration in its own database; tests never touch it.
     const cluster = new URL(database.adminUrl); cluster.pathname = '/postgres';
@@ -106,6 +113,7 @@ export async function startTestStack(options: { browserOrigins: readonly string[
     const signingSecret = randomBytes(48).toString('hex');
     const anonKey = jwt('anon', signingSecret), serviceKey = jwt('service_role', signingSecret);
     cleanups.push(() => resources.closeContainers());
+    proceed();
     // Recovery tests consume the link GoTrue actually emails: a PKCE link carries the browser's code challenge, which an admin-generated link cannot.
     const mail = await resources.run('mail', images.mail, ['--publish', '127.0.0.1::8025', '--tmpfs', '/tmp:rw,nosuid,size=67108864'], {
       MP_SMTP_BIND_ADDR: '0.0.0.0:1025', MP_UI_BIND_ADDR: '0.0.0.0:8025', MP_DATABASE: '/tmp/mailpit.db', MP_MAX_MESSAGES: '500',
@@ -121,14 +129,17 @@ export async function startTestStack(options: { browserOrigins: readonly string[
       GOTRUE_MAILER_URLPATHS_RECOVERY: '/auth/v1/verify', GOTRUE_MAILER_URLPATHS_CONFIRMATION: '/auth/v1/verify', GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: '/auth/v1/verify', GOTRUE_MAILER_URLPATHS_INVITE: '/auth/v1/verify',
     });
     proxy.route(await resources.port(auth, 9999));
+    proceed();
     const deadline = Date.now() + 45000;
     for (;;) {
       try {
         if ((await fetch(proxy.url + '/auth/v1/health', { signal: AbortSignal.timeout(1000) })).ok && (await fetch(mailUrl + '/api/v1/info', { signal: AbortSignal.timeout(1000) })).ok) break;
       } catch { /* Services are not ready; bounded below. */ }
       if (Date.now() > deadline) throw new Error('Test stack Auth/mail startup deadline exceeded');
+      proceed();
       await delay(100);
     }
+    proceed();
     const media = { toolchainDirectory: resolve(`outputs/toolchains/ffmpeg-${MEDIA_ARCHIVE.sha256}`), dockerPath: await realpath('/usr/local/bin/docker') };
     const sandbox = await createMediaSandbox(media);
     const files = { png: join(directory, 'image.png'), jpeg: join(directory, 'image.jpg'), video: join(directory, 'clip.mp4'), poster: join(directory, 'poster.png') };

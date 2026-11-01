@@ -5,6 +5,6 @@ export default [
   { ignores: ['**/node_modules/**', '**/dist/**', '**/.mastra/**', '**/.test-build/**', 'outputs/**'] },
   js.configs.recommended,
   ...ts.configs.recommended,
-  { languageOptions: { globals: { process: 'readonly', console: 'readonly', Buffer: 'readonly', setTimeout: 'readonly', clearTimeout: 'readonly' } } },
+  { languageOptions: { globals: { process: 'readonly', console: 'readonly', Buffer: 'readonly', setTimeout: 'readonly', clearTimeout: 'readonly', AbortController: 'readonly' } } },
   { files: ['**/*.cjs'], languageOptions: { sourceType: 'commonjs' } },
 ];

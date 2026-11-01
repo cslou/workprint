@@ -8,18 +8,26 @@ from pathlib import Path
 
 # Adapt only to verified repo commands; keep lists out of event wrappers.
 # Tier map and inventory: docs/regression-gates.md. The test stack's lifecycle lives inside
-# stack-suites, which removes it on SIGTERM, so the gate itself owns no setup/teardown resources.
+# stack-suites; setup records a resource baseline and teardown fails on anything this run left behind.
+# Steps print 'NOTICE:' lines for non-blocking results the final report must carry.
+BASELINE = '.checks/.logs/stack-baseline.json'
+COMPILED = ['env', 'WORKPRINT_TESTS_COMPILED=1']
 COMMANDS = {
-    'setup': ['true'],
+    # Compile the tests once; later groups reuse the build.
+    'setup': ['sh', '-c', 'node scripts/test-stack-leftovers.mjs baseline ' + BASELINE
+              + ' && pnpm exec node scripts/test.mjs compile'],
     'check': ['pnpm', 'check'],
-    'unit': ['pnpm', 'test:unit'],
+    'unit': COMPILED + ['pnpm', 'test:unit'],
     'build': ['pnpm', 'build'],
-    'tooling': ['pnpm', 'test:tooling'],
-    # One shared stack for integration and browser journeys; unit has already compiled the launcher.
-    'stack-suites': ['pnpm', 'exec', 'node', 'scripts/test-stack.mjs', 'sh', '-c',
-                     'node scripts/test.mjs integration && playwright test --config test/e2e/playwright.config.ts'],
-    'audit': ['pnpm', 'audit', '--audit-level=high'],
-    'teardown': ['true'],
+    'tooling': COMPILED + ['pnpm', 'test:tooling'],
+    # One shared stack for integration and browser journeys.
+    'stack-suites': COMPILED + ['pnpm', 'exec', 'node', 'scripts/test-stack.mjs', 'sh', '-c',
+                                'node scripts/test.mjs integration'
+                                ' || { echo "NOTICE: integration failed; browser journeys not run"; exit 1; }; '
+                                'playwright test --config test/e2e/playwright.config.ts'
+                                ' || { echo "NOTICE: browser journeys failed after integration passed"; exit 1; }'],
+    'audit': ['node', 'scripts/audit.mjs'],
+    'teardown': ['node', 'scripts/test-stack-leftovers.mjs', 'verify', BASELINE],
 }
 TIERS = {'quick': ['check', 'unit'], 'standard': ['check', 'unit', 'build', 'tooling'],
          'deep': ['check', 'unit', 'build', 'tooling', 'stack-suites', 'audit']}
@@ -62,6 +70,12 @@ def group_alive(pid):
         return True
     except ProcessLookupError:
         return False
+
+def notices():
+    found = []
+    for path in sorted(logs.iterdir(), key=lambda item: int(item.name.split('-')[0])):
+        found += [line.rstrip() for line in path.read_text(errors='replace').splitlines() if line.startswith('NOTICE:')]
+    return found
 
 def run(argv, label, capture=False, cleaning=False):
     if interruption and not cleaning:
@@ -180,6 +194,9 @@ try:
     head = run(['git', 'rev-parse', 'HEAD'], 'head', True)
     work = ['setup'] + TIERS[tier]
     if args.merge:
+        # Merge evidence must describe the head commit itself, not uncommitted edits on top of it.
+        require(run(['git', 'status', '--porcelain', '--untracked-files=no'], 'status', True) == '',
+                'tracked working tree changes; merge evidence must match the head commit')
         branch = run(['git', 'branch', '--show-current'], 'branch', True)
         extra = cfg['story_checks'][branch]  # Missing is blocked, not an assumed empty list.
         require(extra == [], 'invalid approved story checks')
@@ -226,12 +243,17 @@ try:
     require(time.monotonic() <= deadline, 'total budget exceeded including cleanup')
     marker.unlink()
     print('PASS tier=' + tier + ' total_seconds=' + str(round(time.monotonic() - started, 3)))
+    for line in notices():
+        print(line)
     print('Not selected by this trigger: ' + ','.join(name for name in COMMANDS if name not in work)
           + '; paid/prod not configured')
 except ERRORS as error:
     if record is not None:
         record.update(error=str(error), elapsed_seconds=round(time.monotonic() - started, 3))
         marker.write_text(json.dumps(record))
+    if record is not None and 'logs' in globals():
+        for line in notices():
+            print(line, file=sys.stderr)
     print('INCOMPLETE: ' + str(error) + '; teardown=' + str(record.get('teardown', 'not started') if record else 'not started')
           + '; total_seconds=' + str(round(time.monotonic() - started, 3)), file=sys.stderr)
     sys.exit(error.code if isinstance(error, GateFailure) else 2)
