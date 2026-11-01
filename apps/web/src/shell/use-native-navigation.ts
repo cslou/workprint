@@ -19,7 +19,9 @@ export function useNativeNavigation(connection: BrowserClient, accountId: string
   const [recents, setRecents] = useState<RecentsState>({ value: null, pending: false, failed: false, target: 0 });
   const [quick, setQuick] = useState<NativeThread[] | null>(null);
   const [dialog, setDialog] = useState<'recents' | null>(null);
-  const active = useRef(true), selection = useRef(0), intent = useRef(0), listing = useRef(0);
+  // Counts New video activations so the shell can focus the opening composer it lands on.
+  const [started, setStarted] = useState(0);
+  const active = useRef(true), selection = useRef(0), listing = useRef(0);
   const requests = useRef(new Set<AbortController>());
   const client = connection.kind === 'configured' ? connection.client.native : null;
   const controller = () => { const value = new AbortController(); requests.current.add(value); return value; };
@@ -28,7 +30,6 @@ export function useNativeNavigation(connection: BrowserClient, accountId: string
   const remember = (id: string) => { const url = new URL(location.href); url.searchParams.set('conversation', id); window.history.replaceState(null, '', url); };
   const open = async (id: string, candidate: NativeThread | null = null) => {
     if (!client || !accountId) { signIn(); return; }
-    intent.current++;
     const revision = ++selection.current, request = controller();
     setDialog(null); setHistory(loading(id, candidate)); remember(id);
     try {
@@ -61,12 +62,12 @@ export function useNativeNavigation(connection: BrowserClient, accountId: string
       setRecents(previous => result.ok ? { value: result.value, pending: false, failed: false, target: page } : { ...previous, pending: false, failed: true, target: page });
     } finally { requests.current.delete(request); }
   };
-  const openRecents = () => { if (!client || !accountId) { signIn(); return; } intent.current++; setDialog('recents'); void list(); };
+  const openRecents = () => { if (!client || !accountId) { signIn(); return; } setDialog('recents'); void list(); };
   // New video is client-only: it returns to the opening composer without writing anything.
   // The native thread (whose id is the video id) is created by the first accepted send.
   const startNew = () => {
     if (!client || !accountId) { signIn(); return; }
-    intent.current++; selection.current++;
+    selection.current++; setStarted(value => value + 1);
     setDialog(null); setHistory(null);
     const url = new URL(location.href); url.searchParams.delete('conversation'); window.history.replaceState(null, '', url);
   };
@@ -85,6 +86,6 @@ export function useNativeNavigation(connection: BrowserClient, accountId: string
       });
     } finally { requests.current.delete(request); }
   };
-  return { history, recents, quick, dialog, startNew, list, open, earlier, openRecents, dismiss() { setDialog(null); } };
+  return { history, recents, quick, dialog, started, startNew, list, open, earlier, openRecents, dismiss() { setDialog(null); } };
 }
 export type NativeNavigationState = ReturnType<typeof useNativeNavigation>;

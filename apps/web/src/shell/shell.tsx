@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Button as AriaButton, Dialog, Heading, Modal, ModalOverlay } from 'react-aria-components';
 import { nativeConversations } from '@workprint/api-client';
@@ -43,6 +43,13 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
   const shown = navigation?.dialog ?? surface;
   const dismiss = () => { if (navigation?.dialog) navigation.dismiss(); setSurface(null); };
   useLayoutEffect(() => { if (shown) dialogHead.current?.querySelector('button')?.focus(); }, [shown]);
+  // New video may remount this shell, removing the focused control; land focus on the opening composer instead.
+  const main = useRef<HTMLElement>(null), started = navigation?.started ?? 0, opening = !navigation?.history;
+  useEffect(() => {
+    if (!started || !opening) return;
+    const frame = requestAnimationFrame(() => { if (!document.querySelector('[role="dialog"]')) main.current?.querySelector<HTMLElement>('.wp-chat-input')?.focus(); });
+    return () => cancelAnimationFrame(frame);
+  }, [started, opening]);
   const qualifiedId = navigation && !navigation.history?.thread ? undefined : conversationId;
   const scope = session ? { accountId: session.accountId, ...(qualifiedId === undefined ? {} : { conversationId: qualifiedId }) } : null;
   const workspace = useWorkspace(connection, scope);
@@ -72,9 +79,9 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
       <nav className="wp-sidebar" aria-label="Workprint">
         <div className="wp-brand"><span className="wp-mark">a</span><span>Workprint</span></div>
         <div className="wp-nav-list">{nav()}<span className="wp-menu"><Button variant="secondary" onPress={() => { setSurface('navigation'); if (navigation && session) void navigation.list(); }}>Menu</Button></span></div>
-        <div className="wp-recents" aria-busy={!!navigation?.recents.pending}>{recent}</div><div className="wp-sidebar-spacer" />{account}
+        <div className="wp-recents" aria-busy={!!navigation?.recents.pending || sidebarPlaceholder.active}>{recent}</div><div className="wp-sidebar-spacer" />{account}
       </nav>
-      <main className="wp-main" data-layout={!navigation?.history || navigation.history.kind === 'ready' && navigation.history.messages.length === 0 ? 'opening' : 'thread'} aria-label={navigation?.history ? 'Conversation' : 'New video'} aria-busy={navigation?.history ? navigation.history.kind === 'loading' : workspace.kind === 'loading'}>
+      <main ref={main} className="wp-main" data-layout={!navigation?.history || navigation.history.kind === 'ready' && navigation.history.messages.length === 0 ? 'opening' : 'thread'} aria-label={navigation?.history ? 'Conversation' : 'New video'} aria-busy={navigation?.history ? navigation.history.kind === 'loading' : workspace.kind === 'loading'}>
         {navigation?.history ? <NativeHistory state={navigation.history} navigation={navigation} /> : <div className="wp-thread"><Welcome owned={!!(navigation && session)} /></div>}
         {workspace.kind === 'settled' && workspace.result.ok && workspace.result.value.pendingQuestion ? <QuestionReview connection={connection} scope={scope} question={workspace.result.value.pendingQuestion} workspace={workspace.result.value} draft={draft} /> : <Composer native={native} draft={draft} connection={connection} scope={scope} />}
       </main>
