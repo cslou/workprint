@@ -1,0 +1,29 @@
+/* Sign-in and account entry states. Each .si-frame stands in for one full page
+   body, so every state rule is scoped to it; @container replaces the original
+   viewport breakpoint so a frame lays out by its own width. */
+@media (min-width: 821px) { .bb-main [id] { scroll-margin-top: 72px; } }
+.bb-spec.si-frame { padding: 0; container: si / inline-size; background: var(--color-bg-canvas); color: var(--color-text-primary); font: var(--font-size-14)/var(--font-line-height-1-5) var(--font-family-sans); }
+.si-frame :is(h1, p) { margin: revert; }
+.si-frame a { color: var(--color-text-link); text-decoration: underline; text-underline-offset: 3px; }
+.si-frame a:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 4px; }
+.si-frame .si-header { display: flex; align-items: center; justify-content: space-between; padding: var(--space-24) var(--space-32); }
+.si-frame .si-brand { font-weight: var(--font-weight-semibold); font-size: var(--font-size-19); }
+.si-frame .si-main { min-height: 480px; display: grid; place-items: center; padding: var(--space-32) var(--space-24); }
+.si-frame .si-card { width: 100%; max-width: 400px; padding: var(--space-32); background: var(--color-bg-surface); border: 1px solid var(--color-border-strong); border-radius: var(--radius-3xl); box-shadow: var(--shadow-input); }
+.si-frame h1 { font: var(--font-weight-regular) var(--font-size-34)/var(--font-line-height-1-15) var(--font-family-display); margin: 0 0 var(--space-12); }
+.si-frame p { margin: 0 0 var(--space-24); color: var(--color-text-secondary); }
+.si-frame .si-label { display: block; margin: var(--space-16) 0 var(--space-6); font-size: var(--font-size-13); font-weight: var(--font-weight-medium); }
+.si-frame .si-field { min-height: 44px; border: 1px solid var(--color-text-subtle); border-radius: var(--radius-md); padding: var(--space-10) var(--space-12); background: var(--color-bg-surface); color: var(--color-text-subtle); }
+.si-frame .si-row { display: flex; justify-content: space-between; gap: var(--space-12); margin-top: var(--space-16); flex-wrap: wrap; }
+.si-frame .si-button { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: var(--space-10) var(--space-16); border-radius: var(--radius-pill); background: var(--color-action-primary-bg); color: var(--color-action-primary-text); text-decoration: none; font-weight: var(--font-weight-semibold); margin-top: var(--space-24); }
+.si-frame .si-feedback { border-left: 2px solid var(--color-text-subtle); padding-left: var(--space-12); margin: var(--space-16) 0; color: var(--color-text-secondary); }
+.si-frame .si-hero { max-width: var(--size-layout-chat); text-align: center; }
+.si-frame .si-hero h1 { font-size: var(--font-size-44); }
+.si-frame .si-hero .si-button { width: fit-content; margin: var(--space-24) auto; }
+.si-frame .si-busy { color: var(--color-text-subtle); font-size: var(--font-size-13); }
+@container si (max-width: 820px) {
+  .si-frame .si-header { padding: var(--space-20) var(--space-24); }
+  .si-frame .si-main { min-height: 420px; padding: var(--space-24) var(--space-16); }
+  .si-frame .si-card { padding: var(--space-24); }
+  .si-frame .si-hero h1 { font-size: var(--font-size-34); }
+}

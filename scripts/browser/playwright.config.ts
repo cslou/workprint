@@ -1,4 +1,4 @@
-import { browserOrigin } from './origin.js';
+import { previewOrigin } from './origin.js';
 import { defineConfig } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
@@ -10,15 +10,15 @@ const dirty = execFileSync('git', ['status', '--porcelain'], { cwd, encoding: 'u
 
 export default defineConfig({
   metadata: { revision, workingTreeDirty: dirty, platform: process.platform, architecture: process.arch },
-  testDir: './tests',
-  outputDir: resolve(process.env.WORKPRINT_BROWSER_OUTPUT ?? `outputs/verification/sprint-003/${revision}${dirty ? '-working' : ''}`),
-  timeout: 30_000,
-  expect: { timeout: 5000 },
-  // Component specs run in parallel; backend-booting journeys pass --workers=1.
+  testDir: './e2e',
+  outputDir: resolve(process.env.WORKPRINT_BROWSER_OUTPUT ?? `outputs/verification/e2e/${revision}${dirty ? '-working' : ''}`),
+  // Every journey shares one worker-scoped backend (see e2e/fixtures.ts).
+  timeout: 120_000,
+  expect: { timeout: 10_000 },
   fullyParallel: false,
   workers: 1,
   retries: 0,
   reporter: 'list',
-  use: { baseURL: browserOrigin, browserName: 'chromium', viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, locale: 'en-US', timezoneId: 'UTC', colorScheme: 'light', reducedMotion: 'reduce', serviceWorkers: 'block', headless: true },
-  webServer: { cwd: fileURLToPath(new URL('../../', import.meta.url)), command: 'pnpm --filter @workprint/web exec vite --config vite.test.config.ts', url: browserOrigin, reuseExistingServer: false, timeout: 30_000, gracefulShutdown: { signal: 'SIGTERM', timeout: 5000 } },
+  // Journeys sign in with synthetic credentials; keep them out of traces, screenshots and video.
+  use: { baseURL: previewOrigin, browserName: 'chromium', viewport: { width: 1440, height: 900 }, locale: 'en-US', timezoneId: 'UTC', reducedMotion: 'reduce', serviceWorkers: 'block', headless: true, trace: 'off', screenshot: 'off', video: 'off' },
 });
