@@ -20,7 +20,7 @@ const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('h
 
 test('reference edits bind verified owned/read-only images to an immutable expected base without copying or repinning other conversations', { timeout: 120000 }, async t => {
   const db = await isolatedPostgres(); t.after(db.close);
-  const service = await isolatedObjectStorage(); t.after(service.close);
+  const service = await isolatedObjectStorage(undefined, undefined, message => t.diagnostic(message)); t.after(service.close);
   const dockerPath = await realpath('/usr/local/bin/docker');
   const sandbox = await createMediaSandbox({ toolchainDirectory: resolve(`outputs/toolchains/ffmpeg-${MEDIA_ARCHIVE.sha256}`), dockerPath }); t.after(() => sandbox.close());
   const pool = new Pool({ connectionString: db.servingUrl, max: 4 }), setupPool = new Pool({ connectionString: db.setupUrl, max: 1 });
