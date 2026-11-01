@@ -124,14 +124,14 @@ Three stories is deliberate (Lou, 2026-11-02): the earlier "assistant script sav
 - **As a** maintainer, **I want** the shell to own workspace tab assembly and preservation, **so that** Story 3's refresh and later tabs don't reach into the materials feature.
 - **Dependencies:** None
 - **Acceptance criteria:**
-  - [ ] The shell (`apps/web/src/shell/`) builds the workspace tab content map and decides `preservePanels`. `apps/web/src/materials/` exports only the Script and Assets content components and imports nothing from `shell/`.
-  - [ ] `apps/web/src/materials/panel.tsx` is removed or reduced to content-only exports. The shell no longer imports a panel-assembly component from materials.
-  - [ ] Behaviour is unchanged. Account/video scope keys, tab preservation, `onSaved` and prerequisites flow as before.
+  - [x] The shell (`apps/web/src/shell/`) builds the workspace tab content map and decides `preservePanels`. `apps/web/src/materials/` exports only the Script and Assets content components and imports nothing from `shell/`.
+  - [x] `apps/web/src/materials/panel.tsx` is removed or reduced to content-only exports. The shell no longer imports a panel-assembly component from materials.
+  - [x] Behaviour is unchanged. Account/video scope keys, tab preservation, `onSaved` and prerequisites flow as before.
 - **Functional verification:**
-  - [ ] N/A for new behaviour (refactor). `pnpm check` (types, lint, dependency-cruiser) passes. `.dependency-cruiser.cjs` gains a rule that `apps/web/src/materials` must not import `apps/web/src/shell`.
-  - [ ] One-off negative probe, recorded in the PR with no persistent test: add a temporary `materials → shell` import, confirm `pnpm check` fails on the new rule, then revert.
+  - [x] N/A for new behaviour (refactor). `pnpm check` (types, lint, dependency-cruiser) passes. `.dependency-cruiser.cjs` gains a rule that `apps/web/src/materials` must not import `apps/web/src/shell`.
+  - [x] One-off negative probe, recorded in the PR with no persistent test: add a temporary `materials → shell` import, confirm `pnpm check` fails on the new rule, then revert.
 - **Regression verification:**
-  - [ ] `test/e2e/saves.spec.ts` and `test/e2e/navigation.spec.ts` pass in one targeted run.
+  - [x] `test/e2e/saves.spec.ts` and `test/e2e/navigation.spec.ts` pass in one targeted run.
     - `saves.spec.ts` covers Script and Assets display, manual save and tab switching.
     - `navigation.spec.ts` covers opening another video and reload, which exercise the scope remount.
     - `preservePanels` across same-video workspace changes is covered by the `library` and `shots` journeys. They run in the completion deep gate rather than per story, which is an accepted risk.
@@ -156,7 +156,7 @@ Three stories is deliberate (Lou, 2026-11-02): the earlier "assistant script sav
 - **As a** creator, **I want** to ask the agent to write or change my video's script, **so that** the script tab holds the agent's version without me retyping it.
 - **Dependencies:** None (independent of Story 1)
 - **Acceptance criteria:**
-  - [ ] **Tool.** An `update-script` tool lives in `apps/api/src/agent/tools/update-script/` and is registered in the production tool list.
+  - [x] **Tool.** An `update-script` tool lives in `apps/api/src/agent/tools/update-script/` and is registered in the production tool list.
     - It takes the complete script content and the id of the script version it last read, which is `null` when the video has no script.
     - Its phrase is "Updating the script…".
     - Its done summary reports the saved version number, for example "Saved version 3". No script text goes in the summary.
@@ -164,14 +164,14 @@ Three stories is deliberate (Lou, 2026-11-02): the earlier "assistant script sav
     - A save doesn't change the video's selection revision. Human script saves and uses don't change it either: only storyboard order and shot-video changes do. (Corrected at Story 2 review: the plan said agent saves would increment it "as human uses do", which they don't.)
     - The base id is the only model-supplied id. It resolves only through a query scoped to the account and video. If the run's video doesn't own it, the result is not-found. If the video owns it but it isn't the current script version, the result is stale.
     - The description carries the writing guidance adapted from `~/projects/animation-studio/.pi/skills/create-scene-script/SKILL.md`: scene adaptation, the order of action and dialogue, and speakers. It does not port that skill's YAML format or file workflow.
-  - [ ] **Validation.** Content is validated by the same `savedScriptContentSchema` as manual saves. Invalid content returns a tool error the model can read, and nothing is saved.
-  - [ ] **First save.** On a video with no script, the tool creates a new script artifact at version 1, created by the assistant. It also creates the video's script use with state `draft`. Afterwards the workspace read returns that version as `script`.
-  - [ ] **Next save.** On a video with a script, if the base id equals the current script version id, the tool saves the next version of the same artifact and moves the script use to it with state `draft`. The previous versions stay in Version history.
-  - [ ] **No overwrite.** If the base id is not the current script version (the user saved meanwhile, or the agent passed a stale or `null` base when a script exists), the tool saves nothing. It returns "stale: re-read the workspace", and no second version or use change occurs. The check and the write run in one transaction.
-  - [ ] **Scope.** Account and video come only from the run scope. A foreign or missing video returns not-found. An agent save never produces state `approved`.
-  - [ ] **Application seam.** One new application function, `saveAssistantScript(account, video, content, baseVersionId)` in `apps/api/src/application/`, is passed through the tool collaborators. The `artifacts` domain gains the narrow write it needs, without calling peer domains, and the tool imports no Mastra or application internals.
+  - [x] **Validation.** Content is validated by the same `savedScriptContentSchema` as manual saves. Invalid content returns a tool error the model can read, and nothing is saved.
+  - [x] **First save.** On a video with no script, the tool creates a new script artifact at version 1, created by the assistant. It also creates the video's script use with state `draft`. Afterwards the workspace read returns that version as `script`.
+  - [x] **Next save.** On a video with a script, if the base id equals the current script version id, the tool saves the next version of the same artifact and moves the script use to it with state `draft`. The previous versions stay in Version history.
+  - [x] **No overwrite.** If the base id is not the current script version (the user saved meanwhile, or the agent passed a stale or `null` base when a script exists), the tool saves nothing. It returns "stale: re-read the workspace", and no second version or use change occurs. The check and the write run in one transaction.
+  - [x] **Scope.** Account and video come only from the run scope. A foreign or missing video returns not-found. An agent save never produces state `approved`.
+  - [x] **Application seam.** One new application function, `saveAssistantScript(account, video, content, baseVersionId)` in `apps/api/src/application/`, is passed through the tool collaborators. The `artifacts` domain gains the narrow write it needs, without calling peer domains, and the tool imports no Mastra or application internals.
 - **Functional verification:**
-  - [ ] Add integration cases to `apps/api/test/integration/tool-activity.test.ts`. Each drives a scripted `update-script` call through a real turn, unless it says otherwise, and asserts the database state and the workspace read.
+  - [x] Add integration cases to `apps/api/test/integration/tool-activity.test.ts`. Each drives a scripted `update-script` call through a real turn, unless it says otherwise, and asserts the database state and the workspace read.
     - **First save:** creates v1 and a `draft` use. The activity line shows "Updating the script…" with the summary "Saved version 1", and the summary contains none of the script text.
     - **Next save:** creates v2, moves the use to it, and the summary is "Saved version 2".
     - **Stale base:** a base id that is an earlier owned version creates no new version, leaves the use unchanged, and the tool result says stale. The line ends done with "Not saved: the script changed".
@@ -181,8 +181,8 @@ Three stories is deliberate (Lou, 2026-11-02): the earlier "assistant script sav
     - **Concurrent first saves:** two parallel `saveAssistantScript(..., null)` calls give exactly one artifact and one use, and the other call returns stale.
     - Pass: every case asserts the version count and the use's version id and state.
 - **Regression verification:**
-  - [ ] The existing `tool-activity.test.ts` and `artifact-writes.test.ts` cases pass in the same targeted stack run: read-workspace, history redaction, and the human save and conflict paths.
-  - [ ] `pnpm live:chat` in its default scripted mode (no network, no cost) runs every step, including the new update-script step, so the script is proven before the paid completion run.
+  - [x] The existing `tool-activity.test.ts` and `artifact-writes.test.ts` cases pass in the same targeted stack run: read-workspace, history redaction, and the human save and conflict paths.
+  - [x] `pnpm live:chat` in its default scripted mode (no network, no cost) runs every step, including the new update-script step, so the script is proven before the paid completion run.
 - **Editorial/design verification:** Review the tool description against the `create-scene-script` sections it adapts: workflow step 3, "Draft and review one Scene at a time"; the output contract's action and dialogue order; and speakers. Record what was kept and dropped in the PR. There is no prose test. The activity line reuses Sprint 006's tool-line design.
 - **Manual-only behavior verification:** N/A
 - **Planned commits:**
@@ -217,30 +217,30 @@ Three stories is deliberate (Lou, 2026-11-02): the earlier "assistant script sav
 - **As a** creator, **I want** the Script tab to show the agent's new script as soon as it is saved, **so that** I don't have to reload, and I don't lose an edit I'm typing.
 - **Dependencies:** Story 1 (shell owns tab assembly) and Story 2 (a saving tool exists)
 - **Acceptance criteria:**
-  - [ ] **Re-read triggers.** The open video's workspace is re-read once each time a tool activity line reaches done, and once when the turn settles, whatever the outcome. Reads are for the same account and video only; a late result after a switch is dropped. While an editor is open, a re-read waits and runs once when the editor closes, as a deferred "Use this version" already does, so saved work never changes under a draft. (Added at Story 3.)
-  - [ ] **Shows the new version.** After the agent's `update-script` finishes, the Script tab's main view shows the new version's text without a reload. This holds on an empty video, which goes from the empty state to the script, and on a video with a script, where Version history lists the earlier version.
-  - [ ] **Unsaved edit survives.** If the user has the script open in the manual editor with unsaved text, the re-read doesn't replace or clear that text. Pressing Save offers the existing "Latest saved version · Continue with my text" review against the agent's version.
-  - [ ] **Newest wins.** The user's confirmed save and use effects in `useWorkspace` still merge over a re-read, but only while they are newer. An own effect is dropped once the re-read covers it:
+  - [x] **Re-read triggers.** The open video's workspace is re-read once each time a tool activity line reaches done, and once when the turn settles, whatever the outcome. Reads are for the same account and video only; a late result after a switch is dropped. While an editor is open, a re-read waits and runs once when the editor closes, as a deferred "Use this version" already does, so saved work never changes under a draft. (Added at Story 3.)
+  - [x] **Shows the new version.** After the agent's `update-script` finishes, the Script tab's main view shows the new version's text without a reload. This holds on an empty video, which goes from the empty state to the script, and on a video with a script, where Version history lists the earlier version.
+  - [x] **Unsaved edit survives.** If the user has the script open in the manual editor with unsaved text, the re-read doesn't replace or clear that text. Pressing Save offers the existing "Latest saved version · Continue with my text" review against the agent's version.
+  - [x] **Newest wins.** The user's confirmed save and use effects in `useWorkspace` still merge over a re-read, but only while they are newer. An own effect is dropped once the re-read covers it:
     - Each effect records the refresh count when it was confirmed. A re-read records the count that started it. An effect confirmed before a re-read started is already committed, so that re-read covers it and the effect is dropped. An effect confirmed during or after it is kept.
     - (Corrected at Story 2 review: the plan keyed use effects on `selectionRevision`, but script uses never advance it, human or agent.)
     - If the user saves and then the agent saves, the tab shows the agent's version.
     - If the user picks "Use this version" on v1 while a re-read is in flight, the tab keeps v1.
 - **Functional verification:**
-  - [ ] One browser journey in `test/e2e/chat.spec.ts` with a scripted provider, on an empty video:
+  - [x] One browser journey in `test/e2e/chat.spec.ts` with a scripted provider, on an empty video:
     1. Turn 1 calls `update-script` with a `null` base. Pass: the Script tab's main view goes from the empty state to the agent's v1 text without a reload.
     2. The user opens the manual editor and types without saving, then sends a message. Turn 2 saves v2 on the v1 base. Pass:
        - the textarea still holds the typed text;
        - Save shows the latest-version review against v2;
        - Version history already lists v2 while the tab stays on the edit's base;
        - after the user cancels the edit, the main view shows v2's text and Version history lists v1.
-  - [ ] Unit cases:
+  - [x] Unit cases:
     - `chat-session.test.ts`: `onToolDone` fires once per tool that reaches done. `onSettled` fires once for each of completed, failed, interrupted and lost.
     - `apps/web/test/unit/shell/` (a new file), with three cases:
       - a late read result for a previous scope or client is dropped, and a failed re-read keeps the shown value;
       - a user save followed by a re-read whose script has a higher revision shows the agent's version;
       - a "Use this version" on v1 followed by a stale re-read still shows v1, and a re-read started after it shows the agent's later version.
 - **Regression verification:**
-  - [ ] The existing `chat.spec.ts` journeys and `saves.spec.ts` pass in the same targeted browser run: chat states, Stop, titles, manual save and conflict. The existing `apps/web/test/unit/api/paged-read.test.ts` passes, because `useScopedRead` changes.
+  - [x] The existing `chat.spec.ts` journeys and `saves.spec.ts` pass in the same targeted browser run: chat states, Stop, titles, manual save and conflict. The existing `apps/web/test/unit/api/paged-read.test.ts` passes, because `useScopedRead` changes.
 - **Editorial/design verification:** N/A — no new visual state. The existing editor review and tool line are reused.
 - **Manual-only behavior verification:** N/A
 - **Planned commits:**
@@ -255,8 +255,8 @@ Three stories is deliberate (Lou, 2026-11-02): the earlier "assistant script sav
 
 After all implementation stories are complete, perform this checklist before sprint integration. This is a completion step, not a separate story.
 
-- [ ] Confirm all stories met their acceptance criteria using recorded implementation and verification evidence.
-- [ ] Fold the agent script-writing flow into spec §8.3 (cross-referenced from §8.1) before the deep gate, together with the §10 sprint-rule fixes and the SC2 exception (Affected Flows).
+- [x] Confirm all stories met their acceptance criteria using recorded implementation and verification evidence.
+- [x] Fold the agent script-writing flow into spec §8.3 (cross-referenced from §8.1) before the deep gate, together with the §10 sprint-rule fixes and the SC2 exception (Affected Flows).
 - [ ] Run the applicable regression suite on the combined sprint branch: the deep gate (Tests requiring extra consideration, item 5).
   - Audit moderates stay the existing B-004/B-008 non-pass.
   - While a QA host holds 4180, use `WORKPRINT_PREVIEW_PORT=4185`. 4190, the earlier choice, is on the Fetch "bad port" list and fails every journey (Sprint 006 Final Review).

@@ -406,7 +406,7 @@ These are intended functional product flows, not claims that the Phase 1 foundat
 - **Send:** a message of at most 32 KiB is sent as one Muse Spark turn. A New video's native thread is created by its first accepted send, without remounting the chat. Recents lists a video only once a send is accepted.
 - **One turn per video:** while a turn runs, Stop replaces Send, and a second send (another tab, say) is rejected as busy with the draft kept. Nothing queues.
 - **Stream:** the reply streams as safe text and tool-activity events only. Each tool shows its phrase with elapsed time, then a done summary or "didn't finish"; a tool without a phrase shows "Working…". History keeps the same lines in order with the text and fails closed on an unknown part.
-- **Tools:** read-workspace reads only the run's own account and video, within 50 items, 16 KiB and 200 characters per text.
+- **Tools:** read-workspace reads only the run's own account and video, within 50 items, 16 KiB and 200 characters per text. update-script writes the video's script (Sprint 007, §8.3). After each finished tool and when the turn ends, the workspace tabs re-read and show saved changes without a reload.
 - **Outcomes:** a turn ends completed, failed (Retry once, which resends; B-035), interrupted, or lost (this page stopped hearing it; no Retry). An unconfirmed send re-reads history before offering Check again or Send anyway, and never resends on its own.
 - **Titles:** after an accepted send to an untitled video, one bounded model call names it from that message: minimal reasoning effort, 1,024 tokens, a 15 s deadline and no retry. The title is cut to 60 characters and saved alone, after the started mark. A failure leaves "Untitled video", and the next message tries once more.
 
@@ -425,6 +425,12 @@ These are intended functional product flows, not claims that the Phase 1 foundat
 - **Data changed:** new Artifact Versions and saved questions bound to exact versions.
 - **Result:** reviewable work and recorded human decisions.
 - **Failure/recovery:** clarify material ambiguity; stale questions cannot approve replacements; unrelated replies leave pending decisions unresolved.
+
+**Script (Sprint 007, implemented):**
+- **Agent writes the script:** asked to write or change the script, the agent calls update-script with the complete script and the version it last read (`null` when the video has none). The save is validated by the same schema as manual saves. It becomes the video's next script version, created by the assistant, and the current script as a draft; it is never an approval. The tool line reads "Updating the script…", then "Saved version N".
+- **No overwrite:** the base must be the version the video uses now. If the user saved or chose another version meanwhile, nothing is saved and the line says "Not saved: the script changed". A base from another script is "not found", and invalid content is "the script isn’t valid". Account and video come only from the run. A built-in script in use is adapted into the account's own script.
+- **Tabs update:** the workspace re-reads after each finished tool and when the turn ends, so the Script tab shows the new version without a reload. While an editor is open the re-read waits until it closes; typed text is never replaced, and Save offers the existing latest-version review.
+- **MVP exception to §8.5 and SC2:** an agent rewrite replaces the current script use as a draft, even when the user had approved the previous version. Reverting goes through Version history "Use this version". Assistant saves are not yet journaled for downstream revalidation (B-036).
 
 ### 8.4 Approve and run a generation batch
 
@@ -488,7 +494,7 @@ Every criterion is observable and maps to the goals; functional and relevant reg
 **MVP criteria (2026-11-01):** each MVP sprint's backlog pass conditions, proven by that sprint's checks and Lou's QA. SC1–SC8 and the deployed-release gate below are the full-release criteria.
 
 - [ ] **SC1 (G1):** Browser proof of a representative idea-to-saved-script/reference/storyboard journey, plus entry through pasted text, uploads and Library reuse without forcing unnecessary stages.
-- [ ] **SC2 (G2/G3):** Correct workspace versions/decisions; manual saves without new assistant turns; explicit stale-save failures; no automatic replacement of approved work; only human approval/selection.
+- [ ] **SC2 (G2/G3):** Correct workspace versions/decisions; manual saves without new assistant turns; explicit stale-save failures; no automatic replacement of approved work (MVP exception: an agent script rewrite replaces the current use as a draft, §8.3); only human approval/selection.
 - [ ] **SC3 (G3):** Exact-version reuse across conversations with independent approvals, original preservation and rejection of foreign-account references.
 - [ ] **SC4 (G4):** End-to-end stream-copy export of compatible chosen clips in order, with clear rejection of incompatible clips. Decode/check picture geometry, order, duration and existing audio; block invalid inputs; preserve independent completed exports.
 - [ ] **SC5 (G5/G7):** Progress, partial success, failure, timeout and uncertainty; distinct Stop/cancel behavior; guarded late publication and accurate saved outcome reports.
@@ -585,7 +591,7 @@ Tools call application/domain functions in process, never application HTTP route
 | 012: Video | B-025 waiting with resume, B-019 MiniMax video, B-020 join clips | Shot videos play in Videos; joined clips play as one video. |
 
 **Sprint rules**
-- Each sprint holds a few small backlog items, so Lou can test often. Sprint 006 takes five because B-023 gives it a real tool to show and B-034 is small (Lou, 2026-11-01). Sprints run in order, each from integrated `phase-3`. Stories are one PR each into `sprint-NNN`. The sprint integrates into `phase-3` on Lou's explicit merge command.
+- Each sprint holds a few small backlog items, so Lou can test often. Sprint 006 takes five because B-023 gives it a real tool to show and B-034 is small (Lou, 2026-11-01). Sprints run in order, each from integrated `main`. Stories are one PR each into `sprint-NNN`. The sprint integrates into `main` on Lou's explicit merge command.
 - Verification:
   - Targeted checks run per change.
   - Deterministic browser and API tests use a test-only scripted model, excluded from the production build.
