@@ -124,7 +124,7 @@
 - **Planned commits:**
   1. `Feat(chat): Wire queue and exact turn controls` — bounded native client integration.
   2. `Test(chat): Prove reconnect and stop isolation` — negative/race/cleanup and visual evidence.
-- **Technical notes:** `native-control.ts`, `native-outcome.ts` and `docs/native-turn-control.md` define distinct run/message IDs. Neither Stop acknowledgment nor local abort proves remote billing ended.
+- **Technical notes:** `packages/api-client/src/native-control.ts` and `packages/api-client/src/native-outcome.ts` define distinct run/message IDs. Neither Stop acknowledgment nor local abort proves remote billing ended.
 
 #### Story 4: Authorized Muse Wonder qualification and activation
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)

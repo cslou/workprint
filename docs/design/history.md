@@ -2,53 +2,43 @@
 
 ## Private single-clip playback — 2026-11-01
 
-**Provisionally approved by the orchestrator under Lou’s delegation; pending Lou’s Phase 3 ratification.** Six `private-clip-playback-r1` desktop/narrow captures inspected: ready, downloading and download failed. Download reuses the exact-version media access with existing secondary-button and plain-status primitives; Library video inspection now plays the same clip instead of a poster. See [binding scope](design.md#private-single-clip-playback-and-download). Playback and download never use, choose or export a version.
+**Provisionally approved by the orchestrator on 2026-11-01 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff.** Download reuses the exact-version media access with the existing secondary-button and plain-status primitives; Library video inspection now plays the same clip instead of a poster. Playback and download never use, choose or export a version. See [design.md](design.md#private-single-clip-playback-and-download).
 
 ## Exact Library reuse — 2026-11-01
 
-**Provisionally approved by the orchestrator under Lou’s delegation; pending Phase 3 ratification.** Ten narrow and three representative desktop `library-reuse-r1` captures inspected. Exact-version inspection/use, original-identity recovery, partial attachment and reference association/conflict states retain existing primitives and distinguish viewing from human authority. No examples catalog, implicit latest, Shot-video choice or playback. See [binding scope and evidence limits](design.md#exact-library-reuse-and-reference-editing). Built-in mutation controls use server-derived metadata; actual authority stays server-side.
+**Provisionally approved by the orchestrator on 2026-11-01 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff.** Exact-version inspection/use, original-identity recovery, partial attachment and reference association/conflict states retain existing primitives and distinguish viewing from human authority. No examples catalog, implicit latest, Shot-video choice or playback; built-in mutation controls use server-derived metadata, and actual authority stays server-side. See [design.md](design.md#exact-library-reuse-and-reference-editing) and the [brand-book page](brand-book/screens/library.html).
 
 ## Image-only upload restriction — 2026-10-31
 
-**Provisionally approved by the orchestrator under Lou’s delegation; pending Lou’s Phase 3 ratification.** Following Lou’s explicit scope decision, entry and refusal feedback now state JPEG/PNG-only upload limits and temporary video unavailability. Main inspected all six `image-only-uploads-r1` desktop/narrow captures; image success remains Draft without reference approval. See [binding scope and evidence limits](design.md#image-only-upload-restriction). This supersedes video-upload entry/success promises for this delivery, not existing owned-media presentation. Runtime verification and human ratification remain separate.
+**Provisionally approved by the orchestrator on 2026-10-31 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff.** Following Lou’s explicit scope decision, entry and refusal feedback state JPEG/PNG-only limits and temporary video unavailability; image success remains Draft without reference approval. This supersedes video-upload entry/success promises for this delivery, not existing owned-media presentation. See [design.md](design.md#image-only-upload-restriction).
 
 ## Verified upload feedback — 2026-10-31
 
-**Provisionally approved by the orchestrator under Lou’s delegation; pending Lou’s Phase 3 ratification.** Sixteen inert states retain existing tokens and distinguish authorization/transfer/verification from saved exact versions. Explicit same-upload recovery, observer-only stop and scope clearing avoid replay or rollback claims. Saved image/video remains Draft; video has a poster, not playback or Shot selection. Main inspected the complete narrow contact sheet and representative desktop/narrow full captures. See [binding decisions and verification limits](design.md#verified-upload-feedback). Synthetic preview assets are not verified media; no runtime acceptance is claimed.
+**Provisionally approved by the orchestrator on 2026-10-31 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff.** Sixteen states keep existing tokens and distinguish authorization, transfer and verification from saved exact versions; explicit same-upload recovery, observer-only stop and scope clearing avoid replay or rollback claims. Saved media remains Draft, not reference approval or Shot selection. See [design.md](design.md#verified-upload-feedback) and the [brand-book page](brand-book/screens/uploads.html).
 
 ## Manual save recovery — 2026-10-30
 
-**Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Existing text editors retain input through conflicts and uncertain outcomes. Explicit same-command retry is distinct from a new save; reviewed-base continuation is local only and blocks changed targets. Reference descriptions and stable planning text reuse these controls without granting later-story structure or selection authority. See [binding recovery decisions](design.md#manual-save-recovery). Inspection of 13 inert states does not claim runtime behavior or human ratification.
+**Provisionally approved by the orchestrator on 2026-10-30 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff.** Text editors keep input through conflicts and uncertain outcomes; explicit same-command retry is distinct from a new save, and reviewed-base continuation is local only and blocks changed targets. Reference descriptions and stable planning text reuse these controls without granting later-story structure or selection authority. See [design.md](design.md#manual-save-recovery).
 
 ## Bounded saved-work navigation — 2026-10-30
 
-**Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Option B adds a loaded-window range and Back to first page after bounded eviction, preserving exact Library choices and keeping navigation inside the scrolling rows. This replaces the inaccessible 1,000-item ceiling without silent loss of back-navigation. [Binding details](design.md#bounded-saved-work-navigation) refine the prior append-only description. Desktop/narrow inert Library/history previews were inspected; runtime and visual parity remain to be verified.
+**Provisionally approved by the orchestrator on 2026-10-30 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff.** Option B adds a loaded-window range and Back to first page after bounded eviction, preserving exact Library choices and keeping navigation inside the scrolling rows. It replaces the inaccessible 1,000-item ceiling without silent loss of back-navigation and refines the earlier append-only description. See [design.md](design.md#bounded-saved-work-navigation).
 
 ## Owned saved-work reads — 2026-10-29
 
-**Provisionally approved by the orchestrator on 2026-10-29 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff.**
-
-- **What:** Sprint 005 Story 1's 14 new states:
-  - version-history and Library pagination, with loading, failure and complete states;
-  - initial history loading and failure;
-  - viewing an earlier exact version;
-  - the neutral empty-Library second line;
-  - text-only references with a `No image` thumbnail and sheet.
-- **Change:** one, from the preview. Library's `Load more` moves from a fixed band above the selection tray to the end of the scrolling grid, matching the history pattern.
-- **Where:** exact copy and behavior are in [Phase 3 saved-work reads](design.md#phase-3-saved-work-reads).
-- **Previews:** ignored files in `outputs/verification/sprint-005/design-proposals/owned-reads/` (the `workprint-2` clone), kept as historical evidence only.
+**Provisionally approved by the orchestrator on 2026-10-29 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff.** Fourteen states: version-history and Library pagination with loading, failure and complete states; initial history loading and failure; viewing an earlier exact version; the neutral empty-Library second line; and text-only references with a `No image` thumbnail and sheet. One change from the preview: Library’s `Load more` moved from a fixed band above the selection tray to the end of the scrolling grid, matching the history pattern. See [design.md](design.md#phase-3-saved-work-reads).
 
 ## Owned conversation navigation and history — 2026-10-30
 
-**Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Twenty-nine inert navigation/history states reuse shell, dialogs and message styles. Explicit Previous/Next Recents, read-only earlier history and uncertain-create feedback avoid automatic mutation replay or invented workspace persistence. All narrow sheets were inspected; [binding decisions](design.md#owned-conversation-navigation-and-history) retain runtime, keyboard, visual and human-ratification gates. Send stays unavailable.
+**Provisionally approved by the orchestrator on 2026-10-30 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff.** Twenty-nine navigation/history states reuse the shell, dialogs and message styles. Explicit Previous/Next Recents, read-only earlier history and uncertain-create feedback avoid automatic mutation replay or invented workspace persistence; Send stays unavailable. See [design.md](design.md#owned-conversation-navigation-and-history).
 
 ## Account failure clarification — 2026-10-30
 
-**Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Five additional session-check/storage-lock/sign-out feedback states extend the original account inventory. Distinguish this-tab lock from persisted fencing and authenticated revocation from credential-free no-op; retry never affects a newer account or replays a mutation. See [binding clarification](design.md#account-failure-clarification). This corrects the earlier implementation’s unsupported assumption that startup-failed was already approved; implementation evidence remains subject to independent review.
+**Provisionally approved by the orchestrator on 2026-10-30 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff.** Five session-check, storage-lock and sign-out states extend the original account inventory. They distinguish this-tab lock from persisted fencing and authenticated revocation from a credential-free no-op; retry never affects a newer account or replays a mutation. This corrects the earlier implementation’s unsupported assumption that startup-failed was already approved. See [design.md](design.md#account-failure-clarification).
 
 ## Account and session flows — 2026-10-30
 
-**Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** The 30 inert account/recovery/session states reuse existing dialogs, with labelled 44px Auth fields, neutral feedback, non-enumerating reset messages and explicit uncertain-update handling. Recovery is quarantined; sign-out/expiry fence old scope without deleting saved data or replaying commands. See [binding decisions](design.md#phase-3-account-and-session-flows). Preview inspection is not implemented behavior or Lou’s ratification.
+**Provisionally approved by the orchestrator on 2026-10-30 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff.** Thirty account, recovery and session states reuse the existing dialogs with labelled 44px Auth fields, neutral feedback, non-enumerating reset messages and explicit uncertain-update handling. Recovery is quarantined; sign-out and expiry fence old scope without deleting saved data or replaying commands. See [design.md](design.md#phase-3-account-and-session-flows).
 
 ## Phase 2 review — 2026-10-29
 
