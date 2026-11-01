@@ -3,6 +3,12 @@ import type { NativeTurnModel } from './model.js';
 
 /** The title call's only instructions; also how a scripted provider tells a title request from a turn. */
 export const titleInstructions = 'Name this short video from the filmmaker’s message in at most six words. Reply with the title only, no quotes.';
+/**
+ * Sent as `reasoning_effort: "minimal"`; Muse Spark cannot turn reasoning off. The model router reads
+ * `openai` on Meta's registry endpoint and `meta` (its provider id) on an explicit OpenAI-compatible URL.
+ */
+const minimalEffort = Object.freeze({ reasoningEffort: 'minimal' });
+export const titleProviderOptions = Object.freeze({ openai: minimalEffort, meta: minimalEffort });
 /** Longest saved title, in characters. */
 export const titleLength = 60;
 
@@ -10,6 +16,7 @@ type StreamPart = { type: string; delta?: unknown; finishReason?: unknown };
 type StreamCall = (options: {
   prompt: readonly ({ role: 'system'; content: string } | { role: 'user'; content: readonly { type: 'text'; text: string }[] })[];
   maxOutputTokens: number;
+  providerOptions: Readonly<Record<string, Readonly<Record<string, string>>>>;
   abortSignal: AbortSignal;
 }) => Promise<{ stream: ReadableStream<StreamPart> }>;
 
@@ -54,7 +61,8 @@ export function createVideoTitler(model: NativeTurnModel, storage: MastraComposi
       if (!thread || thread.resourceId !== accountId || thread.title?.trim()) return;
       const { stream } = await bounded(doStream({
         prompt: [{ role: 'system', content: titleInstructions }, { role: 'user', content: [{ type: 'text', text: message }] }],
-        maxOutputTokens: limits.titleTokens, abortSignal: deadline.signal,
+        // A title needs no deliberation; the lowest effort Muse Spark accepts keeps it to about a second.
+        maxOutputTokens: limits.titleTokens, providerOptions: titleProviderOptions, abortSignal: deadline.signal,
       }));
       reader = stream.getReader();
       let text = '', finishReason: unknown;

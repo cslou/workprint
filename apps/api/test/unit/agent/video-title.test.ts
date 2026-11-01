@@ -5,14 +5,14 @@ import { cleanTitle, titleInstructions, titleLength, type NativeTurnModel } from
 import { createVideoTitler } from '../../../src/agent/mastra/video-title.js';
 
 const owner = 'owner', video = 'video';
-const limits = { titleTokens: 32, titleMs: 200 };
+const limits = { titleTokens: 1024, titleMs: 200 };
 
 /** A model whose title stream the test supplies, recording each call's options. */
 function fakeModel(respond: (signal: AbortSignal) => ReadableStream<unknown>) {
-  const calls: { prompt: unknown; maxOutputTokens: unknown; abortSignal: AbortSignal }[] = [];
+  const calls: { prompt: unknown; maxOutputTokens: unknown; providerOptions: unknown; abortSignal: AbortSignal }[] = [];
   const model = { specificationVersion: 'v2', provider: 'fake', modelId: 'fake', supportedUrls: {},
     doGenerate: () => Promise.reject(new Error('unused')),
-    async doStream(options: { prompt: unknown; maxOutputTokens: unknown; abortSignal: AbortSignal }) { calls.push(options); return { stream: respond(options.abortSignal) }; } };
+    async doStream(options: { prompt: unknown; maxOutputTokens: unknown; providerOptions: unknown; abortSignal: AbortSignal }) { calls.push(options); return { stream: respond(options.abortSignal) }; } };
   return { model: model as unknown as NativeTurnModel, calls };
 }
 const text = (...deltas: string[]) => () => new ReadableStream<unknown>({ start(controller) {
@@ -46,12 +46,13 @@ test('a title is one line without quotes or a full stop, at most 60 characters',
   assert.equal(cleanTitle(`${'a'.repeat(59)}${family}b`), `${'a'.repeat(59)}${family}`);
 });
 
-test('an untitled video gets one capped call and a title-only save', async () => {
+test('an untitled video gets one capped, minimal-effort call and a title-only save', async () => {
   const { model, calls } = fakeModel(text('Night ', 'swim'));
   const { storage, patches } = fakeStorage({ title: '', metadata: { workprintStarted: true } });
   await createVideoTitler(model, storage, limits)(owner, video, 'A short film about a night swim');
   assert.equal(calls.length, 1);
-  assert.equal(calls[0]!.maxOutputTokens, 32);
+  assert.equal(calls[0]!.maxOutputTokens, 1024);
+  assert.deepEqual(calls[0]!.providerOptions, { openai: { reasoningEffort: 'minimal' }, meta: { reasoningEffort: 'minimal' } });
   assert.deepEqual(calls[0]!.prompt, [{ role: 'system', content: titleInstructions }, { role: 'user', content: [{ type: 'text', text: 'A short film about a night swim' }] }]);
   assert.deepEqual(patches, [{ id: video, title: 'Night swim' }], 'never metadata');
 });

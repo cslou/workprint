@@ -5,7 +5,7 @@ import { withStallLimit } from '../../../src/agent/mastra/stall-limit.js';
 
 test('production turn limits match the approved values', () => {
   assert.deepEqual({ ...turnLimits }, {
-    inputBytes: 32768, maxOutputTokens: 32768, maxSteps: 100, stallMs: 120000, turnMs: 35 * 60 * 1000, cleanupMs: 3000, titleTokens: 32, titleMs: 15000,
+    inputBytes: 32768, maxOutputTokens: 32768, maxSteps: 100, stallMs: 120000, turnMs: 35 * 60 * 1000, cleanupMs: 3000, titleTokens: 1024, titleMs: 15000,
   });
   assert.ok(Object.isFrozen(turnLimits));
 });
