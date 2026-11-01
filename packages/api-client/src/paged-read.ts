@@ -1,5 +1,5 @@
 import { applicationResponseBytes } from '@workprint/contracts';
-import type { ClientError, ClientResult } from './result.js';
+import type { ClientError, ClientResult } from './types.js';
 
 export type ReadPage<T> = { items: T[]; nextCursor: string | null };
 type WindowMetadata = { omittedItems?: number };

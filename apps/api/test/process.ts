@@ -25,10 +25,11 @@ export async function start(command: string, args: string[], options: { cwd: str
   });
   let done = false;
   let stopped = false;
+  let termination: { code: number | null; signal: NodeJS.Signals | null } | undefined;
   const lifetime = setTimeout(() => { void stop(); }, 120000);
   const exited = new Promise<number>((resolve, reject) => {
     child.once('error', (error) => { clearTimeout(lifetime); reject(error); });
-    child.once('exit', (code) => { clearTimeout(lifetime); done = true; resolve(code ?? 1); });
+    child.once('exit', (code, signal) => { clearTimeout(lifetime); done = true; termination = { code, signal }; resolve(code ?? 1); });
   });
   await new Promise<void>((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject); });
   await log.close();
@@ -49,6 +50,8 @@ export async function start(command: string, args: string[], options: { cwd: str
     } finally { clearTimeout(timer); }
   }
   return {
+    pid: child.pid!,
+    get termination() { return termination; },
     exited,
     stop,
     async response(url: string) {

@@ -13,9 +13,10 @@ const env = {
 };
 const serving = { ...env };
 delete serving.MIGRATION_DATABASE_URL;
-delete serving.WORKPRINT_PUBLIC_API_ORIGIN;
-// Only this explicit public origin may cross into Vite; never backend settings.
-const webEnv = Object.fromEntries(['PATH', 'HOME', 'TMPDIR', 'SYSTEMROOT', 'NODE_OPTIONS', 'WORKPRINT_PUBLIC_API_ORIGIN'].filter((key) => env[key]).map((key) => [key, env[key]]));
+const publicSettings = ['WORKPRINT_PUBLIC_API_ORIGIN', 'WORKPRINT_PUBLIC_SUPABASE_URL', 'WORKPRINT_PUBLIC_SUPABASE_PUBLISHABLE_KEY'];
+for (const key of publicSettings) delete serving[key];
+// Only these explicit public settings may cross into Vite; never backend settings.
+const webEnv = Object.fromEntries(['PATH', 'HOME', 'TMPDIR', 'SYSTEMROOT', 'NODE_OPTIONS', ...publicSettings].filter((key) => env[key]).map((key) => [key, env[key]]));
 const children = new Set();
 let stopping = false;
 function stop(signal = 'SIGTERM') {
@@ -57,7 +58,6 @@ try {
     await run('tsc', ['-p', 'apps/api/tsconfig.build.json']);
   }
   if (task === 'build') {
-    await run('mastra', ['build'], 'apps/api');
     await run('pnpm', ['exec', 'vite', 'build'], 'apps/web', webEnv);
   } else if (task === 'db:prepare') {
     await run(process.execPath, ['dist/src/mastra/prepare.js'], 'apps/api');
@@ -66,11 +66,11 @@ try {
       await run('tsc', ['-p', 'packages/contracts/tsconfig.json']);
       await run('tsc', ['-p', 'packages/api-client/tsconfig.json']);
       await run('tsc', ['-p', 'packages/player/tsconfig.json']);
+      await run('tsc', ['-p', 'apps/api/tsconfig.build.json']);
     }
     await Promise.all([
-      task === 'dev'
-        ? run('mastra', ['dev'], 'apps/api', serving)
-        : run(process.execPath, ['apps/api/.mastra/output/index.mjs'], '.', serving),
+      ...(task === 'dev' ? [run('tsc', ['-p', 'apps/api/tsconfig.build.json', '--watch', '--preserveWatchOutput'], '.', serving)] : []),
+      run(process.execPath, [...(task === 'dev' ? ['--watch'] : []), 'apps/api/dist/src/mastra/server.js'], '.', serving),
       run('pnpm', ['exec', 'vite', ...(task === 'start' ? ['preview'] : []), '--host', '127.0.0.1', '--port', process.env.WEB_PORT ?? '5173', '--strictPort'], 'apps/web', webEnv),
     ]);
   }
