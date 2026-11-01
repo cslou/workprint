@@ -1,32 +1,7 @@
 import { registerApiRoute } from '@mastra/core/server';
 import { applicationError, errorStatus, operations, type OperationName } from '@workprint/contracts';
 import type { Application } from '../application/index.js';
-
-async function readBody(request: Request): Promise<unknown> {
-  if (!request.body) return {};
-  if (request.method === 'GET' || !/^application\/json(?:\s*;|$)/i.test(request.headers.get('content-type') ?? '')) throw new Error('Invalid body');
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const deadline = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Body deadline')), 2000); });
-  try {
-    for (;;) {
-      const { done, value } = await Promise.race([reader.read(), deadline]);
-      if (done) break;
-      size += value.byteLength;
-      if (size > 1024 * 1024) throw new Error('Body limit');
-      chunks.push(value);
-    }
-    const bytes = new Uint8Array(size);
-    let offset = 0;
-    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-    return JSON.parse(new TextDecoder().decode(bytes));
-  } finally {
-    if (timer !== undefined) clearTimeout(timer);
-    try { await reader.cancel(); } finally { reader.releaseLock(); }
-  }
-}
+import { readBody } from './body.js';
 
 export const applicationRoutes = (application: Application) => (Object.keys(operations) as OperationName[]).map((name) => {
   const operation = operations[name];
