@@ -649,7 +649,7 @@ For controls whose prerequisites are not implemented, use read-only sample props
 
 - Phase 1's authenticated callable application contracts and declared, not yet qualified, native conversation interfaces.
 - Existing design tokens, components and approved flows.
-- Reproducible synthetic or appropriately licensed sample content for layout/component tests—not private, ignored demo assets. Real R2 transfer/playback qualification accompanies the first functional media slice; it is not a prerequisite for an unavailable-feature response.
+- Reproducible synthetic or appropriately licensed sample content for layout/component tests—not private, ignored demo assets. Hosted R2 transfer/playback qualification accompanies hosted deployment (P4-S19), not the local Phase 3 media slices (Lou, 2026-11-01); it is not a prerequisite for an unavailable-feature response.
 
 #### Stories
 
@@ -822,7 +822,7 @@ Classify operations by their intended callers, not by their folder name. A front
 - No additional manual creative-authoring or structured-document import screens are assumed beyond the already intended frontend inputs and edits. Initial creative production and automatic prose-to-structured-work conversion stay in Phase 4. Pasted text can be a native message or an edit; sending prose does not automatically create a Script Artifact Version.
 - Local generation cancellation and status reads can be verified on real records and a controlled native workflow. Mocking the external cancellation boundary does not qualify a real provider, late generated-result publication or stopped charges. Phase 4 owns those proofs before live generation is accepted.
 - Question answering commits the decision independently of its native notification. A recorded approval is not a claim that Generation Requests exist or execution started. Agent-side continuation with production tools is a Phase 4 dependency.
-- The first functional media slice includes actual development-R2 signing, stored-byte/type/size confirmation, CORS/range access, expiry/reacquisition or explicit failure, and authorized download. Later player stories add full product playback/sequence evidence, not a delayed replacement for transport qualification.
+- The first functional media slice includes actual signing against the pinned local S3-compatible emulator, stored-byte/type/size confirmation, CORS/range access, expiry/reacquisition or explicit failure, and authorized download; hosted-R2 qualification moves to P4-S19 (Lou, 2026-11-01). Later player stories add full product playback/sequence evidence, not a delayed replacement for transport qualification.
 
 #### Modules
 
@@ -924,7 +924,7 @@ This umbrella retains references to the original capability; the following indep
 - **Acceptance criteria:**
   - [ ] Upload through `api-client` to private R2, inspect actual bytes/type/size and supported media, create bounded metadata/posters and link the confirmed version for the human's intended use. Neither a signed URL nor transfer completion alone creates usable work.
   - [ ] Reject malformed/unsupported/oversized or mismatched content. Confirmation is repeat-safe; an upload URL cannot overwrite published media. Failed/expired transfers retain safe cleanup references without publishing a version.
-  - [ ] Use real development R2 and a browser to qualify signing, CORS, range access, stored-object checks, expiry/reacquisition or explicit failure, image display and authorized download. Test owner isolation and interrupted confirmation. Synthetic/licensed media and redacted evidence only.
+  - [ ] Use the pinned local S3-compatible emulator and a browser to qualify signing, CORS, range access, stored-object checks, expiry/reacquisition or explicit failure, image display and authorized download. Test owner isolation and interrupted confirmation. Synthetic/licensed media and redacted evidence only.
 - **Commits:** ≤5.
 
 ##### P3-S4 — Library reuse and reference controls
@@ -977,7 +977,7 @@ This umbrella retains references to the original capability; the following indep
 - **What:** complete actual product playback of individual versions and chosen clips.
 - **Acceptance criteria:**
   - [ ] Play/pause/seek use exact backend-provided versions. Verify picture and embedded audio; viewing does not change any selection or create an exported file.
-  - [ ] `api-client` obtains/reacquires authorized sources; `player` only consumes them. Verify real R2 cross-origin/range behavior and URL expiry, ownership failures, switching conversations and loading/interruption states through the actual consumer.
+  - [ ] `api-client` obtains/reacquires authorized sources; `player` only consumes them. Verify emulator cross-origin/range behavior and URL expiry, ownership failures, switching conversations and loading/interruption states through the actual consumer.
   - [ ] Individual uploaded-video playback requires no Script/Shot plan; local public clips alone do not qualify private product playback. No sequential Play all, comparison playback, timeline editing or audio mixing.
 - **Commits:** ≤5.
 
@@ -1044,7 +1044,7 @@ The approved spec scope supersedes older architecture/design language about spen
 
 - [ ] Frontend-only/shared backend operations and their actual browser consumers are implemented, with their valid-record prerequisites and real behavior demonstrated—not just success-shaped responses.
 - [ ] Shared rules preserve exact versions, human-only authority, stale-write rejection, owner isolation and the Phase 4 integration boundary; no production creative tool was smuggled into this phase.
-- [ ] Upload/private access/playback have actual development-R2 evidence, including range/CORS/expiry; usage is recorded from the first live model calls enabled here.
+- [ ] Upload/private access/playback have actual local-emulator evidence, including range/CORS/expiry (hosted-R2 evidence belongs to P4-S19); usage is recorded from the first live model calls enabled here.
 - [ ] Export actually produces a verified downloadable video and passes exact-input/currentness, compatibility-rejection, restart, finalization-race and completed-output-independence tests.
 - [ ] Functional UI designs are approved; desktop/narrow keyboard/focus/loading/error checks, relevant automated suites and existing application-repository checks pass with reproducible evidence and no sensitive logs.
 - [ ] Agent-created prerequisites, tools/skills, provider execution and complete agent-driven flows remain explicitly assigned to Phase 4. Phase 4 now also owns remaining combined-product acceptance and release, not deferred Phase 3 feature correctness.
@@ -1087,6 +1087,7 @@ Wave 2 starts after both Wave 1 sprints integrate and B-007 qualifies the combin
 **Decisions recorded with this packaging**
 
 - **R2, local first:** P3-S3/S10 are developed and tested against a pinned local S3-compatible emulator (SeaweedFS 4.51, by digest). Their real development-R2 criteria move to a dedicated final qualification story in Sprint 005. Sprint 005 cannot complete without it, and Lou provides the bucket before that story starts. Lou confirmed this on 2026-10-29, including keeping the real-R2 check in Sprint 005.
+  - **Superseded 2026-11-01 (Lou):** SeaweedFS is sufficient for Phase 3 and the MVP. The real development-R2 story is removed from Sprint 005 and Sprint 005 can complete without it; hosted-storage qualification moves to hosted deployment (P4-S19).
   - Cloudflare's experimental local R2 S3 endpoint (Wrangler 4.115 / Miniflare, July 2026) was considered and not chosen: its CORS is always permissive, so our rules cannot be tested locally, and it adds about 140 MB of native packages.
   - For the real check, the token is limited to object read/write in the dev bucket. Lou sets the bucket's CORS rule once, and the tests verify it.
 - **Built-in Library examples:** ignored for now (Lou, 2026-10-29). Only the read-only `builtIn` semantics are implemented, proven with test-only records.
