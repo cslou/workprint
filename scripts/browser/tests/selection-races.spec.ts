@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-type Harness = { selectionRace: { configure(mode: 'video' | 'panel', options?: { bound?: boolean }): void; pending(): number; complete(id: string, revision: number): void } };
+type Harness = { selectionRace: { configure(mode: 'video' | 'panel', options?: { bound?: boolean; composed?: boolean }): void; pending(): number; useScript(revision: number): void; composedRevision(): number; complete(id: string, revision: number): void } };
 
 test('one scoped Shot owns selection across every candidate row', async ({ page }, info) => {
   await info.attach('prerequisite', { body: 'Read-only public versions and controlled validated command acknowledgements; reconciliation proof, not persisted backend success.', contentType: 'text/plain' });
@@ -47,4 +47,17 @@ test('owned videos bound to a Shot are exact candidates; only an explicit Use ch
   await page.evaluate(() => (window as unknown as Harness).selectionRace.complete('video-v1', 10));
   await expect(rows.nth(0).getByText('Chosen', { exact: true })).toBeVisible();
   await expect(page.getByText('Chosen', { exact: true })).toHaveCount(1);
+});
+test('a later unrelated use at the same revision keeps exactly the confirmed Shot-video choice', async ({ page }) => {
+  await page.goto('/selection-races.html'); await page.waitForFunction(() => !!(window as unknown as Harness).selectionRace);
+  await page.evaluate(() => (window as unknown as Harness).selectionRace.configure('video', { bound: true, composed: true }));
+  const rows = page.locator('.wp-video-row'); await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0).getByText('Chosen', { exact: true })).toBeVisible();
+  await rows.nth(1).getByRole('button', { name: 'Use this version', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as Harness).selectionRace.pending())).toBe(1);
+  await page.evaluate(() => (window as unknown as Harness).selectionRace.complete('video-v2', 10));
+  await page.evaluate(() => (window as unknown as Harness).selectionRace.useScript(10));
+  await expect.poll(() => page.evaluate(() => (window as unknown as Harness).selectionRace.composedRevision())).toBe(10);
+  await expect(page.getByText('Chosen', { exact: true })).toHaveCount(1);
+  await expect(rows.nth(1).getByText('Chosen', { exact: true })).toBeVisible();
 });

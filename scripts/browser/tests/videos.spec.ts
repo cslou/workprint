@@ -74,7 +74,8 @@ observedTest('Video Use, list/details and cancellation receive real 401/404/501 
         expect(commands).toEqual([]);
         const use = page.waitForResponse(value => value.url() === `${origin}/v1/conversations/read-only-conversation/uses`);
         await activate(page.locator('.wp-video-row').getByRole('button', { name: 'Use this version', exact: true }), status === 501);
-        // Shot-video choice is implemented; the fixture conversation is not owned, so an authenticated Use is denied without effects.
+        // `status` names the unavailable generation responses. Shot-video choice is implemented, and the fixture conversation
+        // is not owned, so an authenticated Use gets 404 and an anonymous one 401, both without effects.
         expect((await use).status()).toBe(status === 501 ? 404 : 401);
         await expect(page.getByText(status === 501 ? 'This version was not selected. The current selection is unchanged.' : 'Sign-in required to use this version. The current selection is unchanged.', { exact: true })).toBeVisible();
         expect(await page.locator('.wp-video-row [data-current-version-id]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-current-version-id')))).toEqual(['video-v1', 'video-v1']);

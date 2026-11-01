@@ -94,6 +94,12 @@ test('exact Shot-video choice keeps one current version per Shot and advances th
     const journal = (await query(db.servingUrl, "SELECT count(*) FILTER (WHERE c.selection_revision IS NOT NULL)::int AS choices,(SELECT count(*)::int FROM artifacts.manual_changes WHERE selection_revision IS NOT NULL) AS edits FROM artifacts.use_changes c")).rows[0];
     assert.equal((await store.workspace(owner, conversation)).selectionRevision, journal?.choices + journal?.edits, 'Every revision belongs to exactly one journalled change');
 
+    // With planning fixed, concurrent choices for one Shot both commit in some order and leave one current choice.
+    const pair = await Promise.allSettled([choose(first.id, 's2'), choose(second.id, 's2')]);
+    assert.deepEqual(pair.map(result => result.status), ['fulfilled', 'fulfilled']);
+    assert.ok([first.id, second.id].includes((await shot('s2')).chosenVideoVersionId!));
+    await assert.rejects(query(db.servingUrl, `UPDATE artifacts.conversation_uses SET state='approved' WHERE purpose='shot_video' AND state='draft' AND binding->>'shotId'='s2'`), /one_approved_choice/, 'SQL keeps one approved choice per Shot');
+
     const repeat = (await query(db.servingUrl, `SELECT previous_version_id,version_id,selection_revision FROM artifacts.use_changes WHERE version_id='${first.id}' ORDER BY created_at LIMIT 2`)).rows;
     assert.deepEqual(repeat.map(row => [row.previous_version_id, row.version_id, row.selection_revision]), [[null, first.id, '1'], [first.id, first.id, null]], 'A first choice and a no-op re-choice are distinguishable');
   } finally { await native.close(); if (!pool.ended) await pool.end(); await setup.close(); await db.close(); }
