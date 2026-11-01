@@ -20,9 +20,10 @@ function composition(scripted: { url: string; apiKey: string } | undefined, gate
   return (src: string) => `
     import { ModelRouterLanguageModel } from '@mastra/core/llm';
     import { createBackend } from ${JSON.stringify(pathToFileURL(`${src}/mastra/backend.js`).href)};
-    import { productionTools, turnLimits } from ${JSON.stringify(pathToFileURL(`${src}/agent/index.js`).href)};
+    import { createAssistantModel, productionTools, turnLimits } from ${JSON.stringify(pathToFileURL(`${src}/agent/index.js`).href)};
     import { chatTestTools } from ${JSON.stringify(tools)};
-    const model = new ModelRouterLanguageModel(${scripted ? `{ id: 'meta/muse-spark-1.3', apiKey: ${JSON.stringify(scripted.apiKey)}, url: ${JSON.stringify(scripted.url)} }` : `{ id: 'meta/muse-spark-1.3', apiKey: process.env.META_API_KEY }`});
+    // Live uses the production factory; scripted routes the same model id to the loopback provider.
+    const model = ${scripted ? `new ModelRouterLanguageModel({ id: 'meta/muse-spark-1.3', apiKey: ${JSON.stringify(scripted.apiKey)}, url: ${JSON.stringify(scripted.url)} })` : `createAssistantModel({ model: 'meta/muse-spark-1.3', apiKey: process.env.META_API_KEY })`};
     const mastra = await createBackend([], {
       model,
       tools: [...productionTools, ...chatTestTools(${JSON.stringify(gateUrl)})],

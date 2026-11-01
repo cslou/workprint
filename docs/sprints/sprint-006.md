@@ -279,6 +279,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
   - First confirm on 1.79.0 that native Memory saves tool-call parts with the assistant message, and which stream chunk types carry tool calls and results.
   - The phrase reaches the browser through a server-owned path: in the observed stream, and in the safe history part. It is not a web-side table.
   - One function exported from `agent` projects tool parts to the safe activity fields and looks up phrases. A new stream adapter module in `apps/api/src/mastra/` (for example `native-stream.ts`) wraps the observed stream and uses it, and so does the history route (`mastra/native-navigation.ts`), so redaction is written once. `mastra/native-turns.ts` stays admission only.
+  - Must fix (Story 1 review, PR #72): native `error` chunks reach the browser with the raw error, including a stack trace with server paths. The same stream adapter replaces each error with a safe name and message before it leaves the server.
   - The `live:chat` read-workspace step passes when an explicit request ("Check our progress on this video") produces a read-workspace call. If the model declines, rephrase once; a second decline is recorded as a finding, not a sprint failure.
 
 #### Story 4: Stop

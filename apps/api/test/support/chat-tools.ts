@@ -23,6 +23,11 @@ export function chatTestTools(gateUrl: string): AgentTool[] {
       },
     },
     {
+      id: 'test-scope', description: 'Report the account and video this tool runs for.',
+      inputSchema: z.strictObject({}),
+      execute: async (_input, { scope }) => ({ accountId: scope.accountId, videoId: scope.videoId }),
+    },
+    {
       id: 'test-unphrased', description: 'A test tool with no activity phrase.',
       inputSchema: z.strictObject({}),
       execute: async () => ({ done: true }),

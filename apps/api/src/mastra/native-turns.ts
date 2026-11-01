@@ -11,18 +11,23 @@ const isSend = (context: Context) => context.req.path === `/api/agents/${nativeA
 
 /**
  * The admitted send body, with a busy thread's message discarded rather than merged into the running turn.
- * Admission already rejects a busy thread; this closes the race between that check and the native send.
+ * Admission already rejects a busy video and holds it until the send starts; this is defence in depth.
  */
 export function nativeTurnBody(context: Context, body: unknown, bytes: Uint8Array<ArrayBuffer> | undefined): Uint8Array<ArrayBuffer> | undefined {
   return isSend(context) && object(body) ? new TextEncoder().encode(JSON.stringify({ ...body, ifActive: { behavior: 'discard' } })) : bytes;
 }
 
+/** An admitted send holds its video until the native send settles; `release` must run once it has. */
+export type AdmittedSend = { release: () => void };
+
 /** Closed pre-native admission. Body resource is a stale-scope precondition, never ownership authority. */
 export function nativeTurnAdmission(mastra: Mastra) {
+  // Videos whose admitted send has not yet started its native run, so two sends cannot both pass the busy check.
+  const starting = new Set<string>();
   const storage = mastra.getStorage();
   const checkOwned = storage ? createOwnedConversationCheck(storage) : undefined;
   const admitRun = nativeRunAdmission(mastra, checkOwned);
-  return async (context: Context, accountId: string, body: unknown) => {
+  return async (context: Context, accountId: string, body: unknown): Promise<Response | AdmittedSend | undefined> => {
     if (context.req.path.endsWith('/observe')) return admitRun(context, accountId, body);
     const fail = (status: 400 | 404 | 409 | 503, code: string, message: string) => context.json({ error: { code, message } }, status);
     const invalid = () => fail(400, 'invalid_input', 'Invalid native request');
@@ -50,8 +55,11 @@ export function nativeTurnAdmission(mastra: Mastra) {
       if (owned.kind !== 'owned') return fail(404, 'not_found', 'Not found');
       if (!hasNativeTurns(mastra)) return unavailable();
       // One active turn per video; there is no queue.
-      if (send && activeNativeRun(mastra, accountId, body.threadId)) return fail(409, 'busy', 'The agent is still working on the last message.');
-      return undefined;
+      if (!send) return undefined;
+      const videoId = body.threadId;
+      if (starting.has(videoId) || activeNativeRun(mastra, accountId, videoId)) return fail(409, 'busy', 'The agent is still working on the last message.');
+      starting.add(videoId);
+      return { release: () => { starting.delete(videoId); } };
     } catch { return unavailable(); }
     finally { clearTimeout(timer); }
   };

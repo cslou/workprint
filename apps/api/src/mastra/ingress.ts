@@ -5,7 +5,7 @@ import { verifyAccount } from './auth.js';
 import { loadServerConfig } from './config.js';
 import { readIntake } from './body.js';
 import { createAdmissionPolicy, decorateCors } from './admission.js';
-import { nativeTurnRoutes, isNativeTurnRoute, nativeTurnAdmission, nativeTurnBody } from './native-turns.js';
+import { nativeTurnRoutes, isNativeTurnRoute, nativeTurnAdmission, nativeTurnBody, type AdmittedSend } from './native-turns.js';
 
 const verifiedAccountKey = 'workprintVerifiedIngressAccount';
 
@@ -54,6 +54,7 @@ export function createIngress(mastra: Mastra): MiddlewareHandler<{ Bindings: Htt
     };
     outgoing?.on('close', closed);
     if (outgoing?.destroyed) closed();
+    let admittedSend: AdmittedSend | undefined;
     try {
       const identity = await verifyAccount(context.req.header('Authorization'), auth);
       if (cancellation.signal.aborted) return invalid();
@@ -66,8 +67,9 @@ export function createIngress(mastra: Mastra): MiddlewareHandler<{ Bindings: Htt
         let { bytes } = intake;
         if (cancellation.signal.aborted) return invalid();
         if (isNativeTurnRoute(context)) {
-          const rejected = await admitTurn(context, identity.accountId, intake.body);
-          if (rejected) return rejected;
+          const admitted = await admitTurn(context, identity.accountId, intake.body);
+          if (admitted instanceof Response) return admitted;
+          admittedSend = admitted;
           if (cancellation.signal.aborted) return invalid();
           bytes = nativeTurnBody(context, intake.body, bytes);
         }
@@ -84,6 +86,8 @@ export function createIngress(mastra: Mastra): MiddlewareHandler<{ Bindings: Htt
       if (origin) decorateCors(context, origin);
       return context.res;
     } finally {
+      // Runs once the native send has settled (or admission ended early), freeing the video for the next send.
+      admittedSend?.release();
       outgoing?.off('close', closed);
     }
   };

@@ -8,10 +8,10 @@ import { completed, nativeTurnClient, type TurnChunk } from '../support/native-t
 import { scriptedProvider } from '../support/scripted-provider.js';
 
 // The built server through the test composition: Muse Spark routed to the scripted provider,
-// test tools registered, and the step cap and stall limit lowered so the edges are reachable.
+// test tools registered, and the step cap, stall limit and turn deadline lowered so the edges are reachable.
 test('the Muse Spark agent loop runs tools, enforces its limits and fails without retries', { timeout: 300000 }, async t => {
   const provider = await scriptedProvider(); t.after(provider.close);
-  const fixture = await accountBrowserFixture({ composition: chatComposition(provider, { maxSteps: 3, stallMs: 1000 }) }); t.after(fixture.close);
+  const fixture = await accountBrowserFixture({ composition: chatComposition(provider, { maxSteps: 3, stallMs: 1000, turnMs: 4000 }) }); t.after(fixture.close);
   const user = await fixture.auth.createAccount();
   const token = await fixture.accessToken(user);
   const client = nativeTurnClient(fixture.apiOrigin, token, user.id);
@@ -54,6 +54,15 @@ test('the Muse Spark agent loop runs tools, enforces its limits and fails withou
     assert.ok(toolMessage, 'tool result sent to the model'); assert.match(JSON.stringify(toolMessage.content), /ping-7f3a/);
   });
 
+  await t.test('a tool runs for the admitted run\'s account and video, never model arguments', async () => {
+    const video = await newVideo();
+    provider.script({ toolCalls: [{ name: 'test-scope', args: {} }] }, { text: ['Scoped'] });
+    assert.ok(completed(await turn(video, 'Which video is this?')));
+    const toolMessage = bodies()[1]!.messages.find(message => message.role === 'tool');
+    const content = JSON.stringify(toolMessage?.content);
+    assert.ok(content.includes(user.id), 'account from the run'); assert.ok(content.includes(video), 'video from the run');
+  });
+
   await t.test('a tool call on the final allowed step fails the turn; a normal stop there completes it', async () => {
     const echo = { toolCalls: [{ name: 'test-echo', args: { text: 'again' } }] };
     provider.script(echo, echo, echo);
@@ -92,6 +101,22 @@ test('the Muse Spark agent loop runs tools, enforces its limits and fails withou
     provider.script({ text: ['a', 'b', 'c', 'd', 'e'], dripMs: 400 });
     const slow = await turn(await newVideo(), 'Slow but steady');
     assert.ok(completed(slow), JSON.stringify(slow.terminal)); assert.equal(slow.text, 'abcde');
+  });
+
+  await t.test('the overall turn deadline fails a turn that keeps streaming past it', async () => {
+    provider.script({ text: Array.from({ length: 12 }, (_, index) => `${index} `), dripMs: 500 });
+    const late = await turn(await newVideo(), 'Keep going');
+    assert.ok(late.terminal && !completed(late), JSON.stringify(late.terminal));
+    assert.equal(provider.requests.length, 1);
+  });
+
+  await t.test('two sends racing on an idle video: one starts, the other is busy', async () => {
+    const video = await newVideo();
+    provider.script({ text: ['Raced'], hold: 'before' });
+    const statuses = (await Promise.all([send(video, 'First'), send(video, 'Second')])).map(response => response.status).sort();
+    assert.deepEqual(statuses, [200, 409]);
+    await provider.held(); provider.release();
+    assert.equal(provider.requests.length + provider.unscripted.length, 1);
   });
 
   await t.test('a send while the video has an active turn is rejected as busy with no provider request', async () => {

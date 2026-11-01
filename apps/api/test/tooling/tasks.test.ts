@@ -131,6 +131,8 @@ test('dev, start and db:prepare layer WORKPRINT_ENV_FILE over .env; the shell wi
       const setup = task === 'db:prepare';
       // Setup receives the override's migration URL and the loaded public setting; serving children receive neither.
       assert.deepEqual(child, { ...expected, ...(setup ? { MIGRATION_DATABASE_URL: 'postgresql://override-setup', WORKPRINT_PUBLIC_API_ORIGIN: 'http://127.0.0.1:4111' } : {}) }, task);
+      // The browser child gets only explicit public settings: never the model or the key.
+      if (!setup) assert.deepEqual(await recorded(journal, 'web'), { WORKPRINT_PUBLIC_API_ORIGIN: 'http://127.0.0.1:4111' }, task);
     } finally { await running.stop(); }
   }
   const shell = await layeredCheckout();
