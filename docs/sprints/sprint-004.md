@@ -591,12 +591,13 @@ The Final Verification Story runs all applicable sprint functional verification 
   - Story 9, Recents/navigation skeletons: #47.
   - Story 10, centred opening composer: #48.
   - QA follow-ups:
-    - Test trim (9a744cf).
+    - Test trim (9a744cf, merged via #46).
     - Client-only New video, skeleton timing and header removal: #50.
     - Fix for a locked tab hanging on "Checking your session": #53.
     - Focus, `aria-busy`, dead-code and design-guide follow-ups: #54.
 
   Every PR had a current-head independent review scoring at least 4/5 with no open P0 or P1.
+  The kickoff checklists for Stories 8–10 are deliberately left unticked as historical planning records. These stories ran under the Completion procedure update, and their gates are evidenced here by the PRs, reviews and QA.
 - **Combined-branch verification:** One trimmed full run at `76e3962`, 212s in total:
   - frozen install, check and build: PASS
   - API: 64/64
