@@ -7,10 +7,13 @@ export type HistoryState = { id: string; thread: NativeThread | null; messages: 
 export type RecentsState = { value: NativeThreads | null; pending: boolean; failed: boolean; target: number };
 export type CreateState = 'idle' | 'pending' | 'rejected' | 'unknown';
 const failureKind = (error: ClientError) => error.code === 'not_found' ? 'unavailable' as const : 'error' as const;
+const loading = (id: string, thread: NativeThread | null = null): HistoryState => ({ id, thread, messages: [], kind: 'loading', page: 0, hasMore: false, earlier: 'idle' });
+const restoring = () => { const id = new URL(location.href).searchParams.get('conversation'); return id && /^[0-9a-f-]{36}$/i.test(id) ? id : null; };
 
 /** Ephemeral presentation only. Native storage is the sole conversation/history authority. */
 export function useNativeNavigation(connection: BrowserClient, accountId: string | null, signIn: () => void) {
-  const [history, setHistory] = useState<HistoryState | null>(null);
+  // A URL-restored conversation starts as loading, so the opening welcome never flashes first.
+  const [history, setHistory] = useState<HistoryState | null>(() => { const id = restoring(); return id && accountId && connection.kind === 'configured' ? loading(id) : null; });
   const [recents, setRecents] = useState<RecentsState>({ value: null, pending: false, failed: false, target: 0 });
   const [quick, setQuick] = useState<NativeThread[] | null>(null);
   const [createState, setCreateState] = useState<CreateState>('idle');
@@ -26,7 +29,7 @@ export function useNativeNavigation(connection: BrowserClient, accountId: string
     if (!client || !accountId) { signIn(); return; }
     intent.current++;
     const revision = ++selection.current, request = controller();
-    setDialog(null); setHistory({ id, thread: candidate, messages: [], kind: 'loading', page: 0, hasMore: false, earlier: 'idle' }); remember(id);
+    setDialog(null); setHistory(loading(id, candidate)); remember(id);
     try {
       const [thread, messages] = await Promise.all([client.loadConversation({ id, resourceId: accountId }, { signal: request.signal }), client.loadMessages({ id, resourceId: accountId, page: 0, perPage: 20 }, { signal: request.signal })]);
       if (!current(revision)) return;
@@ -39,8 +42,8 @@ export function useNativeNavigation(connection: BrowserClient, accountId: string
     } finally { requests.current.delete(request); }
   };
   useEffect(() => {
-    const id = new URL(location.href).searchParams.get('conversation');
-    if (id && accountId && /^[0-9a-f-]{36}$/i.test(id)) void open(id);
+    const id = restoring();
+    if (id && accountId) void open(id);
     // Account composition re-keys this owner; restore is a read, never a create.
   }, []);
   useEffect(() => {

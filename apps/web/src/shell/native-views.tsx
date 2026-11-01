@@ -5,6 +5,7 @@ import { Button } from '../ui/controls.js';
 import { SkeletonLines, SkeletonRows } from '../ui/skeleton.js';
 import { HistoryScroll } from './history-scroll.js';
 import type { HistoryState, NativeNavigationState } from './use-native-navigation.js';
+import { Welcome } from './welcome.js';
 import './native-views.css';
 
 export const threadTitle = (thread: NativeThread | null) => thread?.title?.trim() || 'Untitled video';
@@ -46,7 +47,7 @@ export function NativeHistory({ state, navigation }: { state: HistoryState; navi
       {state.kind === 'loading' && <><p className="wp-sr-only" role="status">Loading conversation…</p><SkeletonLines count={4} /></>}
       {state.kind === 'unavailable' && <div className="wp-history-state"><p role="status">This conversation isn’t available.</p><div className="wp-native-actions"><Button variant="secondary" onPress={navigation.openRecents}>Recents</Button></div></div>}
       {state.kind === 'error' && <div className="wp-history-state"><p role="status">This conversation couldn’t be loaded. Check your connection and try again.</p><div className="wp-native-actions"><Button variant="secondary" onPress={() => void navigation.open(state.id, state.thread)}>Try again</Button><Button variant="secondary" onPress={navigation.openRecents}>Recents</Button></div></div>}
-      {state.kind === 'ready' && (state.messages.length === 0 ? <p className="wp-history-state" role="status">No messages yet.</p> : <>
+      {state.kind === 'ready' && (state.messages.length === 0 ? <Welcome owned heading="h2" /> : <>
         <div className="wp-history-more">{state.earlier === 'loading' ? <p role="status">Loading earlier messages…</p> : state.earlier === 'error' ? <div className="wp-history-earlier-error"><p role="status">Earlier messages couldn’t be loaded.</p><Button variant="secondary" onPress={earlier}>Try again</Button></div> : state.hasMore ? <Button variant="secondary" onPress={earlier}>Load earlier messages</Button> : <p role="status">Beginning of conversation.</p>}</div>
         <ol className="wp-saved-messages" aria-label="Saved messages">{state.messages.map(message => <li key={message.id} data-message-id={message.id} className={message.role === 'user' ? 'wp-saved-user' : 'wp-saved-assistant'} aria-label={message.role === 'user' ? 'Your message' : 'Assistant message'}>{message.content.parts?.map((part, index) => part.type === 'text' ? message.role === 'assistant' ? <p key={index}>{part.text}</p> : <span key={index}>{part.text}</span> : null)}</li>)}</ol>
       </>)}

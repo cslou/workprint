@@ -21,6 +21,7 @@ import { useWorkspace } from './workspace.js';
 import { WorkspaceReadPlaceholder } from './workspace-placeholder.js';
 import { CreateFeedback, NativeHistory, RecentRows, Recents } from './native-views.js';
 import { SkeletonRows } from '../ui/skeleton.js';
+import { Welcome } from './welcome.js';
 import type { NativeNavigationState } from './use-native-navigation.js';
 import './shell.css';
 
@@ -54,7 +55,6 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
     setSurface(action);
   };
   const accountName = session?.name ?? 'Account';
-  const welcomeLead = `Describe the moment you want to see. Rough is fine; ${navigation && session ? 'I’ll' : "I'll"} ask about anything I need.`;
   const nav = (popup = false) => <>
     <AriaButton className={`wp-nav-item${navigation?.history || navigation && popup ? '' : ' current'}`} isDisabled={navigation?.createState === 'pending'} onPress={() => void runNative('new')}><svg className="wp-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>New video</AriaButton>
     <AriaButton className="wp-nav-item wp-library-nav" onPress={() => setSurface('library')}><svg className="wp-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="4" height="16" rx="1" /><rect x="9" y="4" width="4" height="16" rx="1" /><path d="m15.5 5.2 3.8-1 3 15.6-3.8.9Z" /></svg>Library</AriaButton>
@@ -73,8 +73,8 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
         <div className="wp-nav-list">{nav()}<span className="wp-menu"><Button variant="secondary" onPress={() => { setSurface('navigation'); if (navigation && session) void navigation.list(); }}>Menu</Button></span></div>
         <div className="wp-recents" aria-busy={!!navigation?.recents.pending}>{recent}</div><div className="wp-sidebar-spacer" />{account}
       </nav>
-      <main className="wp-main" aria-label={navigation?.history ? 'Conversation' : 'New video'} aria-busy={navigation?.history ? navigation.history.kind === 'loading' : workspace.kind === 'loading'}>
-        {navigation?.history ? <NativeHistory state={navigation.history} navigation={navigation} /> : <div className="wp-thread"><div className="wp-welcome"><h1>What would you like to make?</h1><p className="wp-lead">{welcomeLead}</p><div className="wp-hints" aria-label="Things that help">{[navigation && session ? 'Who’s in it' : "Who's in it", 'Where it happens', 'What happens', 'Anything they say', 'Look or mood'].map((hint) => <span key={hint}>{hint}</span>)}</div><p className="wp-aside-note">Have photos of the people or places? You can attach them now or later.</p></div></div>}
+      <main className="wp-main" data-layout={!navigation?.history || navigation.history.kind === 'ready' && navigation.history.messages.length === 0 ? 'opening' : 'thread'} aria-label={navigation?.history ? 'Conversation' : 'New video'} aria-busy={navigation?.history ? navigation.history.kind === 'loading' : workspace.kind === 'loading'}>
+        {navigation?.history ? <NativeHistory state={navigation.history} navigation={navigation} /> : <div className="wp-thread"><Welcome owned={!!(navigation && session)} /></div>}
         {workspace.kind === 'settled' && workspace.result.ok && workspace.result.value.pendingQuestion ? <QuestionReview connection={connection} scope={scope} question={workspace.result.value.pendingQuestion} workspace={workspace.result.value} draft={draft} /> : <Composer native={native} draft={draft} connection={connection} scope={scope} />}
       </main>
       <aside className="wp-workspace" aria-label="This video"><MaterialPanel connection={connection} scope={scope} workspace={projection} {...(projection ? { additionalContent: { storyboard: <Storyboard connection={connection} scope={scope} workspace={projection} {...(storyboardPrerequisites ? { prerequisites: storyboardPrerequisites } : {})} />, videos: <WorkspaceVideos connection={connection} scope={scope} workspace={projection} {...(videoPrerequisites ? { videoPrerequisites } : {})} /> } } : {})} {...(materialPrerequisites ? { prerequisites: materialPrerequisites } : {})} placeholder={placeholder} selectedKey={tab} onSelectionChange={(key) => setTab(key as WorkspaceTab)} {...(content === undefined ? {} : { contentOverride: content })} /></aside>
