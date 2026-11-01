@@ -20,6 +20,8 @@ test('the Muse Spark agent loop runs tools, enforces its limits and fails withou
   const turn = async (videoId: string, message: string) => { const result = await client.turn(videoId, message); streamed.push(...result.chunks); return result; };
   const bodies = () => provider.requests.map(request => request.body as { messages: { role: string; content: unknown }[]; tools?: unknown; max_tokens?: number });
   t.beforeEach(() => provider.reset());
+  const get = async (path: string) => fetch(fixture.apiOrigin + path, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10000) });
+  const listed = async () => ((await (await get('/memory/threads?page=0&perPage=50')).json()) as { threads: { id: string }[] }).threads.map(thread => thread.id);
 
   await t.test('a text reply streams and the next turn carries the saved first turn', async () => {
     const video = await newVideo();
@@ -131,6 +133,28 @@ test('the Muse Spark agent loop runs tools, enforces its limits and fails withou
     provider.release();
     assert.ok(completed(await running));
     assert.equal(provider.requests.length + provider.unscripted.length, 1);
+  });
+
+  await t.test('a video is listed in Recents only once a send to it is accepted', async () => {
+    const video = await newVideo();
+    assert.equal((await send(video, 'a'.repeat(32 * 1024 + 1))).status, 400);
+    assert.ok(!(await listed()).includes(video));
+    provider.script({ text: ['Listed'] });
+    assert.ok(completed(await turn(video, 'Now it counts')));
+    assert.ok((await listed()).includes(video));
+  });
+
+  await t.test('a failed reply keeps its streamed text in history and never its error', async () => {
+    for (const [step, expected] of [[{ text: ['Partial'], incomplete: true }, ['Fail here', 'Partial']], [{ status: 500 }, ['Fail here']]] as const) {
+      provider.reset(); provider.script(step);
+      const video = await newVideo();
+      assert.ok(!completed(await turn(video, 'Fail here')));
+      const history = await get(`/memory/threads/${video}/messages?page=0&perPage=20`);
+      assert.equal(history.status, 200);
+      const body = await history.json() as { messages: { content: { parts: { text: string }[] } }[] };
+      assert.deepEqual(body.messages.map(message => message.content.parts.map(part => part.text).join('')).reverse(), expected);
+      assert.doesNotMatch(JSON.stringify(body), /Scripted failure|AI_|finish reason|error/i);
+    }
   });
 
   await t.test('there is no message queue', async () => {
