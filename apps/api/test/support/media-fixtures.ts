@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { runMediaChild } from '../../src/storage/media/child.js';
 import type { MediaSandbox } from '../../src/storage/media/sandbox.js';
@@ -28,5 +29,17 @@ export async function qualifiedMediaFixtures(sandbox: MediaSandbox, docker: stri
     const jpeg=await exec(['/bin/cat','/work/still.jpg']),video=await exec(['/bin/cat','/work/clip.mp4']);
     const progress=await exec(['/tools/ffmpeg','-nostdin','-v','error','-xerror','-err_detect','explode','-threads','1','-i','/work/clip.mp4','-map','0:v:0','-map','0:a?','-progress','pipe:1','-nostats','-f','null','-']);
     return {png,jpeg,video,progress};
+  });
+}
+
+/** The generated clip's first frame as a PNG poster, after confirming the clip is the expected H.264/AAC media. */
+export async function qualifiedPoster(sandbox: MediaSandbox, docker: string, video: Buffer) {
+  return sandbox.use(video, async job => {
+    const exec = async (args: string[]) => (await runMediaChild(docker, ['exec', job.resource.id, ...args], { timeoutMs: 5000 })).stdout;
+    const probe = JSON.parse((await exec(['/tools/ffprobe', '-v', 'error', '-show_streams', '-of', 'json', '/input.bin'])).toString()) as { streams: { codec_type: string; width?: number; height?: number; codec_name: string }[] };
+    assert.ok(probe.streams.some(stream => stream.codec_type === 'video' && stream.width === 320 && stream.height === 180 && stream.codec_name === 'h264'));
+    assert.ok(probe.streams.some(stream => stream.codec_type === 'audio' && stream.codec_name === 'aac'));
+    await exec(['/tools/ffmpeg', '-nostdin', '-v', 'error', '-threads', '1', '-i', '/input.bin', '-frames:v', '1', '-y', '/work/poster.png']);
+    return exec(['/bin/cat', '/work/poster.png']);
   });
 }

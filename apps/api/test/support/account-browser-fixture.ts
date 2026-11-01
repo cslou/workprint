@@ -1,16 +1,15 @@
 import { PostgresStore } from '@mastra/pg';
 import { join } from 'node:path';
-import { isolatedAuth } from './isolated-auth.js';
-import { isolatedPostgres } from './postgres.js';
+import { testStack } from './test-stack.js';
 import { environment } from './environment.js';
 import { buildServerComposition } from './built-server.js';
 import { startAuthServer } from './auth-server.js';
 import { applyArtifactMigrations } from './artifact-database.js';
 import { createNativeConversation } from './native-conversations.js';
-import { failFixtureAcquisition, type AcquisitionPhase, type FixtureResource } from './fixture-diagnostics.js';
+import { failFixtureAcquisition, type AcquisitionPhase } from './fixture-diagnostics.js';
 import type { PrivateStorageConfiguration } from '../../src/storage/index.js';
 
-export type AppFixtureOptions = Parameters<typeof isolatedAuth>[0] & {
+export type AppFixtureOptions = {
   /** Apply application migrations so saved-work operations are served. */
   artifacts?: boolean;
   storage?: PrivateStorageConfiguration;
@@ -19,21 +18,19 @@ export type AppFixtureOptions = Parameters<typeof isolatedAuth>[0] & {
   serverLifetimeMs?: number;
 };
 
-/** Test-only real backend + isolated Auth. Native data uses existing supported fixture, no new route. */
+/** Test-only real backend on the shared stack's Auth and its own database. Native data uses existing supported fixture, no new route. */
 export async function accountBrowserFixture(options: AppFixtureOptions = {}, browserOrigin = 'http://127.0.0.1:4180') {
-  const { artifacts, storage, media, serverLifetimeMs, ...authOptions } = options;
-  const auth = await isolatedAuth(authOptions);
-  const cleanups: (() => Promise<unknown>)[] = [auth.close];
+  const { artifacts, storage, media, serverLifetimeMs } = options;
+  const { auth, testDatabase } = testStack();
+  const cleanups: (() => Promise<unknown>)[] = [];
   const close = async () => {
     const errors: unknown[] = [];
     for (const cleanup of [...cleanups].reverse()) { try { await cleanup(); } catch (error) { errors.push(error); } }
     if (errors.length) throw new AggregateError(errors, 'Account browser fixture cleanup failed');
   };
   let phase: AcquisitionPhase = 'postgres-acquisition';
-  const owned: FixtureResource[] = [];
   try {
-    const db = await isolatedPostgres(); cleanups.push(db.close);
-    owned.push({ owner: db.owner, containerId: db.containerId });
+    const db = await testDatabase(); cleanups.push(db.close);
     const store = new PostgresStore({ id: 'account-browser-fixture', connectionString: db.setupUrl, schemaName: 'mastra' }); cleanups.push(() => store.close());
     phase = 'storage-init';
     await store.init();
@@ -71,5 +68,5 @@ export async function accountBrowserFixture(options: AppFixtureOptions = {}, bro
         return JSON.stringify({ threads, messages: ids.length ? await memory.listMessages({ threadId: ids, perPage: 1000 }) : { messages: [] } });
       },
     };
-  } catch (error) { return failFixtureAcquisition(error, phase, owned, close); }
+  } catch (error) { return failFixtureAcquisition(error, phase, [], close); }
 }

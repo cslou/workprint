@@ -4,30 +4,28 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { environment, sentinel } from './environment.js';
-import { loadAuthFixture, readPrivateJson, signInFixtureAccount, startAuthServer } from './auth-server.js';
+import { signInFixtureAccount, startAuthServer, type AuthFixture } from './auth-server.js';
 import { createApiClient } from '@workprint/api-client';
 import { operations, type OperationName, type OperationRequest } from '@workprint/contracts';
 import { applicationRequests } from './operation-requests.js';
-import { query, isolatedPostgres } from './postgres.js';
+import { query } from './postgres.js';
+import { testStack } from './test-stack.js';
 import { PostgresStore } from '@mastra/pg';
 import { applyArtifactMigrations } from './artifact-database.js';
 import { buildServerComposition } from './built-server.js';
-import type { PrivateStorageConfiguration } from '../../src/storage/index.js';
 
-// Shared by current-scope checks and the separately invoked B-001 qualification.
-// Private fixture input is never inherited by serving. Accounts already exist.
-export type BuiltAdmissionTarget = { origin: string; accessToken: string; accessTokens: readonly string[]; refreshAccessTokens(): Promise<readonly string[]>; logs: string };
+// Private fixture input is never inherited by serving. Accounts exist before the servers start.
 export type SavedWorkSetup = { accountIds: readonly string[]; native: PostgresStore; servingUrl: string; setupUrl?: string };
 type FixtureContext = { diagnostic(message: string): void; after(cleanup: () => void | Promise<void>): void };
-export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (server: BuiltAdmissionTarget) => Promise<void>, options: { browserOrigin?: string; storage?: PrivateStorageConfiguration; media?: { toolchainDirectory: string; dockerPath: string; archivePath?: string }; prepareSavedWork?: (setup: SavedWorkSetup) => Promise<void>; verifySavedEffects?: (servingUrl: string) => Promise<void> } = {}) {
-  const config = await loadAuthFixture();
+export async function verifyBuiltAdmission(t: FixtureContext) {
+  const { auth, testDatabase } = testStack();
   const fixture = await environment();
   t.diagnostic(`Evidence: ${fixture.logs}`);
-  const statusFile = process.env.WORKPRINT_AUTH_SIGNING_FIXTURE;
-  assert.ok(statusFile, 'Supply private CLI status JSON to exercise a signed expired token');
-  const { JWT_SECRET: signingKey } = await readPrivateJson(statusFile) as { JWT_SECRET: string };
-  assert.ok(signingKey, 'Signing fixture must supply the authorized development signing key');
-  assert.equal(config.accounts.length, 2);
+  const signingKey = auth.signingSecret;
+  // Application tests own their data database; Auth is the shared stack's.
+  const database = await testDatabase();
+  t.after(database.close);
+  const config: AuthFixture = { url: auth.url, anonKey: auth.anonKey, servingUrl: database.servingUrl, accounts: await Promise.all([auth.createAccount(), auth.createAccount()]) };
   // Separate compiled compositions share the production entry, never an environment-switched probe.
   const probeEntry = await buildServerComposition(fixture.logs, 'probe', (directory) => `
     import { createBackend } from ${JSON.stringify(join(directory, 'mastra/backend.js'))};
@@ -40,24 +38,12 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
   // Fresh sign-ins happen after building. Never log request/response credentials.
   const signIn = () => Promise.all(config.accounts.map((account) => signInFixtureAccount(config, account)));
   const identities = await signIn(), accessTokens = identities.map(identity => identity.access_token);
-  const refreshAccessTokens = async () => {
-    const refreshed = await signIn();
-    assert.deepEqual(refreshed.map(identity => identity.user.id), identities.map(identity => identity.user.id), 'Renewed fixture sign-ins retain exact owners');
-    const tokens = refreshed.map(identity => identity.access_token); accessTokens.push(...tokens); return tokens;
-  };
   assert.notEqual(identities[0]!.user.id, identities[1]!.user.id);
-  // Application tests own their data database; Auth alone uses the authorized shared stack.
-  const database = await isolatedPostgres();
-  t.after(database.close);
   const setup = new PostgresStore({ id: 'admission-native-setup', connectionString: database.setupUrl, schemaName: 'mastra' });
   try {
     await setup.init(); await database.grantServing(); await applyArtifactMigrations(database.setupUrl);
-    await options.prepareSavedWork?.({ accountIds: identities.map(identity => identity.user.id), native: setup, servingUrl: database.servingUrl, setupUrl: database.setupUrl });
   } finally { await setup.close(); }
-  const servingEnv = { DATABASE_URL: database.servingUrl,
-    ...(options.browserOrigin ? { WORKPRINT_BROWSER_ORIGIN: options.browserOrigin } : {}),
-    ...(options.media ? { MEDIA_TOOLCHAIN_DIRECTORY: options.media.toolchainDirectory, MEDIA_DOCKER_PATH: options.media.dockerPath, ...(options.media.archivePath ? { MEDIA_ARCHIVE_PATH: options.media.archivePath } : {}) } : {}),
-    ...(options.storage ? { S3_ENDPOINT: options.storage.endpoint, S3_REGION: options.storage.region, S3_BUCKET: options.storage.bucket, S3_ACCESS_KEY_ID: options.storage.credentials.accessKeyId, S3_SECRET_ACCESS_KEY: options.storage.credentials.secretAccessKey } : {}) };
+  const servingEnv = { DATABASE_URL: database.servingUrl };
   const { server: probe, origin, port } = await startAuthServer(probeEntry, fixture.env, config, join(fixture.logs, 'probe.log'), { env: servingEnv });
   t.after(probe.stop);
   for (const identity of identities) {
@@ -68,7 +54,7 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { accountId: identity.user.id });
   }
-  // The separately authorized CLI stack's signing secret creates a genuinely signed expired token.
+  // The stack's Auth signing secret creates a genuinely signed expired token.
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
   const tokenParts = identities[0]!.access_token.split('.');
   const tokenPayload = JSON.parse(Buffer.from(tokenParts[1]!, 'base64url').toString()) as Record<string, unknown>;
@@ -191,15 +177,13 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
   assert.equal(oversized.status, 400, 'Application rejects completed JSON beyond 1 MiB');
   assert.equal(oversized.payload.error.code, 'invalid_input');
 
-  if (qualifyIngress) await qualifyIngress({ origin, accessToken: identities[0]!.access_token, accessTokens: identities.map((identity) => identity.access_token), refreshAccessTokens, logs: fixture.logs });
   for (const [path, method] of [['/v1/conversations/c/workspace/extra', 'GET'], ['/v1/conversations//workspace', 'GET'], ['/v1/conversations/c/workspace', 'POST'], ['/v1/library/', 'GET']] as const) {
     assert.equal((await raw(path, method, undefined)).status, 404, 'Only exact catalog paths/methods are admitted');
   }
-  // All cases preserve native records; only explicit write qualifications may change application records.
+  // No case may change native or application records.
   const afterRequests = await snapshot();
   assert.deepEqual(afterRequests.filter(row => !String((row as unknown[])[0]).startsWith('artifacts.')), beforeRequests.filter(row => !String((row as unknown[])[0]).startsWith('artifacts.')), 'Application commands never start or modify native turns');
-  if (options.verifySavedEffects) await options.verifySavedEffects(database.servingUrl);
-  else assert.deepEqual(afterRequests, beforeRequests, 'Read and unavailable-command matrix creates/changes no native or application records');
+  assert.deepEqual(afterRequests, beforeRequests, 'Read and unavailable-command matrix creates/changes no native or application records');
   const exposure: { path: string; bearer: boolean; status: number }[] = [];
   for (const path of ['/api/auth/capabilities', '/api/auth/me', '/__auth_probe', '/api/agents', '/api/memory/threads', '/api/workflows', '/api/tools', '/api/telemetry', '/swagger-ui', '/openapi.json', '/health/', '/__qualification', '/__qualification/release', '/test/shell.html', '/fixtures/clip.webm', '/studio', '/assets/index.js', '/api/tools/test/execute']) {
     for (const bearer of [false, true]) {

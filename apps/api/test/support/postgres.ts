@@ -20,6 +20,34 @@ export async function query(url: string, sql: string) {
   }
 }
 
+/** One application database owned by `wp_setup`, as provisioned in a fresh cluster or the shared test stack. */
+export async function applicationDatabase(admin: string, name: string, setupPassword: string, servingPassword: string) {
+  if (!/^[a-z][a-z0-9_]{0,62}$/.test(name)) throw new Error('Invalid fixture database name');
+  await query(admin, `CREATE DATABASE ${name} OWNER wp_setup`);
+  const at = (url: string, user?: { name: string; password: string }) => {
+    const target = new URL(url);
+    target.pathname = `/${name}`;
+    if (user) { target.username = user.name; target.password = user.password; }
+    return target.href;
+  };
+  const adminUrl = at(admin);
+  await query(adminUrl, `REVOKE ALL ON DATABASE ${name} FROM PUBLIC; GRANT CONNECT ON DATABASE ${name} TO wp_setup, wp_serving; REVOKE CREATE ON SCHEMA public FROM PUBLIC`);
+  const setupUrl = at(admin, { name: 'wp_setup', password: setupPassword });
+  const servingUrl = at(admin, { name: 'wp_serving', password: servingPassword });
+  return {
+    name, setupUrl, servingUrl, adminUrl,
+    async terminateServingConnection(pid: number) {
+      if (!Number.isInteger(pid) || pid < 1) throw new Error('Invalid fixture backend PID');
+      const result = await query(adminUrl, `SELECT pg_terminate_backend(pid) AS terminated FROM pg_stat_activity WHERE pid = ${pid} AND datname = current_database() AND usename = 'wp_serving' AND state = 'idle'`);
+      if (result.rows[0]?.terminated !== true) throw new Error('Refusing to terminate an unknown or non-idle fixture connection');
+    },
+    async grantServing() {
+      // Privilege grants only; all native DDL is exclusively PostgresStore.init().
+      await query(setupUrl, 'GRANT USAGE ON SCHEMA mastra TO wp_serving; GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA mastra TO wp_serving; GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA mastra TO wp_serving');
+    },
+  };
+}
+
 export async function isolatedPostgres(options: { network?: { name: string; owner: string } } = {}) {
   const owner = randomUUID();
   const password = randomBytes(24).toString('hex');
@@ -95,25 +123,8 @@ export async function isolatedPostgres(options: { network?: { name: string; owne
     }
     await query(admin, `CREATE ROLE wp_setup LOGIN PASSWORD '${setupPassword}'`);
     await query(admin, `CREATE ROLE wp_serving LOGIN PASSWORD '${servingPassword}'`);
-    await query(admin, 'CREATE DATABASE workprint OWNER wp_setup');
-    const adminTarget = new URL(admin);
-    adminTarget.pathname = '/workprint';
-    const adminDatabase = adminTarget.href;
-    await query(adminDatabase, 'REVOKE ALL ON DATABASE workprint FROM PUBLIC; GRANT CONNECT ON DATABASE workprint TO wp_setup, wp_serving; REVOKE CREATE ON SCHEMA public FROM PUBLIC');
-    const setupUrl = `postgresql://wp_setup:${setupPassword}@127.0.0.1:${port}/workprint`;
-    const servingUrl = `postgresql://wp_serving:${servingPassword}@127.0.0.1:${port}/workprint`;
-    return {
-      setupUrl, servingUrl, adminUrl: adminDatabase, containerId: id, owner, close,
-      async terminateServingConnection(pid: number) {
-        if (!Number.isInteger(pid) || pid < 1) throw new Error('Invalid fixture backend PID');
-        const result = await query(adminDatabase, `SELECT pg_terminate_backend(pid) AS terminated FROM pg_stat_activity WHERE pid = ${pid} AND datname = current_database() AND usename = 'wp_serving' AND state = 'idle'`);
-        if (result.rows[0]?.terminated !== true) throw new Error('Refusing to terminate an unknown or non-idle fixture connection');
-      },
-      async grantServing() {
-        // Privilege grants only; all native DDL is exclusively PostgresStore.init().
-        await query(setupUrl, 'GRANT USAGE ON SCHEMA mastra TO wp_serving; GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA mastra TO wp_serving; GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA mastra TO wp_serving');
-      },
-    };
+    const database = await applicationDatabase(admin, 'workprint', setupPassword, servingPassword);
+    return { ...database, containerId: id, owner, close };
   } catch (error) {
     return failFixtureAcquisition(error, 'postgres-acquisition', id ? [{ owner, containerId: id }] : [], close);
   }

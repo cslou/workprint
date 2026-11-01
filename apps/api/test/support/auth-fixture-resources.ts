@@ -14,7 +14,6 @@ export class AuthFixtureResources {
   networkId = '';
   edgeNetworkId = '';
   readonly edgeNetworkName = `${this.networkName}-edge`;
-  readonly containerIds: string[] = [];
   private containers: { name: string; id?: string }[] = [];
 
   private async inspect(kind: 'container' | 'network', reference: string): Promise<Identity | undefined> {
@@ -52,11 +51,10 @@ export class AuthFixtureResources {
   }
   async run(suffix: string, image: string, args: string[], env: Record<string, string>) {
     if (!/^[a-z]+$/.test(suffix)) throw new Error('Invalid fixture service name');
-    const privateOnly = suffix === 'auth';
-    const networkName = privateOnly ? this.networkName : this.edgeNetworkName;
+    const networkName = this.edgeNetworkName;
     const network = await this.inspect('network', networkName);
     if (!network) throw new Error('Missing isolated Auth network');
-    this.owned(network, privateOnly ? this.networkId : this.edgeNetworkId);
+    this.owned(network, this.edgeNetworkId);
     const target: { name: string; id?: string } = { name: `${this.networkName}-${suffix}` };
     this.containers.push(target);
     const result = await exec('docker', [
@@ -69,10 +67,10 @@ export class AuthFixtureResources {
     const found = await this.inspect('container', target.name);
     if (!found) throw new Error('Isolated Auth service not acquired');
     this.owned(found, result.stdout.trim());
-    target.id = found.id; this.containerIds.push(found.id);
+    target.id = found.id;
     try {
       if (found.state !== 'running') throw new Error('Service exited during acquisition');
-      if (!privateOnly) await this.attachPrivate(found.id, this.owner, suffix);
+      await this.attachPrivate(found.id, this.owner, suffix);
     } catch {
       // Startup only, before accounts exist; redact every supplied value before diagnostics.
       const logs = await exec('docker', ['logs', '--tail', '8', found.id], { timeout: 10000 });
@@ -82,29 +80,6 @@ export class AuthFixtureResources {
       throw new Error(`Isolated ${suffix} startup failed: ${detail.slice(0, 1000)}`);
     }
     return found.id;
-  }
-  async pauseOwned(id: string) {
-    if (!this.containerIds.includes(id)) throw new Error('Refusing unregistered service stop');
-    const found = await this.inspect('container', id);
-    if (!found) throw new Error('Missing isolated Auth service');
-    this.owned(found, id);
-    await docker('pause', id);
-  }
-  async resumeOwned(id: string) {
-    if (!this.containerIds.includes(id)) throw new Error('Refusing unregistered service resume');
-    const found = await this.inspect('container', id);
-    if (!found) throw new Error('Missing isolated Auth service');
-    this.owned(found, id);
-    await docker('unpause', id);
-  }
-  async logsContain(id: string, privateValue: string): Promise<boolean> {
-    if (!this.containerIds.includes(id)) throw new Error('Refusing unregistered service logs');
-    const found = await this.inspect('container', id);
-    if (!found) throw new Error('Missing isolated Auth service');
-    this.owned(found, id);
-    const result = await exec('docker', ['logs', id], { timeout: 10000 });
-    // Raw logs and the supplied value stay private in memory; never return/log a URI.
-    return result.stdout.includes(privateValue) || result.stderr.includes(privateValue);
   }
   async port(id: string, port: number) {
     const found = await this.inspect('container', id);

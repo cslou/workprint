@@ -7,14 +7,15 @@ import type { OperationRequest, Version } from '@workprint/contracts';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
 import { createArtifactStore, createArtifactWriters } from '../../src/artifacts/index.js';
 import { createNativeConversation } from '../support/native-conversations.js';
-import { isolatedPostgres, query } from '../support/postgres.js';
+import { query } from '../support/postgres.js';
+import { testStack, type TestDatabase } from '../support/test-stack.js';
 import { applyArtifactMigrations } from '../support/artifact-database.js';
 
 type Command = OperationRequest<'saveVersion'>['body'];
 const script = (action: string) => ({ schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'Station', time: 'morning' }, characters: ['Ada'], script: [{ action }] }] });
 
 test('human reference save moves only the exact role/conversation use and journals its identity', { timeout: 120000 }, async () => {
-  const db = await isolatedPostgres();
+  const db = await testStack().testDatabase();
   const pool = new Pool({ connectionString: db.servingUrl, max: 4, connectionTimeoutMillis: 1000, statement_timeout: 2000 });
   const native = new PostgresStore({ id: 'distinct-reference-bindings', connectionString: db.setupUrl, schemaName: 'mastra' });
   const serving = new PostgresStore({ id: 'distinct-reference-serving', schemaName: 'mastra', disableInit: true, pool });
@@ -53,12 +54,12 @@ test('human reference save moves only the exact role/conversation use and journa
 });
 
 describe('manual save writers', { timeout: 120000 }, () => {
-  let db: Awaited<ReturnType<typeof isolatedPostgres>>, pool: Pool, native: PostgresStore;
+  let db: TestDatabase, pool: Pool, native: PostgresStore;
   let store: ReturnType<typeof createArtifactStore>, writers: ReturnType<typeof createArtifactWriters>;
   let a: { id: string }, empty: { id: string }, b: { id: string }, first: Version, base: Version, foreign: Version, command: Command, draftCommand: Omit<Command, 'intendedUse'>;
   let fingerprint: () => Promise<unknown[]>, initial: unknown[], saved: Awaited<ReturnType<ReturnType<typeof createArtifactWriters>['human']['save']>>, detached: typeof saved, referenceSaved: typeof saved;
   before(async () => {
-    db = await isolatedPostgres();
+    db = await testStack().testDatabase();
     pool = new Pool({ connectionString: db.servingUrl, max: 4, connectionTimeoutMillis: 1000, statement_timeout: 2000, application_name: 'artifact-command-qualification' });
     native = new PostgresStore({ id: 'artifact-writers-setup', connectionString: db.setupUrl, schemaName: 'mastra' });
     await native.init(); await db.grantServing(); await applyArtifactMigrations(db.setupUrl);

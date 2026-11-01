@@ -1,7 +1,5 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
-import { realpath } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import { crc32 } from 'node:zlib';
 import { test } from 'node:test';
 import { Pool } from 'pg';
@@ -12,30 +10,26 @@ import { uploadRecords } from '../../src/artifacts/uploads/records.js';
 import { completeUpload } from '../../src/artifacts/uploads/completion.js';
 import { inspectMediaBytes } from '../../src/artifacts/uploads/media-bytes.js';
 import { createMediaSandbox, createPrivateObjectStorage } from '../../src/storage/index.js';
-import { MEDIA_ARCHIVE } from '../../src/storage/media/pins.js';
-import { isolatedPostgres } from '../support/postgres.js';
-import { isolatedObjectStorage } from '../support/object-storage.js';
+import { testStack } from '../support/test-stack.js';
 import { applyArtifactMigrations } from '../support/artifact-database.js';
 import { createNativeConversation } from '../support/native-conversations.js';
-import { qualifiedMediaFixtures } from '../support/media-fixtures.js';
 
 const refusal = { code: 'unsupported', message: 'Video uploads are temporarily unavailable. Use JPEG or PNG.' };
 const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 
 test('image-only upload admission refuses new and previously issued video uploads before external work', { timeout: 90000 }, async t => {
-  const db = await isolatedPostgres(); t.after(db.close);
-  const service = await isolatedObjectStorage(); t.after(service.close);
-  const docker = await realpath('/usr/local/bin/docker');
-  const sandbox = await createMediaSandbox({ toolchainDirectory: resolve(`outputs/toolchains/ffmpeg-${MEDIA_ARCHIVE.sha256}`), dockerPath: docker }); t.after(() => sandbox.close());
+  const db = await testStack().testDatabase(); t.after(db.close);
+  const { storage: service, media } = testStack();
+  const sandbox = await createMediaSandbox(media.toolchain); t.after(() => sandbox.close());
   const native = new PostgresStore({ id: 'image-only-uploads', connectionString: db.setupUrl, schemaName: 'mastra' });
   const pool = new Pool({ connectionString: db.servingUrl, max: 2 });
   const setup = new Pool({ connectionString: db.setupUrl, max: 1 });
-  const storage = createPrivateObjectStorage({ endpoint: service.endpoint, bucket: service.bucket, region: 'us-east-1', credentials: service.credentials });
+  const storage = createPrivateObjectStorage(service);
   try {
     await native.init(); await db.grantServing(); await applyArtifactMigrations(db.setupUrl);
     const account = 'image-only-owner', conversation = (await createNativeConversation(native, account)).id;
     // Ordinary synthetic decoder fixtures are not qualification of user video upload.
-    const fixtures = await qualifiedMediaFixtures(sandbox, docker), verify = createMediaVerifier(sandbox);
+    const fixtures = media, verify = createMediaVerifier(sandbox);
     const effects = { signing: 0, reads: 0, publication: 0, inspection: 0 };
     const guarded = { ...storage,
       presignPut: async (...args: Parameters<typeof storage.presignPut>) => { effects.signing++; return storage.presignPut(...args); },
@@ -93,9 +87,9 @@ test('image-only upload admission refuses new and previously issued video upload
 });
 
 test('the real decoder accepts exact PNG, JPEG and H264+AAC and rejects damaged or mislabelled bytes', { timeout: 30000 }, async () => {
-  const docker=await realpath('/usr/local/bin/docker');const sandbox=await createMediaSandbox({toolchainDirectory:resolve(`outputs/toolchains/ffmpeg-${MEDIA_ARCHIVE.sha256}`),dockerPath:docker});
+  const fixtures=testStack().media;const sandbox=await createMediaSandbox(fixtures.toolchain);
   try {
-    const fixtures=await qualifiedMediaFixtures(sandbox,docker),verify=createMediaVerifier(sandbox),signal=new AbortController().signal;
+    const verify=createMediaVerifier(sandbox),signal=new AbortController().signal;
     for(const [bytes,contentType] of [[fixtures.png,'image/png'],[fixtures.jpeg,'image/jpeg']] as const){
       const before=Buffer.from(bytes);const media=await verify({kind:'image',bytes,contentType,signal});assert.equal(media.width,240);assert.equal(media.height,240);assert.equal(media.byteSize,bytes.length);assert.equal(media.poster,undefined);assert.deepEqual(bytes,before);
     }

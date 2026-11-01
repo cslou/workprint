@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-export type AcquisitionPhase = 'postgres-acquisition' | 'auth-acquisition' | 'auth-storage' | 'auth-mail-readiness' | 'storage-prepare' | 'storage-init' | 'storage-grants' | 'backend-startup';
+export type AcquisitionPhase = 'postgres-acquisition' | 'storage-prepare' | 'storage-init' | 'storage-grants' | 'backend-startup';
 export type FixtureResource = { owner: string; containerId: string };
 export type SafeFixtureFailure = { phase: AcquisitionPhase; subtype: string; kind: string; code: string | number | null };
 export type FixtureObserver = { operationTimeoutMs?: number; beforeCleanup(failure: SafeFixtureFailure, resources: readonly FixtureResource[], signal: AbortSignal): Promise<void>; stop(signal: AbortSignal): Promise<void> };
@@ -16,10 +16,7 @@ export function describeFixtureFailure(error: unknown, phase: AcquisitionPhase):
   const classify = (value: unknown, depth = 0): string | undefined => {
     if (!(value instanceof Error) || seen.has(value) || depth > 8) return;
     seen.add(value);
-    if (/^Isolated Auth\/mail startup deadline exceeded \(owned auth [a-f0-9]{64}\)$/.test(value.message)) return 'auth-mail-readiness';
     if (value.message === 'Postgres startup deadline exceeded') return 'postgres-startup';
-    const account = /^Isolated account creation failed \((\d{3})\)$/.exec(value.message);
-    if (account) return `auth-http-${account[1]}`;
     if (value.message === 'Serving storage unavailable or privileged; prepare storage separately and use restricted DATABASE_URL') return 'storage-serving-guard';
     // Existing acquisition helpers put the primary error first; cause can be a cleanup error.
     if (value instanceof AggregateError) for (const child of value.errors) { const result = classify(child, depth + 1); if (result) return result; }
@@ -28,7 +25,7 @@ export function describeFixtureFailure(error: unknown, phase: AcquisitionPhase):
   const code = error && typeof error === 'object' && 'code' in error ? error.code : null;
   return {
     phase,
-    subtype: classify(error) ?? (['storage-prepare', 'storage-init', 'storage-grants', 'auth-storage'].includes(phase) ? 'storage' : 'unknown'),
+    subtype: classify(error) ?? (['storage-prepare', 'storage-init', 'storage-grants'].includes(phase) ? 'storage' : 'unknown'),
     kind: error instanceof AggregateError ? 'AggregateError' : 'Error',
     code: typeof code === 'number' && Number.isInteger(code) ? code : typeof code === 'string' && /^(?:[0-9A-Z]{5}|E[A-Z_]{2,30})$/.test(code) ? code : null,
   };

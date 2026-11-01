@@ -1,7 +1,7 @@
 import { globSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
-// Groups: `unit` needs no Docker; `integration` boots Postgres, Auth, storage or media containers.
+// Groups: `unit` needs no Docker; `integration` runs against one shared stack of Postgres, Auth and storage containers.
 const group = process.argv[2];
 if (group && !['unit', 'integration', 'compile'].includes(group)) throw new Error('Unknown test group');
 
@@ -20,5 +20,8 @@ const integration = compiled.filter(file => file.startsWith('apps/api/.test-buil
 const unit = compiled.filter(file => !integration.includes(file));
 const files = group === 'unit' ? unit : group === 'integration' ? integration : [...unit, ...integration];
 if (files.length === 0) throw new Error('No tests discovered');
-const result = spawnSync(process.execPath, ['--test', '--test-concurrency=1', ...files], { stdio: 'inherit' });
+const run = [process.execPath, '--test', '--test-concurrency=1', ...files];
+// Integration files share one stack for the whole run; the launcher always removes it afterwards.
+const command = files.some(file => integration.includes(file)) ? [process.execPath, 'scripts/test-stack.mjs', ...run] : run;
+const result = spawnSync(command[0], command.slice(1), { stdio: 'inherit' });
 process.exit(result.status ?? 1);

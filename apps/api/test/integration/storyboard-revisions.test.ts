@@ -9,7 +9,8 @@ import { publishVersion } from '../../src/artifacts/publication.js';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
 import { transaction } from '../../src/db/index.js';
 import { createNativeConversation } from '../support/native-conversations.js';
-import { isolatedPostgres, query } from '../support/postgres.js';
+import { query } from '../support/postgres.js';
+import { testStack } from '../support/test-stack.js';
 import { applyArtifactMigrations } from '../support/artifact-database.js';
 
 type Edit = OperationRequest<'editStoryboard'>['body'];
@@ -17,7 +18,7 @@ const script = { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', lo
 const reference = (name: string) => ({ schemaVersion: 1, subject: { id: name.toLowerCase(), kind: 'character', name, description: `${name} in a green coat.`, continuityNotes: ['Keep the coat.'] }, references: [] });
 
 test('storyboard edits keep stable Shot and Panel identities and one forward-only selection revision', { timeout: 120000 }, async t => {
-  const db = await isolatedPostgres(), pool = new Pool({ connectionString: db.servingUrl, max: 4, connectionTimeoutMillis: 1000, statement_timeout: 2000 });
+  const db = await testStack().testDatabase(), pool = new Pool({ connectionString: db.servingUrl, max: 4, connectionTimeoutMillis: 1000, statement_timeout: 2000 });
   const setup = new PostgresStore({ id: 'storyboard-prerequisite', connectionString: db.setupUrl, schemaName: 'mastra' });
   const native = new PostgresStore({ id: 'storyboard-serving', schemaName: 'mastra', disableInit: true, pool });
   try {
