@@ -2,7 +2,7 @@
 
 **Date:** Planned and started 2026-10-29
 **Goal:** Serve the backend through an app-owned entry on the official Mastra Hono adapter and pass bounded-ingress qualification, deliver standard Auth and owned conversation navigation, and qualify native turn transport and independent workflow recovery through the built backend without enabling application inference.
-**Status:** 🟢 Complete — all stories merged into `sprint-004`. Human QA passed (Lou, 2026-11-01). Integration into `main` awaits Lou's explicit merge command.
+**Status:** 🟢 Complete — all stories merged into `sprint-004`. Human QA passed (Lou, 2026-11-01). Integration into `phase-3` awaits Lou's explicit merge command (spec §Phase 3 integration order).
 
 **Added-story planning review:** Second independent review **5/5**, no remaining findings. Initial Story 9 P1 and five P2 clarifications are resolved inline. Lou authorizes implementation; displayed design checkpoints remain main-owned under delegation, with whole-sprint QA handback and later human ratification. Added-story kickoff checklists are confirmed only when their design/dependency gates are met.
 
@@ -620,7 +620,7 @@ The Final Verification Story runs all applicable sprint functional verification 
     - restore not stealing focus
   - The rAF modal-focus guard is duplicated and could become a shared helper.
   - Full audit remains NON-PASS (B-004, B-008) under the existing private/local-only exception.
-- **Review:** Story and follow-up PRs were reviewed as listed above. This completion record and the cumulative `sprint-004 → main` diff each get a current-head independent review. Sprint integration needs Lou's explicit merge command.
+- **Review:** Story and follow-up PRs were reviewed as listed above. This completion record and the cumulative `sprint-004 → phase-3` diff each get a current-head independent review. Sprint integration needs Lou's explicit merge command.
 - **Spec/flow changes:**
   - New video is client-only. The video id is the native thread id, created by the first accepted send in [Sprint 006](sprint-006.md) Story 2; this is recorded in the implementation spec and the Sprint 006 ACs.
   - Send remains disabled in this sprint.
