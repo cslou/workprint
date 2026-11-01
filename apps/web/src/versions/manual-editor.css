@@ -1,0 +1,9 @@
+.wp-manual-recovery { margin-top: var(--space-6); }
+.wp-manual-recovery > .wp-button-quiet, .wp-manual-latest .wp-button-quiet { padding: 0; }
+.wp-manual-latest { border-top: 0; margin-top: var(--space-12); padding-top: var(--space-2); }
+.wp-manual-latest > p:not(.wp-version-feedback) { margin: 0; font-size: var(--font-size-14); line-height: var(--font-line-height-1-5); white-space: pre-wrap; }
+.wp-manual-latest .wp-panel-label { margin-bottom: var(--space-8); }
+.wp-reference-images { padding: var(--space-16) 0; }
+.wp-reference-images h3 { font-size: var(--font-size-13); margin: 0 0 var(--space-8); }
+.wp-reference-image-row { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: var(--space-8); padding: var(--space-12); margin: var(--space-8) 0; border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-md); font-size: var(--font-size-13); overflow-wrap: anywhere; }
+.wp-reference-image-preview { display: block; max-width: 100%; max-height: var(--size-layout-viewer); object-fit: contain; }

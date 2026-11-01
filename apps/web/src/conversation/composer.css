@@ -9,6 +9,7 @@
 .wp-chat-input::placeholder { color: var(--color-text-subtle); opacity: 1; }
 .wp-chat-input:focus { outline: none; box-shadow: none; }
 .wp-chat-actions { display: flex; align-items: center; gap: var(--space-8); }
-.wp-chat-feedback { width: min(var(--size-layout-chat), calc(100% - 2 * var(--space-16))); margin: calc(-1 * var(--space-14)) auto var(--space-24); color: var(--color-text-subtle); font-size: var(--font-size-13); }
+.wp-chat-feedback, .wp-upload-guidance { width: min(var(--size-layout-chat), calc(100% - 2 * var(--space-16))); margin: calc(-1 * var(--space-14)) auto var(--space-24); color: var(--color-text-subtle); font-size: var(--font-size-13); }
 .wp-opening-composer.wp-chat-docked { margin: var(--space-12) calc(-1 * var(--space-14)) 0; border: 0; border-top: var(--border-width-default) solid var(--color-border-default); border-radius: 0; padding: var(--space-14) var(--space-12) var(--space-10) var(--space-16); box-shadow: none; background: transparent; width: auto; }
+.wp-chat-docked + .wp-upload-guidance { margin: var(--space-8) var(--space-14) var(--space-12); width: auto; }
 .wp-chat-docked .wp-chat-input { line-height: var(--font-line-height-1-45); }

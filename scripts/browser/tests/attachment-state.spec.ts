@@ -45,7 +45,8 @@ for (const outcome of ['abort', 'acknowledged'] as const) test(`reference attach
   await page.locator('.wp-picker-tile').click();
   await page.getByRole('button', { name: 'Attach (1)', exact: true }).click();
   if (outcome === 'abort') {
-    await expect(page.locator('.wp-picker-feedback')).toHaveText('Nothing was attached. Your existing attachments are unchanged.');
+    await expect(page.locator('.wp-picker-feedback')).toHaveText('Attached 0 of 1. One use could not be confirmed. Retry checks the same exact choice. Closing does not undo a completed use.');
+    await expect(page.getByRole('button', { name: 'Retry attach', exact: true })).toBeVisible();
     await expect(page.locator('.wp-picker-tile')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('.wp-picker-count')).toHaveText('1 selected');
   } else await expect(page.locator('.wp-picker-count')).toHaveText('Nothing selected yet');

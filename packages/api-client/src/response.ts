@@ -1,11 +1,11 @@
-import { errorEnvelopeSchema, errorStatus } from '@workprint/contracts';
+import { applicationResponseBytes, errorEnvelopeSchema, errorStatus } from '@workprint/contracts';
 import type { ClientResult } from './types.js';
 
 type Messages = { invalid: string; tooLarge?: string; invalidError?: string };
 const invalid = (message: string): ClientResult<never> => ({ ok: false, error: { code: 'invalid_response', message } });
 
 /** Shared bounded wire decoding only; callers retain auth, cancellation and protocol guards. */
-export async function readJsonResponse(response: Response, messages: Messages): Promise<ClientResult<{ bytes: ArrayBuffer; value: unknown }>> {
+export async function readJsonResponse(response: Response, messages: Messages, limit = applicationResponseBytes): Promise<ClientResult<{ bytes: ArrayBuffer; value: unknown }>> {
   const reader = response.body?.getReader();
   if (!reader) return invalid(messages.invalid);
   let size = 0;
@@ -15,7 +15,7 @@ export async function readJsonResponse(response: Response, messages: Messages): 
       const { done, value } = await reader.read();
       if (done) break;
       size += value.byteLength;
-      if (size > 1024 * 1024) { await reader.cancel(); return invalid(messages.tooLarge ?? messages.invalid); }
+      if (size > limit) { await reader.cancel(); return invalid(messages.tooLarge ?? messages.invalid); }
       chunks.push(value);
     }
   } finally { reader.releaseLock(); }

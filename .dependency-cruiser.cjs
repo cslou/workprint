@@ -5,6 +5,8 @@ const rules = [
   { name: 'no-unresolved', from: {}, to: { couldNotResolve: true } },
   { name: 'production-no-tests', from: { path: '^(apps/[^/]+/src/|packages/)', pathNot: '\\.test\\.[jt]sx?$' }, to: { path: '(^|/)(test|tests|fixtures)/|\\.test\\.[jt]sx?$' } },
   { name: 'browser-no-server', from: { path: '^(apps/web/|packages/(contracts|api-client|player)/)' }, to: { path: '^(apps/api/|.*node_modules/(@mastra/(core|pg)|pg)/)' } },
+  { name: 'web-materials-uploads-no-media', from: { path: '^apps/web/src/(materials|uploads)/' }, to: { path: '^apps/web/src/media/' } },
+  { name: 'web-shared-no-features', from: { path: '^apps/web/src/(ui|api)/' }, to: { path: '^apps/web/src/', pathNot: '^apps/web/src/(ui|api)/' } },
   { name: 'browser-no-node', from: { path: '^(apps/web/|packages/(contracts|api-client|player)/)' }, to: { dependencyTypes: ['core'] } },
   { name: 'packages-no-apps', from: { path: '^packages/' }, to: { path: '^apps/' } },
   { name: 'contracts-no-transport', from: { path: '^packages/contracts/' }, to: { path: '^packages/(api-client|player)/' } },

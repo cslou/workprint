@@ -3,6 +3,7 @@ import type { Version } from '@workprint/contracts';
 import type { BrowserClient } from '../api/client.js';
 import type { ReadScope } from '../api/use-scoped-read.js';
 import { PanelSection } from '../ui/panel.js';
+import { useDraftGuard } from '../api/draft-guard.js';
 import { VersionTextSection, saveFeedback } from './text-section.js';
 
 export type VersionEditorProps = { connection: BrowserClient; scope: ReadScope | null; version: Version; field: string; label: string; readOnly?: boolean };
@@ -12,13 +13,14 @@ type ContentVersion = Extract<Version, { content: unknown }>;
 export function VersionEditor(props: VersionEditorProps) {
   const { version, field, scope } = props;
   if (!('content' in version) || !Object.hasOwn(version.content, field) || typeof version.content[field] !== 'string') return null;
-  if (props.readOnly) return <PanelSection title={props.label}><div className="wp-version-editor" data-version-id={version.id} data-version-revision={version.revision}><p className="wp-version-display">{String(version.content[field])}</p></div></PanelSection>;
+  if (props.readOnly || version.builtIn) return <PanelSection title={props.label}><div className="wp-version-editor" data-version-id={version.id} data-version-revision={version.revision}><p className="wp-version-display">{String(version.content[field])}</p></div></PanelSection>;
   return <BoundEditor key={JSON.stringify([scope?.accountId, scope?.conversationId, version.id, version.revision, field])} {...props} version={version} />;
 }
 function BoundEditor({ connection, scope, version, field, label }: VersionEditorProps & { version: ContentVersion }) {
   const [saved, setSaved] = useState<ContentVersion | null>(null);
   const visible = saved ?? version;
   const [editing, setEditing] = useState(false);
+  useDraftGuard(editing);
   const [text, setText] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
   const [pending, setPending] = useState(false);

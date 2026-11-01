@@ -22,6 +22,8 @@
 .wp-picker-sub { display: block; font-size: var(--font-size-12); color: var(--color-text-subtle); }
 .wp-picker-empty { display: grid; place-items: center; align-content: center; gap: var(--space-4); text-align: center; min-height: 240px; color: var(--color-text-subtle); font-size: var(--font-size-13); }
 .wp-picker-empty b { color: var(--color-text-primary); font-size: var(--font-size-15); font-weight: var(--font-weight-semibold); }
+.wp-picker-pagination { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-6); padding-top: var(--space-10); }
+.wp-picker-pagination p { font-size: var(--font-size-13); margin: 0; color: var(--color-text-subtle); }
 .wp-picker-tray { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-8); padding: var(--space-12) var(--space-16); border-top: var(--border-width-default) solid var(--color-border-default); background: var(--color-bg-surface); }
 .wp-picker-count { font-size: var(--font-size-13); color: var(--color-text-secondary); margin-right: var(--space-4); }
 .wp-picker-chip { display: inline-flex; align-items: center; gap: var(--space-6); padding: var(--space-2) var(--space-10); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-pill); font-size: var(--font-size-12); }

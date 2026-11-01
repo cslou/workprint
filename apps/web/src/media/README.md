@@ -1,0 +1,5 @@
+# Private exact-version media
+
+`reads.ts` owns exact-version `media` access for one viewer: it reacquires before the signed URL expires (at most 10 s early, or halfway through a shorter lifetime), keeps the last unexpired access for the same version and scope while a refresh is pending, and treats a failed refresh or a second already-expired response as terminal. It never resolves a version ID or reacquires in a loop.
+
+`viewer.tsx` composes that access with the framework-free `@workprint/player`. `PrivateClip` keeps one player per mounted clip; a refreshed URL for the same version is passed as the same `sourceId`, so the player carries position and play/pause state across the switch. Download reads the currently held signed URL once through `readPrivateVideo`, which requires the version's exact content type and byte size, then saves the bytes locally. Playback and download never use, choose or export a version. Issued signed URLs are time-limited bearer capabilities: a scope change tears the clip down but does not revoke an already issued URL before it expires.

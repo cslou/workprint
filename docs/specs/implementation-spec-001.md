@@ -195,7 +195,7 @@ Application-owned schema changes use the Supabase CLI migration workflow under `
 
 | Operation | Request | Response and errors |
 | --- | --- | --- |
-| `GET /conversations/:id/workspace` | none | `{ script, assets, storyboard, videos, pendingQuestion, activeWork, selectionRevision }`: current versions/uses per tab with Draft/Ready state; ordered Shots, each with its Panels (per Panel: description, references, candidate image versions and the approved image, if any) and chosen video; candidate requests with status and target; the single pending question or `null`; and the selection revision |
+| `GET /conversations/:id/workspace` | none | `{ script, assets, storyboard, videos, pendingQuestion, activeWork, selectionRevision }`: current versions/uses per tab with Draft/Ready state; ordered Shots, each with its Panels (per Panel: description, references, candidate image versions and the approved image, if any), the chosen video and, additively, the exact owned candidate video versions bound to the Shot (Sprint 005 Story 7; pending Lou's ratification); candidate requests with status and target; the single pending question or `null`; and the selection revision |
 | `GET /artifacts/:id/versions`, `GET /versions/:id` | bounded `cursor`/`limit` | Version summaries or one version `{ id, artifactId, kind, revision, createdBy: 'human'\|'assistant', createdAt, content\|media, dependencies }`; `not_found` for foreign or unknown IDs |
 | `GET /library` | `kind?`, `cursor`, `limit` | Owned Artifacts and read-only built-ins with latest-version summaries; no conversation-specific Draft/Ready state |
 | `POST /conversations/:id/versions` | `{ operationId, artifactId?, kind: 'script'\|'reference'\|'storyboard', baseVersionId?, content, dependencies: [versionId], intendedUse? }` | `201 { version, use? }`: a new immutable version created by the human (assistant saves use the in-process tool with `createdBy: 'assistant'`), the human use moved to approved when `intendedUse` is given. `stale_revision` if `baseVersionId` is not the Artifact's latest; `invalid_input` for content failing the kind's schema |
@@ -649,7 +649,7 @@ For controls whose prerequisites are not implemented, use read-only sample props
 
 - Phase 1's authenticated callable application contracts and declared, not yet qualified, native conversation interfaces.
 - Existing design tokens, components and approved flows.
-- Reproducible synthetic or appropriately licensed sample content for layout/component tests—not private, ignored demo assets. Real R2 transfer/playback qualification accompanies the first functional media slice; it is not a prerequisite for an unavailable-feature response.
+- Reproducible synthetic or appropriately licensed sample content for layout/component tests—not private, ignored demo assets. Hosted R2 transfer/playback qualification is not required before hosted deployment (P4-S19) (Lou, 2026-11-01); it is not a prerequisite for an unavailable-feature response.
 
 #### Stories
 
@@ -822,7 +822,7 @@ Classify operations by their intended callers, not by their folder name. A front
 - No additional manual creative-authoring or structured-document import screens are assumed beyond the already intended frontend inputs and edits. Initial creative production and automatic prose-to-structured-work conversion stay in Phase 4. Pasted text can be a native message or an edit; sending prose does not automatically create a Script Artifact Version.
 - Local generation cancellation and status reads can be verified on real records and a controlled native workflow. Mocking the external cancellation boundary does not qualify a real provider, late generated-result publication or stopped charges. Phase 4 owns those proofs before live generation is accepted.
 - Question answering commits the decision independently of its native notification. A recorded approval is not a claim that Generation Requests exist or execution started. Agent-side continuation with production tools is a Phase 4 dependency.
-- The first functional media slice includes actual development-R2 signing, stored-byte/type/size confirmation, CORS/range access, expiry/reacquisition or explicit failure, and authorized download. Later player stories add full product playback/sequence evidence, not a delayed replacement for transport qualification.
+- The first functional media slice includes actual signing against the pinned local S3-compatible emulator, stored-byte/type/size confirmation, CORS/range access, expiry/reacquisition or explicit failure, and authorized download; hosted-R2 qualification is not required before hosted deployment (P4-S19) (Lou, 2026-11-01). Later player stories add full product playback/sequence evidence, not a delayed replacement for transport qualification.
 
 #### Modules
 
@@ -851,7 +851,7 @@ Qualify the single background-execution mechanism in P3-S18/S19 before cancellat
 
 - Phase 1's built-server foundation, backend Auth and contracts plus Phase 2's connected frontend. Resolve B-001's pre-authentication/pre-timeout JSON-read limitation and qualify the chosen serving path before Phase 3 native-runtime qualification. P3-S1a–S1c qualifies conversations; P3-S18/S19 qualifies shared workflows before P3-S8/S11–S13. Preserve established checks; mocks cannot replace native qualification.
 - The configured assistant integration for frontend chat, a declared media upload/playback allowlist and export compatibility rules/limits. Choose concrete versions, formats and technical bounds during sprint packaging; verify real response shapes before integration-specific handling and qualify behavior before feature acceptance.
-- Dedicated development Supabase/R2 and separately authorized real-model/service verification. Tests use isolated data and synthetic/licensed media, never customer records or private demo assets.
+- Dedicated development Supabase (local SeaweedFS for object storage; Lou, 2026-11-01) and separately authorized real-model/service verification. Tests use isolated data and synthetic/licensed media, never customer records or private demo assets.
 - Existing design references. New conflict, progress, expired-source and export states need visual approval before implementation; Phase approval does not approve unseen screens.
 - Hosted content schemas/validation needed for frontend edits preserve `CONTEXT.md` distinctions and exact references. Adapting the local creative skills into hosted agent workflows remains Phase 4. The existing local assembly helper proves compatible stream-copy behavior; the hosted export reuses that approach with hosted storage, records and native recovery rather than adding conversion.
 - The saved-record producer dependencies above remain explicit. They do not justify bringing an agent tool into Phase 3 or inventing a frontend creator to change its category.
@@ -918,13 +918,13 @@ This umbrella retains references to the original capability; the following indep
   - [ ] The common domain interface preserves producer provenance and pinned approved versions; nonhuman writes cannot claim a human decision. Verify those domain rules directly without registering agent tools. Do not add agent-only creative operations or new frontend authoring/structured-document import screens.
 - **Commits:** ≤5.
 
-##### P3-S3 — Real uploads, private access and R2 qualification
+##### P3-S3 — Real uploads, private access and storage qualification
 
 - **What:** complete file selection → authorized transfer → verified confirmation → saved/viewable image or video.
 - **Acceptance criteria:**
-  - [ ] Upload through `api-client` to private R2, inspect actual bytes/type/size and supported media, create bounded metadata/posters and link the confirmed version for the human's intended use. Neither a signed URL nor transfer completion alone creates usable work.
+  - [ ] Upload through `api-client` to private S3-compatible storage (local SeaweedFS in Phase 3), inspect actual bytes/type/size and supported media, create bounded metadata/posters and link the confirmed version for the human's intended use. Neither a signed URL nor transfer completion alone creates usable work.
   - [ ] Reject malformed/unsupported/oversized or mismatched content. Confirmation is repeat-safe; an upload URL cannot overwrite published media. Failed/expired transfers retain safe cleanup references without publishing a version.
-  - [ ] Use real development R2 and a browser to qualify signing, CORS, range access, stored-object checks, expiry/reacquisition or explicit failure, image display and authorized download. Test owner isolation and interrupted confirmation. Synthetic/licensed media and redacted evidence only.
+  - [ ] Use the pinned local S3-compatible emulator and a browser to qualify signing, CORS, range access, stored-object checks, expiry/reacquisition or explicit failure, image display and authorized download. Test owner isolation and interrupted confirmation. Synthetic/licensed media and redacted evidence only.
 - **Commits:** ≤5.
 
 ##### P3-S4 — Library reuse and reference controls
@@ -977,7 +977,7 @@ This umbrella retains references to the original capability; the following indep
 - **What:** complete actual product playback of individual versions and chosen clips.
 - **Acceptance criteria:**
   - [ ] Play/pause/seek use exact backend-provided versions. Verify picture and embedded audio; viewing does not change any selection or create an exported file.
-  - [ ] `api-client` obtains/reacquires authorized sources; `player` only consumes them. Verify real R2 cross-origin/range behavior and URL expiry, ownership failures, switching conversations and loading/interruption states through the actual consumer.
+  - [ ] `api-client` obtains/reacquires authorized sources; `player` only consumes them. Verify emulator cross-origin/range behavior and URL expiry, ownership failures, switching conversations and loading/interruption states through the actual consumer.
   - [ ] Individual uploaded-video playback requires no Script/Shot plan; local public clips alone do not qualify private product playback. No sequential Play all, comparison playback, timeline editing or audio mixing.
 - **Commits:** ≤5.
 
@@ -1044,7 +1044,7 @@ The approved spec scope supersedes older architecture/design language about spen
 
 - [ ] Frontend-only/shared backend operations and their actual browser consumers are implemented, with their valid-record prerequisites and real behavior demonstrated—not just success-shaped responses.
 - [ ] Shared rules preserve exact versions, human-only authority, stale-write rejection, owner isolation and the Phase 4 integration boundary; no production creative tool was smuggled into this phase.
-- [ ] Upload/private access/playback have actual development-R2 evidence, including range/CORS/expiry; usage is recorded from the first live model calls enabled here.
+- [ ] Upload/private access/playback have actual local-emulator evidence, including range/CORS/expiry (hosted-R2 evidence is not required before hosted deployment, P4-S19); usage is recorded from the first live model calls enabled here.
 - [ ] Export actually produces a verified downloadable video and passes exact-input/currentness, compatibility-rejection, restart, finalization-race and completed-output-independence tests.
 - [ ] Functional UI designs are approved; desktop/narrow keyboard/focus/loading/error checks, relevant automated suites and existing application-repository checks pass with reproducible evidence and no sensitive logs.
 - [ ] Agent-created prerequisites, tools/skills, provider execution and complete agent-driven flows remain explicitly assigned to Phase 4. Phase 4 now also owns remaining combined-product acceptance and release, not deferred Phase 3 feature correctness.
@@ -1067,7 +1067,7 @@ Approved by Lou on 2026-10-29. Phase 3 runs as parallel waves. Sprints in one wa
 | --- | --- | --- | --- |
 | Foundation | [Story 001](../stories/story-001.md) | Per-checkout browser-test port; trusted owned-conversation check and its test-only native-conversation helper | Browser harness port, the collaborator in `application`/`agent/mastra` |
 | 1 | [Sprint 004](../sprints/sprint-004.md) — Native runtime and conversations | B-001 → P3-S1a (account/session, then owned conversation navigation/history) → P3-S1b (send/stream/persist, then queue/reconnect/exact-turn Stop) → P3-S18 → P3-S19 | Backend `mastra/` serving/auth/native/workflow adapters, `agent/mastra/`, web `shell/` account/New video/Recents and native-history parts of `conversation/`, native/Auth client methods. No application tables |
-| 1 | [Sprint 005](../sprints/sprint-005.md) — Saved work, uploads and media | P3-S2 (schema and owned reads, then manual saves) → P3-S3 (storage/upload coordination, then media verification and upload UI) → P3-S4 → P3-S5 (storyboard edits with the selection revision, then exact Shot-video choice) → P3-S10 → real-R2 qualification | `supabase/` migrations, `db`, `artifacts`, `storage`, `application`; the `workspace`, version, `library`, save/use, `editStoryboard`, upload and `media` operations; web materials/versions/library/uploads/storyboard/videos choice/media; `player` |
+| 1 | [Sprint 005](../sprints/sprint-005.md) — Saved work, uploads and media | P3-S2 (schema and owned reads, then manual saves) → P3-S3 (storage/upload coordination, then media verification and upload UI) → P3-S4 → P3-S5 (storyboard edits with the selection revision, then exact Shot-video choice) → P3-S10 (real-R2 qualification removed 2026-11-01) | `supabase/` migrations, `db`, `artifacts`, `storage`, `application`; the `workspace`, version, `library`, save/use, `editStoryboard`, upload and `media` operations; web materials/versions/library/uploads/storyboard/videos choice/media; `player` |
 | 2a | [006 — Muse Wonder chat](../sprints/sprint-006.md) | P3-S1c without usage records: bounded binding → browser send/history → queue/reconnect/Stop → authorized live qualification | `agent/mastra/` model binding, native client and web `conversation/` chat; no `usage` persistence |
 | 2b | [007 — Human decisions and generation records](../sprints/sprint-007.md) | P3-S7 reads/B-003 → exact answers and durable hand-off → P3-S8 reads → cancellation | question/answer additions in `artifacts`, `generation`, application coordination, web question/proposal and request consumers; no export |
 | 3 | 008 — Refresh and Phase 3 acceptance | P3-S9 → P3-S17; retire remaining test pages (B-005); B-006 tidy-ups; carried Phase 2 items | Refresh/reconnect across features, acceptance evidence, surface catalog and Phase 4 hand-off |
@@ -1087,6 +1087,7 @@ Wave 2 starts after both Wave 1 sprints integrate and B-007 qualifies the combin
 **Decisions recorded with this packaging**
 
 - **R2, local first:** P3-S3/S10 are developed and tested against a pinned local S3-compatible emulator (SeaweedFS 4.51, by digest). Their real development-R2 criteria move to a dedicated final qualification story in Sprint 005. Sprint 005 cannot complete without it, and Lou provides the bucket before that story starts. Lou confirmed this on 2026-10-29, including keeping the real-R2 check in Sprint 005.
+  - **Superseded 2026-11-01 (Lou):** SeaweedFS is sufficient for Phase 3 and the MVP. The real development-R2 story is removed from Sprint 005 and Sprint 005 can complete without it; hosted-storage qualification is not required before hosted deployment (P4-S19).
   - Cloudflare's experimental local R2 S3 endpoint (Wrangler 4.115 / Miniflare, July 2026) was considered and not chosen: its CORS is always permissive, so our rules cannot be tested locally, and it adds about 140 MB of native packages.
   - For the real check, the token is limited to object read/write in the dev bucket. Lou sets the bucket's CORS rule once, and the tests verify it.
 - **Built-in Library examples:** ignored for now (Lou, 2026-10-29). Only the read-only `builtIn` semantics are implemented, proven with test-only records.

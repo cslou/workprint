@@ -8,6 +8,50 @@
 
 **Human reference:** [Brand book](brand-book.html) (home; pages under `brand-book/`) · **Values:** this file ([tokens](#color)) · **Approved screens:** [Generate flows](generate-flows.html) · **Interaction decisions:** [App user flows](user-flows.md) · **History:** [earlier studies and Editor alternatives](history.md)
 
+## Private single-clip playback and download
+
+**Provisionally approved by the orchestrator on 2026-11-01 under Lou’s delegation; pending Lou’s Phase 3 ratification.** Scope: Sprint 005 Story 8. Main inspected ready, downloading and download-failed captures at 1440 × 900 and 390 × 844 from ignored `outputs/verification/sprint-005/design-proposals/private-clip-playback-r1/`. The approved single-clip appearance is unchanged. A secondary `Download` button sits beneath the clip, followed on the same row by one plain status line: `Downloading this exact version…` while pending (button disabled), or `This video could not be downloaded. Nothing was changed.` on failure. Success shows no toast and saves `version-<revision>.<ext>` from the same owned media access; it never exports, uses or chooses. Library video inspection replaces the poster-only preview with the same clip and Download, then the existing measured line and `Playing or downloading does not use this version or choose it for a Shot.` Refreshed access reloads the same clip in place at the same position and play state; while the new link loads, the surface briefly shows the existing `Loading this video…` note. A failed refresh shows the existing `This video could not be loaded. Nothing was changed.` No Play all, comparison, timeline or progress percentage.
+
+## Exact Library reuse and reference editing
+
+**Provisionally approved by the orchestrator on 2026-11-01 under Lou’s delegation; pending Lou’s Phase 3 ratification.** Scope: Sprint 005 Story 5. Main inspected all ten narrow captures and desktop Library, unknown-use and reference-conflict captures from inert `library-reuse-r1` (source bundle SHA256 `4e9c9f83a0e3693d5d96638a780abe8a21fae6821e50b69c2bed69f86b014d29`). Approve kind filters, separate local Select/Inspect, exact-version use, reference role, unknown-use recovery, partial multi-attach, reference description/image associations and expected-base conflict states. Existing tokens and dialog/focus mechanisms remain authoritative; no Examples switch or Draft/Ready Library tiles.
+
+Inspection/history never approves; explicit Use pins the exact version and purpose in the current conversation without copying objects or choosing a Shot video. Unknown commands lock the original payload/identity; explicit Retry reconciles it, never automatically replays known successes. Partial attachment retains successful effects and pending exact choices. Back/Close/Escape preserves the tray and restores invoking focus; closing is not rollback. Existing unsaved editors must remain mounted with their original text/base/recovery identity when reuse changes the underlying projection; no silent replacement. If that cannot be achieved within these states, return a focused preview rather than discard drafts.
+
+Reference edits save description and exact image associations through existing manual-save authority, retaining original base/choices on conflict. Missing views/coverage stay explicitly unknown. A server-derived built-in/read-only version indicator may disable mutation controls after reload; server enforcement remains authoritative and this does not authorize a catalog. Media specimens are synthetic: actual image access needs verified bytes; video inspection is metadata/poster only with isolated qualified saved-video fixtures, never upload or playback qualification.
+
+Ignored previews at `outputs/verification/sprint-005/design-proposals/library-reuse-r1/` are inspection evidence, not mandatory runtime references. Provide tracked independent sources, all main widths 1440/390/820/821 and representative states 1440/390 with zero drift, keyboard/focus, geometry and no overflow. Search remains limited to loaded names and must be labelled accordingly using the existing approved bounded-navigation guidance. This approval is not runtime acceptance, a complete accessibility audit or human ratification.
+
+## Image-only upload restriction
+
+**Provisionally approved by the orchestrator on 2026-10-31 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Implements Lou’s explicit temporary video-upload restriction. Main inspected all six wide/narrow captures of `image-only-uploads-r1`: entry, video unavailable and saved image. Existing composer, receipt, tokens and image-recovery states remain. State that uploads accept JPEG/PNG up to 10 MiB and 4096 × 4096 pixels, and that video uploads are temporarily unavailable. Refusal offers “Choose an image” without replaying a prior transfer or claiming that saved work was undone. Saved images remain Draft, not approved references. Send availability is unchanged by this restriction.
+
+This supersedes the video-upload entry/success promises below for the current delivery; existing owned-video presentation is not new upload authorization. Ignored previews at `outputs/verification/sprint-005/design-proposals/image-only-uploads-r1/` are inspection evidence only. Use tracked independent references/substitutions for runtime comparisons, with required main widths and representative states. Captures show legible, unclipped content; this model-assisted inspection is not runtime, accessibility or human acceptance. Product behavior and source/geometry checks remain required.
+
+## Verified upload feedback
+
+**Provisionally approved by the orchestrator on 2026-10-31 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Scope: Sprint 005 Story 4. The 16-state inert revision `verified-media-uploads-r1` was inspected through its complete narrow contact sheet and full desktop image-success and narrow confirmation-unknown/poster-success captures. Existing tokens and composer primitives remain unchanged. Approve textual preparing/uploading/verifying feedback, exact-version image/poster success, expiry/interruption/unknown confirmation, stopped observation, definitive format/size/damage rejection, exact-version source loading/failure/expiry and generic scope-cleared feedback. No fabricated percentages, usable pre-verification thumbnail, new modal or toast.
+
+Single file at a time, no queue. Retain the captured file through ordinary failure until replacement/close; clear file, grant and result on account/conversation teardown. Show the generic scope-cleared notice without the former filename or identity. Stop waiting cancels observation, not transfer authorization or committed work. Explicit retry repeats the original confirmation identity; retrying transfer reuses the same captured bytes and unexpired grant. Expiry requires explicit new authorization. No automatic mutation replay. Technical success is Draft, not reference approval or Shot-video choice. Video success shows an owned poster only; playback remains a later slice. Access recovery reacquires the same exact saved version, never repeats upload.
+
+The authored specimen and displayed measurements are placeholders, not decoded production assets. Ignored previews under `outputs/verification/sprint-005/design-proposals/verified-media-uploads-r1/` are inspection evidence only. Implementation must provide tracked independent visual references/substitutions, state links and actual main-surface comparisons at 1440/390/820/821 plus representative states at 1440/390. Functional, accessibility, geometry and media verification remain unrun at this approval; this is not human ratification or product acceptance.
+
+## Bounded saved-work navigation
+
+**Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** This narrowly revises [saved-work reads](#phase-3-saved-work-reads): append loaded pages while within the bounded window; after eviction, show `Showing loaded items N–M` and `Back to first page` alongside the existing Load more/Load earlier versions control. Approve Option B, not silent rolling eviction or close/reopen as the recovery path. First-page return preserves exact Library choices and provides access to earlier items without an unbounded cache or automatic fetch. Search covers the currently loaded window, not unseen or evicted items; range feedback makes this limitation visible. Scope/filter changes still invalidate stale reads and choices under existing rules.
+
+The controls remain after the final row inside the scroll region, not above the selection tray. Keyboard focus and announcements settle across page append, eviction, terminal pages and return. Ordinary small collections retain their approved appearance; window feedback is needed when the displayed range is displaced. Inert Option B Library/history captures at 1440×900 and 390×844 were inspected in ignored `outputs/verification/sprint-005/design-proposals/pagination-window-r1/`; those previews are inspection evidence only. Tests derive comparisons from tracked references plus these substitutions and prove access beyond 1,000 items, bounded retained content, preserved exact choices and stale-response isolation. No new approval/selection authority, server search or wire contract is granted.
+
+## Manual save recovery
+
+**Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Scope: Sprint 005 Story 2, existing Script/reference/planning text targets only. Thirteen inert states in ignored `outputs/verification/sprint-005/design-proposals/manual-version-saves-r1/` were inspected through the narrow contact sheet and representative full conflict-review, uncertain-save and reference captures. Reuse tracked r74/r82 editor primitives: six rows, 14px/21px, 8px/12px padding, 10px radius, Cancel then Save, plain subtle feedback; no new palette, modal, success toast or authoring screen.
+
+Failed/stale saves retain typed text and original base. Pending and unknown-outcome text remains selectable/read-only; explicit Retry save repeats the original immutable command and payload, never a new identity or automatic mutation. Cancel closes the edit and does not undo a committed save. Conflict review reads the latest exact version without saving or approving it. Continue with my text changes only the local base after explicit review and only when the same text target is demonstrably preserved; a later explicit Save is a fresh command and rechecks latest. Structural mismatch blocks continuation rather than guessing an index, flattening a Script or replacing dependencies silently. Latest-read failure retains input with explicit retry.
+
+Reference description placement and existing stable Shot/Panel text editing use the same recovery treatment. Preserve all unedited structured fields, stable identities, order and exact dependencies. No reference attachment, new entry navigation, builder/reorder, selection authority or later-story storyboard-edit bypass is authorized. Human Save on currently used work atomically approves only its exact intended use and records the manual change; assistant drafts cannot claim that authority. Success reuses the actual saved-version display/history, without a turn or fabricated chat response. No promise of draft persistence after cancel, reload or scope switch.
+
+Preview inspection is not runtime proof or human ratification. Use tracked approved references plus these substitutions for independent comparisons, never ignored previews. Verify real concurrent conflicts, rollback, lost-response idempotency, safe reviewed-base continuation, scope/focus races and zero-drift representative states before delivery.
+
 ## Phase 3 account and session flows
 
 **Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Scope: Sprint 004 Story 2 only, not signup, account administration or generation.
@@ -750,6 +794,30 @@ The four unavailable pairs retain the same shared two-line empty treatment. Down
 - **Read-only contract projection:** status, currentness and compatibility come only from their typed fields. No local stale-submission rules, export state machine, stream validation, inferred currentness or processing is approved. Populated records remain labelled read-only prerequisites in isolated mounts until their real producer exists.
 
 The ignored `outputs/verification/sprint-003/design-proposals/story4/` previews preserve the initial candidates as `*-v1` and regenerate populated history/detail with these final substitutions. They are inspection evidence only; runtime and reference comparisons use tracked references plus this record, never ignored assets. This is design approval (by Lou, 2026-10-29), not implementation acceptance.
+
+### Phase 3 saved-work reads
+
+**Owned saved-work reads — 005/Story 1.** Provisionally approved by the orchestrator on 2026-10-29 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff. The approval covers 14 states shown as inert previews at 1440×900 and 390×844, with one change (Library pagination placement, below). Everything else reuses the approved Script sections, reference rows and sheets, Version/Use history rows, Library fallback tiles and shared buttons, with no token changes.
+
+- **Version history pagination:** after the loaded rows, a secondary `Load earlier versions` button. It loads only when activated, and pages are appended.
+  - Next-page loading keeps the rows, disables the button and adds the plain line `Loading earlier versions…`.
+  - Next-page failure keeps the rows, restores the same button and adds `Earlier versions could not be loaded. The versions already shown are unchanged.`
+  - The button is removed only when there is no next page. Only then does the summary show the known count, `Version history · N earlier`.
+  - The initial read shows `Loading version history…`. If it fails, the button `Load version history` plus `Version history could not be loaded.`
+- **Earlier exact version:** `Viewing version N` with a quiet `Back to current version`. Earlier content is read-only, with no edit pencil. Viewing or returning approves or selects nothing.
+- **Library pagination:** a secondary `Load more`, with `Loading more Library items…` and `More Library items could not be loaded. The items already shown are unchanged.`
+  - Loading keeps the tiles; the button is removed when there is no next page.
+  - **Change from the preview:** the button and its line sit inside the scrolling grid, directly after the last row of tiles and left-aligned, like the history button. They are not in a fixed band above the selection tray; the tray is unchanged.
+  - No Examples switch, and no Draft/Ready pills on Library tiles. Search keeps its approved loaded-items-only behavior.
+- **Empty Library:** `Nothing saved yet` / `Your saved work will appear here.`, in the shared two-line empty treatment.
+- **Reference without an image:** the Asset row keeps its layout with a dashed `No image` thumbnail; no invented media, and the reference is never hidden. Its Ready pill comes from the exact conversation use, not Library membership.
+  - The text-only sheet keeps its typography and sections and says `No images are supplied.` Section text comes only from validated exact-version content, never from IDs or guessed JSON.
+- **Behavior:**
+  - Enter/Space activates the pagination buttons, loading is announced politely, and repeat activation is disabled while loading.
+  - When the last page arrives, focus moves to the first newly added control before the load button is removed; otherwise focus stays on the button. No unexpected scroll jumps.
+  - Changing account, conversation, resource or filter discards loaded pages and late responses, with no replayed action.
+
+The ignored previews in `outputs/verification/sprint-005/design-proposals/owned-reads/` in the `workprint-2` clone are inspection evidence only. Runtime and visual comparisons use the tracked references plus this record. This is design approval, not implementation acceptance.
 
 ### Reference sheet
 

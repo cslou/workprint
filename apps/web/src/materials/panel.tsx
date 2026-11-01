@@ -7,12 +7,12 @@ import { Script } from './script.js';
 import { Assets } from './assets.js';
 import type { MaterialPrerequisites } from './presentation.js';
 
-type Props = Omit<ComponentProps<typeof WorkspacePanel>, 'content'> & { connection: BrowserClient; scope: ReadScope | null; workspace: OperationResponse<'workspace'> | null; prerequisites?: MaterialPrerequisites; additionalContent?: ComponentProps<typeof WorkspacePanel>['content']; contentOverride?: ComponentProps<typeof WorkspacePanel>['content'] };
+type Props = Omit<ComponentProps<typeof WorkspacePanel>, 'content'> & { connection: BrowserClient; scope: ReadScope | null; workspace: OperationResponse<'workspace'> | null; prerequisites?: MaterialPrerequisites; onSaved?: (result: OperationResponse<'saveVersion'>) => void; additionalContent?: ComponentProps<typeof WorkspacePanel>['content']; contentOverride?: ComponentProps<typeof WorkspacePanel>['content'] };
 export function MaterialPanel(props: Props) {
   return <ScopedPanel key={JSON.stringify([props.scope?.accountId, props.scope?.conversationId])} {...props} />;
 }
-function ScopedPanel({ connection, scope, workspace, prerequisites, additionalContent, contentOverride, ...tabs }: Props) {
-  const common = { connection, scope, ...(prerequisites ? { prerequisites } : {}) };
+function ScopedPanel({ connection, scope, workspace, prerequisites, onSaved, additionalContent, contentOverride, ...tabs }: Props) {
+  const common = { connection, scope, ...(onSaved ? { onSaved } : {}), ...(prerequisites ? { prerequisites } : {}) };
   const content = contentOverride ?? (workspace ? { script: <Script {...common} workspace={workspace} />, assets: <Assets {...common} workspace={workspace} />, ...additionalContent } : undefined);
   return <WorkspacePanel {...tabs} preservePanels={!!workspace && (!!workspace.script || workspace.assets.length > 0 || workspace.storyboard.shots.length > 0)} {...(content ? { content } : {})} />;
 }

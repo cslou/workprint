@@ -1,4 +1,4 @@
-import { applicationError, operations, type OperationName, type OperationRequest, type OperationResponse } from '@workprint/contracts';
+import { applicationError, operations, workspaceResponseBytes, type OperationName, type OperationRequest, type OperationResponse } from '@workprint/contracts';
 import { readJsonResponse } from './response.js';
 import { createNativeNavigation, type NativeNavigation } from './native.js';
 import { createNativeTurns, type NativeTurnMethods } from './native-turns.js';
@@ -10,6 +10,12 @@ export type { NativeTurnScope, NativeTextInput, NativeSendReceipt, NativeObserve
 
 import type { ClientError, ClientResult, CallOptions } from './types.js';
 export type { ClientError, ClientResult, CallOptions } from './types.js';
+export { createPageRead, type PageRead, type PageReadState, type ReadPage } from './paged-read.js';
+export { transferUpload } from './upload-transfer.js';
+export { createUploadSession, type UploadSession, type UploadState, type UploadScope } from './upload-session.js';
+export { privateVideoDeadlineMs, readPrivateImage, readPrivateVideo } from './private-image.js';
+export { createManualSave, type ManualSave, type ManualSaveState, type ManualTextTarget } from './manual-save.js';
+export { createExactVersionUse, requestVersionUse, type ExactVersionUse, type ExactVersionUseState, type VersionUseClient } from './version-use.js';
 type ApplicationMethods = { [N in OperationName]: (input: OperationRequest<N>, options?: CallOptions) => Promise<ClientResult<OperationResponse<N>>> };
 const nativeNames = ['createConversation', 'listConversations', 'loadConversation', 'loadMessages', 'sendText', 'subscribe', 'stop', 'queueText', 'observeTurn'] as const;
 type NativeMethods = NativeNavigation & NativeTurnMethods & NativeTurnControls;
@@ -50,7 +56,7 @@ export function createApiClient(config: { baseUrl: string; getAccessToken: () =>
           ...(operation.method !== 'GET' ? { body: JSON.stringify(input.body) } : {}),
           signal: controller.signal, redirect: 'error', credentials: 'omit',
         });
-        const payload = await readJsonResponse(response, { invalid: 'Invalid API response', tooLarge: 'API response too large', invalidError: 'Invalid API error response' });
+        const payload = await readJsonResponse(response, { invalid: 'Invalid API response', tooLarge: 'API response too large', invalidError: 'Invalid API error response' }, name === 'workspace' && response.ok ? workspaceResponseBytes : undefined);
         if (!payload.ok) return payload;
         const decoded = operation.response.safeParse(payload.value.value);
         return decoded.success ? { ok: true, value: decoded.data as OperationResponse<N> } : fail('invalid_response', 'Invalid API response');

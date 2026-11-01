@@ -15,7 +15,7 @@ async function mount(page: Page, input: unknown) {
 }
 const choiceIds = (page: Page) => page.locator('.wp-video-row [data-current-version-id]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-current-version-id')));
 
-test('actual Videos Export, history, detail and download receive built 401/501 without effects', async ({ page, materialNetwork }, info) => {
+test('Videos Export stays unavailable and nonexistent output media stays denied without effects', async ({ page, materialNetwork }, info) => {
   test.setTimeout(180000);
   await info.attach('prerequisite', { body: 'Labelled read-only public workspace, exact video and two export projections. No producer/success response is mocked. Every application request is continued to built backend admission.', contentType: 'text/plain' });
   const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
@@ -71,7 +71,9 @@ test('actual Videos Export, history, detail and download receive built 401/501 w
         await expect(page.getByText('No export record was loaded.', { exact: true })).toBeVisible();
         const media = page.waitForResponse(value => value.url() === `${origin}/v1/versions/output-exact/media`);
         await activate(page.getByRole('button', { name: 'Download', exact: true }), status === 501);
-        expect((await media).status()).toBe(status);
+        const denied = await media;
+        expect(denied.status()).toBe(status === 501 ? 404 : 401);
+        expect(await denied.json()).toMatchObject({ error: { code: status === 501 ? 'not_found' : 'unauthenticated' } });
         await expect(page.getByText('Download is not available yet.', { exact: true })).toBeVisible();
         await expect(page.getByText('No file was downloaded.', { exact: true })).toBeVisible();
         await expect(page.locator('a[download],video,[role="progressbar"]')).toHaveCount(0);

@@ -24,7 +24,7 @@ for (const order of ['new-first', 'old-first'] as const) test(`pending upload re
   await page.goto('/uploads.html');
   await page.waitForFunction(() => !!(window as unknown as UploadsHarness).uploadsTest);
   await hold(page, '**/v1/conversations/*/uploads', held);
-  const input = page.getByLabel('Choose an image or video', { exact: true });
+  const input = page.getByLabel('Choose a JPEG or PNG image', { exact: true });
   const image = { name: 'vale.png', mimeType: 'image/png', buffer: Buffer.from('image-bytes') };
   await uploadScope(page, 'account-a', 'conversation-a');
   await input.setInputFiles(image);
@@ -59,7 +59,7 @@ for (const order of ['new-first', 'old-first'] as const) test(`pending upload re
   await page.goto('/uploads.html');
   await page.waitForFunction(() => !!(window as unknown as UploadsHarness).uploadsTest);
   await hold(page, '**/v1/conversations/*/uploads', held);
-  const input = page.getByLabel('Choose an image or video', { exact: true });
+  const input = page.getByLabel('Choose a JPEG or PNG image', { exact: true });
   const image = { name: 'vale.png', mimeType: 'image/png', buffer: Buffer.from('image-bytes') };
   await uploadScope(page, 'account-a', 'conversation-a');
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Scope A draft');

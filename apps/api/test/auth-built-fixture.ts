@@ -8,14 +8,18 @@ import { loadAuthFixture, readPrivateJson, signInFixtureAccount, startAuthServer
 import { createApiClient } from '@workprint/api-client';
 import { operations, type OperationName, type OperationRequest } from '@workprint/contracts';
 import { applicationRequests } from './application-requests.js';
-import { query } from './postgres.js';
+import { query, isolatedPostgres } from './postgres.js';
+import { PostgresStore } from '@mastra/pg';
+import { applyArtifactMigrations } from './artifact-database.js';
 import { buildServerComposition } from './built-server.js';
+import type { PrivateStorageConfiguration } from '../src/storage/index.js';
 
 // Shared by current-scope checks and the separately invoked B-001 qualification.
 // Private fixture input is never inherited by serving. Accounts already exist.
-export type BuiltAdmissionTarget = { origin: string; accessToken: string; accessTokens: readonly string[]; logs: string };
+export type BuiltAdmissionTarget = { origin: string; accessToken: string; accessTokens: readonly string[]; refreshAccessTokens(): Promise<readonly string[]>; logs: string };
+export type SavedWorkSetup = { accountIds: readonly string[]; native: PostgresStore; servingUrl: string; setupUrl?: string };
 type FixtureContext = { diagnostic(message: string): void; after(cleanup: () => void | Promise<void>): void };
-export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (server: BuiltAdmissionTarget) => Promise<void>, options: { browserOrigin?: string } = {}) {
+export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (server: BuiltAdmissionTarget) => Promise<void>, options: { browserOrigin?: string; storage?: PrivateStorageConfiguration; media?: { toolchainDirectory: string; dockerPath: string; archivePath?: string }; prepareSavedWork?: (setup: SavedWorkSetup) => Promise<void>; verifySavedEffects?: (servingUrl: string) => Promise<void> } = {}) {
   const config = await loadAuthFixture();
   const fixture = await environment();
   t.diagnostic(`Evidence: ${fixture.logs}`);
@@ -34,9 +38,26 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
   `, fixture.env);
   const productionEntry = await buildServerComposition(fixture.logs, 'production', undefined, fixture.env);
   // Fresh sign-ins happen after building. Never log request/response credentials.
-  const identities = await Promise.all(config.accounts.map((account) => signInFixtureAccount(config, account)));
+  const signIn = () => Promise.all(config.accounts.map((account) => signInFixtureAccount(config, account)));
+  const identities = await signIn(), accessTokens = identities.map(identity => identity.access_token);
+  const refreshAccessTokens = async () => {
+    const refreshed = await signIn();
+    assert.deepEqual(refreshed.map(identity => identity.user.id), identities.map(identity => identity.user.id), 'Renewed fixture sign-ins retain exact owners');
+    const tokens = refreshed.map(identity => identity.access_token); accessTokens.push(...tokens); return tokens;
+  };
   assert.notEqual(identities[0]!.user.id, identities[1]!.user.id);
-  const servingEnv = options.browserOrigin ? { WORKPRINT_BROWSER_ORIGIN: options.browserOrigin } : {};
+  // Application tests own their data database; Auth alone uses the authorized shared stack.
+  const database = await isolatedPostgres();
+  t.after(database.close);
+  const setup = new PostgresStore({ id: 'admission-native-setup', connectionString: database.setupUrl, schemaName: 'mastra' });
+  try {
+    await setup.init(); await database.grantServing(); await applyArtifactMigrations(database.setupUrl);
+    await options.prepareSavedWork?.({ accountIds: identities.map(identity => identity.user.id), native: setup, servingUrl: database.servingUrl, setupUrl: database.setupUrl });
+  } finally { await setup.close(); }
+  const servingEnv = { DATABASE_URL: database.servingUrl,
+    ...(options.browserOrigin ? { WORKPRINT_BROWSER_ORIGIN: options.browserOrigin } : {}),
+    ...(options.media ? { MEDIA_TOOLCHAIN_DIRECTORY: options.media.toolchainDirectory, MEDIA_DOCKER_PATH: options.media.dockerPath, ...(options.media.archivePath ? { MEDIA_ARCHIVE_PATH: options.media.archivePath } : {}) } : {}),
+    ...(options.storage ? { S3_ENDPOINT: options.storage.endpoint, S3_REGION: options.storage.region, S3_BUCKET: options.storage.bucket, S3_ACCESS_KEY_ID: options.storage.credentials.accessKeyId, S3_SECRET_ACCESS_KEY: options.storage.credentials.secretAccessKey } : {}) };
   const { server: probe, origin, port } = await startAuthServer(probeEntry, fixture.env, config, join(fixture.logs, 'probe.log'), { env: servingEnv });
   t.after(probe.stop);
   for (const identity of identities) {
@@ -101,12 +122,18 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
   t.after(production.stop);
   // The same built production artifact/admission fixture proves all application routes.
   const snapshot = async () => {
-    const tables = await query(config.servingUrl, "SELECT tablename FROM pg_tables WHERE schemaname = 'mastra' ORDER BY tablename");
+    const tables = await query(database.servingUrl, "SELECT tablename FROM pg_tables WHERE schemaname = 'mastra' ORDER BY tablename");
     const fingerprints: unknown[] = [];
     for (const row of tables.rows as { tablename: string }[]) {
       const table = row.tablename.replaceAll('"', '""');
-      const result = await query(config.servingUrl, `SELECT md5(COALESCE(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text)::text, '[]')) AS digest FROM mastra."${table}" t`);
+      const result = await query(database.servingUrl, `SELECT md5(COALESCE(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text)::text, '[]')) AS digest FROM mastra."${table}" t`);
       fingerprints.push([row.tablename, result.rows[0]]);
+    }
+    const applicationTables = await query(database.servingUrl, "SELECT tablename FROM pg_tables WHERE schemaname='artifacts' ORDER BY tablename");
+    for (const row of applicationTables.rows as { tablename: string }[]) {
+      const table = row.tablename.replaceAll('"', '""');
+      const result = await query(database.servingUrl, `SELECT md5(COALESCE(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text)::text, '[]')) AS digest FROM artifacts."${table}" t`);
+      fingerprints.push([`artifacts.${row.tablename}`, result.rows[0]]);
     }
     return fingerprints;
   };
@@ -117,7 +144,15 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
     const invoke = <N extends OperationName>(name: N) => (client[name] as (input: OperationRequest<N>) => Promise<unknown>)(applicationRequests[name]);
     for (const name of Object.keys(operations) as OperationName[]) {
       const result = await invoke(name);
-      assert.deepEqual(result, { ok: false, error: { code: 'not_implemented', message: 'This operation is not implemented' } }, name);
+      if (name === 'library') {
+        const settled = result as { ok: boolean; value: unknown };
+        assert.equal(settled.ok, true, 'Owned Library read settles successfully');
+        assert.ok(operations.library.response.safeParse(settled.value).success);
+      } else if (name === 'workspace' || name === 'artifactVersions' || name === 'version' || name === 'requestUpload' || name === 'confirmUpload' || name === 'media' || name === 'useVersion' || name === 'editStoryboard') {
+        assert.deepEqual(result, { ok: false, error: { code: 'not_found', message: 'Saved work not found' } }, 'Unknown and foreign reads share their denial');
+      } else if (name === 'saveVersion') {
+        assert.deepEqual(result, { ok: false, error: { code: 'invalid_input', message: 'Invalid saved-work request' } }, 'Unsupported initial/empty save creates no effects');
+      } else assert.deepEqual(result, { ok: false, error: { code: 'not_implemented', message: 'This operation is not implemented' } }, name);
     }
   }
   const raw = async (path: string, method: string, body: string | undefined, token = identities[0]!.access_token) => {
@@ -156,12 +191,15 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
   assert.equal(oversized.status, 400, 'Application rejects completed JSON beyond 1 MiB');
   assert.equal(oversized.payload.error.code, 'invalid_input');
 
-  if (qualifyIngress) await qualifyIngress({ origin, accessToken: identities[0]!.access_token, accessTokens: identities.map((identity) => identity.access_token), logs: fixture.logs });
+  if (qualifyIngress) await qualifyIngress({ origin, accessToken: identities[0]!.access_token, accessTokens: identities.map((identity) => identity.access_token), refreshAccessTokens, logs: fixture.logs });
   for (const [path, method] of [['/v1/conversations/c/workspace/extra', 'GET'], ['/v1/conversations//workspace', 'GET'], ['/v1/conversations/c/workspace', 'POST'], ['/v1/library/', 'GET']] as const) {
     assert.equal((await raw(path, method, undefined)).status, 404, 'Only exact catalog paths/methods are admitted');
   }
-  // No product resources exist; these arbitrary IDs prove no ownership semantics.
-  assert.deepEqual(await snapshot(), beforeRequests, 'Unavailable matrix creates/changes no native records');
+  // All cases preserve native records; only explicit write qualifications may change application records.
+  const afterRequests = await snapshot();
+  assert.deepEqual(afterRequests.filter(row => !String((row as unknown[])[0]).startsWith('artifacts.')), beforeRequests.filter(row => !String((row as unknown[])[0]).startsWith('artifacts.')), 'Application commands never start or modify native turns');
+  if (options.verifySavedEffects) await options.verifySavedEffects(database.servingUrl);
+  else assert.deepEqual(afterRequests, beforeRequests, 'Read and unavailable-command matrix creates/changes no native or application records');
   const exposure: { path: string; bearer: boolean; status: number }[] = [];
   for (const path of ['/api/auth/capabilities', '/api/auth/me', '/__auth_probe', '/api/agents', '/api/memory/threads', '/api/workflows', '/api/tools', '/api/telemetry', '/swagger-ui', '/openapi.json', '/health/', '/__qualification', '/__qualification/release', '/test/shell.html', '/fixtures/clip.webm', '/studio', '/assets/index.js', '/api/tools/test/execute']) {
     for (const bearer of [false, true]) {
@@ -176,7 +214,7 @@ export async function verifyBuiltAdmission(t: FixtureContext, qualifyIngress?: (
   await production.stop();
   for (const name of ['probe.log', 'production.log', 'probe-build.log', 'production-build.log', 'failure.log', 'malformed.log', 'stall.log', 'body-stall.log']) {
     const log = await readFile(join(fixture.logs, name), 'utf8');
-    for (const secret of [sentinel, signingKey, signingControl, expired, config.anonKey, config.servingUrl, new URL(config.servingUrl).password, ...config.accounts.map((account) => account.password), ...identities.map((identity) => identity.access_token)]) assert.ok(!log.includes(secret));
+    for (const secret of [sentinel, signingKey, signingControl, expired, config.anonKey, config.servingUrl, new URL(config.servingUrl).password, ...config.accounts.map((account) => account.password), ...accessTokens]) assert.ok(!log.includes(secret));
   }
   await fixture.noNetwork();
 }

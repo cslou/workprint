@@ -18,9 +18,9 @@ test('Vite serves browser modules but denies private research and fixture creden
   await cp(join(root, 'apps/web/src'), join(web, 'src'), { recursive: true });
   await symlink(join(root, 'node_modules'), join(checkout, 'node_modules'), 'dir');
   await symlink(join(root, 'apps/web/node_modules'), join(web, 'node_modules'), 'dir');
-  const paths = ['docs/research/synthetic-private.md', 'outputs/local-database.env'];
-  for (const file of paths) await writeFile(join(checkout, file), sentinel);
-  for (const name of ['native-conversations.ts', 'built-server.ts', 'auth-built-fixture.ts', 'auth-server.ts', 'isolated-auth.ts', 'auth-fixture-resources.ts', 'auth-mail.ts', 'account-browser-fixture.ts', 'native-navigation.test.ts', 'native-client.contracts.test.ts', 'native-workflow-outcome.ts', 'native-workflow-outcome.test.ts']) {
+  const paths = ['docs/research/synthetic-private.md', 'outputs/local-database.env', 'outputs/local-object-storage.json', 'outputs/local-supabase.setup.json', 'outputs/toolchains/synthetic-media-cache/archive.tar.xz', 'outputs/toolchains/synthetic-media-cache/bin/ffmpeg', 'outputs/toolchains/synthetic-media-cache/bin/ffprobe', 'outputs/toolchains/synthetic-media-cache/binary-manifest.json', 'outputs/media-job/resource.json'];
+  for (const file of paths) { await mkdir(join(checkout,file,'..'),{recursive:true}); await writeFile(join(checkout, file), sentinel); }
+  for (const name of ['native-conversations.ts', 'built-server.ts', 'auth-built-fixture.ts', 'auth-server.ts', 'isolated-auth.ts', 'auth-fixture-resources.ts', 'auth-mail.ts', 'account-browser-fixture.ts', 'native-navigation.test.ts', 'native-client.contracts.test.ts', 'native-workflow-outcome.ts', 'native-workflow-outcome.test.ts', 'artifact-database.ts', 'saved-work.ts', 'paged-saved-work.ts', 'object-storage.ts', 'media-fixtures.ts']) {
     const helper = `apps/api/test/${name}`;
     await copyFile(join(root, helper), join(checkout, helper));
     paths.push(helper);

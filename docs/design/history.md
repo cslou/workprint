@@ -1,5 +1,43 @@
 # Workprint — Application Design History
 
+## Private single-clip playback — 2026-11-01
+
+**Provisionally approved by the orchestrator under Lou’s delegation; pending Lou’s Phase 3 ratification.** Six `private-clip-playback-r1` desktop/narrow captures inspected: ready, downloading and download failed. Download reuses the exact-version media access with existing secondary-button and plain-status primitives; Library video inspection now plays the same clip instead of a poster. See [binding scope](design.md#private-single-clip-playback-and-download). Playback and download never use, choose or export a version.
+
+## Exact Library reuse — 2026-11-01
+
+**Provisionally approved by the orchestrator under Lou’s delegation; pending Phase 3 ratification.** Ten narrow and three representative desktop `library-reuse-r1` captures inspected. Exact-version inspection/use, original-identity recovery, partial attachment and reference association/conflict states retain existing primitives and distinguish viewing from human authority. No examples catalog, implicit latest, Shot-video choice or playback. See [binding scope and evidence limits](design.md#exact-library-reuse-and-reference-editing). Built-in mutation controls use server-derived metadata; actual authority stays server-side.
+
+## Image-only upload restriction — 2026-10-31
+
+**Provisionally approved by the orchestrator under Lou’s delegation; pending Lou’s Phase 3 ratification.** Following Lou’s explicit scope decision, entry and refusal feedback now state JPEG/PNG-only upload limits and temporary video unavailability. Main inspected all six `image-only-uploads-r1` desktop/narrow captures; image success remains Draft without reference approval. See [binding scope and evidence limits](design.md#image-only-upload-restriction). This supersedes video-upload entry/success promises for this delivery, not existing owned-media presentation. Runtime verification and human ratification remain separate.
+
+## Verified upload feedback — 2026-10-31
+
+**Provisionally approved by the orchestrator under Lou’s delegation; pending Lou’s Phase 3 ratification.** Sixteen inert states retain existing tokens and distinguish authorization/transfer/verification from saved exact versions. Explicit same-upload recovery, observer-only stop and scope clearing avoid replay or rollback claims. Saved image/video remains Draft; video has a poster, not playback or Shot selection. Main inspected the complete narrow contact sheet and representative desktop/narrow full captures. See [binding decisions and verification limits](design.md#verified-upload-feedback). Synthetic preview assets are not verified media; no runtime acceptance is claimed.
+
+## Manual save recovery — 2026-10-30
+
+**Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Existing text editors retain input through conflicts and uncertain outcomes. Explicit same-command retry is distinct from a new save; reviewed-base continuation is local only and blocks changed targets. Reference descriptions and stable planning text reuse these controls without granting later-story structure or selection authority. See [binding recovery decisions](design.md#manual-save-recovery). Inspection of 13 inert states does not claim runtime behavior or human ratification.
+
+## Bounded saved-work navigation — 2026-10-30
+
+**Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Option B adds a loaded-window range and Back to first page after bounded eviction, preserving exact Library choices and keeping navigation inside the scrolling rows. This replaces the inaccessible 1,000-item ceiling without silent loss of back-navigation. [Binding details](design.md#bounded-saved-work-navigation) refine the prior append-only description. Desktop/narrow inert Library/history previews were inspected; runtime and visual parity remain to be verified.
+
+## Owned saved-work reads — 2026-10-29
+
+**Provisionally approved by the orchestrator on 2026-10-29 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff.**
+
+- **What:** Sprint 005 Story 1's 14 new states:
+  - version-history and Library pagination, with loading, failure and complete states;
+  - initial history loading and failure;
+  - viewing an earlier exact version;
+  - the neutral empty-Library second line;
+  - text-only references with a `No image` thumbnail and sheet.
+- **Change:** one, from the preview. Library's `Load more` moves from a fixed band above the selection tray to the end of the scrolling grid, matching the history pattern.
+- **Where:** exact copy and behavior are in [Phase 3 saved-work reads](design.md#phase-3-saved-work-reads).
+- **Previews:** ignored files in `outputs/verification/sprint-005/design-proposals/owned-reads/` (the `workprint-2` clone), kept as historical evidence only.
+
 ## Owned conversation navigation and history — 2026-10-30
 
 **Provisionally approved by the orchestrator on 2026-10-30 under Lou’s delegation; pending Lou’s ratification at the Phase 3 handoff.** Twenty-nine inert navigation/history states reuse shell, dialogs and message styles. Explicit Previous/Next Recents, read-only earlier history and uncertain-create feedback avoid automatic mutation replay or invented workspace persistence. All narrow sheets were inspected; [binding decisions](design.md#owned-conversation-navigation-and-history) retain runtime, keyboard, visual and human-ratification gates. Send stays unavailable.

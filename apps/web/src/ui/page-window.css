@@ -1,0 +1,2 @@
+.wp-page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-6) var(--space-12); }
+.wp-page-actions .wp-button-quiet { padding: 0; }

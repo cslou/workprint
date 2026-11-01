@@ -4,8 +4,10 @@ import { browserOrigin, previewOrigin } from './origin.js';
 
 type Entry = { method: string; url: URL; body: unknown };
 type Operation = Readonly<{ origin: string; method: string; path: string; count: number; query: Readonly<Record<string, string>>; purpose?: OperationRequest<'useVersion'>['body']['purpose'] }>;
-type Allowance = Omit<Operation, 'count' | 'query'> & { query: string; consumed: boolean };
-export type MaterialNetwork = { entries: Entry[]; expectOperations(...operations: Operation[]): void; assertSafe(): void };
+type Allowance = Omit<Operation, 'count' | 'query'> & { query: string; consumed: boolean; optional?: boolean };
+export type MaterialNetwork = { entries: Entry[]; expectOperations(...operations: Operation[]): void; expectObjectTransfer(url: string, count?: number, method?: 'PUT' | 'GET', optional?: number): void; assertSafe(): void };
+const redactQuery = (entries: Iterable<[string, string]>) => [...entries].map(([key, value]): [string, string] => [key, /^x-amz-/i.test(key) ? '[redacted]' : value]);
+const safeURL = (input: URL) => { const url = new URL(input); url.search = new URLSearchParams(redactQuery(url.searchParams)).toString(); return url; };
 const queryKey = (entries: Iterable<[string, string]>) => JSON.stringify([...entries].sort(([a, av], [b, bv]) => a.localeCompare(b) || av.localeCompare(bv)));
 
 /** Records every HTTP request; exact operation allowances are consumed at observation, never retroactively. */
@@ -14,10 +16,13 @@ export const test = base.extend<{ materialNetwork: MaterialNetwork }>({
     const entries: Entry[] = [];
     const allowances: Allowance[] = [];
     const unexpected: Entry[] = [];
+    const objectOrigins = new Set<string>();
     const record = (request: Request) => {
-      let body: unknown = null;
-      if (request.postData()) { try { body = request.postDataJSON(); } catch { body = 'non-JSON transfer'; } }
-      const url = new URL(request.url());
+      const actualURL = new URL(request.url());
+      const objectRequest = objectOrigins.has(actualURL.origin) || actualURL.searchParams.has('X-Amz-Signature');
+      let body: unknown = objectRequest ? 'private object transfer' : null;
+      if (!objectRequest && request.postData()) { try { body = request.postDataJSON(); } catch { body = 'non-JSON transfer'; } }
+      const url = safeURL(actualURL);
       const auth = url.pathname.startsWith('/auth/v1/') || url.pathname === '/auth/callback';
       if (auth) {
         // Auth payloads/URLs are secret-bearing. Redact before retaining any evidence.
@@ -28,8 +33,14 @@ export const test = base.extend<{ materialNetwork: MaterialNetwork }>({
       }
       const entry = { method: request.method(), url, body };
       entries.push(entry);
-      if ((entry.url.pathname.startsWith('/v1/') || entry.url.pathname.startsWith('/memory/')) || auth && entry.method !== 'OPTIONS' || !['GET', 'HEAD', 'OPTIONS'].includes(entry.method)) {
-        const allowance = allowances.find(value => !value.consumed && value.method === entry.method && value.origin === entry.url.origin && value.path === entry.url.pathname && value.query === queryKey(entry.url.searchParams.entries()));
+      if (objectRequest) {
+        expect(Object.hasOwn(request.headers(), 'authorization'), 'API bearer must never reach object storage').toBe(false);
+        expect(Object.hasOwn(request.headers(), 'cookie'), 'Application cookies must never reach object storage').toBe(false);
+      }
+      if (objectRequest || entry.url.pathname.startsWith('/v1/') || entry.url.pathname.startsWith('/memory/') || auth && entry.method !== 'OPTIONS' || !['GET', 'HEAD', 'OPTIONS'].includes(entry.method)) {
+        // Signed object grants match their exact (unredacted) query; Auth matches its redacted form.
+        const match = objectRequest ? actualURL : entry.url;
+        const allowance = allowances.find(value => !value.consumed && value.method === entry.method && value.origin === match.origin && value.path === match.pathname && value.query === queryKey(match.searchParams.entries()));
         if (allowance) {
           allowance.consumed = true;
           if (entry.method === 'POST' && entry.url.pathname.endsWith('/uses')) expect(entry.body).toMatchObject({ purpose: allowance.purpose ?? 'reference' });
@@ -43,7 +54,11 @@ export const test = base.extend<{ materialNetwork: MaterialNetwork }>({
         if (!((entry.method === 'GET' && /^\/v1\/(conversations\/[^/]+\/)?generation-requests(\/[^/]+)?$/.test(entry.url.pathname)) || (entry.method === 'POST' && /^\/v1\/generation-requests\/[^/]+\/cancel$/.test(entry.url.pathname)))) expect(entry.url.pathname).not.toMatch(/generation|provider/);
         if (entry.url.pathname === '/v1/library') {
           expect(entry.method).toBe('GET');
-          expect([...entry.url.searchParams.keys()].filter(key => key !== 'cursor')).toEqual([]);
+          expect([...entry.url.searchParams.keys()].filter(key => !['cursor', 'kind', 'limit'].includes(key))).toEqual([]);
+          const limit = entry.url.searchParams.get('limit');
+          if (limit !== null) expect(/^[1-9]\d*$/.test(limit) && Number(limit) <= 100).toBe(true);
+          const kind = entry.url.searchParams.get('kind');
+          if (kind !== null) expect(['script', 'reference', 'storyboard', 'image', 'video']).toContain(kind);
         }
       }
     };
@@ -58,12 +73,20 @@ export const test = base.extend<{ materialNetwork: MaterialNetwork }>({
           expect(Number.isInteger(operation.count) && operation.count > 0).toBe(true);
           for (let index = 0; index < operation.count; index++) allowances.push({ origin: operation.origin, method: operation.method, path: operation.path, query: queryKey(Object.entries(operation.query)), ...(operation.purpose ? { purpose: operation.purpose } : {}), consumed: false });
         }
+      }, expectObjectTransfer(value, count = 1, method = 'PUT', optional = 0) {
+        const url = new URL(value);
+        expect(url.searchParams.has('X-Amz-Signature'), 'Only an exact signed object grant may be allowed').toBe(true);
+        expect(Number.isInteger(count) && count > 0).toBe(true);
+        objectOrigins.add(url.origin);
+        expect(Number.isInteger(optional) && optional >= 0).toBe(true);
+        // Optional allowances bound browser-chosen range reads; they never excuse a missing required transfer.
+        for (let index = 0; index < count + optional; index++) allowances.push({ origin: url.origin, method, path: url.pathname, query: queryKey(url.searchParams), consumed: false, ...(index >= count ? { optional: true } : {}) });
       }, assertSafe });
     } finally {
       await context.close();
       try {
         assertSafe();
-        expect(allowances.filter(value => !value.consumed).map(value => `${value.method} ${value.origin}${value.path} query=${value.query}`), 'Expected operations were not consumed').toEqual([]);
+        expect(allowances.filter(value => !value.consumed && !value.optional).map(value => `${value.method} ${value.origin}${value.path} query=${JSON.stringify(redactQuery(JSON.parse(value.query) as [string, string][]))}`), 'Expected operations were not consumed').toEqual([]);
       } finally { context.off('request', record); }
     }
   }, { auto: true }],

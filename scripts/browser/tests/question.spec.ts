@@ -34,7 +34,7 @@ test('workspace order positions supply numbering and ambiguous or mismatched tar
   }
 });
 
-observedTest('real question/proposal/version reads and exact option answers distinguish 401/501 without effects', async ({ page, materialNetwork }, info) => {
+observedTest('real question/proposal/version reads and exact option answers distinguish 401/404/501 without effects', async ({ page, materialNetwork }, info) => {
   observedTest.setTimeout(120000);
   await info.attach('prerequisites', { body: 'Labelled read-only question, proposal, exact versions and identity-bound display facts; not saved product records.', contentType: 'text/plain' });
   const { verifyBuiltAdmission } = await import(pathToFileURL(resolve('apps/api/.test-build/test/auth-built-fixture.js')).href) as { verifyBuiltAdmission: typeof VerifyBuiltAdmission };
@@ -55,12 +55,12 @@ observedTest('real question/proposal/version reads and exact option answers dist
           if (url.origin === origin) requests.push({ method: route.request().method(), path: url.pathname, body: route.request().method() === 'POST' ? route.request().postDataJSON() : null });
           await route.continue();
         });
-        const responses: number[] = [];
-        const listener = (response: import('@playwright/test').Response) => { if (new URL(response.url()).origin === origin) responses.push(response.status()); };
+        const responses: { path: string; status: number }[] = [];
+        const listener = (response: import('@playwright/test').Response) => { const url = new URL(response.url()); if (url.origin === origin) responses.push({ path: url.pathname, status: response.status() }); };
         page.on('response', listener);
         await page.evaluate((value) => (window as unknown as { questionTest: { configure(value: unknown): void } }).questionTest.configure(value), { apiOrigin: origin, token, withProposal: true });
         await expect.poll(() => responses.length).toBe(4);
-        expect(responses).toEqual([status, status, status, status]);
+        expect([...responses].sort((a, b) => a.path.localeCompare(b.path))).toEqual(['/v1/questions/question-example', '/v1/proposals/proposal-example', '/v1/versions/vale-v1', '/v1/versions/gallery-v1'].sort((a, b) => a.localeCompare(b)).map(path => ({ path, status: status === 501 && path.startsWith('/v1/versions/') ? 404 : status })));
         expect(requests.map((request) => request.path).sort()).toEqual(['/v1/questions/question-example', '/v1/proposals/proposal-example', '/v1/versions/vale-v1', '/v1/versions/gallery-v1'].sort());
         await expect(page.getByText('Shot 2 · Panel 2.1 · 1 image', { exact: true })).toBeVisible();
         await activate(page.locator('.wp-proposal summary'), status === 501);

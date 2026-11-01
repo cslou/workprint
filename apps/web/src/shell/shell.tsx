@@ -1,13 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Button as AriaButton, Dialog, Heading, Modal, ModalOverlay } from 'react-aria-components';
-import { nativeConversations } from '@workprint/api-client';
+import { createUploadSession, nativeConversations, type UploadSession } from '@workprint/api-client';
 import type { OperationResponse } from '@workprint/contracts';
 import type { BrowserClient } from '../api/client.js';
+import { DraftGuard } from '../api/draft-guard.js';
 import { Button } from '../ui/controls.js';
 import type { WorkspaceTab } from '../ui/panel.js';
 import { Library } from '../library/library.js';
 import { LibraryPicker } from '../library/picker.js';
+import { createLibrarySelection } from '../library/selection.js';
 import type { LibraryPrerequisites } from '../library/picker.js';
 import { MaterialPanel } from '../materials/panel.js';
 import type { MaterialPrerequisites } from '../materials/presentation.js';
@@ -32,9 +34,11 @@ const nativeCopy = { new: ['New video is not available yet.', 'No conversation w
 
 /** Session is supplied by its qualified owner; this shell never creates or persists one. */
 export function Shell(props: ShellProps) {
-  return <ScopedShell key={JSON.stringify([props.session?.accountId ?? null, props.conversationId ?? null])} {...props} />;
+  const [uploadSession] = useState(() => createUploadSession());
+  useLayoutEffect(() => () => uploadSession.dispose(), [uploadSession]);
+  return <DraftGuard key={JSON.stringify([props.session?.accountId ?? null, props.conversationId ?? null])}><ScopedShell uploadSession={uploadSession} {...props} /></DraftGuard>;
 }
-function ScopedShell({ navigation, onAccountOpen, connection, session, conversationId, workspaceContent, materialPrerequisites, storyboardPrerequisites, videoPrerequisites, libraryPrerequisites }: ShellProps) {
+function ScopedShell({ navigation, onAccountOpen, connection, session, conversationId, workspaceContent, materialPrerequisites, storyboardPrerequisites, videoPrerequisites, libraryPrerequisites, uploadSession }: ShellProps & { uploadSession: UploadSession }) {
   const [surface, setSurface] = useState<Surface>(null);
   const [tab, setTab] = useState<WorkspaceTab>('script');
   const [composerText, setComposerText] = useState('');
@@ -53,6 +57,11 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
   const qualifiedId = navigation && !navigation.history?.thread ? undefined : conversationId;
   const scope = session ? { accountId: session.accountId, ...(qualifiedId === undefined ? {} : { conversationId: qualifiedId }) } : null;
   const workspace = useWorkspace(connection, scope);
+  const libraryConnection = useRef(connection); libraryConnection.current = connection;
+  // A restored thread qualifies the workspace scope without remounting; read its current receipt handler.
+  const libraryUsed = useRef(workspace.onUsed); libraryUsed.current = workspace.onUsed;
+  const [librarySelection] = useState(() => createLibrarySelection({ getClient: () => libraryConnection.current.kind === 'configured' ? libraryConnection.current.client : null, ...(conversationId ? { conversationId } : {}), onUsed: (result, version) => libraryUsed.current(result, version) }));
+  useEffect(() => () => librarySelection.dispose(), [librarySelection]);
   const native = connection.kind === 'configured' ? connection.client.native : nativeConversations;
   const runNative = async (action: 'new' | 'recents') => {
     if (!session && onAccountOpen && connection.kind === 'configured') { onAccountOpen(); return; }
@@ -83,9 +92,9 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
       </nav>
       <main ref={main} className="wp-main" data-layout={!navigation?.history || navigation.history.kind === 'ready' && navigation.history.messages.length === 0 ? 'opening' : 'thread'} aria-label={navigation?.history ? 'Conversation' : 'New video'} aria-busy={navigation?.history ? navigation.history.kind === 'loading' : workspace.kind === 'loading'}>
         {navigation?.history ? <NativeHistory state={navigation.history} navigation={navigation} /> : <div className="wp-thread"><Welcome owned={!!(navigation && session)} /></div>}
-        {workspace.kind === 'settled' && workspace.result.ok && workspace.result.value.pendingQuestion ? <QuestionReview connection={connection} scope={scope} question={workspace.result.value.pendingQuestion} workspace={workspace.result.value} draft={draft} /> : <Composer native={native} draft={draft} connection={connection} scope={scope} />}
+        {workspace.kind === 'settled' && workspace.result.ok && workspace.result.value.pendingQuestion ? <QuestionReview uploadSession={uploadSession} onUploaded={workspace.onUploaded} connection={connection} scope={scope} question={workspace.result.value.pendingQuestion} workspace={workspace.result.value} draft={draft} /> : <Composer uploadSession={uploadSession} onUploaded={workspace.onUploaded} native={native} draft={draft} connection={connection} scope={scope} />}
       </main>
-      <aside className="wp-workspace" aria-label="This video"><MaterialPanel connection={connection} scope={scope} workspace={projection} {...(projection ? { additionalContent: { storyboard: <Storyboard connection={connection} scope={scope} workspace={projection} {...(storyboardPrerequisites ? { prerequisites: storyboardPrerequisites } : {})} />, videos: <WorkspaceVideos connection={connection} scope={scope} workspace={projection} {...(videoPrerequisites ? { videoPrerequisites } : {})} /> } } : {})} {...(materialPrerequisites ? { prerequisites: materialPrerequisites } : {})} placeholder={placeholder} selectedKey={tab} onSelectionChange={(key) => setTab(key as WorkspaceTab)} {...(content === undefined ? {} : { contentOverride: content })} /></aside>
+      <aside className="wp-workspace" aria-label="This video"><MaterialPanel connection={connection} scope={scope} workspace={projection} onSaved={workspace.onSaved} {...(projection ? { additionalContent: { storyboard: <Storyboard connection={connection} scope={scope} workspace={projection} onSaved={workspace.onSaved} onUsed={workspace.onUsed} {...(storyboardPrerequisites ? { prerequisites: storyboardPrerequisites } : {})} />, videos: <WorkspaceVideos connection={connection} scope={scope} workspace={projection} onUsed={workspace.onUsed} {...(videoPrerequisites ? { videoPrerequisites } : {})} /> } } : {})} {...(materialPrerequisites ? { prerequisites: materialPrerequisites } : {})} placeholder={placeholder} selectedKey={tab} onSelectionChange={(key) => setTab(key as WorkspaceTab)} {...(content === undefined ? {} : { contentOverride: content })} /></aside>
     </div>
     <ModalOverlay className="wp-modal-overlay" isOpen={shown !== null} onOpenChange={(open) => { if (!open) dismiss(); }} isDismissable><Modal className={`wp-modal${navigation && (navigation.dialog || shown === 'navigation') ? ' wp-native-dialog' : ''}`}><Dialog className="wp-dialog"><div className="wp-dialog-head" ref={dialogHead}><Heading slot="title">{title}</Heading><Button variant="icon" aria-label="Close" autoFocus onPress={dismiss}>×</Button></div>
       {shown === 'navigation' && (navigation && session ? <div className="wp-owned-navigation"><div className="wp-navigation-dialog wp-owned-navigation-links">{nav(true)}</div><h3>Recents</h3><Recents navigation={navigation} embedded onActivate={() => setSurface(null)} /><div className="wp-navigation-dialog wp-owned-navigation-account">{account}</div></div> : <div className="wp-navigation-dialog">{nav()}{recent}{account}</div>)}
@@ -93,7 +102,7 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
       {surface === 'account' && <div className="wp-session-content"><p><b>{session?.name ?? 'Not signed in'}</b></p>{session ? <div className="wp-session-actions"><Button variant="secondary" onPress={() => setSurface('account-unavailable')}>Sign out</Button><Button variant="secondary" onPress={() => setSurface('account-unavailable')}>Switch account</Button></div> : <><p>Sign-in is not available yet.</p><div className="wp-session-actions"><Button isDisabled size="choose">Sign in</Button></div></>}</div>}
       {surface === 'account-unavailable' && <p className="wp-session-message" role="status">Account actions are not available yet. Nothing about your session has changed.</p>}
       {!navigation && (surface === 'new' || surface === 'recents') && <div className="wp-session-content" role="status">{nativeCopy[surface].map((line) => <p key={line}>{line}</p>)}</div>}
-      {surface === 'library' && <Library connection={connection} scope={scope}>{(library) => <LibraryPicker connection={connection} scope={scope} library={library} {...(libraryPrerequisites === undefined ? {} : { prerequisites: libraryPrerequisites })} />}</Library>}
+      {surface === 'library' && <Library connection={connection} scope={scope}>{(library, pagination, windowOffset, filter) => <LibraryPicker filter={filter} selection={librarySelection} connection={connection} scope={scope} library={library} pagination={pagination} windowOffset={windowOffset} {...(libraryPrerequisites === undefined ? {} : { prerequisites: libraryPrerequisites })} />}</Library>}
     </Dialog></Modal></ModalOverlay>
   </>;
 }

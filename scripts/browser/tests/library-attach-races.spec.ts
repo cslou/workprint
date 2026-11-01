@@ -43,3 +43,28 @@ test('pending Attach locks selection and double press cannot duplicate the seque
   await expect(page.locator('.wp-picker-count')).toHaveText('Nothing selected yet');
   await expect(tiles.nth(2)).toBeEnabled();
 });
+
+test('a URL-restored conversation reflects a Library use once its thread loads', async ({ page, materialNetwork }, info) => {
+  const origin = browserOrigin, conversation = '7d9f1c2e-4b3a-4c5d-8e6f-0a1b2c3d4e5f', accountId = '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d';
+  materialNetwork.expectOperations(
+    { origin, method: 'GET', path: `/v1/conversations/${conversation}/workspace`, count: 1, query: {} },
+    { origin, method: 'GET', path: '/v1/library', count: 1, query: {} },
+    { origin, method: 'POST', path: `/v1/conversations/${conversation}/uses`, count: 1, query: {} },
+  );
+  await info.attach('prerequisite', { body: 'Held native thread read and read-only Library/workspace projections, solely to order restore before attach; not persisted product success.', contentType: 'text/plain' });
+  await page.route('**/v1/library*', route => route.fulfill({ json: { items: items.slice(0, 1), nextCursor: null } }));
+  await page.route(`**/v1/conversations/${conversation}/workspace`, route => route.fulfill({ json: { script: null, assets: [], storyboard: { work: null, shots: [] }, videos: [], pendingQuestion: null, activeWork: [], selectionRevision: 0 } }));
+  await page.route(`**/v1/conversations/${conversation}/uses`, route => route.fulfill({ json: { use: { id: 'use-alpha', versionId: 'alpha-v1', state: 'approved', binding: { purpose: 'reference' } }, selectionRevision: 1 } }));
+  await page.goto('/shell.html');
+  await page.waitForFunction(() => !!(window as unknown as { shellTest?: unknown }).shellTest);
+  await page.evaluate(input => (window as unknown as { shellTest: { configure(input: unknown): void } }).shellTest.configure({ session: { accountId: input.accountId, name: 'Creator' }, conversationId: input.conversation, apiOrigin: window.location.origin, token: null, libraryPrerequisites: { display: input.display }, restore: true }), { accountId, conversation, display });
+  await expect(page.getByRole('main', { name: 'Conversation' })).toHaveAttribute('aria-busy', 'true');
+  await page.evaluate(() => (window as unknown as { shellTest: { releaseThread(): void } }).shellTest.releaseThread());
+  await expect(page.getByRole('tabpanel')).toHaveText('Workspace revision 0');
+  await page.getByRole('button', { name: 'Library', exact: true }).click();
+  await page.locator('.wp-picker-tile').first().click();
+  await page.getByRole('button', { name: 'Attach (1)', exact: true }).click();
+  await expect(page.locator('.wp-picker-count')).toHaveText('Nothing selected yet');
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByRole('tabpanel')).toHaveText('Workspace revision 1');
+});
