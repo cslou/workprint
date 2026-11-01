@@ -58,7 +58,9 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
   const scope = session ? { accountId: session.accountId, ...(qualifiedId === undefined ? {} : { conversationId: qualifiedId }) } : null;
   const workspace = useWorkspace(connection, scope);
   const libraryConnection = useRef(connection); libraryConnection.current = connection;
-  const [librarySelection] = useState(() => createLibrarySelection({ getClient: () => libraryConnection.current.kind === 'configured' ? libraryConnection.current.client : null, ...(conversationId ? { conversationId } : {}), onUsed: workspace.onUsed }));
+  // A restored thread qualifies the workspace scope without remounting; read its current receipt handler.
+  const libraryUsed = useRef(workspace.onUsed); libraryUsed.current = workspace.onUsed;
+  const [librarySelection] = useState(() => createLibrarySelection({ getClient: () => libraryConnection.current.kind === 'configured' ? libraryConnection.current.client : null, ...(conversationId ? { conversationId } : {}), onUsed: (result, version) => libraryUsed.current(result, version) }));
   useEffect(() => () => librarySelection.dispose(), [librarySelection]);
   const native = connection.kind === 'configured' ? connection.client.native : nativeConversations;
   const runNative = async (action: 'new' | 'recents') => {

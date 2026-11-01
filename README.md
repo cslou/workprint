@@ -34,7 +34,7 @@ These are implemented module responsibilities, not claims of working business op
 | `apps/api/src/mastra/server.ts`, `shutdown.ts` | Shared app-owned entry: official Hono adapter, trusted composition hooks, one loopback listener, workers, startup recovery and one bounded signal-driven drain/shutdown. |
 | `apps/api/src/mastra/{admission,ingress,body}.ts` | Catalog/CORS/header-Auth admission and one bounded JSON reader; trusted identity and readable raw-byte handoff before native context creation. |
 | `apps/api/src/mastra/native-navigation.ts` | Only qualified native thread create/list/read/message reads, with verified-resource ownership and bounded native responses. |
-| `scripts/browser` | Playwright verification harness: `capture.ts` settles layout before assertions and `material-network.ts` observes exact consumable request allowances. |
+| `scripts/browser` | Playwright verification harness: `material-network.ts` observes exact consumable request allowances. |
 
 Backend ownership reads are declared by `application/`, implemented by `agent/mastra/` through native storage, and supplied by backend `mastra/` composition. Application code imports neither native integration subtree. Ownership has no separate public route; the four implemented saved-work reads consume the collaborator through the application/domain boundary.
 

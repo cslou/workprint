@@ -15,7 +15,7 @@ ffmpeg -i clip.webm -frames:v 1 -y clip-poster.png
 
 `corrupt.webm` is deliberately invalid bytes, used only to exercise the native player error path. It is not media, must never gain a valid codec claim, and is not a visual comparison asset.
 
-`library-tile.png` is a deterministic 240×240 wordless blue-grey gradient generated locally with pngjs. It stands in for a supplied Library tile image on both sides of the zero-tolerance picker comparisons; it is not product media, a saved Library item or a claim about thumbnail generation. It replaces the tracked reference's `Example media omitted` placeholder, which is never product copy.
+`library-tile.png` is a deterministic 240×240 wordless blue-grey gradient generated once, locally, with pngjs (not a repository dependency). It stands in for a supplied Library tile image on both sides of the zero-tolerance picker comparisons; it is not product media, a saved Library item or a claim about thumbnail generation. It replaces the tracked reference's `Example media omitted` placeholder, which is never product copy.
 
 ```js
 // pngjs; one RGB gradient, alpha 255, no text or transparency.
