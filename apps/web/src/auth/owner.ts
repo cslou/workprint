@@ -12,6 +12,9 @@ type Exit = { intent: string | null; accountId: string | null; confirmed: boolea
 export type AccountScreen = 'sign-in' | 'account' | 'reset' | 'reset-sent' | 'password' | 'password-rejected' | 'password-updated' | 'update-unconfirmed' | 'invalid-link' | 'checking-link' | 'checking' | 'refreshing' | 'refresh-failed' | 'expired' | 'startup-failed' | 'signed-out' | 'signout-unconfirmed' | 'switching' | 'unconfigured' | 'account-lock-not-saved' | 'signout-pending-lock-not-saved' | 'signout-confirmed-lock-not-saved' | 'signout-unconfirmed-lock-not-saved';
 export type AccountPresentation = { screen: AccountScreen; account: AccountIdentity | null; open: boolean; busy: boolean; message: string };
 
+/** Whether an SDK reset/sign-in verifier is pending. Key names only; verifier values are never read. */
+const pendingVerifier = () => Object.keys(localStorage).some(key => key.startsWith('workprint.auth') && key.endsWith('-code-verifier'));
+
 /** One persistent SDK authority. All application state is presentation/purpose metadata, never credentials. */
 export class AccountOwner {
   private state: AccountPresentation = { screen: 'checking', account: null, open: false, busy: false, message: '' };
@@ -117,7 +120,9 @@ export class AccountOwner {
       // A locked tab never refreshes. At startup, answer the SDK's initial refresh with a local,
       // non-retryable rejection: a thrown error reads as a network failure, and the SDK then
       // retries with backoff for about 30 seconds while the page waits on "Checking your session".
-      if (this.initializing) return new Response(JSON.stringify({ code: 'workprint_access_fenced', message: 'Account access is locked in this browser' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+      // The SDK then removes an expired stored session together with every PKCE verifier, so keep
+      // the slower retryable path while a reset link or an unconfirmed sign-out still needs them.
+      if (this.initializing && !this.recoveryWanted && !(this.exit && !this.exit.confirmed) && !pendingVerifier()) return new Response(JSON.stringify({ error_code: 'workprint_access_fenced', msg: 'Account access is locked in this browser' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
       throw new DOMException('Account access is fenced', 'AbortError');
     }
     if (refresh && this.state.account && !this.blocked) this.set({ screen: 'refreshing', busy: true });

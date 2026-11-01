@@ -125,6 +125,11 @@ test('a locked tab with an expired stored session reaches sign-in promptly inste
       const session = JSON.parse(localStorage.getItem('workprint.auth')!) as { expires_at: number }; session.expires_at = Math.floor(Date.now() / 1000) - 60;
       localStorage.setItem('workprint.auth', JSON.stringify(session));
     });
+    // A pending reset verifier keeps the slower retryable path: the SDK's removal would also delete it.
+    await page.evaluate(() => localStorage.setItem('workprint.auth-code-verifier', '"pending-reset"'));
+    await page.reload(); await page.waitForTimeout(3000);
+    expect(await page.evaluate(() => localStorage.getItem('workprint.auth-code-verifier'))).toBe('"pending-reset"');
+    await page.evaluate(() => localStorage.removeItem('workprint.auth-code-verifier'));
     // The strict ledger also proves the locked tab sends no refresh or user read to Auth.
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible({ timeout: 5000 });
