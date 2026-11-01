@@ -1,7 +1,7 @@
 import { PostgresStore } from '@mastra/pg';
 import { join } from 'node:path';
 import { testStack } from './test-stack.js';
-import { environment } from './environment.js';
+import { environment, type TestEnvironment } from './environment.js';
 import { buildServerComposition } from './built-server.js';
 import { startAuthServer } from './auth-server.js';
 import { applyArtifactMigrations } from './artifact-database.js';
@@ -16,11 +16,16 @@ export type AppFixtureOptions = {
   media?: { toolchainDirectory: string; dockerPath: string };
   /** Bound the API process to a suite-long lifetime instead of the per-test default. */
   serverLifetimeMs?: number;
+  /** Test-only composition source (for example the scripted chat provider); defaults to the production entry. */
+  composition?: (directory: string) => string;
+  /** Child environment; defaults to the guarded test environment. Only `live:chat --live` passes another. */
+  environment?: () => Promise<TestEnvironment>;
 };
 
 /** Test-only real backend on the shared stack's Auth and its own database. Native data uses existing supported fixture, no new route. */
 export async function accountBrowserFixture(options: AppFixtureOptions = {}, browserOrigin = 'http://127.0.0.1:4180') {
-  const { artifacts, storage, media, serverLifetimeMs } = options;
+  const { artifacts, storage, media, serverLifetimeMs, composition } = options;
+  const childEnvironment = options.environment ?? environment;
   const { auth, testDatabase } = testStack();
   const cleanups: (() => Promise<unknown>)[] = [];
   const close = async () => {
@@ -38,14 +43,16 @@ export async function accountBrowserFixture(options: AppFixtureOptions = {}, bro
     await db.grantServing();
     if (artifacts) await applyArtifactMigrations(db.setupUrl);
     phase = 'backend-startup';
-    const env = await environment();
-    const entry = await buildServerComposition(env.logs, 'account-browser', undefined, env.env);
+    const env = await childEnvironment();
+    const entry = await buildServerComposition(env.logs, 'account-browser', composition, env.env);
     const servingEnv = { WORKPRINT_BROWSER_ORIGIN: browserOrigin,
       ...(storage ? { S3_ENDPOINT: storage.endpoint, S3_REGION: storage.region, S3_BUCKET: storage.bucket, S3_ACCESS_KEY_ID: storage.credentials.accessKeyId, S3_SECRET_ACCESS_KEY: storage.credentials.secretAccessKey } : {}),
       ...(media ? { MEDIA_TOOLCHAIN_DIRECTORY: media.toolchainDirectory, MEDIA_DOCKER_PATH: media.dockerPath } : {}) };
     const server = await startAuthServer(entry, env.env, { url: auth.url, anonKey: auth.anonKey, servingUrl: db.servingUrl, accounts: [] }, join(env.logs, 'account-api.log'), { env: servingEnv, ...(serverLifetimeMs ? { lifetimeMs: serverLifetimeMs } : {}) });
     cleanups.push(server.server.stop); cleanups.push(env.noNetwork);
     return { auth, apiOrigin: server.origin, close, native: store, servingUrl: db.servingUrl, setupUrl: db.setupUrl,
+      /** The API process log, for leak checks. */
+      serverLog: join(env.logs, 'account-api.log'),
       /** A fresh access token for an account this fixture created. */
       accessToken: async (user: { email: string; password: string }) => {
         const response = await auth.request('token?grant_type=password', { email: user.email, password: user.password });

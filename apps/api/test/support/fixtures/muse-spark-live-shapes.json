@@ -1,0 +1,250 @@
+{
+  "observed": "2026-11-01",
+  "model": "meta/muse-spark-1.3",
+  "shapes": {
+    "send": [
+      {
+        "type": "start",
+        "payloadKeys": [
+          "id",
+          "messageId"
+        ]
+      },
+      {
+        "type": "data-user-message",
+        "payloadKeys": []
+      },
+      {
+        "type": "step-start",
+        "payloadKeys": [
+          "messageId",
+          "modelId",
+          "provider",
+          "request",
+          "startedAt",
+          "stepId",
+          "warnings"
+        ]
+      },
+      {
+        "type": "text-start",
+        "payloadKeys": [
+          "id"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "id",
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "id",
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "id",
+          "text"
+        ]
+      },
+      {
+        "type": "text-end",
+        "payloadKeys": [
+          "id",
+          "type"
+        ]
+      },
+      {
+        "type": "step-finish",
+        "payloadKeys": [
+          "_durableResponseMessages",
+          "_durableStepContent",
+          "metadata",
+          "output",
+          "providerMetadata",
+          "stepResult",
+          "type"
+        ],
+        "reason": "stop"
+      },
+      {
+        "type": "finish",
+        "payloadKeys": [
+          "output",
+          "stepResult"
+        ],
+        "reason": "stop"
+      }
+    ],
+    "tool": [
+      {
+        "type": "start",
+        "payloadKeys": [
+          "id",
+          "messageId"
+        ]
+      },
+      {
+        "type": "data-user-message",
+        "payloadKeys": []
+      },
+      {
+        "type": "step-start",
+        "payloadKeys": [
+          "messageId",
+          "modelId",
+          "provider",
+          "request",
+          "startedAt",
+          "stepId",
+          "warnings"
+        ]
+      },
+      {
+        "type": "text-start",
+        "payloadKeys": [
+          "id"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "id",
+          "text"
+        ]
+      },
+      {
+        "type": "tool-call-input-streaming-start",
+        "payloadKeys": [
+          "toolCallId",
+          "toolName"
+        ]
+      },
+      {
+        "type": "tool-call-delta",
+        "payloadKeys": [
+          "argsTextDelta",
+          "toolCallId",
+          "toolName"
+        ]
+      },
+      {
+        "type": "text-end",
+        "payloadKeys": [
+          "id",
+          "type"
+        ]
+      },
+      {
+        "type": "tool-call-input-streaming-end",
+        "payloadKeys": [
+          "toolCallId"
+        ]
+      },
+      {
+        "type": "tool-call",
+        "payloadKeys": [
+          "args",
+          "toolCallId",
+          "toolName"
+        ],
+        "toolName": "test-echo",
+        "argsKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "tool-result",
+        "payloadKeys": [
+          "args",
+          "result",
+          "toolCallId",
+          "toolName"
+        ],
+        "toolName": "test-echo",
+        "resultKeys": [
+          "echo"
+        ]
+      },
+      {
+        "type": "step-finish",
+        "payloadKeys": [
+          "_durableResponseMessages",
+          "_durableStepContent",
+          "metadata",
+          "output",
+          "providerMetadata",
+          "stepResult",
+          "type"
+        ],
+        "reason": "tool-calls"
+      },
+      {
+        "type": "step-start",
+        "payloadKeys": [
+          "messageId",
+          "modelId",
+          "provider",
+          "request",
+          "startedAt",
+          "stepId",
+          "warnings"
+        ]
+      },
+      {
+        "type": "text-start",
+        "payloadKeys": [
+          "id"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "id",
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "id",
+          "text"
+        ]
+      },
+      {
+        "type": "text-end",
+        "payloadKeys": [
+          "id",
+          "type"
+        ]
+      },
+      {
+        "type": "step-finish",
+        "payloadKeys": [
+          "_durableResponseMessages",
+          "_durableStepContent",
+          "metadata",
+          "output",
+          "providerMetadata",
+          "stepResult",
+          "type"
+        ],
+        "reason": "stop"
+      },
+      {
+        "type": "finish",
+        "payloadKeys": [
+          "output",
+          "stepResult"
+        ],
+        "reason": "stop"
+      }
+    ]
+  }
+}
