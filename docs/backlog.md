@@ -41,9 +41,11 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 
 ### B-023 — Agent reads the video's current work
 - Problem: The tools in B-013 to B-020 need the agent to know the video's current script, assets (with exact image versions), storyboard and videos. Otherwise it cannot update the script, use "an image from the db" (B-015) or know which asset the user means (B-016). Neither sprint plan covers this; the spec calls it P4-S2.
-- Outcome: Each turn, or a read tool, gives the agent a bounded summary of the video's saved work with exact version ids, scoped to the signed-in account and this video. Pass: asked "what's in my script?" or "use the Vale image", the agent answers from, or uses, the exact saved version.
-- Constraint: Account and video come from the trusted server context, never from model arguments.
-- References: `docs/specs/implementation-spec-001.md` P4-S2; the owned workspace reads from Sprint 005 (`apps/api/src/application/saved-reads.ts`).
+- Outcome: A read-workspace tool returns a compact listing of the video's saved work (names, kinds, exact version ids, short text), and a second call can fetch one item in full. The agent calls it when it needs current state. Pass: asked "what's in my script?" or "use the Vale image", the agent answers from, or uses, the exact saved version.
+- Constraint:
+  - Account and video come from the trusted server context, never from model arguments.
+  - Keep the system prompt and tool list static, with no workspace state or timestamps in them. Meta caches the matching prompt prefix automatically, so changing state early in the prompt would end the match on every turn. Tool results join the conversation after the cached prefix.
+- References: `docs/specs/implementation-spec-001.md` P4-S2; [Meta prompt caching](https://dev.meta.ai/docs/prompt-caching); the owned workspace reads from Sprint 005 (`apps/api/src/application/saved-reads.ts`).
 
 ### B-013 — Agent tool: update the video's script
 - Problem: The Script tab can only show and manually edit saved scripts. The agent has no way to write one.
@@ -100,13 +102,13 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 - Context: Lou will supply the reference-sheet details and templates soon (2026-11-01). Keep this as a placeholder until then.
 - Problem: The Assets tab can show reference sheets (`apps/web/src/materials/sheet.tsx`), but only manual saves create them. The agent cannot create a character, place or prop reference.
 - Outcome: The agent creates a reference sheet for a subject: a saved reference version with its description, continuity notes and images generated through B-015. The sheet appears in Assets. Pass: the user asks for a reference sheet, and a saved sheet with images shows in Assets.
-- Constraint: Tool or workflow is still open; see B-018.
+- Constraint: Built as tools that the agent loop calls (Lou, 2026-11-01). Converting them to workflows can be decided later.
 - References: `~/projects/animation-studio/.pi/skills/create-storyboard/references/reference-package-schema.md` and `generate-image/references/prompt-preparation.md`, until Lou's sources arrive.
 
 ### B-018 — Agent makes the storyboard from the script
 - Problem: Storyboard reads and manual edits exist (`apps/api/src/artifacts/storyboard.ts`, `apps/web/src/storyboard/`), but the agent cannot plan shots or make panels.
 - Outcome: The agent plans shots from the current script version, then creates each panel's image through B-015 using the selected reference sheets. It saves a storyboard version linked to that script and those references. Pass: the Storyboard tab shows the planned shots with generated panel images.
-- Constraint: Tool or workflow is pending Lou's decision. The proposal is tools that the B-012 loop drives, with the skill's steps written into the agent's guidance, rather than a Mastra workflow. The skill relies on back-and-forth with the user at each step (shot approval, panel picks), and that fits the conversation loop. A workflow suits fixed, long-running steps that need no judgement.
+- Constraint: Built as tools that the agent loop calls, with the skill's steps written into the agent's guidance (Lou, 2026-11-01). Converting them to workflows can be decided later.
 - References: `~/projects/animation-studio/.pi/skills/create-storyboard/SKILL.md` with `references/panel-generation-strategy.md` and `storyboard-schema.md`; B-013, B-015, B-017.
 
 ### B-025 — Run generation jobs outside the chat turn, with status
