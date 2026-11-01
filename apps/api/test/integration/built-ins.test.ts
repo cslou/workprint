@@ -7,13 +7,14 @@ import type { Version } from '@workprint/contracts';
 import { createArtifactStore, createArtifactWriters, createVersionUses } from '../../src/artifacts/index.js';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
 import { createNativeConversation } from '../support/native-conversations.js';
-import { isolatedPostgres, query } from '../support/postgres.js';
+import { query } from '../support/postgres.js';
+import { testStack } from '../support/test-stack.js';
 import { applyArtifactMigrations } from '../support/artifact-database.js';
 
 const script = (action: string) => ({ schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'Station', time: 'morning' }, characters: ['Ada'], script: [{ action }] }] });
 
 test('test-only sealed built-ins are readable and independently reusable but immutable through human, assistant and SQL writers', { timeout: 120000 }, async () => {
-  const db = await isolatedPostgres(), pool = new Pool({ connectionString: db.servingUrl, max: 4, connectionTimeoutMillis: 1000, statement_timeout: 2000 });
+  const db = await testStack().testDatabase(), pool = new Pool({ connectionString: db.servingUrl, max: 4, connectionTimeoutMillis: 1000, statement_timeout: 2000 });
   const setup = new PostgresStore({ id: 'builtin-prerequisite', connectionString: db.setupUrl, schemaName: 'mastra' });
   const native = new PostgresStore({ id: 'builtin-serving', schemaName: 'mastra', disableInit: true, pool });
   try {

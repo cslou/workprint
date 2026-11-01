@@ -11,13 +11,13 @@ import type { SavedWorkSetup } from '../../../apps/api/test/support/auth-built-f
 
 // Fixtures are compiled by `node scripts/test.mjs compile`; Playwright loads the emitted modules.
 export const loadSupport = <T>(module: string) => import(pathToFileURL(resolve(`apps/api/.test-build/test/support/${module}.js`)).href) as Promise<T>;
-/** The isolated Auth service caps its lifetime at 15 minutes; the whole suite shares one backend inside that bound. */
+/** The whole suite shares one backend, bounded to 15 minutes inside the 30-minute test stack lifetime. */
 const suiteLifetimeMs = 900_000;
 const loopback = new Set(['127.0.0.1', 'localhost', '[::1]']);
 
 export type Account = { id: string; email: string; password: string; nextPassword: string };
 
-/** One real stack for the worker: Postgres, Auth, private object storage, media toolchain, API and the built web app. */
+/** One backend for the worker on the shared test stack (Postgres, Auth, object storage, media): API and the built web app. */
 async function startBackend() {
   const { accountBrowserFixture } = await loadSupport<typeof AppFixture>('account-browser-fixture');
   const { createLibraryMediaFixture } = await loadSupport<typeof MediaWork>('library-media-work');
@@ -29,8 +29,8 @@ async function startBackend() {
     if (errors.length) throw new AggregateError(errors, 'End-to-end backend cleanup failed');
   };
   try {
-    const media = await createLibraryMediaFixture(previewOrigin); cleanups.push(media.close);
-    const app = await accountBrowserFixture({ artifacts: true, storage: media.configuration, media: media.media, serverLifetimeMs: suiteLifetimeMs, browserOrigins: [previewOrigin] }, previewOrigin);
+    const media = await createLibraryMediaFixture(); cleanups.push(media.close);
+    const app = await accountBrowserFixture({ artifacts: true, storage: media.configuration, media: media.media, serverLifetimeMs: suiteLifetimeMs }, previewOrigin);
     cleanups.push(app.close);
     const logs = await mkdtemp(join(tmpdir(), 'workprint-e2e-')); cleanups.push(() => rm(logs, { recursive: true, force: true }));
     const env = { PATH: process.env.PATH, HOME: process.env.HOME, WORKPRINT_PUBLIC_SUPABASE_URL: app.auth.url, WORKPRINT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: app.auth.anonKey, WORKPRINT_PUBLIC_API_ORIGIN: app.apiOrigin };

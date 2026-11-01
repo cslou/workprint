@@ -6,18 +6,19 @@ import type { Version } from '@workprint/contracts';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
 import { createArtifactStore } from '../../src/artifacts/index.js';
 import { createNativeConversation } from '../support/native-conversations.js';
-import { isolatedPostgres, query } from '../support/postgres.js';
+import { query } from '../support/postgres.js';
+import { testStack, type TestDatabase } from '../support/test-stack.js';
 import { applyArtifactMigrations } from '../support/artifact-database.js';
 
 const content = { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'Station', time: 'morning' }, characters: [], script: [{ action: 'An empty train arrives.' }] }] };
 
 describe('owned artifact persistence and reads', { timeout: 120000 }, () => {
-  let db: Awaited<ReturnType<typeof isolatedPostgres>>, pool: Pool, native: PostgresStore, serving: PostgresStore;
+  let db: TestDatabase, pool: Pool, native: PostgresStore, serving: PostgresStore;
   let store: ReturnType<typeof createArtifactStore>, conversation: string, otherConversation: string;
   let insert: Parameters<ReturnType<typeof createArtifactStore>['insert']>[0];
   let first: Version, second: Version, historyCursor: string, libraryCursor: string;
   before(async () => {
-    db = await isolatedPostgres();
+    db = await testStack().testDatabase();
     pool = new Pool({ connectionString: db.servingUrl, max: 4, connectionTimeoutMillis: 1000, statement_timeout: 2000 });
     native = new PostgresStore({ id: 'artifact-reads-native', connectionString: db.setupUrl, schemaName: 'mastra' });
     serving = new PostgresStore({ id: 'artifact-reads-serving', schemaName: 'mastra', disableInit: true, pool });

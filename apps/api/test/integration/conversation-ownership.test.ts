@@ -5,11 +5,11 @@ import { PostgresStore } from '@mastra/pg';
 import { Pool } from 'pg';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
 import { createNativeConversation } from '../support/native-conversations.js';
-import { isolatedPostgres } from '../support/postgres.js';
+import { testStack } from '../support/test-stack.js';
 
 test('native ownership is account-exact, read-only and hides foreign or absent conversations', { timeout: 60000 }, async () => {
   const accountA = randomUUID(), accountB = randomUUID();
-  const db = await isolatedPostgres();
+  const db = await testStack().testDatabase();
   try {
     const setup = new PostgresStore({ id: 'ownership-fixture', connectionString: db.setupUrl, schemaName: 'mastra' });
     try {
