@@ -15,4 +15,4 @@ for (let y = 0; y < 240; y++) for (let x = 0; x < 240; x++) {
 
 # Muse Spark live shapes
 
-`muse-spark-live-shapes.json` is written by `pnpm live:chat --live` (scripts/live/chat.mjs) from one real `meta/muse-spark-1.3` run. It keeps only chunk types, payload keys, tool names and finish reasons: no ids, text, stacks or provider metadata values. It records what the native stream looks like for a plain reply and for a tool call, so the scripted provider and stream handling can be checked against real behaviour.
+`muse-spark-live-shapes.json` is written by `pnpm live:chat --live` (scripts/live/chat.mjs) from one real `meta/muse-spark-1.3` run. It keeps only chunk types, payload keys, tool names and finish reasons: no ids, text, stacks or provider metadata values. It records the stream the browser observes for each step (send, tool, read-workspace, Stop), after the server's safe projection, so it no longer shows raw provider chunks. It is a reviewed snapshot to compare by hand when the scripted provider or stream handling changes; no test reads it.
