@@ -38,7 +38,7 @@ function ScopedPicker({ connection, scope, library, prerequisites, pagination, w
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string | null>(null);
   const latest = useRef(connection); latest.current = connection;
-  const [ownedSelection] = useState(() => selection ? null : createLibrarySelection({ getClient: () => latest.current.kind === 'configured' ? latest.current.client : null, ...(scope?.conversationId ? { conversationId: scope.conversationId } : {}) }));
+  const [ownedSelection] = useState(() => selection ? null : createLibrarySelection({ getClient: () => latest.current.kind === 'configured' ? latest.current.client : null, getConversationId: () => scope?.conversationId }));
   const session = selection ?? ownedSelection!;
   const { choices: selectedItems, phase, feedback } = useSyncExternalStore(session.subscribe, session.getSnapshot);
   const selected = selectedItems, busy = phase === 'pending', locked = busy || phase === 'unknown';

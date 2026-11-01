@@ -1,0 +1,4 @@
+.wp-turn-notice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-10); margin-top: var(--space-10); font-size: var(--font-size-13); color: var(--color-text-secondary); white-space: normal; }
+.wp-turn-notice p { margin: 0; }
+.wp-saved-assistant p + .wp-turn-notice { margin-top: var(--space-12); }
+.wp-turn-notice .wp-button-secondary { height: var(--size-control-md); border-color: var(--color-border-strong); background: var(--color-bg-surface); color: var(--color-text-primary); }

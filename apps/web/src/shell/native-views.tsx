@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { Button as AriaButton } from 'react-aria-components';
 import type { NativeThread } from '@workprint/api-client';
 import { Button } from '../ui/controls.js';
@@ -29,12 +29,13 @@ export function Recents({ navigation, embedded = false, onActivate = () => {} }:
     </>}
   </div>;
 }
-export function NativeHistory({ state, navigation }: { state: HistoryState; navigation: NativeNavigationState }) {
+/** `live` holds turns sent from this page, shown after the saved messages. */
+export function NativeHistory({ state, navigation, live = null }: { state: HistoryState; navigation: NativeNavigationState; live?: ReactNode }) {
   const title = useRef<HTMLHeadingElement>(null), scroller = useRef<HTMLDivElement>(null);
   // History only delays its placeholder: holding it after resolution would also hold the opening/thread layout.
   const placeholder = usePlaceholder(state.kind === 'loading', 0);
   useEffect(() => {
-    if (state.kind !== 'ready') return;
+    if (state.kind !== 'ready' || state.quiet) return;
     const frame = requestAnimationFrame(() => { if (!document.querySelector('[role="dialog"]')) title.current?.focus(); });
     return () => cancelAnimationFrame(frame);
   }, [state.id, state.kind]);
@@ -46,9 +47,10 @@ export function NativeHistory({ state, navigation }: { state: HistoryState; navi
       {state.kind === 'loading' && <>{placeholder.visible && <p className="wp-sr-only" role="status">Loading conversation…</p>}<SkeletonLines count={4} visible={placeholder.visible} /></>}
       {state.kind === 'unavailable' && <div className="wp-history-state"><p role="status">This conversation isn’t available.</p><div className="wp-native-actions"><Button variant="secondary" onPress={navigation.openRecents}>Recents</Button></div></div>}
       {state.kind === 'error' && <div className="wp-history-state"><p role="status">This conversation couldn’t be loaded. Check your connection and try again.</p><div className="wp-native-actions"><Button variant="secondary" onPress={() => void navigation.open(state.id, state.thread)}>Try again</Button><Button variant="secondary" onPress={navigation.openRecents}>Recents</Button></div></div>}
-      {state.kind === 'ready' && (state.messages.length === 0 ? <Welcome owned heading="h2" /> : <>
+      {state.kind === 'ready' && (state.messages.length === 0 ? live ?? <Welcome owned heading="h2" /> : <>
         <div className="wp-history-more">{state.earlier === 'loading' ? <p role="status">Loading earlier messages…</p> : state.earlier === 'error' ? <div className="wp-history-earlier-error"><p role="status">Earlier messages couldn’t be loaded.</p><Button variant="secondary" onPress={earlier}>Try again</Button></div> : state.hasMore ? <Button variant="secondary" onPress={earlier}>Load earlier messages</Button> : <p role="status">Beginning of conversation.</p>}</div>
         <ol className="wp-saved-messages" aria-label="Saved messages">{state.messages.map(message => <li key={message.id} data-message-id={message.id} className={message.role === 'user' ? 'wp-saved-user' : 'wp-saved-assistant'} aria-label={message.role === 'user' ? 'Your message' : 'Assistant message'}>{message.content.parts?.map((part, index) => part.type === 'text' ? message.role === 'assistant' ? <p key={index}>{part.text}</p> : <span key={index}>{part.text}</span> : null)}</li>)}</ol>
+        {live}
       </>)}
     </HistoryScroll></div>
   </>;

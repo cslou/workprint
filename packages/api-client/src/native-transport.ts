@@ -4,7 +4,12 @@ import type { CallOptions, ClientError, ClientResult } from './types.js';
 import type { NativeTextInput, NativeTurnScope } from './native-types.js';
 
 export type NativeConfig = { baseUrl: string; getAccessToken(): Promise<string | null>; timeoutMs?: number };
-export const nativeTransportLimits = Object.freeze({ inputBytes: 8192, outputBytes: 8192, wireBytes: 1024 * 1024, establishmentMs: 3000, observationMs: 9000 });
+/**
+ * Client bounds for one turn. Input matches server admission (32 KiB). Reply text allows the
+ * 32,768-token output cap with room for multi-byte text. Observation outlasts the server's
+ * 35-minute turn deadline by a minute, so the server's own failure arrives first.
+ */
+export const nativeTransportLimits = Object.freeze({ inputBytes: 32 * 1024, outputBytes: 512 * 1024, wireBytes: 16 * 1024 * 1024, establishmentMs: 3000, observationMs: 36 * 60_000 });
 export const failed = (code: ClientError['code'], message: string): ClientResult<never> => ({ ok: false, error: { code, message } });
 export const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 export const uuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);

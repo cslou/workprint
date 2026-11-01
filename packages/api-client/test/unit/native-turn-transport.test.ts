@@ -16,6 +16,7 @@ test('native facade bounds actual HTTP/token/stream faults and releases resource
     assert.equal(request.headers.cookie, undefined);
     if (mode === 'hold') return;
     if (mode === 'json-held') { response.writeHead(200, { 'Content-Type': 'application/json' }); response.write('{'); return; }
+    if (mode === 'busy') { response.writeHead(409, { 'Content-Type': 'application/json' }); response.end(JSON.stringify({ error: { code: 'busy', message: 'The agent is still working on the last message.' } })); return; }
     if (mode === 'rejected') { response.writeHead(503, { 'Content-Type': 'application/json' }); response.end(JSON.stringify({ error: { code: 'integration_failure', message: 'Native turns unavailable' } })); return; }
     if (mode === 'bad-ack') { response.writeHead(200, { 'Content-Type': 'application/json' }); response.end(JSON.stringify({ accepted: true, runId: executionId, signal: { id: executionId, type: 'user', contents: 'Text' } })); return; }
     if (mode === 'control-stop-good' || mode === 'control-stop-bad') { response.writeHead(200, { 'Content-Type': 'application/json' }); response.end(JSON.stringify(mode === 'control-stop-good' ? { aborted: false } : { cancelled: true })); return; }
@@ -37,6 +38,7 @@ test('native facade bounds actual HTTP/token/stream faults and releases resource
   const address = server.address(); assert.ok(address && typeof address !== 'string');
   const baseUrl = `http://127.0.0.1:${address.port}`;
   const client = createApiClient({ baseUrl, getAccessToken: async () => 'synthetic-fault-only-bearer', timeoutMs: 120 });
+  const wireClient = createApiClient({ baseUrl, getAccessToken: async () => 'synthetic-fault-only-bearer', timeoutMs: 10000 });
   const released = async () => {
     const deadline = Date.now() + 1500;
     while (openResponses) { assert.ok(Date.now() < deadline, 'HTTP response must release'); await delay(10); }
@@ -49,7 +51,8 @@ test('native facade bounds actual HTTP/token/stream faults and releases resource
   });
   for (const fault of ['stream-held', 'wire-large', 'wire-at', 'wrong-type', 'eof']) await t.test(`${fault} cannot be reported as a successful native completion`, async () => {
     mode = fault; const before = requests;
-    const subscription = await client.native.subscribe(scope);
+    // Streaming the 16 MiB wire bound takes longer than the short fault deadline.
+    const subscription = await (fault.startsWith('wire') ? wireClient : client).native.subscribe(scope);
     if (fault === 'wrong-type') { assert.equal(subscription.ok, false); if (!subscription.ok) assert.equal(subscription.error.code, 'invalid_response'); }
     else {
       assert.ok(subscription.ok);
@@ -62,16 +65,33 @@ test('native facade bounds actual HTTP/token/stream faults and releases resource
     }
     await released(); assert.equal(requests - before, 1);
   });
-  await t.test('default observation deadline is finite and closes a real stalled HTTP stream', async () => {
+  await t.test('turn bounds match the server: 32 KiB input, and observation outlasts the 35-minute turn deadline', async () => {
+    assert.equal(nativeTransportLimits.inputBytes, 32 * 1024);
+    assert.equal(nativeTransportLimits.observationMs, 36 * 60_000);
+    const before = requests;
+    const over = await client.native.sendText({ ...scope, message: 'a'.repeat(32 * 1024 + 1) });
+    assert.ok(!over.ok && over.error.code === 'invalid_input');
+    mode = 'bad-ack';
+    const at = await client.native.sendText({ ...scope, message: 'a'.repeat(32 * 1024) });
+    assert.ok(!at.ok && at.error.code === 'invalid_response', 'a 32 KiB message is sent');
+    await released(); assert.equal(requests - before, 1);
+  });
+  await t.test('the observation deadline is finite and closes a real stalled HTTP stream', async () => {
     mode = 'stream-held'; const before = requests;
-    const native = createApiClient({ baseUrl, getAccessToken: async () => 'synthetic-fault-only-bearer' }).native;
+    const native = createApiClient({ baseUrl, getAccessToken: async () => 'synthetic-fault-only-bearer', timeoutMs: 400 }).native;
     const subscription = await native.subscribe(scope); assert.ok(subscription.ok);
     const started = performance.now(); let watchdog: ReturnType<typeof setTimeout> | undefined;
     try {
-      const result = await Promise.race([subscription.value.consume(executionId, () => {}), new Promise<never>((_, reject) => { watchdog = setTimeout(() => reject(new Error('Independent observation watchdog exceeded')), 12000); })]);
+      const result = await Promise.race([subscription.value.consume(executionId, () => {}), new Promise<never>((_, reject) => { watchdog = setTimeout(() => reject(new Error('Independent observation watchdog exceeded')), 3000); })]);
       assert.equal(result.ok, false); if (!result.ok) assert.equal(result.error.code, 'timed_out');
-      assert.ok(performance.now() - started >= 8800 && performance.now() - started < 10500);
+      assert.ok(performance.now() - started >= 350 && performance.now() - started < 1500);
     } finally { clearTimeout(watchdog); subscription.value.close(); }
+    await released(); assert.equal(requests - before, 1);
+  });
+  await t.test('a busy video rejects the send with a typed busy error', async () => {
+    mode = 'busy'; const before = requests;
+    const result = await client.native.sendText({ ...scope, message: 'Text' });
+    assert.ok(!result.ok); assert.equal(result.error.code, 'busy');
     await released(); assert.equal(requests - before, 1);
   });
   await t.test('matched HTTP rejection and aliased execution/message acknowledgment remain typed failures', async () => {
