@@ -346,16 +346,12 @@ test('the assistant\'s script saves show in the Script tab without a reload, and
   const { provider } = backend;
   const panel = page.getByRole('tabpanel');
   const first = 'Mara swims across the dark lake.', second = 'Mara swims faster as the far shore appears.', mine = 'Mara floats and looks at the stars.';
-  // The reply is held after the tool finishes, so the tab must update on the tool's done line, mid-turn.
-  provider.script({ toolCalls: [{ name: 'update-script', args: { baseVersionId: null, script: scriptOf(first) } }] }, { text: ['I saved the script.'], hold: 'before' });
+  provider.script({ toolCalls: [{ name: 'update-script', args: { baseVersionId: null, script: scriptOf(first) } }] }, { text: ['I saved the script.'] });
   await signIn(page, account!);
   await message(page).fill('Write the script');
   await message(page).press('Enter');
   await expect(live(page).getByText('Saved version 1', { exact: true })).toBeVisible();
-  await provider.held();
   await expect(panel).toContainText(first);
-  await expect(page.getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
-  provider.release();
   await expect(working(page)).toHaveCount(0);
 
   // The editor is open with unsaved text when the assistant saves version 2 on version 1.
@@ -386,6 +382,19 @@ test('the assistant\'s script saves show in the Script tab without a reload, and
   await expect(panel).toContainText(second);
   await expect(panel).not.toContainText(first);
   await expect(page.getByRole('button', { name: 'View version 1', exact: true })).toBeVisible();
+
+  // With no editor open, the tab updates on the tool's done line: the reply is still held, so the turn hasn't ended.
+  const latest = await backend.read<{ script: { version: { id: string } } }>(account!, `/v1/conversations/${video}/workspace`);
+  const third = 'Mara reaches the shore and laughs.';
+  provider.script({ toolCalls: [{ name: 'update-script', args: { baseVersionId: latest.script.version.id, script: scriptOf(third) } }] }, { text: ['Version 3 is saved.'], hold: 'before' });
+  await message(page).fill('Let her reach the shore');
+  await message(page).press('Enter');
+  await expect(live(page).getByText('Saved version 3', { exact: true })).toBeVisible();
+  await provider.held();
+  await expect(panel).toContainText(third);
+  await expect(page.getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
+  provider.release();
+  await expect(working(page)).toHaveCount(0);
 });
 
 const abortPath = '/api/agents/assistant/threads/abort';
