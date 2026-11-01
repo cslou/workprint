@@ -182,7 +182,7 @@ test('Stop names the exact run once; an acknowledged Stop that ends the turn sho
   assert.deepEqual(calls.send, ['Long one', 'Long one']);
 });
 
-test('Stop is unconfirmed when the server does not acknowledge it, and then offers no Retry', async () => {
+test('a Stop the server does not acknowledge is unacknowledged when the turn still ends interrupted, and offers one Retry', async () => {
   const held = heldTurn();
   const { session, calls } = harness({ conversationId: video, turn: held.turn, stop: async () => ({ ok: true, value: { runId: 'run-1', abortRequested: false } }) });
   const sending = session.send('Long one');
@@ -190,9 +190,33 @@ test('Stop is unconfirmed when the server does not acknowledge it, and then offe
   // The stream may end before the acknowledgment arrives; the outcome waits for it.
   held.end({ ok: true, value: { outcome: 'interrupted', runId: 'run-1' } });
   await session.stop(); await sending;
-  assert.deepEqual([session.getSnapshot().turns[0]!.state, session.getSnapshot().turns[0]!.stop], ['interrupted', 'unconfirmed']);
+  assert.deepEqual([session.getSnapshot().turns[0]!.state, session.getSnapshot().turns[0]!.stop], ['interrupted', 'unacknowledged']);
   await session.retry(session.getSnapshot().turns[0]!.key);
-  assert.deepEqual(calls.send, ['Long one']);
+  assert.deepEqual(calls.send, ['Long one', 'Long one']);
+});
+
+test('a turn lost while stopping is unconfirmed with no Retry; one that fails while stopping shows as failed', async () => {
+  const held = heldTurn();
+  const { session, calls } = harness({ conversationId: video, turn: held.turn });
+  const sending = session.send('Long one');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const stopping = session.stop();
+  held.end(fail('transport_failure'));
+  await stopping; await sending;
+  const lost = session.getSnapshot().turns[0]!;
+  assert.deepEqual([lost.state, lost.stop, session.getSnapshot().phase], ['interrupted', 'unconfirmed', 'idle']);
+  await session.retry(lost.key);
+  assert.deepEqual(calls.send, ['Long one'], 'it may still be running');
+
+  const failing = heldTurn();
+  const second = harness({ conversationId: video, turn: failing.turn });
+  const again = second.session.send('Long one');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const stopped = second.session.stop();
+  failing.end({ ok: true, value: { outcome: 'failed', runId: 'run-1', reason: 'error' } });
+  await stopped; await again;
+  const failed = second.session.getSnapshot().turns[0]!;
+  assert.deepEqual([failed.state, failed.stop], ['failed', undefined]);
 });
 
 test('without an outcome the chat settles after the Stop deadline, stops watching, and ignores a late result', async () => {

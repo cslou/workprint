@@ -327,11 +327,14 @@ test('Stop mid-reply: Stopped within 10 s, the composer is usable, and reload sh
   const stops: string[] = [];
   page.on('request', request => { if (new URL(request.url()).pathname === abortPath) stops.push(request.postData() ?? ''); });
   const clicked = Date.now();
-  await page.getByRole('button', { name: 'Stop', exact: true }).click();
+  // From the keyboard: Stop leaves when the turn settles, and focus returns to the message field.
+  await page.getByRole('button', { name: 'Stop', exact: true }).focus();
+  await page.keyboard.press('Enter');
   await expect(page.getByText('Stopped.', { exact: true })).toBeVisible({ timeout: 10_000 });
   expect(Date.now() - clicked).toBeLessThan(10_000);
   expect(stops).toHaveLength(1);
   await expect(working(page)).toHaveCount(0);
+  await expect(message(page)).toBeFocused();
   await message(page).fill('Next');
   await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeEnabled();
   expect(provider.requests).toHaveLength(1);
@@ -339,6 +342,29 @@ test('Stop mid-reply: Stopped within 10 s, the composer is usable, and reload sh
   await page.reload();
   await expect(saved(page).getByRole('listitem')).toHaveText(['Write a long reply', 'Partial answer']);
   await expect(page.getByText('Stopped.', { exact: true })).toHaveCount(0);
+});
+
+test('a Stop that is never acknowledged settles within 10 s as unconfirmed, with no Retry, and never sends a second Stop', async ({ page, backend }) => {
+  const [account] = await backend.accounts(1);
+  const { provider } = backend;
+  provider.script({ text: ['Still ', 'going'], hold: 'mid' });
+  await signIn(page, account!);
+  let stops = 0;
+  // The Stop never reaches the server, so the reply keeps running there.
+  await page.route(url => url.pathname === abortPath, route => { stops++; return route.abort(); });
+  await message(page).fill('Write a long reply');
+  await message(page).press('Enter');
+  await expect(live(page).getByRole('listitem', { name: 'Assistant message' })).toHaveText('Still');
+  const clicked = Date.now();
+  await page.getByRole('button', { name: 'Stop', exact: true }).click();
+  await expect(page.getByText('We couldn’t confirm the reply stopped.', { exact: true })).toBeVisible({ timeout: 10_000 });
+  expect(Date.now() - clicked).toBeLessThan(10_000);
+  await expect(page.getByText('Stopped.', { exact: true })).toHaveCount(0);
+  await expect(live(page).getByRole('button', { name: 'Retry' })).toHaveCount(0);
+  await message(page).fill('Next');
+  await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeEnabled();
+  expect(stops).toBe(1);
+  provider.release();
 });
 
 test('closing the page mid-turn sends no Stop, and the reply is saved for when the video is reopened', async ({ page, backend }) => {

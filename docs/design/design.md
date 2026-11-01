@@ -421,7 +421,8 @@ Inert previews: [`chat-states/`](chat-states/index.html) at 1440 and 390 (Sprint
 | Reply failed | Under the reply, after any text that streamed | "Something went wrong and this reply didn’t finish." | **Retry**, once: it sends the same message again |
 | Reply interrupted | Under the reply | "This reply was interrupted." | **Retry**, once |
 | Reply stopped | Under the reply, after **Stop**, once the server acknowledged the Stop and the reply ended interrupted | "Stopped." | **Retry**, once |
-| Stop unconfirmed | Under the reply, when the Stop was not acknowledged or the reply did not end within about 8 s of the click (the chat stops watching; it never sends a second Stop) | "We couldn’t confirm the reply stopped." | None: the reply may still be running |
+| Stop unacknowledged | Under the reply, after **Stop**, when the reply ended interrupted but the server did not acknowledge the Stop | "We couldn’t confirm the reply stopped." | **Retry**, once |
+| Stop unconfirmed | Under the reply, when this page stopped hearing the reply after **Stop**, or it did not end within about 8 s of the click (the chat stops watching; it never sends a second Stop) | "We couldn’t confirm the reply stopped." | None: the reply may still be running |
 | Reply lost | Under the reply, when this page stops hearing it (the server may still finish it) | "We lost track of this reply. It may still finish; reload to see it." | None: a Retry could duplicate a reply that is still running |
 | Send unconfirmed | Above the chat box; the draft stays in the box, read-only, and Send is unavailable | "We couldn’t confirm your message was sent." While history is re-read: "Checking whether your message was sent…" with both buttons unavailable | **Check again** (reads history only) and **Send anyway** (may send it twice) |
 | Send rejected | Under the chat box; the draft stays | "Your message wasn’t sent. It’s still here, so you can try again." | Send |

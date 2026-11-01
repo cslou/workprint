@@ -99,8 +99,14 @@ try {
     const ended = await turn;
     const reason = ended.terminal?.payload?.stepResult?.reason;
     const interrupted = ended.terminal?.type === 'abort' || reason === 'abort';
-    // A model that finished before the Stop arrived is a timing finding, not a failure.
-    assert.ok(interrupted || completed(ended), `turn neither stopped nor completed: ${ended.terminal?.type ?? 'no terminal chunk'}`);
+    if (live) {
+      // A real model that finished before the Stop arrived is a timing finding, not a failure.
+      assert.ok(interrupted || completed(ended), `turn neither stopped nor completed: ${ended.terminal?.type ?? 'no terminal chunk'}`);
+    } else {
+      // Scripted, the reply is held, so the Stop must land and end the turn.
+      assert.equal(aborted, true, 'Stop not acknowledged');
+      assert.ok(interrupted, `turn not interrupted: ${ended.terminal?.type ?? 'no terminal chunk'}`);
+    }
     assert.ok(acknowledgedMs < 5000, `Stop acknowledged after ${acknowledgedMs} ms`);
     shapes.stop = sanitize(ended.chunks);
     return { aborted, interrupted, acknowledgedMs, settledMs: Date.now() - started };

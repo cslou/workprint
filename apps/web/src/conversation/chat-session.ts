@@ -15,9 +15,10 @@ export type LiveTurn = Readonly<{
   retried: boolean;
   /**
    * Set once Stop is pressed. stopped: the server acknowledged the Stop and the turn ended interrupted.
-   * unconfirmed: either is unknown, so the turn may still be running.
+   * unacknowledged: the turn ended interrupted, but the server did not acknowledge this Stop.
+   * unconfirmed: this page stopped hearing the turn, so it may still be running.
    */
-  stop?: 'stopping' | 'stopped' | 'unconfirmed';
+  stop?: 'stopping' | 'stopped' | 'unacknowledged' | 'unconfirmed';
 }>;
 /**
  * idle: Send available. sending: waiting for the send to be accepted. working: a turn from this page is running.
@@ -150,14 +151,14 @@ export function createChatSession(config: ChatSessionConfig) {
     const stopping = state.turns.find(turn => turn.key === key)?.stop === 'stopping';
     if (stopping && (outcome === 'interrupted' || outcome === 'lost')) {
       // "Stopped" needs both: the turn ended interrupted and the server acknowledged this Stop.
-      const confirmed = outcome === 'interrupted' && await run.acknowledged === true;
-      if (alive) settle(run, 'interrupted', outcome === 'lost', confirmed ? 'stopped' : 'unconfirmed');
+      const stop = outcome === 'lost' ? 'unconfirmed' : await run.acknowledged === true ? 'stopped' : 'unacknowledged';
+      if (alive) settle(run, 'interrupted', outcome === 'lost', stop);
     } else settle(run, outcome, !result.ok);
     return 'sent';
   }
 
   /** Ends this page's view of a turn once: its state, its lines, and the composer becomes available again. */
-  function settle(run: NonNullable<typeof active>, outcome: LiveTurn['state'], lost: boolean, stop?: 'stopped' | 'unconfirmed') {
+  function settle(run: NonNullable<typeof active>, outcome: LiveTurn['state'], lost: boolean, stop?: Exclude<LiveTurn['stop'], 'stopping'>) {
     if (run.settled) return;
     run.settled = true; clearTimeout(run.deadline);
     if (active === run) active = null;

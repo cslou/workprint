@@ -51,7 +51,8 @@ test('Stop ends exactly the turn it names, including a running tool, and nothing
     provider.script({ toolCalls: [{ name: 'test-gated', args: {} }] }, { text: ['Should never be asked for'] });
     const { accepted, turn } = running(video, 'Run the gated tool');
     const runId = await accepted; await provider.gate().reached;
-    assert.equal((await stop(client, owner.id, video, runId)).status, 200);
+    const acknowledged = await stop(client, owner.id, video, runId);
+    assert.equal(acknowledged.status, 200); assert.deepEqual(await acknowledged.json(), { aborted: true });
     const ended = await turn;
     assert.ok(interrupted(ended), JSON.stringify(ended.terminal));
     await wait(1000);
