@@ -6,7 +6,7 @@ Convention: `docs/conventions/backlog-management.md` (selected harness root; AGE
 
 ## Next
 
-MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority order. B-021 to B-025 were added the same day from the Sprint 006/007 plans and the gaps they exposed, placed where their dependencies need them. They will be tied to Sprint 006 and 007 once grooming is done. Each tool lives in its own directory under the agent module and calls application functions in process, never application HTTP routes (implementation spec §10). Assistant saves and generations never count as human approval (AGENTS.md).
+MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority order. B-021 to B-025 were added the same day from the Sprint 006/007 plans and the gaps they exposed, placed where their dependencies need them. Sprint allocation is in spec §10 [Phase 3 sprint packaging](specs/implementation-spec-001.md#phase-3-sprint-packaging). Spec story IDs (P3-S*, P4-S*) and the "reduced-delivery amendment" or "Submission and recovery contract" cited below refer to text removed from the spec on 2026-11-01; read it with `git show eb98e49:docs/specs/implementation-spec-001.md`. The same applies to the former Sprint 006/007 plans, `git show eb98e49:docs/sprints/sprint-006.md` (and `sprint-007.md`). Each tool lives in its own directory under the agent module and calls application functions in process, never application HTTP routes (implementation spec §10). Assistant saves and generations never count as human approval (AGENTS.md).
 
 ### B-012 — Chat with the agent through a tool-using loop
 - Problem: Send is still disabled. The only native agent (`apps/api/src/agent/mastra/native-turns.ts`) is text-only: "Do not use tools", one step, a 64-token output cap and an 8-second budget. `DEFAULT_ASSISTANT_MODEL` is checked for syntax only, so no live model is connected. The send/stream path also lost its tests in the Sprint 004 MVP test trim.
@@ -34,7 +34,7 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
     - Confirm the real Meta response and streaming shapes with a few live calls before finalizing parsing.
   - No spending ceiling for live calls during MVP development (Lou, 2026-11-01); limits are tracked in B-033. Keep tests on the scripted model and make live calls only to confirm real behaviour.
 - References:
-  - [Sprint 006](sprints/sprint-006.md) Stories 1–3: the planned model binding, send/stream and Stop work. It was planned for Muse Wonder and will be re-cut around this item.
+  - Former Sprint 006 plan, Stories 1–3: the earlier model binding, send/stream and Stop plan, written for Muse Wonder.
   - `apps/api/src/mastra/config.ts`: model admission.
   - [Meta models](https://dev.meta.ai/docs/models): model IDs. API base `https://api.meta.ai/v1`, with OpenAI-compatible Responses and Chat Completions APIs.
 
@@ -46,13 +46,13 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
   - Long tools show elapsed time, for example "Generating video… 2 min" (B-025).
   - Tool lines must survive a reload, so confirm on the installed Mastra version that tool calls are saved with the assistant message.
 - Test: a test-only scripted model calls a tool. The test holds the tool open and asserts the in-progress line, releases it and asserts the done line and the streamed text, then reloads and asserts both are still shown.
-- References: [Sprint 006](sprints/sprint-006.md) Story 2 states and scope rules; `docs/design/demo-02.html`; B-012.
+- References: Former Sprint 006 plan, Story 2 states and scope rules; `docs/design/demo-02.html`; B-012.
 
 ### B-022 — Stop the agent's reply
 - Problem: An agent loop that calls paid tools needs a way to stop it. Sprint 006 Story 3 plans an exact-turn Stop, bundled with queue and reconnect work the MVP doesn't need.
 - Outcome: A Stop button ends the current agent turn, including any tool still waiting. The UI settles within a bounded time and says "stopped" only when the stop is confirmed, or "unknown" otherwise. Pass: Stop mid-reply ends streaming within the bound, and the partial reply is saved or marked interrupted. Stop during video generation ends the polling, and the saved MiniMax task stays on record so it can be resumed (B-025).
 - Constraint: Stop does not cancel the provider's task. MiniMax may still finish and charge, and an in-flight Meta image may still be billed. The UI never claims remote work or charges stopped.
-- References: [Sprint 006](sprints/sprint-006.md) Story 3 Stop criteria (five-second acknowledgment cap, ten-second local settlement); the exact-turn control from Sprint 004.
+- References: Former Sprint 006 plan, Story 3 Stop criteria (five-second acknowledgment cap, ten-second local settlement); the exact-turn control from Sprint 004.
 
 ### B-023 — Agent reads the video's current work
 - Problem: The tools in B-013 to B-020 need the agent to know the video's current script, assets (with exact image versions), storyboard and videos. Otherwise it cannot update the script, use "an image from the db" (B-015) or know which asset the user means (B-016). Neither sprint plan covers this; the spec calls it P4-S2.
@@ -89,7 +89,7 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
   - Restart-proof continuation is deferred (B-028).
 - References:
   - `docs/design/demo-02.html`: the approved look.
-  - [Sprint 007](sprints/sprint-007.md) Stories 1–2: the planned question reads and exact answers, to be re-cut around this item.
+  - Former Sprint 007 plan, Stories 1–2: the planned question reads and exact answers.
   - `packages/contracts/src/models.ts`: `questionSchema`.
 
 ### B-015 — Agent tool: generate images with Meta Muse Image
@@ -157,7 +157,7 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 - References:
   - `~/projects/animation-studio/.pi/skills/generate-video/SKILL.md` (submit → save manifest → poll → download → validate, plus `--resume-manifest`).
   - `references/minimax-video-v2.md`.
-  - [Sprint 007](sprints/sprint-007.md) Story 3 (generation records); `packages/contracts` `generationRequestSchema`.
+  - Former Sprint 007 plan, Story 3 (generation records); `packages/contracts` `generationRequestSchema`.
 
 ### B-019 — Agent tool: generate a video with MiniMax
 - Problem: The Videos tab and player exist, but nothing produces a generated video.
@@ -191,7 +191,7 @@ Deprioritized: everything here waits until the Next items are done (Lou, 2026-11
 ### B-026 — Queue messages while the agent is replying
 - Problem: Sprint 006 Story 3 planned letting the user send up to three more messages while a reply streams, kept in order. Lou does not need it for the MVP but wants it tracked (2026-11-01).
 - Outcome: Messages typed during a reply queue in order with distinct identities. Overflow is rejected before any extra model call, and an unclear queue acknowledgment never resends.
-- References: [Sprint 006](sprints/sprint-006.md) Story 3.
+- References: Former Sprint 006 plan, Story 3.
 
 ### B-032 — Run video generation in the background so chat stays free
 - Problem: In the MVP the video tool waits inside the turn (B-025), so the user cannot chat for 1–5 minutes per video. Lou accepted this for the MVP and wants a better approach afterwards (2026-11-01).
@@ -211,24 +211,24 @@ Deprioritized: everything here waits until the Next items are done (Lou, 2026-11
 ### B-027 — Reconnect to an in-progress reply after reload
 - Problem: Sprint 006 Story 3 planned re-attaching to a still-running turn after a reload or reconnect, inside the native three-second replay window. The MVP shows the saved result instead.
 - Outcome: A reload during streaming re-attaches to the same turn without resending, or honestly reports the reply's state as unknown once the replay window has passed. Closing the view never sends Stop.
-- References: [Sprint 006](sprints/sprint-006.md) Story 3.
+- References: Former Sprint 006 plan, Story 3.
 
 ### B-028 — Questions survive a server restart mid-continuation
 - Problem: Sprint 007 Story 2 planned a durable, recoverable hand-off from a saved answer to the agent's continuation, proven by killing and restarting the server. The MVP passes the answer back as the next message (B-014).
 - Outcome: An answer committed just before a crash still leads to exactly one continuation after restart, with no duplicate effects.
-- References: [Sprint 007](sprints/sprint-007.md) Story 2.
+- References: Former Sprint 007 plan, Story 2.
 
 ### B-029 — Cancel a running generation request
 - Problem: Sprint 007 Story 4 planned cancelling one owned generation request, with idempotent cancellation, races against success or failure, and the provider's remote outcome (requested, unsupported or unknown).
 - Outcome: The user cancels one request; local status and the remote outcome are reported separately, and other work keeps running.
 - Constraint: Never claims remote work or charges stopped.
-- References: [Sprint 007](sprints/sprint-007.md) Story 4; B-025.
+- References: Former Sprint 007 plan, Story 4; B-025.
 
 ### B-030 — Review and approve generation proposals before paid calls
 - Problem: The spec requires an exact human-approved proposal before any paid image or video call (P4-S8, P3-S7). Sprint 007 Stories 1–2 planned the proposal card reads and approval. Lou's MVP list has the agent generate on request instead.
 - Outcome: If proposals return, the user reviews the exact prompt, inputs, model and estimate, and approves once before paid work starts. B-003 supplies the input names.
 - Constraint: Lou decided on 2026-11-01 that the MVP needs no user authorization before paid image or video calls, to save time. This item adds that authorization later.
-- References: [Sprint 007](sprints/sprint-007.md) Stories 1–2; B-003; spec "Submission and recovery contract".
+- References: Former Sprint 007 plan, Stories 1–2; B-003; spec "Submission and recovery contract".
 
 ### B-031 — Deploy the MVP
 - Problem: The spec's P4-S19 deploys the reviewed build to Cloudflare (web), one Railway backend, Supabase and private R2, with an operating handoff. Lou decided on 2026-11-01 that the MVP does not need deployment; it runs locally.

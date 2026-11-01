@@ -12,7 +12,7 @@
 - **Test trim:** The MVP keeps only crucial suites. One-off screenshot/visual suites, auth-evidence qualification, ingress qualification and non-crucial API/browser specs are removed (merged before the QA build). Run targeted checks per change and one trimmed full run before QA, not repeated heavy runs.
 - **Skeleton timing:** This overrides Story 9's "no artificial delay". Placeholders appear only after about 250ms, reserving their space invisibly, then stay at least about 450ms. History uses the delay only.
 - **Chat header:** The visible conversation title, the "Conversation history" subtext and the divider are removed. A screen-reader-only heading stays the focus target.
-- **New video is client-only:** Clicking it writes nothing; it returns to the opening composer. The video id is the native thread id, and that thread is created by the first accepted send ([Sprint 006](sprint-006.md) Story 2). Until Send ships, New video creates no record. This replaces the earlier explicit create-on-click flow (PR #50).
+- **New video is client-only:** Clicking it writes nothing; it returns to the opening composer. The video id is the native thread id, and that thread is created by the first accepted send (backlog [B-012](../backlog.md), Sprint 006). Until Send ships, New video creates no record. This replaces the earlier explicit create-on-click flow (PR #50).
 
 **Planning result:** sprint-doc-reviewer **4/5**, "Ready to start" (2026-10-29), with one P2 resolved below. The independent dependency review of the Phase 3 packaging returned "sound with fixes"; all its fixes are applied. Lou authorized Phase 3 Wave 1 on 2026-10-29. [Story 001](../stories/story-001.md) merged into `phase-3` at `a7444a2` ([PR #33](https://github.com/cslou/workprint/pull/33)), the start checklists are confirmed, and `sprint-004` branches from that head.
 
@@ -622,7 +622,7 @@ The Final Verification Story runs all applicable sprint functional verification 
   - Full audit remains NON-PASS (B-004, B-008) under the existing private/local-only exception.
 - **Review:** Story and follow-up PRs were reviewed as listed above. This completion record and the cumulative `sprint-004 → phase-3` diff each get a current-head independent review. Sprint integration needs Lou's explicit merge command.
 - **Spec/flow changes:**
-  - New video is client-only. The video id is the native thread id, created by the first accepted send in [Sprint 006](sprint-006.md) Story 2; this is recorded in the implementation spec and the Sprint 006 ACs.
+  - New video is client-only. The video id is the native thread id, created by the first accepted send (backlog B-012, Sprint 006); this is recorded in the implementation spec and the backlog.
   - Send remains disabled in this sprint.
   - Public `/`, `/sign-in` and protected `/app` routing replaces the dialog-first entry.
 - **New Dependencies:** None added by Stories 8–10 or the follow-ups. `pngjs`/`@types/pngjs` were removed with the screenshot suites. Story 1a–7 dependencies are unchanged: `@mastra/hono` 1.7.21, `hono` 4.13.14, `@hono/node-server` 1.19.17, `@mastra/memory` 1.39.0, `@mastra/client-js` 1.56.0 and `@supabase/auth-js` 2.118.0.
