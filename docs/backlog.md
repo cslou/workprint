@@ -31,7 +31,8 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
     - A lost send acknowledgment never resends automatically, and the draft is kept until acceptance is known.
     - A New video creates its thread only on the first accepted send; a failed first send creates no video.
     - Enter sends once; Shift+Enter and IME composition do not send.
-    - Confirm the real Meta response and streaming shapes with a few live calls before finalizing parsing; live calls need Lou's budget approval.
+    - Confirm the real Meta response and streaming shapes with a few live calls before finalizing parsing.
+  - No spending ceiling for live calls during MVP development (Lou, 2026-11-01); limits are tracked in B-033. Keep tests on the scripted model and make live calls only to confirm real behaviour.
 - References:
   - [Sprint 006](sprints/sprint-006.md) Stories 1–3: the planned model binding, send/stream and Stop work. It was planned for Muse Wonder and will be re-cut around this item.
   - `apps/api/src/mastra/config.ts`: model admission.
@@ -64,7 +65,10 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 ### B-013 — Agent tool: update the video's script
 - Problem: The Script tab can only show and manually edit saved scripts. The agent has no way to write one.
 - Outcome: An update-script tool, in its own directory, saves a new assistant-made script version for the current video/thread and makes it the video's current script as a draft (not approved) workspace use. The user sees the Script tab update to match. Pass: the database holds the new version and the Script tab shows it.
-- Constraint: The saved version is a draft, not an approval. Turn the animation-studio skill's instructions into the tool's description and the agent's guidance rather than copying its local file workflow. The skill's Scene Script YAML schema differs from Workprint's saved script content, so the mapping needs a decision.
+- Constraint:
+  - The saved version is a draft, not an approval.
+  - Keep Workprint's saved script schema (Lou, 2026-11-01). Adapt only the skill's writing guidance (scene adaptation, action and dialogue order, speakers) into the tool description and agent guidance; do not port its YAML format or local file workflow.
+  - The agent must be able to update every field of that schema. The tool accepts complete script content, validated by the same schema as manual saves, so any part can be changed and unedited parts are carried over. If the skill's guidance needs a field the schema lacks, extend the schema through the normal contract change rather than hiding the data in free text.
 - References:
   - `~/projects/animation-studio/.pi/skills/create-scene-script/SKILL.md` and `references/scene-script-schema.md`: Lou's create-script skill.
   - `apps/api/src/artifacts/content.ts`: the saved script schema.
@@ -117,7 +121,7 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 - References: B-014; B-003; `packages/contracts/src/models.ts` `questionSchema`.
 
 ### B-017 — Agent creates reference sheets
-- Context: Lou will supply the reference-sheet details and templates soon (2026-11-01). Keep this as a placeholder until then.
+- Context: Lou will supply the reference-sheet details and templates later (2026-11-01). Keep this as a placeholder until then; it does not block B-012 to B-016.
 - Problem: The Assets tab can show reference sheets (`apps/web/src/materials/sheet.tsx`), but only manual saves create them. The agent cannot create a character, place or prop reference.
 - Outcome: The agent creates a reference sheet for a subject: a saved reference version with its description, continuity notes and images generated through B-015. The sheet appears in Assets. Pass: the user asks for a reference sheet, and a saved sheet with images shows in Assets.
 - Constraint: Built as tools that the agent loop calls (Lou, 2026-11-01). Converting them to workflows can be decided later.
@@ -160,6 +164,7 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 - Outcome: A generate-video tool takes a prompt and up to two images (first and last frame, from uploads or storyboard panels) and starts a MiniMax Video V2 task. It waits for the result as in B-025, stores the video, and shows it in the Videos tab. Pass: the generated video is stored, appears in Videos and plays.
 - Constraint:
   - Lou chose MiniMax for now (2026-11-01); Meta's API has no video generation, only video understanding.
+  - The key is `MINIMAX_API_KEY` in the root `.env`, added by Lou on 2026-11-01. It is server-only; never print it.
   - Waiting, resume and failure handling follow B-025.
   - Frames go to MiniMax as data URLs, because storage is private.
   - Use one fixed resolution and frame rate for every shot, so B-020 can join clips without re-encoding.
@@ -196,6 +201,12 @@ Deprioritized: everything here waits until the Next items are done (Lou, 2026-11
   - Stop and disconnect never cancel the job.
   - Telling the agent that a job finished is the hard part. It needs a saved-report and acknowledgment design.
 - References: B-025; spec "Submission and recovery contract", P3-S18/S19 and P4-S9/S14; B-026, B-029.
+
+### B-033 — Set spending limits for live model and generation calls
+- Problem: Lou set no spending ceiling for Meta (chat and images) or MiniMax (video) calls during MVP development, to save time (2026-11-01). The product also lets the agent generate without user approval (B-030), so nothing caps cost.
+- Outcome: Agreed limits for development and product use, such as per-account caps, per-turn generation limits or a monthly ceiling, enforced on the server.
+- Constraint: This depends on knowing actual usage (B-010). Proposal estimates are not measured usage.
+- References: B-010, B-030; spec reduced-delivery amendment.
 
 ### B-027 — Reconnect to an in-progress reply after reload
 - Problem: Sprint 006 Story 3 planned re-attaching to a still-running turn after a reload or reconnect, inside the native three-second replay window. The MVP shows the saved result instead.
