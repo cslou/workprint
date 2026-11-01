@@ -2,7 +2,7 @@
 
 **Date:** Start 2026-11-02, after Sprint 006 (PR #78) merged into `main` – End after completion gates and Lou's QA
 **Goal:** In a local build, a signed-in user asks the agent to write or change the video's script. The agent saves a new script version, which becomes the video's current script, and the Script tab shows it without a reload. An unsaved manual edit is not lost.
-**Status:** 🟡 Planning
+**Status:** 🔵 In progress
 
 ---
 
@@ -117,7 +117,7 @@ Three stories is deliberate (Lou, 2026-11-02): the earlier "assistant script sav
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: Pass 1 (3/5 overall): P2 the new dependency rule had no proof it fires; P2 preservation and remount on switch had no named regression check. Pass 2 (4/5): no findings.
   - Resolution: Added a one-off negative probe and `navigation.spec.ts` to the targeted run; `preservePanels` across same-video changes is left to the deep gate as accepted risk.
@@ -149,7 +149,7 @@ Three stories is deliberate (Lou, 2026-11-02): the earlier "assistant script sav
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: Pass 1: P2s on unverified phrase and summary, description guidance, scope cases, foreign base id vs spec §10, and concurrent first saves. Pass 2 (4/5): P2 refusal outcomes for the activity line were undefined; P2 the live script change had no pre-completion check.
   - Resolution: Added assertions for phrase, summary and selection revision; an editorial check of the description; scope, foreign-base and concurrent cases; named refusal summaries; and a scripted `pnpm live:chat` run.
@@ -204,7 +204,7 @@ Three stories is deliberate (Lou, 2026-11-02): the earlier "assistant script sav
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: Pass 1: P1 the browser pass condition accepted Version history alone and skipped the first-save path; P2s on effect precedence, late refresh and outcomes, and badge wording. Pass 2 (4/5): P2 the revision ordering key was undefined; P2 plain-view rendering of v2 was not asserted.
   - Resolution: Rewrote the journey (empty video → v1, then editor open → v2, then cancel shows v2). Ordering now keys on `selectionRevision`, with a Use-this-version case. Added unit cases for late refresh and each outcome. Lou (2026-11-02) dropped the badge guard: no badge exists, so there is nothing to test.
