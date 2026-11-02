@@ -145,7 +145,7 @@ test('a download is bounded, sends no key, and refuses non-HTTPS, private hosts 
 
 test('private addresses include IPv6 forms that carry a private IPv4 address', () => {
   for (const address of ['127.0.0.1', '10.0.0.1', '172.16.0.1', '192.168.1.1', '169.254.169.254', '100.64.0.1', '0.0.0.0', '224.0.0.1',
-    '::1', '::', 'fc00::1', 'fd12::1', 'fe80::1', 'ff02::1', '::ffff:127.0.0.1', '::ffff:7f00:1', '::127.0.0.1', '::7f00:1',
+    '::1', '::', 'fc00::1', 'fd12::1', 'fe80::1', 'fec0::1', 'feff::1', 'ff02::1', '::ffff:0:127.0.0.1', '::ffff:0:a00:1', '::ffff:127.0.0.1', '::ffff:7f00:1', '::127.0.0.1', '::7f00:1',
     '64:ff9b::a00:1', '64:ff9b::7f00:1', '64:ff9b:1::1', '2002:7f00:1::', '2002:a00:1::1', 'not-an-address'])
     assert.equal(privateAddress(address), true, address);
   for (const address of ['8.8.8.8', '2606:4700:4700::1111', '::ffff:8.8.8.8', '64:ff9b::808:808', '2002:808:808::1'])

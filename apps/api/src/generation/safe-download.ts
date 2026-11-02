@@ -46,7 +46,7 @@ function groups(address: string): number[] | undefined {
 const embedded = (high: number, low: number) => `${high >> 8}.${high & 255}.${low >> 8}.${low & 255}`;
 /**
  * True for loopback, private, link-local, multicast and unparseable addresses, including IPv6 forms
- * that carry an IPv4 address (mapped, compatible, NAT64 and 6to4), which are judged by that address.
+ * that carry an IPv4 address (mapped, compatible, translated, NAT64 and 6to4), which are judged by that address.
  */
 export function privateAddress(address: string) {
   const value = address.toLowerCase().replace(/^\[|\]$/g, '');
@@ -57,9 +57,11 @@ export function privateAddress(address: string) {
   if (!g) return true;
   if (g.every(group => group === 0) || (g.slice(0, 7).every(group => group === 0) && g[7] === 1)) return true;
   const first = g[0]!;
-  if ((first & 0xfe00) === 0xfc00 || (first & 0xffc0) === 0xfe80 || (first & 0xff00) === 0xff00) return true;
-  // ::ffff:a.b.c.d (mapped) and ::a.b.c.d (compatible)
+  // fc00::/7 unique local, fe80::/9 link- and site-local, ff00::/8 multicast
+  if ((first & 0xfe00) === 0xfc00 || (first & 0xff80) === 0xfe80 || (first & 0xff00) === 0xff00) return true;
+  // ::ffff:a.b.c.d (mapped), ::a.b.c.d (compatible) and ::ffff:0:a.b.c.d (translated)
   if (g.slice(0, 5).every(group => group === 0) && (g[5] === 0xffff || g[5] === 0)) return privateIpv4(embedded(g[6]!, g[7]!));
+  if (g.slice(0, 4).every(group => group === 0) && g[4] === 0xffff && g[5] === 0) return privateIpv4(embedded(g[6]!, g[7]!));
   // 64:ff9b::/96 and 64:ff9b:1::/48 (NAT64)
   if (first === 0x64 && g[1] === 0xff9b) return g[2] === 1 || privateIpv4(embedded(g[6]!, g[7]!));
   // 2002::/16 (6to4)

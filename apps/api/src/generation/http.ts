@@ -19,6 +19,7 @@ export async function readBounded(body: AsyncIterable<Uint8Array> | null, declar
 /** Waits `ms`, or less when `signal` aborts first; never rejects. */
 export function abortableDelay(ms: number, signal: AbortSignal | undefined): Promise<void> {
   return new Promise<void>(resolve => {
+    if (signal?.aborted) { resolve(); return; }
     const stop = () => { clearTimeout(timer); resolve(); };
     const timer = setTimeout(() => { signal?.removeEventListener('abort', stop); resolve(); }, ms);
     signal?.addEventListener('abort', stop, { once: true });
