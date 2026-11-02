@@ -8,6 +8,7 @@ import { ArtifactError } from './errors.js';
 import { lockPublicationOwner, publishVersion } from './publication.js';
 import { verifiedMedia } from './references.js';
 import { scriptSubjectsNow } from './script-reads.js';
+import { currentSheets, type Sheet } from './sheet-reads.js';
 import { createArtifactStore } from './store.js';
 import { useRoom as roomLeft } from './use-room.js';
 import { usedImageVersions } from './workspace-images.js';
@@ -39,19 +40,7 @@ export class SheetSaveError extends Error {
 }
 const invalidImages = () => new SheetSaveError('invalid', 'images');
 
-type SheetRow = { use_id: string; version_id: string; version_owner_id: string; artifact_id: string; binding: unknown; content: unknown; dependencies: string[] };
-type Sheet = SheetRow & { sheet: z.infer<typeof savedReferenceContentSchema> };
-
 const trimmedLength = (value: string) => value.trim().length;
-
-/** The video's current sheets in workspace order, each with its parsed content, locked for this save. */
-async function currentSheets(client: PoolClient, account: string, conversation: string): Promise<Sheet[]> {
-  const rows = (await client.query<SheetRow>(`SELECT u.use_id,u.version_id,u.version_owner_id,v.artifact_id,u.binding,v.content,
-      COALESCE((SELECT array_agg(d.dependency_id ORDER BY d.position) FROM artifacts.version_dependencies d WHERE d.owner_id=v.owner_id AND d.version_id=v.version_id),ARRAY[]::text[]) AS dependencies
-    FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.version_owner_id AND v.version_id=u.version_id
-    WHERE u.owner_id=$1 AND u.conversation_id=$2 AND u.purpose='reference' AND v.kind='reference' ORDER BY u.created_at,u.use_id FOR UPDATE OF u`, [account, conversation])).rows;
-  return rows.flatMap(row => { const sheet = savedReferenceContentSchema.safeParse(row.content); return sheet.success ? [{ ...row, sheet: sheet.data }] : []; });
-}
 
 /** Which of these image versions the video still uses, read under the lock on the transaction's own connection. */
 async function stillUsed(client: PoolClient, account: string, conversation: string, ids: readonly string[], sheets: readonly Sheet[]): Promise<Set<string>> {

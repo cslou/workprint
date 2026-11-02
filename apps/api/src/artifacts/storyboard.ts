@@ -21,8 +21,11 @@ function editedPlan(base: Plan, shots: Command['shots']): Plan {
   const next = shots.map(shot => {
     const old = previous.get(shot.shotId);
     if (!old || shot.panels.length !== old.panels.length || new Set(shot.panels.map(panel => panel.panelId)).size !== shot.panels.length) throw new ArtifactError('invalid_input');
-    const panels = new Map(old.panels.map(panel => [panel.panelId, panel]));
-    return { shotId: shot.shotId, order: shot.order, intent: shot.intent ?? old.intent, panels: shot.panels.map(panel => {
+    // A person edits intent and panel text only; the assistant's Shot fields (framing, action, dialogue, camera note and
+    // subject references) are kept from the base unchanged.
+    const { panels: oldPanels, ...fields } = old;
+    const panels = new Map(oldPanels.map(panel => [panel.panelId, panel]));
+    return { ...fields, shotId: shot.shotId, order: shot.order, intent: shot.intent ?? old.intent, panels: shot.panels.map(panel => {
       const current = panels.get(panel.panelId);
       if (!current) throw new ArtifactError('invalid_input');
       return { panelId: panel.panelId, order: panel.order, description: panel.description ?? current.description, references: [...panel.references] };
@@ -72,7 +75,11 @@ export function createStoryboardEdits(pool: Pool, checkOwnedConversation: Parame
       const content = editedPlan(savedStoryboardContentSchema.parse(base.content), body.shots);
       if (canonicalJson(content) === canonicalJson(before)) throw new ArtifactError('invalid_input');
       const references = [...new Set(content.shots.flatMap(shot => shot.panels.flatMap(panel => panel.references)))];
-      const dependencies = [content.sourceScriptVersionId, ...references];
+      // The base's other dependencies (its Shots' subject sheets) carry over unchanged.
+      const basePlan = savedStoryboardContentSchema.parse(base.content);
+      const baseLinks = new Set([basePlan.sourceScriptVersionId, ...basePlan.shots.flatMap(shot => shot.panels.flatMap(panel => panel.references))]);
+      const sheets = base.dependencies.filter(id => id !== content.sourceScriptVersionId && !baseLinks.has(id) && !references.includes(id));
+      const dependencies = [content.sourceScriptVersionId, ...references, ...sheets];
       if (dependencies.length > 100) throw new ArtifactError('invalid_input');
       const resolved = new Map<string, Version>();
       for (const id of dependencies) resolved.set(id, await reads.version(account, id));

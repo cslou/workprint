@@ -190,5 +190,21 @@ test('storyboard edits keep stable Shot and Panel identities and one forward-onl
       const history = await store.history(owner, board.artifactId);
       assert.deepEqual(history.items.map((version: Version) => version.revision), [4, 3, 2, 1], 'Every saved plan stays in history');
     });
+
+    await t.test('a person\'s edit of an assistant storyboard keeps its Shot fields and its sheets', async () => {
+      // The assistant's Shot fields and subject sheets are not part of the person's edit body; an edit must not drop them.
+      const video = (await createNativeConversation(setup, owner)).id;
+      const scene = { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'Station', time: 'morning' }, characters: ['Ada'], script: [{ action: 'Ada waits.' }] }], subjects: [{ id: 'ada', kind: 'character', name: 'Ada' }, { id: 'station', kind: 'place', name: 'Station' }] };
+      const told = await store.insert({ accountId: owner, conversationId: video, kind: 'script', content: scene, createdBy: 'human', dependencies: [], use: { binding: { purpose: 'script' }, state: 'approved' } });
+      const sheet = await store.insert({ accountId: owner, conversationId: video, kind: 'reference', content: reference('Ada'), createdBy: 'assistant', dependencies: [], use: { binding: { purpose: 'reference' }, state: 'draft' } });
+      const fields = { framing: 'close-up', action: 'Ada checks the clock.', cameraNote: 'Hold.', dialogue: [{ character: 'Ada', text: 'Late again.' }], references: [{ subjectId: 'ada', role: 'identity' as const, purpose: 'Her face.' }] };
+      const planned = await store.insert({ accountId: owner, conversationId: video, kind: 'storyboard', createdBy: 'assistant', dependencies: [told.id, sheet.id], use: { binding: { purpose: 'storyboard' }, state: 'draft' },
+        content: { schemaVersion: 1, sourceScriptVersionId: told.id, shots: [{ shotId: 'a1', order: 0, intent: 'Ada waits.', ...fields, panels: [{ panelId: 'a1-p1', order: 0, description: 'Ada under the clock.', references: [] }] }] } });
+      const edited = await edits.editStoryboard(owner, video, { operationId: randomUUID(), baseVersionId: planned.id, shots: [{ shotId: 'a1', order: 0, intent: 'Ada waits, worried.', panels: [{ panelId: 'a1-p1', order: 0, references: [] }] }] });
+      assert.ok('content' in edited.version);
+      const [shot] = (edited.version.content as { shots: Record<string, unknown>[] }).shots;
+      assert.deepEqual({ ...shot, panels: undefined }, { shotId: 'a1', order: 0, intent: 'Ada waits, worried.', ...fields, panels: undefined });
+      assert.deepEqual(edited.version.dependencies, [told.id, sheet.id], 'the sheet the plan was made from stays a dependency');
+    });
   } finally { await native.close(); if (!pool.ended) await pool.end(); await setup.close(); await db.close(); }
 });
