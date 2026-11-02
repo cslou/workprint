@@ -68,6 +68,8 @@ test('a pending dot holds the reply\'s place, and the thread follows the newest 
   await message(page).press('Enter');
   await expect(live(page).locator('.wp-reply-pending')).toBeVisible();
   await expect(working(page)).toBeVisible();
+  // The page shows the dot before the request reaches the model, so wait for the hold before releasing it.
+  await provider.held();
   provider.release();
   await expect(working(page)).toHaveCount(0);
   await expect(live(page).locator('.wp-pending-dot')).toHaveCount(0);
@@ -533,4 +535,88 @@ test('closing the page mid-turn sends no Stop, and the reply is saved for when t
   const reopened = await context.newPage();
   await reopened.goto(`/app?conversation=${video}`);
   await expect(saved(reopened).getByRole('listitem')).toHaveText(['Keep going without me', 'Kept going']);
+});
+
+test('images the agent makes are shown under their line, each read once, and stay there after reload', async ({ page, backend }) => {
+  const [account] = await backend.accounts(1);
+  const { provider, meta } = backend;
+  meta.reset();
+  provider.script({ toolCalls: [{ name: 'generate-image', args: { prompt: 'A quiet gallery bench', count: 3, showInChat: true } }] }, { text: ['Here they are.'] });
+  const reads: string[] = [];
+  page.on('request', request => { const read = /\/v1\/versions\/([^/]+)\/media$/.exec(new URL(request.url()).pathname); if (read) reads.push(read[1]!); });
+  await signIn(page, account!);
+  await message(page).fill('Make me three images of a gallery bench');
+  await message(page).press('Enter');
+  const reply = live(page).getByRole('listitem', { name: 'Assistant message' }).last();
+  await expect(reply.getByText('Saved 3 images', { exact: true })).toBeVisible({ timeout: 45_000 });
+  // More images than the two reads allowed at once: the rest wait their turn, so all three show.
+  for (const number of [1, 2, 3]) {
+    const image = reply.locator(`img[alt="Image ${number} · Version 1"]`);
+    await expect(image).toBeVisible();
+    await expect.poll(() => image.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  }
+  // The image carries its own size, so its box is held before it loads.
+  await expect(reply.locator('img[alt="Image 1 · Version 1"]')).toHaveAttribute('width', '64');
+  await expect(reply.getByText('Here they are.', { exact: true })).toBeVisible();
+  expect(new Set(reads).size).toBe(3);
+
+  // Not asked for directly: the line, and no image. The hidden Assets panel reads nothing until it opens.
+  provider.script({ toolCalls: [{ name: 'generate-image', args: { prompt: 'Another bench' } }] }, { text: ['Saved another one.'] });
+  await message(page).fill('Save another bench for later');
+  await message(page).press('Enter');
+  const second = live(page).getByRole('listitem', { name: 'Assistant message' }).last();
+  await expect(second.getByText('Saved another one.', { exact: true })).toBeVisible({ timeout: 45_000 });
+  await expect(second.getByText('Saved Image 4 · Version 1', { exact: true })).toBeVisible();
+  await expect(second.locator('.wp-shown-image')).toHaveCount(0);
+  // The refresh has landed once the hidden panel holds four rows; an eager row would read its image now.
+  await expect(page.locator('.wp-asset-row')).toHaveCount(4);
+  await page.waitForTimeout(500);
+  expect(reads).toHaveLength(3);
+  await page.getByRole('tab', { name: 'Assets', exact: true }).click();
+  // Rows are named as the agent names them, with no status: nothing can approve an image yet.
+  for (const number of [1, 2, 3, 4]) await expect(page.locator('.wp-asset-row').nth(number - 1)).toHaveAccessibleName(new RegExp(`^Image ${number} · Version 1`));
+  await expect(page.locator('.wp-assets .wp-status')).toHaveCount(0);
+  await expect.poll(() => page.locator('.wp-asset-row img').evaluateAll(images => images.filter(image => (image as HTMLImageElement).naturalWidth > 0).length)).toBe(4);
+  await live(page).getByRole('listitem', { name: 'Assistant message' }).first().getByRole('button', { name: 'Open Image 1 · Version 1' }).click();
+  await expect(page.getByRole('dialog').getByRole('img', { name: 'Saved image', exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog').locator('.wp-status')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  // Each image was read once, however many places show it.
+  expect(reads).toHaveLength(4); expect(new Set(reads).size).toBe(4);
+
+  await page.reload();
+  const replies = saved(page).getByRole('listitem', { name: 'Assistant message' });
+  await expect(replies).toHaveCount(2);
+  for (const number of [1, 2, 3]) await expect(replies.first().locator(`img[alt="Image ${number} · Version 1"]`)).toBeVisible();
+  await expect(replies.last().locator('.wp-shown-image')).toHaveCount(0);
+});
+
+test('an edit of one image is its next version: Assets keeps one row, with the earlier version in its history', async ({ page, backend }) => {
+  const [account] = await backend.accounts(1);
+  const { provider, meta } = backend;
+  meta.reset();
+  provider.script({ toolCalls: [{ name: 'generate-image', args: { prompt: 'A quiet gallery bench' } }] }, { text: ['Saved it.'] });
+  await signIn(page, account!);
+  await message(page).fill('Save an image of a gallery bench');
+  await message(page).press('Enter');
+  await expect(live(page).getByText('Saved Image 1 · Version 1', { exact: true })).toBeVisible({ timeout: 45_000 });
+  const row = page.locator('.wp-asset-row');
+  await expect(row).toHaveCount(1);
+  const first = await row.getAttribute('data-media-version-id');
+  provider.script({ toolCalls: [{ name: 'generate-image', args: { prompt: 'The same bench at dusk', inputImages: [first], revises: first } }] }, { text: ['Changed it.'] });
+  await message(page).fill('Make it dusk');
+  await message(page).press('Enter');
+  await expect(live(page).getByText('Saved Image 1 · Version 2', { exact: true })).toBeVisible({ timeout: 45_000 });
+  await page.getByRole('tab', { name: 'Assets', exact: true }).click();
+  await expect(row).toHaveCount(1);
+  await expect(row).toHaveAccessibleName(/^Image 1 · Version 2/);
+  await row.click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('img', { name: 'Saved image', exact: true })).toBeVisible();
+  await dialog.locator('.wp-version-history summary').click();
+  await expect(dialog.locator('.wp-version-history summary')).toHaveText('Version history · 1 earlier');
+  await dialog.getByRole('button', { name: 'View version 1', exact: true }).click();
+  await expect(dialog.getByText('Viewing version 1', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('Image saved · Version 1', { exact: true })).toBeVisible();
 });

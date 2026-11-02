@@ -6,6 +6,7 @@ import { Hono, type MiddlewareHandler } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { timeout } from 'hono/timeout';
 import { createAssistantModel } from '../agent/index.js';
+import { createMetaImageClient } from '../generation/index.js';
 import { createBackend } from './backend.js';
 import { loadServerConfig } from './config.js';
 import { createIngress } from './ingress.js';
@@ -65,6 +66,6 @@ export async function startServer(mastra: Mastra, beforeMastra: readonly Middlew
 }
 
 if (import.meta.main) {
-  const { assistant } = loadServerConfig(process.env);
-  await startServer(await createBackend([], { model: createAssistantModel(assistant) }));
+  const { assistant, images } = loadServerConfig(process.env);
+  await startServer(await createBackend([], { model: createAssistantModel(assistant), images: createMetaImageClient(images) }));
 }

@@ -4,6 +4,15 @@ Convention: `docs/conventions/backlog-management.md` (selected harness root; AGE
 
 ## Inbox
 
+### B-040 — Image version history is hard to find, and "Use this version" seems not to work
+- Context: Lou's Sprint 008 QA (2026-11-02, at `13a2144`). An edit with `revises` (PR #93) saves the image's next version and moves the video's use to it; the earlier version stays, unchanged, in that image's history. Lou couldn't see the history anywhere and suspects a bug, since "Use this version" didn't work either.
+- Problem:
+  - The history is only in the viewer opened from an Assets row, as a closed "Version history" disclosure under the image. The viewer opened from a chat image has no history.
+  - After "Use this version", nothing refreshes: `Assets` gets no `onUsed` from `apps/web/src/shell/workspace-tabs.tsx`, so the row, title and viewer keep the replaced version until the next workspace read. Script and reference rows share this gap.
+  - "Use this version" is a human use, so it approves that image version (`apps/api/src/artifacts/uses.ts`). Nothing shows the approval, since media shows no status pill, and later assistant edits of an approved image become new images (SC2). The design guide and comments still say images can't be approved.
+- Outcome: The person can find an image's earlier versions from where they see the image, and choosing one visibly takes effect at once. Lou decides whether choosing a version approves it (and then shows a status) or only switches the current version, and whether image history is view-only until the looks picker (Sprint 012). Pass: after an edit, the person opens the earlier version, chooses it, and Assets and chat show it without a reload.
+- References: PR #93 (`apps/web/src/materials/assets.tsx` wraps the image viewer in history; `apps/api/src/artifacts/generated-images.ts` makes an approved image's edit a new image); PR #91 body, Pending (the approval and refresh P2s from its re-review); `apps/web/src/versions/review.tsx` (the closed Version history disclosure); `apps/web/src/conversation/shown-images.tsx` (the chat viewer, with no history); `apps/web/src/shell/workspace-tabs.tsx` (no `onUsed` for Assets); spec §8.3 Images and SC2 (why an approval is never replaced); B-036 (edits are not journaled).
+
 ## Next
 
 MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority order. B-021 to B-025 were added the same day from the former Sprint 006/007 plans and the gaps they exposed, placed where their dependencies need them. B-034 was added the same day from Lou's Sprint 006 decision that the agent names the video, and is ranked second because the new Sprint 006 includes it. In this file, "former Sprint 006/007" means the deleted plans at `eb98e49`; plain "Sprint 006" means the current [Sprint 006 plan](sprints/sprint-006.md). Sprint allocation is in spec §10 [Phase 3 sprint packaging](specs/implementation-spec-001.md#phase-3-sprint-packaging). Spec story IDs (P3-S*, P4-S*) and the "reduced-delivery amendment" or "Submission and recovery contract" cited below refer to text removed from the spec on 2026-11-01; read it with `git show eb98e49:docs/specs/implementation-spec-001.md`. The same applies to the former Sprint 006/007 plans, `git show eb98e49:docs/sprints/sprint-006.md` (and `sprint-007.md`). Each tool lives in its own directory under the agent module and calls application functions in process, never application HTTP routes (implementation spec §10). Assistant saves and generations never count as human approval (AGENTS.md).
@@ -99,22 +108,6 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 - References: `apps/web/src/shell/workspace.ts`; B-011 (the related first-read recovery); spec P3-S9 and P4-S14.
 - Work: [Sprint 007](sprints/sprint-007.md) Story 3 (PR #81) for the Script tab. The other tabs re-read the same way; their own saving tools come with B-015 to B-020. Remaining: re-reads wait while any editor is open, in any tab. Scope that wait to the tab being edited when other tabs gain saving tools.
 
-### B-014 — Agent tool: AskUserQuestion with options in the UI
-- Problem: The question card UI and contract exist (`questionSchema`, `apps/web/src/conversation/question.tsx`). The agent cannot ask a question yet, and answers cannot reach the agent.
-- Outcome: The agent calls AskUserQuestion with one or more questions, each with options. The tool saves them and the turn ends. The UI shows the question as in demo-02: question N of M, lettered options, plus "type your own answer". The user's choice is sent as their next message, carrying the exact question and option ids (and asset ids, B-016). The agent continues from that message. A typed answer is an ordinary message. Pass: the options appear in the UI, and choosing one resumes the agent with that answer.
-- Constraint:
-  - Every id taken from model arguments or the browser (question or option) must resolve to an exact version owned by the trusted account and video, checked by an account- and video-scoped domain query that the tool reaches through an application function; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
-  - The answer's asset comes from the saved question's option, never from an id the browser sends.
-  - Kept from former Sprint 007 (`eb98e49`) Stories 1–2:
-  - Pending questions load from saved records.
-  - Answering is idempotent: a repeated answer has no extra effect, and a stale or already-answered question cannot be answered again.
-  - Typing an ordinary message while a question is pending leaves it pending.
-  - Restart-proof continuation is deferred (B-028).
-- References:
-  - `docs/design/demo-02.html`: the approved look.
-  - Former Sprint 007 plan, Stories 1–2: the planned question reads and exact answers.
-  - `packages/contracts/src/models.ts`: `questionSchema`.
-
 ### B-015 — Agent tool: generate images with Meta Muse Image
 - Problem: The product cannot create images; users can only upload them (Sprint 005).
 - Outcome: A generate-image tool calls Meta's image API from a text prompt, optionally with images already in the user's storage as inputs. It stores the result in private storage as the user's image. The image always appears in the Assets tab. When the user asks for an image directly ("generate me an image"), it also appears in the chat (Lou, 2026-11-01). Pass: the user asks for an image, the agent calls Meta, the image is stored and shown in the chat and in Assets, and a follow-up request can use a stored image as input.
@@ -137,14 +130,7 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
   - [Meta image generation](https://dev.meta.ai/docs/image-generation).
   - `~/projects/animation-studio/.pi/skills/generate-image/references/prompt-preparation.md`: prompt guidance.
   - `apps/api/src/storage/`: storage from Sprint 005.
-
-### B-016 — Images on AskUserQuestion options, with exact asset identity
-- Problem: Question options carry only an id and a label. The agent cannot show image choices, and an answer cannot say which asset was chosen.
-- Outcome: An option can carry a stored image (an exact asset/version), and the UI shows it as a thumbnail. The answer returned to the agent names that exact asset/version, so the agent knows which asset the user means. Pass: the user picks an image option, and the agent's next action uses that exact asset.
-- Constraint:
-  - Every id taken from model arguments or the browser (image, video, question or option) must resolve to an exact version owned by the trusted account and video, checked by an account- and video-scoped domain query that the tool reaches through an application function; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
-  - Do not guess identity from labels or untyped content. Same principle as B-003.
-- References: B-014; B-003; `packages/contracts/src/models.ts` `questionSchema`.
+- Work: [Sprint 008](sprints/sprint-008.md) Stories 1–5. Planning live calls (2026-11-02) confirmed the response shape and found an XMP AI-generated label in Meta's PNGs, which the sprint keeps.
 
 ### B-017 — Agent creates reference sheets
 - Context: Lou will supply the reference-sheet details and templates later (2026-11-01). Keep this as a placeholder until then; it does not block B-012 to B-016.
@@ -212,11 +198,57 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
   - Run ffmpeg inside the existing bounded media sandbox, and verify the output like any other video.
 - References: `~/projects/animation-studio/.pi/skills/assemble-video/SKILL.md` (stream-copy joining with compatibility checks) and `.pi/lib/ffmpeg.mjs`; `apps/api/src/storage/media/sandbox.ts` (the existing ffmpeg sandbox); B-019.
 
+Moved after video (Lou, 2026-11-02): AskUserQuestion (B-014) and image options (B-016) wait until video generation (B-025, B-019, B-020) is done. Until then the agent asks in plain chat text.
+
+### B-014 — Agent tool: AskUserQuestion with options in the UI
+- Problem: The question card UI and contract exist (`questionSchema`, `apps/web/src/conversation/question.tsx`). The agent cannot ask a question yet, and answers cannot reach the agent.
+- Outcome: The agent calls AskUserQuestion with one or more questions, each with options. The tool saves them and the turn ends. The UI shows the question as in demo-02: question N of M, lettered options, plus "type your own answer". The user's choice is sent as their next message, carrying the exact question and option ids (and asset ids, B-016). The agent continues from that message. A typed answer is an ordinary message. Pass: the options appear in the UI, and choosing one resumes the agent with that answer.
+- Constraint:
+  - Every id taken from model arguments or the browser (question or option) must resolve to an exact version owned by the trusted account and video, checked by an account- and video-scoped domain query that the tool reaches through an application function; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
+  - The answer's asset comes from the saved question's option, never from an id the browser sends.
+  - Kept from former Sprint 007 (`eb98e49`) Stories 1–2:
+  - Pending questions load from saved records.
+  - Answering is idempotent: a repeated answer has no extra effect, and a stale or already-answered question cannot be answered again.
+  - Typing an ordinary message while a question is pending leaves it pending.
+  - Restart-proof continuation is deferred (B-028).
+- References:
+  - `docs/design/demo-02.html`: the approved look.
+  - Former Sprint 007 plan, Stories 1–2: the planned question reads and exact answers.
+  - `packages/contracts/src/models.ts`: `questionSchema`.
+
+### B-016 — Images on AskUserQuestion options, with exact asset identity
+- Problem: Question options carry only an id and a label. The agent cannot show image choices, and an answer cannot say which asset was chosen.
+- Outcome: An option can carry a stored image (an exact asset/version), and the UI shows it as a thumbnail. The answer returned to the agent names that exact asset/version, so the agent knows which asset the user means. Pass: the user picks an image option, and the agent's next action uses that exact asset.
+- Constraint:
+  - Every id taken from model arguments or the browser (image, video, question or option) must resolve to an exact version owned by the trusted account and video, checked by an account- and video-scoped domain query that the tool reaches through an application function; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
+  - Do not guess identity from labels or untyped content. Same principle as B-003.
+- References: B-014; B-003; `packages/contracts/src/models.ts` `questionSchema`.
+
+After video generation (Lou, 2026-11-02, from Sprint 008 QA): B-038 and B-039 wait until B-025, B-019 and B-020 are done.
+
+### B-038 — Small server-made image previews
+- Problem: Chat, Assets and the viewer all read each image's full stored bytes, up to 10 MiB, even where it is shown at most 240px tall or as a 56px key image. Sprint 008 QA fixes made reads lazy and shared within a session, but a page with many images still downloads every full image it shows.
+- Outcome: When an image is saved, the server also makes a small preview under the same media checks. Chat and Assets show the preview, and only the viewer reads the full image. Pass: a chat with many images downloads only previews until one is opened.
+- Constraint: A preview belongs to its exact version and is never a separate asset or version. It must not weaken the private-media rules: signed, short-lived and owned reads only.
+- References: `apps/web/src/api/owned-image-cache.ts` and `apps/web/src/ui/use-near-viewport.ts` (PR #92); `apps/api/src/artifacts/generated-images.ts`; the media sandbox in `apps/api/src/storage/media/`.
+
+### B-039 — Keep images across reloads
+- Problem: Each reload reads every shown image again, because the shared copy lasts only for the page session (PR #92). Storage reads are signed, uncached (`cache: 'no-store'`) and short-lived.
+- Outcome: Images already seen are not downloaded again after a reload, within a privacy decision Lou makes first: what may be kept on the device, for how long, and that it is cleared on sign-out or account change. Pass: reloading a chat with images makes no new full image reads, and signing out leaves nothing readable.
+- Constraint: This is a privacy decision before an implementation choice. Private bytes must never be visible to another account on the same browser.
+- References: `packages/api-client/src/private-image.ts` (`no-store`, credential-free reads); `apps/web/src/main.tsx` (clears the session copy on account change); B-038.
+
 ## In progress
 
 ## Later
 
 Deprioritized: everything here waits until the Next items are done (Lou, 2026-11-01). Nothing here is ranked.
+
+### B-037 — Delete saved work
+- Problem: Saved work is append-only. Images (uploaded or generated), scripts and videos can be versioned but never deleted, so a user can't remove an unwanted image from Assets or storage. Lou raised it while planning Sprint 008 (2026-11-02): "we probably need that in the future".
+- Outcome: A user can delete an image (and later other saved work) from a video. It leaves the video's Assets, and its stored bytes are removed when nothing else uses it. Pass: a deleted image no longer appears in Assets or read-workspace, and its object is gone from private storage when unused.
+- Constraint: Decide what happens to work that depends on the item (for example a storyboard panel or video that used the image as a reference) before deleting. It applies to uploads as well as generated images. Spec §8.8 (Delete work/account) is deferred and describes the full-release behaviour.
+- References: Sprint 008 planning; `docs/specs/implementation-spec-001.md` §8.8; `apps/api/src/storage/s3.ts` (`remove`).
 
 ### B-026 — Queue messages while the agent is replying
 - Problem: Former Sprint 006 (`eb98e49`) Story 3 planned letting the user send up to three more messages while a reply streams, kept in order. Lou does not need it for the MVP but wants it tracked (2026-11-01).
@@ -245,9 +277,9 @@ Deprioritized: everything here waits until the Next items are done (Lou, 2026-11
 - References: Former Sprint 006 plan, Story 3; Sprint 006 Story 2.
 
 ### B-036 — Journal assistant saves for downstream revalidation
-- Problem: Sprint 007's update-script tool saves a script version and moves the use, but writes no `artifacts.commands` or `manual_changes` row, which human saves write. Nothing reads the journal yet, so nothing breaks today. A later tool that revalidates downstream work after a change (storyboard from script, B-017 onward) would miss assistant changes.
+- Problem: Sprint 007's update-script tool saves a script version and moves the use, but writes no `artifacts.commands` or `manual_changes` row, which human saves write. Sprint 008's generate-image edit with `revises` (PR #93) moves an image's reference use the same way, without the `use_changes` row a human "Use this version" writes. Nothing reads the journal yet, so nothing breaks today. A later tool that revalidates downstream work after a change (storyboard from script, B-017 onward) would miss assistant changes.
 - Outcome: Assistant saves record what they replaced, in the same shape later revalidation reads for human saves. Pass: a downstream check sees an assistant script change the same way it sees a human one.
-- References: Sprint 007 Story 2 (PR #80) recorded deviations; `apps/api/src/artifacts/assistant-scripts.ts`; `apps/api/src/artifacts/writers.ts`.
+- References: Sprint 007 Story 2 (PR #80) recorded deviations; `apps/api/src/artifacts/assistant-scripts.ts`; `apps/api/src/artifacts/generated-images.ts` (the `revises` save); `apps/api/src/artifacts/uses.ts` (`upstreamAffected`); `apps/api/src/artifacts/writers.ts`.
 
 ### B-035 — Clean history for retried and stopped replies
 - Problem: In Sprint 006, Retry may resend the user's message if Mastra 1.79 cannot regenerate a reply, so history can show the message twice. A stopped reply is marked interrupted only live; after a reload it shows as plain partial text. Lou accepted both for the MVP (2026-11-01).

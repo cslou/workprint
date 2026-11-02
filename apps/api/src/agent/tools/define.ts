@@ -1,5 +1,6 @@
 import type { z } from 'zod';
-import type { ReadOwnedWorkspace, SaveAssistantScript } from '../../application/index.js';
+import type { ReadImageInputs, ReadOwnedWorkspace, SaveAssistantScript, SaveGeneratedImage } from '../../application/index.js';
+import type { MetaImageClient } from '../../generation/index.js';
 
 /** Trusted scope from the admitted native run, never from model arguments. */
 export interface ToolScope {
@@ -7,8 +8,13 @@ export interface ToolScope {
   readonly videoId: string;
 }
 
-/** Application functions that tools may call. Supplied once by composition. */
-export type AgentCollaborators = Readonly<{ readWorkspace: ReadOwnedWorkspace; saveScript: SaveAssistantScript }>;
+/** Application functions that tools may call, and the Meta image client. Supplied once by composition. */
+export type AgentCollaborators = Readonly<{
+  readWorkspace: ReadOwnedWorkspace; saveScript: SaveAssistantScript;
+  readImageInputs: ReadImageInputs; saveGeneratedImage: SaveGeneratedImage;
+  /** Absent when images can't be saved (no storage or media checker) or a test composes no Meta fake; the tool then refuses before any call. */
+  images?: Pick<MetaImageClient, 'generate' | 'edit'>;
+}>;
 
 export interface ToolContext {
   readonly scope: ToolScope;
@@ -23,8 +29,12 @@ export interface AgentTool {
   readonly inputSchema: z.ZodType;
   /** Activity phrase shown while the tool runs; a tool without one shows a generic phrase. */
   readonly phrase?: string;
+  /** A phrase from the call's arguments, when they are valid; otherwise `phrase` is shown. */
+  readonly phraseFor?: (input: unknown) => string | undefined;
   /** Short summary for the done line, derived from the tool's own result. */
   readonly doneSummary?: (output: unknown) => string | undefined;
+  /** Saved image version ids to show under the done line, derived from the tool's own result. */
+  readonly shownImages?: (output: unknown) => readonly string[] | undefined;
   readonly execute: (input: unknown, context: ToolContext) => Promise<unknown>;
 }
 
@@ -34,13 +44,17 @@ export function defineTool<Schema extends z.ZodType, Output>(tool: {
   description: string;
   inputSchema: Schema;
   phrase?: string;
+  phraseFor?: (input: z.infer<Schema>) => string;
   doneSummary?: (output: Output) => string | undefined;
+  shownImages?: (output: Output) => readonly string[] | undefined;
   execute: (input: z.infer<Schema>, context: ToolContext) => Promise<Output>;
 }): AgentTool {
-  const { doneSummary, execute, ...rest } = tool;
+  const { doneSummary, execute, phraseFor, shownImages, ...rest } = tool;
   return {
     ...rest,
+    ...(phraseFor ? { phraseFor: (input: unknown) => { const parsed = tool.inputSchema.safeParse(input); return parsed.success ? phraseFor(parsed.data) : undefined; } } : {}),
     ...(doneSummary ? { doneSummary: (output: unknown) => doneSummary(output as Output) } : {}),
+    ...(shownImages ? { shownImages: (output: unknown) => shownImages(output as Output) } : {}),
     execute: (input, context) => execute(tool.inputSchema.parse(input), context),
   };
 }

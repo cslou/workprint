@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Pool } from 'pg';
-import { idSchema, operations, versionSchema } from '@workprint/contracts';
+import { idSchema, operations } from '@workprint/contracts';
 import { createArtifactStore } from '../store.js';
 import { MAX_OBJECT_BYTES } from '../../storage/index.js';
 import { authorizeUpload, parseUploadRequest, requireImageUpload, uploadTarget } from './policy.js';
@@ -9,15 +9,10 @@ import { uploadRecords } from './records.js';
 import { completeUpload } from './completion.js';
 import { cleanupUpload } from './cleanup.js';
 import { createMediaAccess } from './access.js';
-import type { MediaVersion, OwnedCheck, UploadCollaborators, UploadRequest, UploadRow, VerifiedMedia } from './types.js';
+import { measuredMedia, verifyWhenFree } from './media-verifier.js';
+import type { OwnedCheck, UploadCollaborators, UploadRequest, VerifiedMedia } from './types.js';
 
 const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
-function measured(row: UploadRow, verified: VerifiedMedia): MediaVersion['media'] {
-  const { kind, poster, ...media } = verified;
-  if (kind !== row.kind || media.contentType !== row.content_type || media.byteSize !== Number(row.byte_size) || (poster && (!['image/png', 'image/jpeg'].includes(poster.contentType) || !poster.bytes.byteLength || poster.bytes.byteLength > 10 * 1024 * 1024))) throw new UploadError('invalid_input');
-  const parsed = versionSchema.safeParse({ id: 'verification', artifactId: 'verification', revision: 1, kind, media, createdBy: 'human', createdAt: new Date().toISOString(), dependencies: [] });
-  if (!parsed.success || !('media' in parsed.data)) throw new UploadError('invalid_input'); return parsed.data.media;
-}
 
 /** One request owns its work; only backend composition may supply a real verifier. */
 export function createUploadCoordinator(pool: Pool, checkOwnedConversation: OwnedCheck, collaborators: UploadCollaborators = {}) {
@@ -57,7 +52,8 @@ export function createUploadCoordinator(pool: Pool, checkOwnedConversation: Owne
         if (snapshot.byteSize !== Number(row.byte_size) || snapshot.contentType !== row.content_type || digest(snapshot.bytes) !== snapshot.sha256) throw new UploadError('invalid_input');
         if (!collaborators.verifyMedia) throw new UploadError('not_implemented');
         const controller = new AbortController();
-        const verification = Promise.resolve().then(() => collaborators.verifyMedia!({ kind: row.kind, bytes: new Uint8Array(snapshot.bytes), contentType: row.content_type, signal: controller.signal }));
+        // An assistant image check holding the one-job checker is waited out, inside this confirm's own limit.
+        const verification = Promise.resolve().then(() => verifyWhenFree(collaborators.verifyMedia!, { kind: row.kind, bytes: new Uint8Array(snapshot.bytes), contentType: row.content_type }, { waitMs: 15_000, retryMs: 250, signal: controller.signal }));
         let timer: ReturnType<typeof setTimeout> | undefined;
         const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new UploadError('integration_failure')); }, 20000); });
         let verified: VerifiedMedia;
@@ -69,7 +65,7 @@ export function createUploadCoordinator(pool: Pool, checkOwnedConversation: Owne
           }
           throw uploadError(error);
         } finally { if (timer) clearTimeout(timer); }
-        const media = measured(row, verified);
+        const media = measuredMedia({ kind: row.kind, contentType: row.content_type, byteSize: Number(row.byte_size) }, verified);
         const poster = verified.poster ? { bytes: Buffer.from(verified.poster.bytes), contentType: verified.poster.contentType } : undefined;
         const expectedPosterHash = poster ? digest(poster.bytes) : undefined;
         const reserved = await records.reserve(row, token, !!poster);

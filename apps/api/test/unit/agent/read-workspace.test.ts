@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { OwnedWorkspace } from '../../../src/application/index.js';
-import { listingBounds, listWorkspace, workspaceItem } from '../../../src/agent/tools/read-workspace/projection.js';
+import { listingBounds, listWorkspace, workspaceItem } from '../../../src/agent/workspace-entries.js';
 
 type Version = OwnedWorkspace['assets'][number]['version'];
 const base = (id: string, revision = 1) => ({ id, artifactId: `artifact-${id}`, revision, createdBy: 'human' as const, createdAt: '2026-11-01T00:00:00.000Z', dependencies: [] });

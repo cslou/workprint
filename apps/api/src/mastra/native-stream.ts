@@ -27,7 +27,7 @@ export function safeNativeChunk(chunk: unknown, registry: readonly AgentTool[], 
   const { type } = chunk, payload = object(chunk.payload) ? chunk.payload : {};
   const state = toolStates[type];
   if (state) {
-    const activity = projectToolActivity(registry, { toolCallId: payload.toolCallId, toolName: payload.toolName, state, output: payload.result });
+    const activity = projectToolActivity(registry, { toolCallId: payload.toolCallId, toolName: payload.toolName, state, input: payload.args, output: payload.result });
     return activity ? { type: 'tool-activity', runId, payload: activity } : null;
   }
   if (type === 'start') return typeof payload.messageId === 'string' ? { type, runId, payload: { messageId: payload.messageId } } : null;

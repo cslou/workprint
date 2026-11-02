@@ -122,12 +122,12 @@ Backend modules are folders within the API deployable, not separate services/pac
 | Backend `mastra` | Native entry/bootstrap, server/auth/HTTP adapters, independent workflow registration/adapters, readiness/drain | Composes `agent/mastra`, `application`, platform/native adapters and trusted collaborators into one runtime | All backend entry/operating paths; P1-S2 admission, Sprint 004 entry and workflows; deployment later (B-031) |
 | `application` | Named shared use cases, cross-domain transaction coordination and recoverable hand-offs | Domain public functions plus narrow supplied native/conversation/workflow collaborators. No domain SQL or imports of `agent`, either Mastra subtree or assembled bootstrap | Cross-domain 8.1–8.9; foundation interfaces, Phase 3 shared behavior, MVP tool use cases |
 | `agent` / `agent/mastra` | Assistant guidance/context/capabilities; native Agent/tool bindings, trusted conversation access, queue/report integration | Shared application/domain interfaces and supported native APIs. Backend composition supplies the native instance; no second loop/store | 8.1/8.3–8.5/8.7/8.9; MVP Sprints 006–012: agent loop and every tool, each in its own directory |
-| `artifacts` | Immutable production work, conversation uses/approval/selection, the conversation selection revision, questions/answers, uploads and dependencies/changes; owned read/write/validation functions | `db`, structural contracts and narrow storage mechanics; composition coordinates peer-owned guards/work. No provider execution | 8.2–8.6; Sprint 005, reused by MVP tools (Sprints 007–011) |
-| `generation` | Exact proposals, approved batches, requests, provider adapters/receipts/tasks, guarded submission/result transitions and batch reporting state | `db`, `model-catalog`, storage mechanics; composition supplies artifact/usage/native collaborators | 8.4/8.7; MVP image and video generation (Sprints 009, 012); proposals and cancellation later (B-029, B-030) |
+| `artifacts` | Immutable production work, conversation uses/approval/selection, the conversation selection revision, questions/answers, uploads and dependencies/changes; owned read/write/validation functions | `db`, structural contracts and narrow storage mechanics; composition coordinates peer-owned guards/work. No provider execution | 8.2–8.6; Sprint 005, reused by MVP tools (Sprints 007–012); assistant-made images saved through generated objects, whose PNGs alone may carry Meta’s XMP AI label (Sprint 008) |
+| `generation` | Exact proposals, approved batches, requests, provider adapters/receipts/tasks, guarded submission/result transitions and batch reporting state | `db`, `model-catalog`, storage mechanics; composition supplies artifact/usage/native collaborators | 8.3/8.4/8.7; MVP image generation (Sprint 008, `generation/meta-image.ts`) and video (Sprint 011); proposals and cancellation later (B-029, B-030) |
 | `exports` | Captured exact ordered sources, compatibility policy, export records/status/currentness, workflow correlation and finalization; output itself is an `artifacts` version | `db`, storage/media mechanics; composition coordinates artifact/native interfaces | 8.6/8.7; deferred (B-009) |
 | `usage` | Trusted per-attempt quantities/cost provenance | `db`; receives observations through integration/application boundaries, never browser-authoritative amounts | 8.9; deferred (B-010) |
-| `model-catalog` | Configuration-only enabled media IDs/mappings, capabilities/limits, pricing references and the server-configured defaults; safe lookup/projection | No owned tables, credentials, provider execution or creator-facing routes. Shared configuration dependency of proposal disclosure and generation | 8.4; MVP model settings for Sprints 009 and 012 |
-| `storage` | Private object transfer/signing and bounded mechanical media inspection/posters/processing | R2/S3 and controlled FFmpeg/ffprobe process adapters; no domain policy or upward imports | 8.2/8.4–8.7; Sprint 005, then generated media (Sprints 009, 012) and joining (B-020) |
+| `model-catalog` | Configuration-only enabled media IDs/mappings, capabilities/limits, pricing references and the server-configured defaults; safe lookup/projection | No owned tables, credentials, provider execution or creator-facing routes. Shared configuration dependency of proposal disclosure and generation | 8.4; MVP model settings for later media work (Sprint 011) |
+| `storage` | Private object transfer/signing and bounded mechanical media inspection/posters/processing | R2/S3 and controlled FFmpeg/ffprobe process adapters; no domain policy or upward imports | 8.2–8.7; Sprint 005, then generated media: images under `published/<id>/<id>` recorded in `artifacts.generated_objects` (Sprint 008), video (Sprint 011) and joining (B-020) |
 | `db` | Connections, transaction primitives and application types | Postgres/`pg`; no scheduler or domain-query dumping ground. Owning modules retain their SQL | All persistence; Phase 1 foundation and owner-scoped feature tests |
 
 Bootstrap supplies narrow collaborators so that `application` never imports `agent`. A public TypeScript function is not automatically an HTTP endpoint or a model tool.
@@ -208,7 +208,7 @@ Application-owned schema changes use the Supabase CLI migration workflow under `
 | `POST /questions/:id/answers` | `{ operationId, questionRevision, optionId }` | `{ question, effects: [{ type, id }], continuationId }`: the recorded human decision, its committed effects (approval, use, batch authority) and the stable native continuation identity. `superseded` if the question is no longer current or `questionRevision` is stale; `invalid_input` for an unlisted option |
 | `GET /proposals/:id` | none | `{ id, revision, questionId, purpose: 'reference_image'\|'panel_image'\|'shot_video', target: { role?, shotId?, panelId? }, provider, model, prompt, settings, candidateCount, inputs: [{ versionId, role, order }], disclosures, estimate: { amount?, currency?, basis: 'provider'\|'calculated'\|'estimated'\|'unknown' } }`. `reference_image` targets a reference `role`; `panel_image` targets one `shotId`/`panelId`; `shot_video` targets one `shotId`. Every candidate produced from the proposal carries this target |
 | `POST /conversations/:id/uploads` | `{ operationId, kind: 'image'\|'video', filename, contentType, byteSize, intendedUse? }` | `201 { uploadId, url, expiresAt, maxBytes }`: a scoped single-use transfer URL; `unsupported` for a type/size outside the declared allowlist |
-| `POST /uploads/:id/confirm` | `{ operationId }` | `{ version, use? }` after actual byte/type/size/decode verification; `invalid_input` with the measured discrepancy when verification fails; `not_found` for expired or foreign uploads. Repeat-safe |
+| `POST /uploads/:id/confirm` | `{ operationId }` | `{ version, use? }` after actual byte/type/size/decode verification; `invalid_input` with the measured discrepancy when verification fails; `not_found` for expired or foreign uploads. Repeat-safe. Uploaded PNGs may carry no text chunks; only assistant-made PNGs may carry Meta's one uncompressed XMP `iTXt` AI label before the image data (Sprint 008) |
 | `GET /versions/:id/media` | none | `{ url, expiresAt, poster?, measured: { width, height, durationMs?, hasAudio? } }`: scoped read access reacquired on expiry; `not_found` for foreign versions |
 | `GET /generation-requests/:id`, `GET /conversations/:id/generation-requests` | `status?`, `cursor`, `limit` | `{ id, batchId, proposalId, purpose, target, status, failureReason?, resultVersionId?, remote: { taskId?, status? }, usage? }` per request; `resultVersionId` is an unapproved candidate at that target until a human `panel_image`, `reference` or `shot_video` use binds it |
 | `POST /generation-requests/:id/cancel` | `{ operationId }` | `{ request, remote: 'requested'\|'unsupported'\|'unknown' }`: guarded local transition plus honest remote status; `invalid_input` if already terminal |
@@ -263,7 +263,7 @@ For every enabled integration, record the selected versions/model mapping, curre
 - **Interfaces used:** actual synchronous submit/result or asynchronous submit/task-status/result, plus cancellation/result refresh only where genuinely supported. Record input modes/reference limits/order, formats/cardinality/settings, pricing basis, errors/moderation, receipts/task identities, idempotency and available usage. Never invent polling for a sync response or treat an HTTP correlation ID as a task ID.
 - **Failure/retry/bounds:** save `submitting` before paid network work. Bound submissions, bodies, downloads, polling pace/deadlines and concurrency; disable automatic unsafe SDK/native/tool paid retries. Known task recovery uses that task; ambiguous submission becomes failed/`outcome_unknown`. Local failure/cancellation does not prove stopped charges. No paid replacement or automatic resubmission; preserve successful siblings.
 - **Owned delivery:** acquire actual bytes into private stable request-owned staging, constrain destinations/redirects and prevent private-network access. Never forward provider auth to output hosts. Verify type/size/decoding/media contract before guarded publication; do not regenerate to repair a transfer or pretend URLs are owned artifacts.
-- **Qualification:** Sprints 009 and 012 capture real response and media evidence with live calls; video Stop and restart behaviour follows B-025. Generated image findings and playable motion/audio review remain distinct from technical decoding. Enabled multimodal inspection needs its own capability/disclosure/usage proof; unsupported inspection is disclosed, not reported as a pass.
+- **Qualification:** Sprints 008 and 011 capture real response and media evidence with live calls; video Stop and restart behaviour follows B-025. Generated image findings and playable motion/audio review remain distinct from technical decoding. Enabled multimodal inspection needs its own capability/disclosure/usage proof; unsupported inspection is disclosed, not reported as a pass.
 
 ### Supabase Auth and Postgres
 
@@ -417,6 +417,7 @@ These are intended functional product flows, not claims that the Phase 1 foundat
 - **Data changed:** save validated uploads as Artifact Versions and link exact upload/Library versions to the conversation.
 - **Result:** assistant can use material in its agreed context.
 - **Failure/recovery:** reject unsupported/invalid/unauthorized input; failed upload creates no usable version. Viewing does not approve; attaching a reference does not select it as a Shot's video.
+- **Saved images as inputs (Sprint 008):** uploaded and assistant-made images can be inputs to the agent's image edits; see §8.3 Images.
 
 ### 8.3 Develop script, references and storyboard
 
@@ -431,6 +432,15 @@ These are intended functional product flows, not claims that the Phase 1 foundat
 - **No overwrite:** the base must be the version the video uses now. If the user saved or chose another version meanwhile, nothing is saved and the line says "Not saved: the script changed". A base from another script is "not found", and the refusal sends the agent to read the workspace first. Invalid content is "the script isn’t valid". A video with no script has nothing to overwrite, so its first save ignores the base (Muse Spark does not reliably send `null`). Account and video come only from the run. A built-in script in use is adapted into the account's own script.
 - **Tabs update:** the workspace re-reads after each finished tool and when the turn ends, so the Script tab shows the new version without a reload. While an editor is open the re-read waits until it closes; typed text is never replaced, and Save offers the existing latest-version review.
 - **MVP exception to §8.5 and SC2:** an agent rewrite replaces the current script use as a draft, even when the user had approved the previous version. Reverting goes through Version history "Use this version". Assistant saves are not yet journaled for downstream revalidation (B-036).
+
+**Images (Sprint 008, implemented):**
+- **Agent makes an image:** the agent calls generate-image with a prompt and Meta's options: 1–10 images, a size (`auto` or `WxH`), reasoning strength and Meta's image search, web search and shell tools. With input images, the call is an edit of those images. The server calls Meta `muse-image-1.0` (`generation/meta-image.ts`) as PNG; paid calls run on request with no user authorization in the MVP. The tool line reads "Making an image…" (or "Making N images…"), then "Saved Image N · Version R". It reads "Saved N images" or "Saved k of n images" for several, and "Saved 1 image" when the label can't be read.
+- **Inputs:** the agent names input images by version id from read-workspace. Only the video's image assets and its panel-candidate images are allowed, at most 10; a foreign or missing id is "an input image wasn’t found" and nothing is sent to Meta.
+- **Saved as drafts:** each image passes the upload byte and decode checks (allowing Meta's XMP AI label) and is saved as the account's own assistant-created image version, recorded in `artifacts.generated_objects`, with any inputs as its dependencies. It joins the video as a draft reference use, never an approval, and appears in Assets without a reload.
+- **Shown in the chat:** when the user asked for the image directly, the agent sets `showInChat`; the done tool line then carries the saved version ids (at most 10), and the chat shows each image under the line through the owned media read. Clicking opens the media viewer. Saved history shows the same after reload.
+- **Edits and versions (Sprint 008 QA, Lou, 2026-11-02):** when the user asks to change one existing image, the agent passes `revises` with that image's version id, which is also an input, and makes one image. The result is that image's next version (revision 2, …) in the same place in the video, a draft again, and the line reads "Saved Image N · Version 2". Edits made at once become successive versions, and none is lost. Anything else is a new image: variations (count above 1), a built-in image, an image this video doesn't use, a `revises` that isn't an input, and an image a person has approved, since an assistant draft never replaces an approval (SC2). An edit is not yet journaled for downstream checks (B-036). A `revises` the user didn't mean moves the original into the image's history rather than leaving two images, and nothing is lost. Choosing between variations comes with the looks picker (Sprint 012). The Assets viewer shows an image's version history, and "Use this version" is the existing human use.
+- **Names and loading:** chat, Assets and read-workspace all name an image "Image N · Version R", counting images in the video's Assets order. Images load near view, and one copy per version is shared in the page session (B-038 previews, B-039 caching across reloads).
+- **Failure/recovery:** a refusal, an invalid request, Meta being unavailable or an image that fails checks or storage each has its own line and a message the agent follows. A server that can't save images refuses before any call to Meta; a partial save keeps the images that passed. Stop ends our request but cannot cancel the generation or its charge at Meta (B-029). Nothing from a response that arrives after Stop is saved. Deleting generated images comes later (B-037).
 
 ### 8.4 Approve and run a generation batch
 
@@ -511,13 +521,13 @@ Phase 1 and Phase 2 evidence is not proof of these product behaviours. The MVP s
 
 | Goal | Flows | Delivered or planned by | Status |
 | --- | --- | --- | --- |
-| G1 Guided creation from an idea or existing material | 8.1–8.5 | Wave 1 (uploads, Library); Sprints 006–012 (B-012, B-013, B-015, B-017–B-019) | MVP |
-| G2 Visible human creative control and targeted revisions | 8.3, 8.5 | Sprint 005 (manual saves, choices); Sprints 007, 008, 011 (B-013, B-014, B-018, B-024) | MVP |
-| G3 Reusable immutable work | 8.2, 8.5 | Sprint 005 (versions, Library reuse); Sprint 009 (B-016 exact asset choice) | MVP |
-| G4 Full chosen clips assembled in order | 8.6 | Sprint 012 joins clips in the conversation (B-020); export with download is B-009 | Partly MVP |
-| G5 Understandable independent work and distinct Stop/cancel | 8.4, 8.7 | Sprint 004 (turn control); Sprint 006 (B-021, B-022); Sprint 012 (B-025); cancellation is B-029 | Partly MVP |
+| G1 Guided creation from an idea or existing material | 8.1–8.5 | Wave 1 (uploads, Library); Sprints 006–011 (B-012, B-013, B-015, B-017–B-019) | MVP |
+| G2 Visible human creative control and targeted revisions | 8.3, 8.5 | Sprint 005 (manual saves, choices); Sprints 007, 010, 012 (B-013, B-018, B-024, B-014) | MVP |
+| G3 Reusable immutable work | 8.2, 8.5 | Sprint 005 (versions, Library reuse); Sprint 012 (B-016 exact asset choice) | MVP |
+| G4 Full chosen clips assembled in order | 8.6 | Sprint 011 joins clips in the conversation (B-020); export with download is B-009 | Partly MVP |
+| G5 Understandable independent work and distinct Stop/cancel | 8.4, 8.7 | Sprint 004 (turn control); Sprint 006 (B-021, B-022); Sprint 011 (B-025); cancellation is B-029 | Partly MVP |
 | G6 Exact informed media authorization | 8.3–8.5 | B-030, B-033 | After the MVP |
-| G7 Reliable return to saved work | 8.1, 8.7 | Sprint 004 (navigation, history); Sprint 006 (B-012); Sprint 012 (B-025 resume) | MVP |
+| G7 Reliable return to saved work | 8.1, 8.7 | Sprint 004 (navigation, history); Sprint 006 (B-012); Sprint 011 (B-025 resume) | MVP |
 | G8 Honest correlated usage and costs | 8.9 | B-010 | After the MVP |
 
 Phases are milestones, not sprint boundaries, and approval of this plan is not implementation or live-service authorization.
@@ -584,11 +594,11 @@ Tools call application/domain functions in process, never application HTTP route
 | Wave 1: [Sprint 005](../sprints/sprint-005.md), Saved work, uploads and media | — | Delivered. |
 | 006: Chat | B-012 agent loop on Muse Spark, B-021 streaming and tool activity phrases, B-022 Stop, B-023 read-workspace tool, B-034 automatic video titles | Chat with streaming replies; a real tool line ("Getting up to date on our progress…"); Stop mid-reply; titled videos in Recents; history after reload. |
 | 007: Script | B-013 update-script tool, B-024 tab refresh | The agent writes the script; the Script tab updates without a reload. |
-| 008: Questions | B-014 AskUserQuestion | Option questions as in `docs/design/demo-02.html`; the chosen option resumes the agent. |
-| 009: Images | B-015 Meta image generation, B-016 image options | Generated images in the chat and Assets; image choices whose exact asset the agent then uses. |
-| 010: Reference sheets | B-017 | Character, place and prop sheets in Assets. |
-| 011: Storyboard | B-018 | Planned shots with generated panel images. |
-| 012: Video | B-025 waiting with resume, B-019 MiniMax video, B-020 join clips | Shot videos play in Videos; joined clips play as one video. |
+| 008: Images | B-015 Meta image generation | Generated images in the chat and Assets; a follow-up can use a saved image as input. |
+| 009: Reference sheets | B-017 | Character, place and prop sheets in Assets. |
+| 010: Storyboard | B-018 | Planned shots with generated panel images. |
+| 011: Video | B-025 waiting with resume, B-019 MiniMax video, B-020 join clips | Shot videos play in Videos; joined clips play as one video. |
+| 012: Questions | B-014 AskUserQuestion, B-016 image options | Option questions as in `docs/design/demo-02.html`; the chosen option resumes the agent; image choices whose exact asset the agent then uses. |
 
 **Sprint rules**
 - Each sprint holds a few small backlog items, so Lou can test often. Sprint 006 takes five because B-023 gives it a real tool to show and B-034 is small (Lou, 2026-11-01). Sprints run in order, each from integrated `main`. Stories are one PR each into `sprint-NNN`. The sprint integrates into `main` on Lou's explicit merge command.
@@ -598,7 +608,8 @@ Tools call application/domain functions in process, never application HTTP route
   - A few live calls confirm real provider response and stream shapes before parsing is finalized.
   - One trimmed full run and a QA build precede each handoff to Lou. No screenshot suites.
 - Design: follow the approved demo references (for example `docs/design/demo-02.html`). Make an inert preview only for a state with no reference.
-- If B-017's details are not ready by Sprint 010, Sprint 012 may run first; video does not need reference sheets or the storyboard.
+- If B-017's details are not ready by Sprint 009, Sprint 011 may run first; video does not need reference sheets or the storyboard.
+- Questions (B-014) and image options (B-016) moved after video on 2026-11-02 (Lou). Until they land, the agent asks in plain chat text and waits for the reply.
 
 ### Agent tool guidance
 
@@ -606,7 +617,7 @@ Tools call application/domain functions in process, never application HTTP route
 
 - **Script:** adapt an idea or selected prose into ordered visible/audible action. Preserve dialogue and sound intentions; do not invent a multi-scene Project or fabricate chapter metadata for an idea. Existing work can be reused without forcing unnecessary rewriting.
 - **References:** keep character, environment, style, prop and composition roles explicit. Library membership, viewing and model suggestion do not approve a reference.
-- **Storyboard:** textual Shot Definitions, ordered Storyboard Panels and image Frames remain different things. Preserve stable Shot/Panel identities, intended state progression and neighbouring context. The agent asks for review (B-014) at the skill's checkpoints rather than assuming approval.
+- **Storyboard:** textual Shot Definitions, ordered Storyboard Panels and image Frames remain different things. Preserve stable Shot/Panel identities, intended state progression and neighbouring context. The agent asks for review at the skill's checkpoints rather than assuming approval: in chat text until B-014 lands (Sprint 012), then with questions.
 - **Generation:** prepare a concise production brief and the exact provider prompt, settings and reference order. Technical validation produces a candidate, never creative approval, a chosen clip or a finished-film claim. No automatic provider/model substitution or paid replacement request.
 - **Production:** map Shot intent to supported video conditioning (MiniMax V2: a first and optionally a last frame) and explain limitations candidly.
 - Local YAML/JSON/HTML layouts, shell flags, spend-limit fields, handoff packages and local sequential orchestration are not hosted requirements. Implement guidance through the supported Mastra agent instructions and tool descriptions; a Markdown filename is not proof the guidance is loaded or followed. Authority checks belong in domain code, not only in prompts: every id a tool takes from model arguments or the browser resolves, through an account- and video-scoped domain query that the tool reaches via an application function, to an exact version owned by the trusted account and video, or returns not-found.
@@ -618,10 +629,10 @@ The skills live in `~/projects/animation-studio/.pi/skills/` (see [source contra
 | Existing source | Hosted disposition | Sprint |
 | --- | --- | --- |
 | `create-scene-script` and its validator | Adapt the writing guidance and ordering/speaker rules. Keep Workprint's saved script schema; do not port the YAML format, file conventions or Python runtime. | 007 (B-013) |
-| `create-storyboard`: Reference Package, storyboard schema and panel-generation strategy | Adapt reference roles, Shot/Panel planning and panel dependency rules. The standalone HTML renderer is not ported. | 010–011 (B-017, B-018) |
-| `generate-image` and its prompt-preparation contract | Adapt brief, prompt and inspection guidance for Meta `muse-image-1.0`. OpenAI/MiniMax image clients are not used. | 009 (B-015) |
-| `generate-video` and its MiniMax V2 provider scripts | Adapt submit → save task → poll → download → validate and same-task resume. Hosted generation records replace the local manifest. | 012 (B-025, B-019) |
-| `assemble-video` and the shared FFmpeg/ffprobe adapters | Reuse the exact ordering, compatibility and decoded-verification rules for stream-copy joining, inside the existing media sandbox. | 012 (B-020) |
+| `create-storyboard`: Reference Package, storyboard schema and panel-generation strategy | Adapt reference roles, Shot/Panel planning and panel dependency rules. The standalone HTML renderer is not ported. | 009–010 (B-017, B-018) |
+| `generate-image` and its prompt-preparation contract | Adapt brief, prompt and inspection guidance for Meta `muse-image-1.0`. OpenAI/MiniMax image clients are not used. | 008 (B-015) |
+| `generate-video` and its MiniMax V2 provider scripts | Adapt submit → save task → poll → download → validate and same-task resume. Hosted generation records replace the local manifest. | 011 (B-025, B-019) |
+| `assemble-video` and the shared FFmpeg/ffprobe adapters | Reuse the exact ordering, compatibility and decoded-verification rules for stream-copy joining, inside the existing media sandbox. | 011 (B-020) |
 | `produce-scene` | Take review, continuity review and Selects assembly are after the MVP; Shot video choice already exists from Sprint 005. | — |
 
 ### After the MVP

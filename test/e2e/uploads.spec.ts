@@ -21,6 +21,11 @@ test('an uploaded image is verified, previewed and still attached after reload, 
   await page.getByRole('tab', { name: 'Assets', exact: true }).click();
   const row = page.locator('.wp-asset-row');
   await expect(row).toHaveCount(1);
+  // The row shows the image itself as a decorative key image; its name still comes from the text.
+  const key = row.locator('img');
+  await expect(key).toHaveAttribute('alt', '');
+  await expect.poll(() => key.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  await expect(row).toHaveAccessibleName(/Image 1 · Version 1/);
   await row.click();
   await expect(page.getByRole('dialog').getByRole('img', { name: 'Saved image', exact: true })).toBeVisible();
 

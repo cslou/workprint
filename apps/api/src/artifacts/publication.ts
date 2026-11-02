@@ -8,7 +8,9 @@ type Publication = {
   accountId: string; conversationId: string; artifactId?: string | undefined;
   dependencies: readonly string[]; baseVersionId?: string | undefined;
 } & ({ kind: 'script' | 'reference' | 'storyboard'; content: ReturnType<typeof parseContent>; createdBy: 'human' | 'assistant' }
-  | { kind: 'image' | 'video'; media: Extract<Version, { kind: 'image' | 'video' }>['media']; createdBy: 'human' });
+  | { kind: 'image' | 'video'; media: Extract<Version, { kind: 'image' | 'video' }>['media']; createdBy: 'human' | 'assistant' });
+/** Human media is an upload; assistant media is the assistant's, like its saves. */
+const provenance = (input: Publication) => input.createdBy === 'assistant' ? 'assistant' : 'media' in input ? 'upload' : 'manual';
 /** All publishers take this owner lock before Artifact, upload, reference or intended-use locks. */
 export async function lockPublicationOwner(client: PoolClient, account: string): Promise<void> {
   await client.query('INSERT INTO artifacts.publication_counters(owner_id,revision) VALUES($1,0) ON CONFLICT(owner_id) DO NOTHING', [account]);
@@ -31,7 +33,7 @@ export async function publishVersion(client: PoolClient, input: Publication): Pr
   const data = 'media' in input ? { media: input.media } : { content: input.content };
   const stored = 'media' in input ? { schemaVersion: 1, media: input.media } : input.content;
   const row = (await client.query<{ created_at: Date }>(`INSERT INTO artifacts.versions(owner_id,version_id,artifact_id,kind,revision,schema_version,content,origin_conversation_id,created_by,provenance,publication_revision)
-    VALUES($1,$2,$3,$4,$5,1,$6,$7,$8,$9,$10) RETURNING created_at`, [input.accountId, id, artifact, input.kind, revision, stored, input.conversationId, input.createdBy, 'media' in input ? 'upload' : input.createdBy === 'assistant' ? 'assistant' : 'manual', publication])).rows[0]!;
+    VALUES($1,$2,$3,$4,$5,1,$6,$7,$8,$9,$10) RETURNING created_at`, [input.accountId, id, artifact, input.kind, revision, stored, input.conversationId, input.createdBy, provenance(input), publication])).rows[0]!;
   for (const [position, dependency] of input.dependencies.entries()) await client.query('INSERT INTO artifacts.version_dependencies(owner_id,version_id,dependency_id,position) VALUES($1,$2,$3,$4)', [input.accountId, id, dependency, position]);
   return versionSchema.parse({ id, artifactId: artifact, kind: input.kind, revision, ...data, dependencies: [...input.dependencies], createdBy: input.createdBy, createdAt: row.created_at.toISOString() });
 }

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chat state · Generated image</title>
+<link rel="stylesheet" href="../app-r11.css">
+<style>
+/* Sprint 008 Story 4. Inert preview: no script, nothing is sent. Gradients stand in for the saved images. */
+.reply{font-size:14px;max-width:100%}
+.reply p{margin:10px 0 0}
+.act{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--fg-subtle);margin:0 0 4px}
+.act svg{width:13px;height:13px;fill:none;stroke:var(--tan, #a8875a);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.shown{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px}
+.shown span{display:block;max-width:100%;height:auto;border:1px solid var(--border);border-radius:10px;background:linear-gradient(160deg,#d9cdb4,#8c7a5b);}
+.shown .wide{width:360px;aspect-ratio:3/2}
+.shown .square{width:240px;aspect-ratio:1/1;background:linear-gradient(200deg,#cfd6d0,#6f7f76)}
+</style>
+</head>
+<body>
+<div class="app">
+ <nav class="sidebar" aria-label="Workprint">
+  <span class="brand"><span class="mark">a</span><span class="name">Workprint</span></span>
+  <div class="navlist"><span class="navitem">New video</span><span class="navitem">Library</span></div>
+  <div class="section"><div class="navlabel">Recents</div><span class="navitem recent current" aria-current="page">Gallery bench</span></div>
+  <div class="spacer"></div>
+  <div class="account"><span class="avatar">A</span>Account</div>
+ </nav>
+ <main class="main" aria-label="Generated image">
+  <div class="thread chat">
+   <div class="msgs">
+    <div class="me">Make me an image of a quiet gallery bench in soft daylight.</div>
+    <div class="reply">
+     <div class="act"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Saved Image 1 · Version 1</span></div>
+     <div class="shown"><span class="wide" role="img" aria-label="Image 1 · Version 1"></span></div>
+     <p>Here it is. It's saved as a draft in Assets.</p>
+    </div>
+    <div class="me">Try two more: one wide, one square.</div>
+    <div class="reply">
+     <div class="act"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span>Saved 2 images</span></div>
+     <div class="shown"><span class="wide" role="img" aria-label="Image 2 · Version 1"></span><span class="square" role="img" aria-label="Image 3 · Version 1"></span></div>
+     <p>Both are saved as drafts.</p>
+    </div>
+   </div>
+  </div>
+  <div class="composer">
+   <div class="field">Describe your video…</div>
+   <div class="bar"><span>+ Attach photos</span><button class="send" type="button">Send</button></div>
+  </div>
+ </main>
+</div>
+</body>
+</html>
