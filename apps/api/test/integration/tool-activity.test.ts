@@ -346,7 +346,8 @@ test('generate-image makes images with Meta and saves each as a draft image of t
   const fixture = await accountBrowserFixture({ artifacts: true, storage, media: media.toolchain, composition: chatComposition(provider, {}, { url: meta.url }) });
   const pool = new Pool({ connectionString: fixture.servingUrl, max: 2 });
   t.after(async () => { await pool.end(); await fixture.close(); });
-  const store = createArtifactStore(pool, createOwnedConversationCheck(fixture.native));
+  const check = createOwnedConversationCheck(fixture.native), store = createArtifactStore(pool, check);
+  const saveScript = createAssistantScriptSaver(createAssistantScripts(pool, check).save);
   const [owner, other] = [await fixture.auth.createAccount(), await fixture.auth.createAccount()];
   const clients = new Map(await Promise.all([owner, other].map(async user => [user.id, nativeTurnClient(fixture.apiOrigin, await fixture.accessToken(user), user.id)] as const)));
   const client = (user: { id: string }) => clients.get(user.id)!;
@@ -419,6 +420,42 @@ test('generate-image makes images with Meta and saves each as a draft image of t
     const assets = (await store.workspace(owner.id, fresh)).assets;
     assert.equal(assets.length, 4); assert.equal(new Set(assets.map(asset => asset.version.artifactId)).size, 4);
     assert.deepEqual(stray.lines.at(-1), ['Making an image…', 'done', 'Saved Image 4 · Version 1']);
+  });
+
+  await t.test('subject files an image under a script subject on its use: an edit keeps or refiles it; one not in the script sends nothing', async () => {
+    const fresh = await client(owner).newVideo();
+    const content = { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'The Gallery', time: 'night' }, characters: [], script: [{ action: 'Mara waits.' }] }] };
+    const scripted = await saveScript(owner.id, fresh, { baseVersionId: null, content, subjects: [{ id: '', kind: 'character', name: 'Mara' }, { id: '', kind: 'place', name: 'The Gallery' }] });
+    assert.equal(scripted.kind, 'saved', JSON.stringify(scripted));
+    const turn = async (args: Record<string, unknown>) => {
+      provider.reset(); meta.reset();
+      const { result } = await generate(owner, fresh, args);
+      assert.ok(result.made, JSON.stringify(result));
+      return result.images[0]!.versionId;
+    };
+    const subjectOf = async (versionId: string) => (await store.workspace(owner.id, fresh)).assets.find(asset => asset.version.id === versionId)?.subjectId;
+    const filed = await turn({ prompt: 'Mara on the bench', subject: 'mara' });
+    assert.equal(await subjectOf(filed), 'mara');
+    // A next version with no subject keeps its image's; one with a subject is refiled under it.
+    const kept = await turn({ prompt: 'Mara at dusk', inputImages: [filed], revises: filed, subject: ' ' });
+    assert.equal(await subjectOf(kept), 'mara');
+    const refiled = await turn({ prompt: 'The bench alone', inputImages: [kept], revises: kept, subject: 'the-gallery' });
+    assert.equal(await subjectOf(refiled), 'the-gallery');
+    assert.equal((await store.version(owner.id, refiled)).revision, 3);
+    const loose = await turn({ prompt: 'A bench', subject: 'null' });
+    assert.equal(await subjectOf(loose), undefined);
+    provider.reset(); meta.reset();
+    const refused = await generate(owner, fresh, { prompt: 'Ben at the door', subject: 'ben' });
+    assert.ok(!refused.result.made && refused.result.reason === 'subject_not_in_script', JSON.stringify(refused.result));
+    assert.deepEqual(refused.lines.at(-1), ['Making an image…', 'done', 'Not made: that subject isn’t in the script']);
+    assert.equal(meta.requests.length, 0);
+    // The next read-workspace turn lists each image with the subject it is filed under.
+    provider.reset();
+    provider.script({ toolCalls: [{ name: 'read-workspace', args: {} }] }, { text: ['Read it'] });
+    assert.ok(completed(await client(owner).turn(fresh, 'What is filed where?')));
+    const listed = (provider.requests[1]!.body as { messages: { role: string; content: unknown }[] }).messages.findLast(message => message.role === 'tool')?.content;
+    const listing = (typeof listed === 'string' ? JSON.parse(listed) : listed) as { items: { kind: string; versionId: string; subjectId?: string }[] };
+    assert.deepEqual(listing.items.filter(item => item.kind === 'image').map(item => [item.versionId, item.subjectId]), [[refiled, 'the-gallery'], [loose, undefined]]);
   });
 
   await t.test('another account\'s image is not found, and nothing is sent to Meta', async () => {
@@ -785,9 +822,9 @@ test('generate-sheet makes a script subject\'s views one at a time with Meta and
     return { result: toolResult(), lines: sheetLines(turn).map(chunk => [chunk.payload?.phrase, chunk.payload?.state, chunk.payload?.summary]), media: sheetLines(turn).at(-1)?.payload?.media };
   };
   /** Images made with generate-image in one turn, in order. */
-  const images = async (user: { id: string }, video: string, count = 1) => {
+  const images = async (user: { id: string }, video: string, count = 1, extra: Record<string, unknown> = {}) => {
     provider.reset(); meta.reset();
-    provider.script({ toolCalls: [{ name: 'generate-image', args: { prompt: 'A photo of Mara', count } }] }, { text: ['Done'] });
+    provider.script({ toolCalls: [{ name: 'generate-image', args: { prompt: 'A photo of Mara', count, ...extra } }] }, { text: ['Done'] });
     assert.ok(completed(await client(user).turn(video, 'Make an image')));
     return (await made(video)).slice(-count).map(row => row.version_id);
   };
@@ -816,6 +853,11 @@ test('generate-sheet makes a script subject\'s views one at a time with Meta and
   const keep = 'Keep the same person as the input image: the same face, build, hair and clothing.';
   const frame = (name: string) => `One reference view of Mara, a character, for a reference sheet: ${name}. A courier in a long grey coat. Keep consistent: Keep the grey coat.`;
   const references = (content: SheetContent | undefined) => content?.references.map(reference => [reference.versionId, reference.view]);
+  /** The subject each image is filed under, from the workspace. */
+  const filing = async (video: string, ids: string[]) => {
+    const assets = (await store.workspace(owner.id, video)).assets;
+    return ids.map(id => assets.find(asset => asset.version.id === id)?.subjectId);
+  };
   const maraVideo = await scripted();
 
   await t.test('a new sheet: views made in order, the first from its prompt and the rest keeping it, saved as one draft sheet', async () => {
@@ -835,6 +877,7 @@ test('generate-sheet makes a script subject\'s views one at a time with Meta and
     const [first, ...rest] = result.views;
     assert.deepEqual((await store.version(owner.id, first!.versionId)).dependencies, []);
     for (const item of rest) assert.deepEqual((await store.version(owner.id, item.versionId)).dependencies, [first!.versionId]);
+    assert.deepEqual(await filing(maraVideo, result.views.map(item => item.versionId)), ['mara', 'mara', 'mara'], 'each made view is filed under Mara');
     assert.deepEqual(lines, [['Making a reference sheet…', 'running', undefined], ['Making a reference sheet…', 'done', 'Saved Mara · Version 1']]);
     assert.deepEqual(shown, result.views.map(item => ({ kind: 'image', versionId: item.versionId })));
     // The next read-workspace turn lists Mara with her sheet's views, and the views aren't items again.
@@ -871,7 +914,7 @@ test('generate-sheet makes a script subject\'s views one at a time with Meta and
 
   await t.test('identity keeps every made view to a given image that stays out of the sheet; a view with image makes nothing', async () => {
     const video = await scripted();
-    const [photo, existing] = await images(owner, video, 2);
+    const [photo] = await images(owner, video), [existing] = await images(owner, video, 1, { subject: 'the-gallery' });
     const { result } = await sheet(owner, video, mara([view('Front'), { view: 'Coat', image: existing }, view('Face')], { identity: photo }));
     assert.ok(result.made, JSON.stringify(result));
     assert.deepEqual(meta.requests.map(request => [request.path, request.body.images]), [['/v1/images/edits', [{ image_url: png(1) }]], ['/v1/images/edits', [{ image_url: png(1) }]]]);
@@ -879,6 +922,8 @@ test('generate-sheet makes a script subject\'s views one at a time with Meta and
     assert.deepEqual(result.views.map(item => item.view), ['Front', 'Coat', 'Face']); assert.equal(result.views[1]!.versionId, existing);
     assert.ok(!result.views.some(item => item.versionId === photo));
     for (const item of [result.views[0]!, result.views[2]!]) assert.deepEqual((await store.version(owner.id, item.versionId)).dependencies, [photo]);
+    // Made views are filed under Mara; a view given as an existing image keeps its own subject, and the identity its own.
+    assert.deepEqual(await filing(video, [result.views[0]!.versionId, existing!, result.views[2]!.versionId, photo!]), ['mara', 'the-gallery', 'mara', undefined]);
     // That image is in Mara's sheet only.
     const gallerySheet = await sheet(owner, video, { ...mara([{ view: 'Wide', image: existing }]), subject: 'the-gallery' });
     assert.deepEqual(gallerySheet.lines.at(-1), ['Making a reference sheet…', 'done', 'Not made: that image is already in Mara’s sheet']);

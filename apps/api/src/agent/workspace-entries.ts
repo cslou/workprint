@@ -7,13 +7,13 @@ type State = 'Draft' | 'Ready';
 /** Listing bounds (Sprint 006 Story 3): item count, serialized UTF-8 bytes, and characters per text field. */
 export const listingBounds = Object.freeze({ items: 50, bytes: 16 * 1024, text: 200 });
 
-/** One exact saved version the video uses, as the model sees it in a listing. */
-export type WorkspaceItem = { name: string; kind: Version['kind']; versionId: string; use: string; state: State; text: string };
+/** One exact saved version the video uses, as the model sees it in a listing; `subjectId` is the subject an image is filed under. */
+export type WorkspaceItem = { name: string; kind: Version['kind']; versionId: string; use: string; state: State; text: string; subjectId?: string };
 export type WorkspaceListing = { items: WorkspaceItem[]; total: number; truncated: boolean };
 /** One item in full: the exact version's saved content, or its media facts. */
 export type WorkspaceItemDetail = { name: string; kind: Version['kind']; versionId: string; revision: number; use: string; state: State } & ({ content: unknown } | { media: unknown });
 
-type Entry = { name: string; use: string; state: State; version: Version };
+type Entry = { name: string; use: string; state: State; version: Version; subjectId?: string | undefined };
 
 const clip = (text: string, limit: number = listingBounds.text) => {
   const flat = text.replace(/\s+/g, ' ').trim();
@@ -91,7 +91,7 @@ export function workspaceEntries(workspace: OwnedWorkspace): Entry[] {
     // Uploaded and made media keep no filename, so they are named by kind and order, or by subject and view in a sheet
     // (the shared rule). A sheet is named by its subject's current script name.
     const subject = 'content' in version && version.kind === 'reference' ? sheetNames.get(version.id) ?? strings(record(record(version.content).subject).name) : '';
-    add({ name: subject ? `${clip(subject, 80)} · ${revision(version)}` : mediaVersionName(labels, version, views), use: 'reference', state: asset.state, version });
+    add({ name: subject ? `${clip(subject, 80)} · ${revision(version)}` : mediaVersionName(labels, version, views), use: 'reference', state: asset.state, version, subjectId: asset.subjectId });
   }
   for (const made of clips) add({ name: mediaVersionName(labels, made.version), use: 'generated video', state: made.state, version: made.version });
   if (workspace.storyboard.work) add({ name: `Storyboard · ${revision(workspace.storyboard.work.version)}`, use: 'storyboard', state: workspace.storyboard.work.state, version: workspace.storyboard.work.version });
@@ -114,7 +114,7 @@ export function listWorkspace(workspace: OwnedWorkspace, envelope: Readonly<Reco
   const entries = workspaceEntries(workspace).filter(entry => !(entry.use === 'reference' && entry.version.kind === 'image' && listedViews.has(entry.version.id)));
   const listing: WorkspaceListing = { items: [], total: entries.length, truncated: false };
   for (const entry of entries) {
-    const item: WorkspaceItem = { name: clip(entry.name), kind: entry.version.kind, versionId: entry.version.id, use: entry.use, state: entry.state, text: summary(entry.version) };
+    const item: WorkspaceItem = { name: clip(entry.name), kind: entry.version.kind, versionId: entry.version.id, use: entry.use, state: entry.state, text: summary(entry.version), ...(entry.subjectId ? { subjectId: entry.subjectId } : {}) };
     const next = { ...listing, items: [...listing.items, item], truncated: true };
     if (listing.items.length >= listingBounds.items || Buffer.byteLength(JSON.stringify({ ...envelope, ...next })) > listingBounds.bytes) { listing.truncated = true; break; }
     listing.items.push(item);
