@@ -17,21 +17,22 @@ const binding = { purpose: 'script' } as const;
  * The assistant's script capability. It saves the video's next script version and makes it the current script.
  * The use is always a draft: an assistant save never approves anything.
  * The base is the exact version the assistant last read. A save on any other base never overwrites newer work:
- * an earlier version of the current script is stale, and any other version is not found.
+ * an earlier version of the current script is stale, and any other version is not found. A video with no script
+ * has nothing to overwrite, so its first save ignores the base (models do not reliably send null).
  */
 export function createAssistantScripts(pool: Pool, checkOwnedConversation: OwnedCheck) {
   const reads = createArtifactStore(pool, checkOwnedConversation);
   return Object.freeze({
     async save(account: string, conversation: string, input: AssistantScriptInput): Promise<AssistantScriptSave> {
       if (!idSchema.safeParse(account).success || !idSchema.safeParse(conversation).success) throw new ArtifactError('invalid_input');
-      if (input.baseVersionId !== null && !idSchema.safeParse(input.baseVersionId).success) throw new ArtifactError('not_found');
       const owned = await checkOwnedConversation(account, conversation);
       if (owned.kind !== 'owned') throw new ArtifactError(owned.kind === 'not_found' ? 'not_found' : 'integration_failure');
       let content: ReturnType<typeof parseContent>;
       try { content = parseContent('script', input.content); } catch { throw new ArtifactError('invalid_input'); }
-      // Native ownership of the base is checked outside SQL; a foreign or missing id is simply not found.
-      const base = input.baseVersionId === null ? null : await reads.version(account, input.baseVersionId);
-      if (base && base.kind !== 'script') throw new ArtifactError('not_found');
+      // Native ownership of the base is checked outside SQL. A foreign, missing or malformed id resolves to
+      // nothing, which is not found only when the video has a script to protect.
+      const base = input.baseVersionId === null || !idSchema.safeParse(input.baseVersionId).success ? null
+        : await reads.version(account, input.baseVersionId).catch((error: unknown) => { if (error instanceof ArtifactError && error.code === 'not_found') return null; throw error; });
 
       return transaction(pool, async client => {
         // The owner lock serializes this account's publishers, so two first saves cannot both create a script.
@@ -39,9 +40,11 @@ export function createAssistantScripts(pool: Pool, checkOwnedConversation: Owned
         const current = (await client.query<{ use_id: string; version_id: string; version_owner_id: string; artifact_id: string }>(`SELECT u.use_id,u.version_id,u.version_owner_id,v.artifact_id
           FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.version_owner_id AND v.version_id=u.version_id
           WHERE u.owner_id=$1 AND u.conversation_id=$2 AND u.purpose='script' FOR UPDATE OF u`, [account, conversation])).rows[0];
-        if (!base) { if (current) throw new ArtifactError('stale_revision'); }
-        else if (!current || current.artifact_id !== base.artifactId) throw new ArtifactError('not_found');
-        else if (current.version_id !== base.id) throw new ArtifactError('stale_revision');
+        if (current) {
+          if (input.baseVersionId === null) throw new ArtifactError('stale_revision');
+          if (!base || base.kind !== 'script' || current.artifact_id !== base.artifactId) throw new ArtifactError('not_found');
+          if (current.version_id !== base.id) throw new ArtifactError('stale_revision');
+        }
         // The next revision of the account's own script; a built-in script in use starts a new owned one.
         const artifactId = current && current.version_owner_id === account ? current.artifact_id : undefined;
         const version = await publishVersion(client, { accountId: account, conversationId: conversation, artifactId, kind: 'script', content, dependencies: [], createdBy: 'assistant' });

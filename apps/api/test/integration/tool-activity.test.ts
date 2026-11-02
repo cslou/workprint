@@ -209,9 +209,21 @@ test('update-script saves the video\'s current script as a draft, and never over
       const { lines, result } = await updateScript(owner, video, { baseVersionId, script: script('Mara stops.') });
       assert.ok('saved' in result && !result.saved && result.reason === 'not_found', JSON.stringify(result));
       assert.deepEqual(lines.at(-1), ['Updating the script…', 'done', 'Not saved: script not found']);
+      // The model must read what it would replace: the refusal sends it to read-workspace and names no id.
+      assert.match(result.message, /Call read-workspace/); assert.ok(!result.message.includes(second));
     }
+    // The malformed base Muse Spark sent, on a video that has a script, is not found too.
+    assert.deepEqual(await saveScript(owner.id, video, { baseVersionId: 'script-v1', content: script('Mara stops.') }), { kind: 'not_found' });
     assert.equal(await versions(owner.id, video), 2); assert.deepEqual(await current(video), [second, second, 'draft']);
     assert.ok(!JSON.stringify(provider.requests).includes('Private.'));
+  });
+
+  await t.test('a video with no script has nothing to overwrite: a first save with any base, even a made-up one, is version 1', async () => {
+    const fresh = await client(owner).newVideo();
+    const { lines, result } = await updateScript(owner, fresh, { baseVersionId: 'script-v1', script: script('Mara dives in.') });
+    assert.ok('saved' in result && result.saved && result.version === 1, JSON.stringify(result));
+    assert.deepEqual(lines.at(-1), ['Updating the script…', 'done', 'Saved version 1']);
+    assert.equal(await versions(owner.id, fresh), 1); assert.deepEqual(await current(fresh), [result.versionId, result.versionId, 'draft']);
   });
 
   await t.test('content the saved-script schema refuses is not saved, and the line says so', async () => {
@@ -221,13 +233,15 @@ test('update-script saves the video\'s current script as a draft, and never over
     assert.equal(await versions(owner.id, video), 2); assert.deepEqual(await current(video), [second, second, 'draft']);
   });
 
-  await t.test('scope comes from the run: a missing video, or a base this video does not use, is not found', async () => {
+  await t.test('scope comes from the run: a missing video or another account\'s video is not found; another video\'s base never moves it', async () => {
     assert.deepEqual(await saveScript(owner.id, randomUUID(), { baseVersionId: null, content: script('Lost.') }), { kind: 'not_found' });
-    const unscripted = await client(owner).newVideo();
-    assert.deepEqual(await saveScript(owner.id, unscripted, { baseVersionId: second, content: script('Moved.') }), { kind: 'not_found' });
     assert.deepEqual(await saveScript(other.id, video, { baseVersionId: second, content: script('Taken.') }), { kind: 'not_found' });
-    assert.equal(await versions(owner.id, unscripted), 0); assert.equal(await versions(owner.id, video), 2);
-    assert.deepEqual(await current(unscripted), [undefined, undefined, undefined]); assert.deepEqual(await current(video), [second, second, 'draft']);
+    // A base from this account's other video starts this video's own script; the other video's script is untouched.
+    const unscripted = await client(owner).newVideo();
+    const own = await saveScript(owner.id, unscripted, { baseVersionId: second, content: script('Moved.') });
+    assert.ok(own.kind === 'saved' && own.revision === 1, JSON.stringify(own));
+    assert.equal(await versions(owner.id, unscripted), 1); assert.equal(await versions(owner.id, video), 2);
+    assert.deepEqual(await current(unscripted), [own.versionId, own.versionId, 'draft']); assert.deepEqual(await current(video), [second, second, 'draft']);
   });
 
   await t.test('two first saves at once make exactly one script; the other is stale', async () => {

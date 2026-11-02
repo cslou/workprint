@@ -8,7 +8,7 @@ type UpdateScriptResult =
 
 const messages = {
   stale: 'Not saved: the script changed since you read it. Call read-workspace, then redo the change on the current script version.',
-  not_found: 'Not saved: baseVersionId is not this video\'s current script. Call read-workspace for the current versionId, or pass null only when the video has no script.',
+  not_found: 'Not saved: baseVersionId is not this video\'s current script. Call read-workspace, then redo the change on the current script version and pass its versionId.',
   invalid: 'Not saved: the script is not valid. Check that every speaker is listed in characters unless the line is voice-over.',
   unavailable: 'Not saved: saving is unavailable right now. Tell the user and do not retry in this turn.',
 } as const;
@@ -19,7 +19,7 @@ export const updateScriptTool = defineTool({
   id: 'update-script',
   description: [
     'Save the script for this video. Send the complete script: it becomes the current script as a new version, and earlier versions stay in the version history.',
-    'Pass baseVersionId: the versionId of the current script from read-workspace, or null when the video has no script yet. If the result says the script changed, call read-workspace and redo the change on the current version.',
+    'Pass baseVersionId: the versionId of the current script from read-workspace, or null when the video has no script yet (the first save ignores it). If a save is refused, follow the result message.',
     'A script has exactly one scene. Write only what the audience can see or hear, in story order, with action and dialogue interleaved as they happen.',
     'Turn narration and inner thought into visible action, dialogue or voice-over, or leave them out. List in characters everyone physically present in the scene.',
     'Every speaker must be in characters, except a voice-over speaker who is absent. Set delivery only to voice_over or off_screen when the story needs it.',
@@ -34,6 +34,7 @@ export const updateScriptTool = defineTool({
   doneSummary: (result: UpdateScriptResult | { error: true }) => 'error' in result ? summaries.invalid : result.saved ? `Saved version ${result.version}` : summaries[result.reason],
   execute: async (input, { scope, collaborators }): Promise<UpdateScriptResult> => {
     const outcome = await collaborators.saveScript(scope.accountId, scope.videoId, { content: input.script, baseVersionId: input.baseVersionId });
-    return outcome.kind === 'saved' ? { saved: true, versionId: outcome.versionId, version: outcome.revision } : { saved: false, reason: outcome.kind, message: messages[outcome.kind] };
+    if (outcome.kind === 'saved') return { saved: true, versionId: outcome.versionId, version: outcome.revision };
+    return { saved: false, reason: outcome.kind, message: messages[outcome.kind] };
   },
 });
