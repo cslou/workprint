@@ -5,7 +5,7 @@ import { logFailure } from './failure-log.js';
 export type AssistantSheetOutcome =
   | { kind: 'saved'; versionId: string; revision: number; subjectName: string }
   | { kind: 'no_script' } | { kind: 'not_in_script' } | { kind: 'not_found' } | { kind: 'stale' }
-  | { kind: 'invalid'; field: 'images' } | { kind: 'in_other_sheet'; subjectName: string } | { kind: 'no_room' } | { kind: 'unavailable' };
+  | { kind: 'invalid'; field: 'images' | 'text' } | { kind: 'in_other_sheet'; subjectName: string } | { kind: 'no_room' } | { kind: 'unavailable' };
 /** Account and video come from trusted server context (an admitted native run), never from model arguments. */
 export type SaveAssistantSheet = (accountId: string, videoId: string, input: AssistantSheetInput) => Promise<AssistantSheetOutcome>;
 /** How many more uses the video can hold, or `unavailable`. */
@@ -26,8 +26,8 @@ export function createAssistantSheets(capability: Capability): AssistantSheets {
         return { kind: 'saved', versionId: version.id, revision: version.revision, subjectName };
       } catch (error) {
         if (error instanceof SheetSaveError) {
-          if (error.reason === 'invalid') return { kind: 'invalid', field: 'images' };
-          if (error.reason === 'in_other_sheet') return { kind: 'in_other_sheet', subjectName: error.subjectName ?? '' };
+          if (error.reason === 'invalid') return { kind: 'invalid', field: error.detail === 'text' ? 'text' : 'images' };
+          if (error.reason === 'in_other_sheet') return { kind: 'in_other_sheet', subjectName: error.detail ?? '' };
           return { kind: error.reason };
         }
         if (error instanceof ArtifactError && error.code === 'not_found') return { kind: 'not_found' };

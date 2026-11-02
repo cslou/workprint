@@ -31,8 +31,16 @@ export async function withStoredObjects<T>(storage: PrivateObjectStorage, object
   }
 }
 
-/** A video holds at most 100 uses; a save that adds one refuses past that. */
-export async function requireUseRoom(client: PoolClient, account: string, conversation: string) {
+/** A video holds at most this many uses. */
+export const maxVideoUses = 100;
+
+/** How many more uses the video can hold. */
+export async function useRoom(client: Pick<PoolClient, 'query'>, account: string, conversation: string): Promise<number> {
   const count = (await client.query<{ count: number }>('SELECT count(*)::int AS count FROM artifacts.conversation_uses WHERE owner_id=$1 AND conversation_id=$2', [account, conversation])).rows[0]!.count;
-  if (count >= 100) throw new UploadError('integration_failure');
+  return Math.max(0, maxVideoUses - count);
+}
+
+/** A save that adds a use refuses when the video has no room. */
+export async function requireUseRoom(client: PoolClient, account: string, conversation: string) {
+  if (await useRoom(client, account, conversation) === 0) throw new UploadError('integration_failure');
 }

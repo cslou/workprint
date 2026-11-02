@@ -11,7 +11,8 @@ test('each sheet save result maps to its outcome with its payload', async () => 
   assert.deepEqual(await saved.save('a', 'v', input), { kind: 'saved', versionId: 'sheet-v2', revision: 2, subjectName: 'Mara Vale' });
   assert.deepEqual(await saved.useRoom('a', 'v'), { kind: 'room', room: 7 });
   for (const reason of ['no_script', 'not_in_script', 'not_found', 'stale', 'no_room'] as const) assert.deepEqual(await failing(new SheetSaveError(reason)).save('a', 'v', input), { kind: reason });
-  assert.deepEqual(await failing(new SheetSaveError('invalid')).save('a', 'v', input), { kind: 'invalid', field: 'images' });
+  assert.deepEqual(await failing(new SheetSaveError('invalid', 'images')).save('a', 'v', input), { kind: 'invalid', field: 'images' });
+  assert.deepEqual(await failing(new SheetSaveError('invalid', 'text')).save('a', 'v', input), { kind: 'invalid', field: 'text' });
   assert.deepEqual(await failing(new SheetSaveError('in_other_sheet', 'Mara')).save('a', 'v', input), { kind: 'in_other_sheet', subjectName: 'Mara' });
   assert.deepEqual(await failing(new ArtifactError('not_found')).save('a', 'v', input), { kind: 'not_found' });
   assert.deepEqual(await failing(new ArtifactError('not_found')).useRoom('a', 'v'), { kind: 'not_found' });

@@ -12,8 +12,8 @@ export interface ToolScope {
 export type AgentCollaborators = Readonly<{
   readWorkspace: ReadOwnedWorkspace; saveScript: SaveAssistantScript;
   readImageInputs: ReadImageInputs; saveGeneratedImage: SaveGeneratedImage;
-  /** Saves a script subject's sheet and reads the video's use room; composition always supplies it, tests may leave it out. */
-  sheets?: AssistantSheets;
+  /** Saves a script subject's sheet and reads the video's use room. */
+  sheets: AssistantSheets;
   /** Absent when images can't be saved (no storage or media checker) or a test composes no Meta fake; the tool then refuses before any call. */
   images?: Pick<MetaImageClient, 'generate' | 'edit'>;
   /** Absent without storage, the media checker or a MiniMax key (or a test's MiniMax fake); the tool then refuses before any call. */

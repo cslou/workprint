@@ -272,6 +272,10 @@ test('the assistant saves a script subject\'s sheet as a draft, never over newer
     assert.deepEqual(await sheets.save(account, video, mara([i1, i2, i3, i4, otherVideos, theirs], base)), { kind: 'invalid', field: 'images' }, 'six views');
     assert.deepEqual(await sheets.save(account, video, { ...mara([i1, i1], base) }), { kind: 'invalid', field: 'images' }, 'one image twice');
     assert.deepEqual(await sheets.save(account, video, { ...mara([i1], base), views: [{ versionId: i1, view: ' ', notes: [] }] }), { kind: 'invalid', field: 'images' }, 'an empty view name');
+    // The sheet's own text is refused as text, not as its images.
+    assert.deepEqual(await sheets.save(account, video, { ...mara([i1], base), continuityNotes: [] }), { kind: 'invalid', field: 'text' });
+    assert.deepEqual(await sheets.save(account, video, { ...mara([i1], base), description: ' ' }), { kind: 'invalid', field: 'text' });
+    assert.deepEqual(await sheets.save(account, video, { ...mara([i1], base), views: [{ versionId: i1, view: 'Front', notes: [' '] }] }), { kind: 'invalid', field: 'text' });
   });
 
   await t.test('a view whose own use moved on stays in the sheet and still counts as used', async () => {
