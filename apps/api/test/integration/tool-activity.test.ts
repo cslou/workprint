@@ -280,6 +280,60 @@ test('update-script saves the video\'s current script as a draft, and never over
     assert.ok(third.kind === 'saved' && third.revision === 3, JSON.stringify(third));
     assert.equal(await versions(owner.id, video), 3); assert.deepEqual(await current(video), [third.versionId, third.versionId, 'draft']);
   });
+
+  const gallery = (characters: string[]) => ({ schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'The Gallery', time: 'night' }, characters, script: [{ action: 'Mara holds the key.' }] }] });
+  type Stored = { subjects?: { id: string; kind: string; name: string }[]; scenes: { characters: string[] }[] };
+  const stored = async (video: string) => { const version = (await store.workspace(owner.id, video)).script!.version; return ('content' in version ? version.content : {}) as unknown as Stored; };
+
+  await t.test('the script lists its subjects with server-made ids that a rename keeps, and refuses ids it never had', async () => {
+    const fresh = await client(owner).newVideo();
+    const made = await saveScript(owner.id, fresh, { baseVersionId: null, content: gallery([]), subjects: [{ id: '', kind: 'character', name: 'Mara' }, { id: '', kind: 'place', name: 'The Gallery' }, { id: ' ', kind: 'prop', name: 'The key' }] });
+    assert.ok(made.kind === 'saved', JSON.stringify(made));
+    assert.deepEqual((await stored(fresh)).subjects, [{ id: 'mara', kind: 'character', name: 'Mara' }, { id: 'the-gallery', kind: 'place', name: 'The Gallery' }, { id: 'the-key', kind: 'prop', name: 'The key' }]);
+    assert.deepEqual((await stored(fresh)).scenes[0]!.characters, ['Mara'], 'the server sets characters from the character subjects');
+    const renamed = await saveScript(owner.id, fresh, { baseVersionId: made.versionId, content: gallery(['Mara']), subjects: [{ id: 'mara', kind: 'character', name: 'Mara Vale' }, { id: 'the-gallery', kind: 'place', name: 'The Gallery' }, { id: 'the-key', kind: 'prop', name: 'The key' }] });
+    assert.ok(renamed.kind === 'saved', JSON.stringify(renamed));
+    assert.deepEqual((await stored(fresh)).subjects?.map(subject => [subject.id, subject.name]), [['mara', 'Mara Vale'], ['the-gallery', 'The Gallery'], ['the-key', 'The key']]);
+    assert.deepEqual((await stored(fresh)).scenes[0]!.characters, ['Mara Vale']);
+    assert.deepEqual(await saveScript(owner.id, fresh, { baseVersionId: renamed.versionId, content: gallery(['Ben']), subjects: [{ id: 'ben', kind: 'character', name: 'Ben' }] }), { kind: 'invalid', field: 'subjects' });
+    // An empty list keeps the subjects while the characters match them.
+    assert.deepEqual(await saveScript(owner.id, fresh, { baseVersionId: renamed.versionId, content: gallery(['Mara Vale', 'Ben']) }), { kind: 'subjects_differ' });
+    const kept = await saveScript(owner.id, fresh, { baseVersionId: renamed.versionId, content: gallery(['Mara Vale']) });
+    assert.ok(kept.kind === 'saved' && kept.revision === 3, JSON.stringify(kept));
+    assert.deepEqual((await stored(fresh)).subjects?.map(subject => subject.id), ['mara', 'the-gallery', 'the-key']);
+    assert.equal(await versions(owner.id, fresh), 3);
+  });
+
+  await t.test('a script saved before subjects existed stores its derived subjects on the next save, and a rename keeps their ids', async () => {
+    const fresh = await client(owner).newVideo();
+    const old = await store.insert({ accountId: owner.id, conversationId: fresh, kind: 'script', createdBy: 'human', dependencies: [], content: gallery(['Mara']), use: { binding: { purpose: 'script' }, state: 'draft' } });
+    const next = await saveScript(owner.id, fresh, { baseVersionId: old.id, content: gallery(['Mara']) });
+    assert.ok(next.kind === 'saved', JSON.stringify(next));
+    assert.deepEqual((await stored(fresh)).subjects, [{ id: 'mara', kind: 'character', name: 'Mara' }, { id: 'the-gallery', kind: 'place', name: 'The Gallery' }]);
+    const renamed = await saveScript(owner.id, fresh, { baseVersionId: next.versionId, content: gallery(['Mara']), subjects: [{ id: 'mara', kind: 'character', name: 'Mara Vale' }, { id: 'the-gallery', kind: 'place', name: 'The Gallery' }] });
+    assert.ok(renamed.kind === 'saved', JSON.stringify(renamed));
+    assert.deepEqual((await stored(fresh)).subjects?.map(subject => [subject.id, subject.name]), [['mara', 'Mara Vale'], ['the-gallery', 'The Gallery']]);
+    // An old base's derived ids are the ones read-workspace listed, so they are kept on the first save that passes subjects too.
+    const older = await client(owner).newVideo();
+    const base = await store.insert({ accountId: owner.id, conversationId: older, kind: 'script', createdBy: 'human', dependencies: [], content: gallery(['Mara']), use: { binding: { purpose: 'script' }, state: 'draft' } });
+    const passed = await saveScript(owner.id, older, { baseVersionId: base.id, content: gallery(['Mara']), subjects: [{ id: 'mara', kind: 'character', name: 'Mara Vale' }, { id: '', kind: 'prop', name: 'The key' }] });
+    assert.ok(passed.kind === 'saved', JSON.stringify(passed));
+    assert.deepEqual((await stored(older)).subjects?.map(subject => subject.id), ['mara', 'the-key']);
+  });
+
+  await t.test('an update-script turn with subjects saves them, and the next read-workspace turn lists them with their ids', async () => {
+    const fresh = await client(owner).newVideo();
+    const { lines, result } = await updateScript(owner, fresh, { baseVersionId: null, script: gallery([]), subjects: [{ id: 'null', kind: 'character', name: 'Mara' }, { id: '', kind: 'place', name: 'The Gallery' }, { id: '', kind: 'prop', name: 'The key' }] });
+    assert.ok('saved' in result && result.saved, JSON.stringify(result));
+    assert.deepEqual(lines.at(-1), ['Updating the script…', 'done', 'Saved version 1']);
+    provider.reset();
+    provider.script({ toolCalls: [{ name: 'read-workspace', args: {} }] }, { text: ['Read it'] });
+    const turn = await client(owner).turn(fresh, 'What are the subjects?');
+    assert.ok(completed(turn), JSON.stringify(turn.terminal));
+    const content = (provider.requests[1]!.body as { messages: { role: string; content: unknown }[] }).messages.findLast(message => message.role === 'tool')?.content;
+    const listing = (typeof content === 'string' ? JSON.parse(content) : content) as { subjects?: unknown };
+    assert.deepEqual(listing.subjects, [{ id: 'mara', kind: 'character', name: 'Mara' }, { id: 'the-gallery', kind: 'place', name: 'The Gallery' }, { id: 'the-key', kind: 'prop', name: 'The key' }]);
+  });
 });
 
 type ImageResult = { made: true; images: { versionId: string; label: string; width: number; height: number }[]; failed: number; showInChat: boolean } | { made: false; reason: string; message: string };
