@@ -2,7 +2,7 @@
 
 **Date:** Start 2026-11-02, from `main` after PR #84 (`3c7a048`) – End after completion gates and Lou's QA
 **Goal:** In a local build, a signed-in user asks the agent for an image. The agent calls Meta `muse-image-1.0`, and the image is checked, saved privately as an assistant-made image, and shown in the chat and in the Assets tab, live and after a reload. The tool also accepts saved images as inputs with the prompt, using every option Meta's image API offers that our storage can keep.
-**Status:** 🟢 Complete
+**Status:** 🟢 Complete (Lou's QA and the merge to main pending)
 
 ---
 
@@ -478,7 +478,7 @@ For descriptive-only work, use editorial review and applicable existing checks. 
 
 ## Final Review
 
-- **Outcome:** goal achieved in the scripted build. Each story merged into `sprint-008` after an independent reasoning-model review of its final head reached at least 4/5 with no open P0/P1:
+- **Outcome:** goal achieved in the scripted build. Every story AC is met except Story 1's opt-in live check, which stays unchecked only for its optional paid run; the checklist says that run doesn't block 🟢. Each story merged into `sprint-008` after an independent reasoning-model review of its final head reached at least 4/5 with no open P0/P1. The verdicts come from the orchestrator's review runs and are not posted on the PRs:
   - Story 1, #85 (Meta image client).
   - Story 2, #86 (save generated images and read inputs).
   - Story 3, #87 (generate-image tool).
@@ -504,9 +504,11 @@ For descriptive-only work, use editorial review and applicable existing checks. 
   - **Story 2:**
     - The save returns no label; the tool takes "Image N · Version 1" from read-workspace, because `application` can't import its naming.
     - The busy-checker and tampered-bytes cases are integration cases, not unit cases.
+    - Two commits instead of three: the save and the read share their integration setup.
   - **Story 4:** the `img` element appears once its private bytes are ready. Before that, a box sized from the version's width and height holds the space. So the Functional item "before the image loads its `img` already has the width and height" is left unchecked: it is met by the box, not the element.
+- **Pending:** Lou's QA, including ratifying the Story 4 chat-image design.
 - **Unresolved issues, accepted:**
-  - Stop cannot cancel a running Meta call; a late response is not saved (Lou, by design).
+  - Stop ends our request but cannot cancel the generation or its charge at Meta (B-029). Nothing from a late response is saved (Lou, by design).
   - An upload confirmed while an image save holds the one-job decode sandbox gets "Upload unavailable", because uploads don't wait out the busy checker.
   - A publish that fails after the storage write can leave an orphaned object if the removal fails too; the save reports it.
   - Story 4 accepted P2s:
