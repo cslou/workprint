@@ -103,6 +103,31 @@ try {
   await toolStep('tool', 'test-echo', ['Use the test-echo tool to echo the text "workprint-live", then tell me what it returned.', 'Call the test-echo tool now with text "workprint-live". Do not answer before calling it.'], { text: 'workprint-live' }, 'It returned workprint-live.');
   await toolStep('read-workspace', 'read-workspace', ['Check our progress on this video.', 'Call the read-workspace tool now to check our progress on this video. Do not answer before calling it.'], {}, 'Nothing is saved yet.');
 
+  // The agent writes a first script; it must use the tool with content the saved-script schema accepts.
+  await step('update-script', async () => {
+    const args = { baseVersionId: null, script: { schemaVersion: 1, scenes: [{ heading: { setting: 'exterior', location: 'Mountain lake', time: 'night' }, characters: ['Mara'], script: [{ action: 'Mara swims across the dark lake toward the far shore.' }, { dialogue: { character: 'Mara', text: 'Almost there.' } }] }] } };
+    const prompts = ['This video has no script yet. Write a short one-scene script in which Mara swims across a mountain lake at night, and save it with the update-script tool.', 'Call the update-script tool now with a one-scene script about Mara swimming across a mountain lake at night. The video has no script yet, so pass baseVersionId null. Do not answer before calling it.'];
+    for (const [attempt, prompt] of prompts.entries()) {
+      if (!live) provider.script({ toolCalls: [{ name: 'update-script', args }] }, { text: ['I saved the script.'] });
+      const video = await client.newVideo();
+      const turn = await client.turn(video, prompt, timeoutMs);
+      const lines = turn.chunks.filter(chunk => chunk.type === 'tool-activity' && chunk.payload?.tool === 'update-script' && chunk.payload?.state === 'done');
+      if (!lines.length && attempt === 0) continue;
+      assert.ok(lines.length, 'the model declined the update-script tool twice');
+      assert.ok(completed(turn), `turn did not complete: ${turn.terminal?.type ?? 'no terminal chunk'}`);
+      // A refused or invalid attempt before the save is a non-pass (Sprint 007 Sprint Completion).
+      const summaries = lines.map(line => line.payload?.summary);
+      assert.deepEqual(summaries, ['Saved version 1'], `expected one first save, got: ${summaries.join(', ')}`);
+      const response = await client.get(`/v1/conversations/${video}/workspace`);
+      assert.equal(response.status, 200, `workspace read answered ${response.status}`);
+      const { script } = await response.json();
+      assert.equal(script?.version.createdBy, 'assistant'); assert.equal(script?.use.state, 'draft');
+      shapes['update-script'] = sanitize(turn.chunks);
+      return { rephrased: attempt > 0, firstChunkMs: turn.firstChunkMs };
+    }
+    throw new Error('unreachable');
+  });
+
   await step('stop', async () => {
     if (!live) provider.script({ text: ['Partial', ' never sent'], hold: 'mid' });
     const video = await client.newVideo();

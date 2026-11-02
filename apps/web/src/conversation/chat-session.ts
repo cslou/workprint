@@ -46,6 +46,8 @@ export type ChatSessionConfig = {
   onConfirmed(thread: NativeThread | null, page: NativeMessages): void;
   /** A turn from this page ended. */
   onSettled?(): void;
+  /** A tool in this page's turn finished, once per tool call: saved work may have changed. */
+  onToolDone?(): void;
   /** Clock for activity elapsed time; tests supply their own. */
   now?(): number;
   /** How long after Stop the turn settles here even without an outcome; tests shorten it. */
@@ -144,7 +146,12 @@ export function createChatSession(config: ChatSessionConfig) {
     const current = observation;
     const result = await current.consumeTurn(sent.value.runId,
       part => { if (alive) patchTurn(key, { parts: withText(partsOf(key), part.text) }); },
-      activity => { if (alive) patchTurn(key, { parts: withActivity(partsOf(key), activity, now()) }); });
+      activity => {
+        if (!alive) return;
+        const finished = activity.state === 'done' && !partsOf(key).some(part => part.kind === 'activity' && part.activity.toolCallId === activity.toolCallId && part.activity.state === 'done');
+        patchTurn(key, { parts: withActivity(partsOf(key), activity, now()) });
+        if (finished) config.onToolDone?.();
+      });
     if (!alive || run.settled) return 'sent';
     if (observation === current) observation = null;
     const outcome = !result.ok ? 'lost' : result.value.outcome === 'complete' ? 'completed' : result.value.outcome;

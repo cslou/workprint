@@ -91,11 +91,13 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
   - `~/projects/animation-studio/.pi/skills/create-scene-script/SKILL.md` and `references/scene-script-schema.md`: Lou's create-script skill.
   - `apps/api/src/artifacts/content.ts`: the saved script schema.
   - `apps/web/src/materials/script.tsx`: the Script tab.
+- Work: [Sprint 007](sprints/sprint-007.md) Story 2 (PR #80). Assistant saves are not yet journaled: B-036.
 
 ### B-024 — Workspace tabs update when the agent saves
 - Problem: The Script, Assets, Storyboard and Videos tabs refresh only on reload or after the user's own saves. Every pass condition that says "user sees … updated" (B-013, B-015, B-017 to B-020) depends on this.
 - Outcome: When the stream reports a saving tool's result (B-021), and again when the turn ends, the browser re-reads the authoritative workspace and the affected tab shows the new version. No new push channel is needed. Same-video drafts and unsaved manual edits are kept. Pass: the agent updates the script, and the Script tab shows it without a reload while an open manual edit survives.
 - References: `apps/web/src/shell/workspace.ts`; B-011 (the related first-read recovery); spec P3-S9 and P4-S14.
+- Work: [Sprint 007](sprints/sprint-007.md) Story 3 (PR #81) for the Script tab. The other tabs re-read the same way; their own saving tools come with B-015 to B-020. Remaining: re-reads wait while any editor is open, in any tab. Scope that wait to the tab being edited when other tabs gain saving tools.
 
 ### B-014 — Agent tool: AskUserQuestion with options in the UI
 - Problem: The question card UI and contract exist (`questionSchema`, `apps/web/src/conversation/question.tsx`). The agent cannot ask a question yet, and answers cannot reach the agent.
@@ -242,6 +244,11 @@ Deprioritized: everything here waits until the Next items are done (Lou, 2026-11
 - MVP behaviour (Sprint 006, accepted by Lou 2026-11-01): after a reload mid-reply the page shows saved history with no "Working…", live text or Stop; a send gets `busy`; the finished reply appears on a later reload.
 - References: Former Sprint 006 plan, Story 3; Sprint 006 Story 2.
 
+### B-036 — Journal assistant saves for downstream revalidation
+- Problem: Sprint 007's update-script tool saves a script version and moves the use, but writes no `artifacts.commands` or `manual_changes` row, which human saves write. Nothing reads the journal yet, so nothing breaks today. A later tool that revalidates downstream work after a change (storyboard from script, B-017 onward) would miss assistant changes.
+- Outcome: Assistant saves record what they replaced, in the same shape later revalidation reads for human saves. Pass: a downstream check sees an assistant script change the same way it sees a human one.
+- References: Sprint 007 Story 2 (PR #80) recorded deviations; `apps/api/src/artifacts/assistant-scripts.ts`; `apps/api/src/artifacts/writers.ts`.
+
 ### B-035 — Clean history for retried and stopped replies
 - Problem: In Sprint 006, Retry may resend the user's message if Mastra 1.79 cannot regenerate a reply, so history can show the message twice. A stopped reply is marked interrupted only live; after a reload it shows as plain partial text. Lou accepted both for the MVP (2026-11-01).
 - Outcome: After a Retry, history shows the user message once with the completed reply. A stopped reply keeps an "interrupted" marker after reload, returned safely by the history route.
@@ -310,6 +317,7 @@ Deprioritized: everything here waits until the Next items are done (Lou, 2026-11
 - Outcome: The shell owns tab assembly and preservation; materials owns only the Script and Assets content. Behaviour unchanged.
 - Constraint: Do it only when the B-013/B-018 work next touches these modules.
 - References: PR #26.
+- Work: [Sprint 007](sprints/sprint-007.md) Story 1 (PR #79).
 
 ### B-003 — Give proposal inputs a display name
 - Problem: The proposal card lists inputs by name ("Vale reference (version 1)"), but no contract carries the name. The card therefore fails closed and allows no approval.

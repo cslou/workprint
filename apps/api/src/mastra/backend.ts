@@ -3,8 +3,8 @@ import { registerApiRoute, type ApiRoute } from '@mastra/core/server';
 import { PostgresStore } from '@mastra/pg';
 import { Pool } from 'pg';
 import { createOwnedConversationCheck, bindNativeTurns, productionTools, turnLimits, type AgentCollaborators, type AgentTool, type NativeTurnModel, type TurnLimits } from '../agent/index.js';
-import { createApplication, createWorkspaceReader, withSavedWork, withManualSaves, withVersionUses, withStoryboardEdits, withUploads } from '../application/index.js';
-import { createArtifactStore, createArtifactWriters, createVersionUses, createStoryboardEdits, createMediaVerifier, createUploadCoordinator } from '../artifacts/index.js';
+import { createApplication, createAssistantScriptSaver, createWorkspaceReader, withSavedWork, withManualSaves, withVersionUses, withStoryboardEdits, withUploads } from '../application/index.js';
+import { createArtifactStore, createArtifactWriters, createAssistantScripts, createVersionUses, createStoryboardEdits, createMediaVerifier, createUploadCoordinator } from '../artifacts/index.js';
 import { configuredMediaSandbox, configuredObjectStorage } from '../storage/index.js';
 import { assertRestrictedRole } from '../db/index.js';
 import { loadServerConfig } from './config.js';
@@ -107,7 +107,7 @@ export async function createBackend(routes: ApiRoute[] = [], turns?: TurnComposi
   }, { before: async () => { try { await media?.close(); } finally { objects?.close(); } }, after: async () => { if (!pool.ended) await pool.end(); } });
   if (turns) {
     // Application functions that tools may call, each over the same owned reads as the HTTP boundary.
-    const collaborators: AgentCollaborators = { readWorkspace: createWorkspaceReader(savedWork) };
+    const collaborators: AgentCollaborators = { readWorkspace: createWorkspaceReader(savedWork), saveScript: createAssistantScriptSaver(createAssistantScripts(pool, application.checkOwnedConversation).save) };
     bindNativeTurns(mastra, { model: turns.model, tools, limits: turns.limits ?? turnLimits, collaborators });
   }
   return mastra;
