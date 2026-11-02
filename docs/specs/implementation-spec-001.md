@@ -511,13 +511,13 @@ Phase 1 and Phase 2 evidence is not proof of these product behaviours. The MVP s
 
 | Goal | Flows | Delivered or planned by | Status |
 | --- | --- | --- | --- |
-| G1 Guided creation from an idea or existing material | 8.1–8.5 | Wave 1 (uploads, Library); Sprints 006–012 (B-012, B-013, B-015, B-017–B-019) | MVP |
-| G2 Visible human creative control and targeted revisions | 8.3, 8.5 | Sprint 005 (manual saves, choices); Sprints 007, 008, 011 (B-013, B-014, B-018, B-024) | MVP |
-| G3 Reusable immutable work | 8.2, 8.5 | Sprint 005 (versions, Library reuse); Sprint 009 (B-016 exact asset choice) | MVP |
-| G4 Full chosen clips assembled in order | 8.6 | Sprint 012 joins clips in the conversation (B-020); export with download is B-009 | Partly MVP |
-| G5 Understandable independent work and distinct Stop/cancel | 8.4, 8.7 | Sprint 004 (turn control); Sprint 006 (B-021, B-022); Sprint 012 (B-025); cancellation is B-029 | Partly MVP |
+| G1 Guided creation from an idea or existing material | 8.1–8.5 | Wave 1 (uploads, Library); Sprints 006–011 (B-012, B-013, B-015, B-017–B-019) | MVP |
+| G2 Visible human creative control and targeted revisions | 8.3, 8.5 | Sprint 005 (manual saves, choices); Sprints 007, 010, 012 (B-013, B-018, B-024, B-014) | MVP |
+| G3 Reusable immutable work | 8.2, 8.5 | Sprint 005 (versions, Library reuse); Sprint 012 (B-016 exact asset choice) | MVP |
+| G4 Full chosen clips assembled in order | 8.6 | Sprint 011 joins clips in the conversation (B-020); export with download is B-009 | Partly MVP |
+| G5 Understandable independent work and distinct Stop/cancel | 8.4, 8.7 | Sprint 004 (turn control); Sprint 006 (B-021, B-022); Sprint 011 (B-025); cancellation is B-029 | Partly MVP |
 | G6 Exact informed media authorization | 8.3–8.5 | B-030, B-033 | After the MVP |
-| G7 Reliable return to saved work | 8.1, 8.7 | Sprint 004 (navigation, history); Sprint 006 (B-012); Sprint 012 (B-025 resume) | MVP |
+| G7 Reliable return to saved work | 8.1, 8.7 | Sprint 004 (navigation, history); Sprint 006 (B-012); Sprint 011 (B-025 resume) | MVP |
 | G8 Honest correlated usage and costs | 8.9 | B-010 | After the MVP |
 
 Phases are milestones, not sprint boundaries, and approval of this plan is not implementation or live-service authorization.
@@ -584,11 +584,11 @@ Tools call application/domain functions in process, never application HTTP route
 | Wave 1: [Sprint 005](../sprints/sprint-005.md), Saved work, uploads and media | — | Delivered. |
 | 006: Chat | B-012 agent loop on Muse Spark, B-021 streaming and tool activity phrases, B-022 Stop, B-023 read-workspace tool, B-034 automatic video titles | Chat with streaming replies; a real tool line ("Getting up to date on our progress…"); Stop mid-reply; titled videos in Recents; history after reload. |
 | 007: Script | B-013 update-script tool, B-024 tab refresh | The agent writes the script; the Script tab updates without a reload. |
-| 008: Questions | B-014 AskUserQuestion | Option questions as in `docs/design/demo-02.html`; the chosen option resumes the agent. |
-| 009: Images | B-015 Meta image generation, B-016 image options | Generated images in the chat and Assets; image choices whose exact asset the agent then uses. |
-| 010: Reference sheets | B-017 | Character, place and prop sheets in Assets. |
-| 011: Storyboard | B-018 | Planned shots with generated panel images. |
-| 012: Video | B-025 waiting with resume, B-019 MiniMax video, B-020 join clips | Shot videos play in Videos; joined clips play as one video. |
+| 008: Images | B-015 Meta image generation | Generated images in the chat and Assets; a follow-up can use a saved image as input. |
+| 009: Reference sheets | B-017 | Character, place and prop sheets in Assets. |
+| 010: Storyboard | B-018 | Planned shots with generated panel images. |
+| 011: Video | B-025 waiting with resume, B-019 MiniMax video, B-020 join clips | Shot videos play in Videos; joined clips play as one video. |
+| 012: Questions | B-014 AskUserQuestion, B-016 image options | Option questions as in `docs/design/demo-02.html`; the chosen option resumes the agent; image choices whose exact asset the agent then uses. |
 
 **Sprint rules**
 - Each sprint holds a few small backlog items, so Lou can test often. Sprint 006 takes five because B-023 gives it a real tool to show and B-034 is small (Lou, 2026-11-01). Sprints run in order, each from integrated `main`. Stories are one PR each into `sprint-NNN`. The sprint integrates into `main` on Lou's explicit merge command.
@@ -598,7 +598,8 @@ Tools call application/domain functions in process, never application HTTP route
   - A few live calls confirm real provider response and stream shapes before parsing is finalized.
   - One trimmed full run and a QA build precede each handoff to Lou. No screenshot suites.
 - Design: follow the approved demo references (for example `docs/design/demo-02.html`). Make an inert preview only for a state with no reference.
-- If B-017's details are not ready by Sprint 010, Sprint 012 may run first; video does not need reference sheets or the storyboard.
+- If B-017's details are not ready by Sprint 009, Sprint 011 may run first; video does not need reference sheets or the storyboard.
+- Questions (B-014) and image options (B-016) moved after video on 2026-11-02 (Lou). Until they land, the agent asks in plain chat text and waits for the reply.
 
 ### Agent tool guidance
 
@@ -606,7 +607,7 @@ Tools call application/domain functions in process, never application HTTP route
 
 - **Script:** adapt an idea or selected prose into ordered visible/audible action. Preserve dialogue and sound intentions; do not invent a multi-scene Project or fabricate chapter metadata for an idea. Existing work can be reused without forcing unnecessary rewriting.
 - **References:** keep character, environment, style, prop and composition roles explicit. Library membership, viewing and model suggestion do not approve a reference.
-- **Storyboard:** textual Shot Definitions, ordered Storyboard Panels and image Frames remain different things. Preserve stable Shot/Panel identities, intended state progression and neighbouring context. The agent asks for review (B-014) at the skill's checkpoints rather than assuming approval.
+- **Storyboard:** textual Shot Definitions, ordered Storyboard Panels and image Frames remain different things. Preserve stable Shot/Panel identities, intended state progression and neighbouring context. The agent asks for review at the skill's checkpoints rather than assuming approval: in chat text until B-014 lands (Sprint 012), then with questions.
 - **Generation:** prepare a concise production brief and the exact provider prompt, settings and reference order. Technical validation produces a candidate, never creative approval, a chosen clip or a finished-film claim. No automatic provider/model substitution or paid replacement request.
 - **Production:** map Shot intent to supported video conditioning (MiniMax V2: a first and optionally a last frame) and explain limitations candidly.
 - Local YAML/JSON/HTML layouts, shell flags, spend-limit fields, handoff packages and local sequential orchestration are not hosted requirements. Implement guidance through the supported Mastra agent instructions and tool descriptions; a Markdown filename is not proof the guidance is loaded or followed. Authority checks belong in domain code, not only in prompts: every id a tool takes from model arguments or the browser resolves, through an account- and video-scoped domain query that the tool reaches via an application function, to an exact version owned by the trusted account and video, or returns not-found.
@@ -618,10 +619,10 @@ The skills live in `~/projects/animation-studio/.pi/skills/` (see [source contra
 | Existing source | Hosted disposition | Sprint |
 | --- | --- | --- |
 | `create-scene-script` and its validator | Adapt the writing guidance and ordering/speaker rules. Keep Workprint's saved script schema; do not port the YAML format, file conventions or Python runtime. | 007 (B-013) |
-| `create-storyboard`: Reference Package, storyboard schema and panel-generation strategy | Adapt reference roles, Shot/Panel planning and panel dependency rules. The standalone HTML renderer is not ported. | 010–011 (B-017, B-018) |
-| `generate-image` and its prompt-preparation contract | Adapt brief, prompt and inspection guidance for Meta `muse-image-1.0`. OpenAI/MiniMax image clients are not used. | 009 (B-015) |
-| `generate-video` and its MiniMax V2 provider scripts | Adapt submit → save task → poll → download → validate and same-task resume. Hosted generation records replace the local manifest. | 012 (B-025, B-019) |
-| `assemble-video` and the shared FFmpeg/ffprobe adapters | Reuse the exact ordering, compatibility and decoded-verification rules for stream-copy joining, inside the existing media sandbox. | 012 (B-020) |
+| `create-storyboard`: Reference Package, storyboard schema and panel-generation strategy | Adapt reference roles, Shot/Panel planning and panel dependency rules. The standalone HTML renderer is not ported. | 009–010 (B-017, B-018) |
+| `generate-image` and its prompt-preparation contract | Adapt brief, prompt and inspection guidance for Meta `muse-image-1.0`. OpenAI/MiniMax image clients are not used. | 008 (B-015) |
+| `generate-video` and its MiniMax V2 provider scripts | Adapt submit → save task → poll → download → validate and same-task resume. Hosted generation records replace the local manifest. | 011 (B-025, B-019) |
+| `assemble-video` and the shared FFmpeg/ffprobe adapters | Reuse the exact ordering, compatibility and decoded-verification rules for stream-copy joining, inside the existing media sandbox. | 011 (B-020) |
 | `produce-scene` | Take review, continuity review and Selects assembly are after the MVP; Shot video choice already exists from Sprint 005. | — |
 
 ### After the MVP

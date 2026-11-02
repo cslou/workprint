@@ -99,22 +99,6 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 - References: `apps/web/src/shell/workspace.ts`; B-011 (the related first-read recovery); spec P3-S9 and P4-S14.
 - Work: [Sprint 007](sprints/sprint-007.md) Story 3 (PR #81) for the Script tab. The other tabs re-read the same way; their own saving tools come with B-015 to B-020. Remaining: re-reads wait while any editor is open, in any tab. Scope that wait to the tab being edited when other tabs gain saving tools.
 
-### B-014 — Agent tool: AskUserQuestion with options in the UI
-- Problem: The question card UI and contract exist (`questionSchema`, `apps/web/src/conversation/question.tsx`). The agent cannot ask a question yet, and answers cannot reach the agent.
-- Outcome: The agent calls AskUserQuestion with one or more questions, each with options. The tool saves them and the turn ends. The UI shows the question as in demo-02: question N of M, lettered options, plus "type your own answer". The user's choice is sent as their next message, carrying the exact question and option ids (and asset ids, B-016). The agent continues from that message. A typed answer is an ordinary message. Pass: the options appear in the UI, and choosing one resumes the agent with that answer.
-- Constraint:
-  - Every id taken from model arguments or the browser (question or option) must resolve to an exact version owned by the trusted account and video, checked by an account- and video-scoped domain query that the tool reaches through an application function; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
-  - The answer's asset comes from the saved question's option, never from an id the browser sends.
-  - Kept from former Sprint 007 (`eb98e49`) Stories 1–2:
-  - Pending questions load from saved records.
-  - Answering is idempotent: a repeated answer has no extra effect, and a stale or already-answered question cannot be answered again.
-  - Typing an ordinary message while a question is pending leaves it pending.
-  - Restart-proof continuation is deferred (B-028).
-- References:
-  - `docs/design/demo-02.html`: the approved look.
-  - Former Sprint 007 plan, Stories 1–2: the planned question reads and exact answers.
-  - `packages/contracts/src/models.ts`: `questionSchema`.
-
 ### B-015 — Agent tool: generate images with Meta Muse Image
 - Problem: The product cannot create images; users can only upload them (Sprint 005).
 - Outcome: A generate-image tool calls Meta's image API from a text prompt, optionally with images already in the user's storage as inputs. It stores the result in private storage as the user's image. The image always appears in the Assets tab. When the user asks for an image directly ("generate me an image"), it also appears in the chat (Lou, 2026-11-01). Pass: the user asks for an image, the agent calls Meta, the image is stored and shown in the chat and in Assets, and a follow-up request can use a stored image as input.
@@ -137,14 +121,7 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
   - [Meta image generation](https://dev.meta.ai/docs/image-generation).
   - `~/projects/animation-studio/.pi/skills/generate-image/references/prompt-preparation.md`: prompt guidance.
   - `apps/api/src/storage/`: storage from Sprint 005.
-
-### B-016 — Images on AskUserQuestion options, with exact asset identity
-- Problem: Question options carry only an id and a label. The agent cannot show image choices, and an answer cannot say which asset was chosen.
-- Outcome: An option can carry a stored image (an exact asset/version), and the UI shows it as a thumbnail. The answer returned to the agent names that exact asset/version, so the agent knows which asset the user means. Pass: the user picks an image option, and the agent's next action uses that exact asset.
-- Constraint:
-  - Every id taken from model arguments or the browser (image, video, question or option) must resolve to an exact version owned by the trusted account and video, checked by an account- and video-scoped domain query that the tool reaches through an application function; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
-  - Do not guess identity from labels or untyped content. Same principle as B-003.
-- References: B-014; B-003; `packages/contracts/src/models.ts` `questionSchema`.
+- Work: [Sprint 008](sprints/sprint-008.md) Stories 1–5. Planning live calls (2026-11-02) confirmed the response shape and found an XMP AI-generated label in Meta's PNGs, which the sprint keeps.
 
 ### B-017 — Agent creates reference sheets
 - Context: Lou will supply the reference-sheet details and templates later (2026-11-01). Keep this as a placeholder until then; it does not block B-012 to B-016.
@@ -212,11 +189,43 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
   - Run ffmpeg inside the existing bounded media sandbox, and verify the output like any other video.
 - References: `~/projects/animation-studio/.pi/skills/assemble-video/SKILL.md` (stream-copy joining with compatibility checks) and `.pi/lib/ffmpeg.mjs`; `apps/api/src/storage/media/sandbox.ts` (the existing ffmpeg sandbox); B-019.
 
+Moved after video (Lou, 2026-11-02): AskUserQuestion (B-014) and image options (B-016) wait until video generation (B-025, B-019, B-020) is done. Until then the agent asks in plain chat text.
+
+### B-014 — Agent tool: AskUserQuestion with options in the UI
+- Problem: The question card UI and contract exist (`questionSchema`, `apps/web/src/conversation/question.tsx`). The agent cannot ask a question yet, and answers cannot reach the agent.
+- Outcome: The agent calls AskUserQuestion with one or more questions, each with options. The tool saves them and the turn ends. The UI shows the question as in demo-02: question N of M, lettered options, plus "type your own answer". The user's choice is sent as their next message, carrying the exact question and option ids (and asset ids, B-016). The agent continues from that message. A typed answer is an ordinary message. Pass: the options appear in the UI, and choosing one resumes the agent with that answer.
+- Constraint:
+  - Every id taken from model arguments or the browser (question or option) must resolve to an exact version owned by the trusted account and video, checked by an account- and video-scoped domain query that the tool reaches through an application function; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
+  - The answer's asset comes from the saved question's option, never from an id the browser sends.
+  - Kept from former Sprint 007 (`eb98e49`) Stories 1–2:
+  - Pending questions load from saved records.
+  - Answering is idempotent: a repeated answer has no extra effect, and a stale or already-answered question cannot be answered again.
+  - Typing an ordinary message while a question is pending leaves it pending.
+  - Restart-proof continuation is deferred (B-028).
+- References:
+  - `docs/design/demo-02.html`: the approved look.
+  - Former Sprint 007 plan, Stories 1–2: the planned question reads and exact answers.
+  - `packages/contracts/src/models.ts`: `questionSchema`.
+
+### B-016 — Images on AskUserQuestion options, with exact asset identity
+- Problem: Question options carry only an id and a label. The agent cannot show image choices, and an answer cannot say which asset was chosen.
+- Outcome: An option can carry a stored image (an exact asset/version), and the UI shows it as a thumbnail. The answer returned to the agent names that exact asset/version, so the agent knows which asset the user means. Pass: the user picks an image option, and the agent's next action uses that exact asset.
+- Constraint:
+  - Every id taken from model arguments or the browser (image, video, question or option) must resolve to an exact version owned by the trusted account and video, checked by an account- and video-scoped domain query that the tool reaches through an application function; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
+  - Do not guess identity from labels or untyped content. Same principle as B-003.
+- References: B-014; B-003; `packages/contracts/src/models.ts` `questionSchema`.
+
 ## In progress
 
 ## Later
 
 Deprioritized: everything here waits until the Next items are done (Lou, 2026-11-01). Nothing here is ranked.
+
+### B-037 — Delete saved work
+- Problem: Saved work is append-only. Images (uploaded or generated), scripts and videos can be versioned but never deleted, so a user can't remove an unwanted image from Assets or storage. Lou raised it while planning Sprint 008 (2026-11-02): "we probably need that in the future".
+- Outcome: A user can delete an image (and later other saved work) from a video. It leaves the video's Assets, and its stored bytes are removed when nothing else uses it. Pass: a deleted image no longer appears in Assets or read-workspace, and its object is gone from private storage when unused.
+- Constraint: Decide what happens to work that depends on the item (for example a storyboard panel or video that used the image as a reference) before deleting. It applies to uploads as well as generated images. Spec §8.8 (Delete work/account) is deferred and describes the full-release behaviour.
+- References: Sprint 008 planning; `docs/specs/implementation-spec-001.md` §8.8; `apps/api/src/storage/s3.ts` (`remove`).
 
 ### B-026 — Queue messages while the agent is replying
 - Problem: Former Sprint 006 (`eb98e49`) Story 3 planned letting the user send up to three more messages while a reply streams, kept in order. Lou does not need it for the MVP but wants it tracked (2026-11-01).
