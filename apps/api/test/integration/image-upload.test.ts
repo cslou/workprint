@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { crc32 } from 'node:zlib';
-import { test } from 'node:test';
+import { describe, test } from 'node:test';
 import { Pool } from 'pg';
 import { PostgresStore } from '@mastra/pg';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
-import { createMediaVerifier, createUploadCoordinator } from '../../src/artifacts/index.js';
+import { createArtifactStore, createGeneratedImages, createMediaVerifier, createUploadCoordinator } from '../../src/artifacts/index.js';
+import { createGeneratedImageSaver, createImageInputReader } from '../../src/application/index.js';
 import { uploadRecords } from '../../src/artifacts/uploads/records.js';
 import { completeUpload } from '../../src/artifacts/uploads/completion.js';
 import { inspectMediaBytes } from '../../src/artifacts/uploads/media-bytes.js';
-import { createMediaSandbox, createPrivateObjectStorage } from '../../src/storage/index.js';
+import { createMediaSandbox, createPrivateObjectStorage, MediaProcessError } from '../../src/storage/index.js';
+import { pngChunk, testPng } from '../support/meta-image-fake.js';
 import { testStack } from '../support/test-stack.js';
 import { applyArtifactMigrations } from '../support/artifact-database.js';
 import { createNativeConversation } from '../support/native-conversations.js';
@@ -101,4 +103,104 @@ test('the real decoder accepts exact PNG, JPEG and H264+AAC and rejects damaged 
     const damaged=Buffer.from(fixtures.video);const mdat=damaged.indexOf(Buffer.from('mdat'));assert.ok(mdat>0);damaged.fill(255,mdat+4,Math.min(damaged.length,mdat+1000));await assert.rejects(verify({kind:'video',bytes:damaged,contentType:'video/mp4',signal}));
     const captured=Buffer.from(fixtures.png);const pending=verify({kind:'image',bytes:captured,contentType:'image/png',signal});captured.fill(0);assert.equal((await pending).width,240,'The child uses the synchronous immutable snapshot, not later caller bytes');
   } finally {await sandbox.close();}
+});
+
+describe('assistant-made images are checked, saved privately as the video\'s drafts, and readable as inputs', { timeout: 120000 }, () => {
+  test('save, refusals, media access and the input read', async t => {
+    const db = await testStack().testDatabase(); t.after(db.close);
+    const { storage: service, media: fixtures } = testStack();
+    const sandbox = await createMediaSandbox(fixtures.toolchain); t.after(() => sandbox.close());
+    const native = new PostgresStore({ id: 'generated-images', connectionString: db.setupUrl, schemaName: 'mastra' });
+    const pool = new Pool({ connectionString: db.servingUrl, max: 4 }), setup = new Pool({ connectionString: db.setupUrl, max: 1 });
+    const storage = createPrivateObjectStorage(service);
+    try {
+      await native.init(); await db.grantServing(); await applyArtifactMigrations(db.setupUrl);
+      const account = 'generated-owner', foreign = 'generated-other', builtin = 'workprint-built-in';
+      const video = (await createNativeConversation(native, account)).id, otherVideo = (await createNativeConversation(native, account)).id;
+      const foreignVideo = (await createNativeConversation(native, foreign)).id, builtinOrigin = (await createNativeConversation(native, builtin)).id;
+      const check = createOwnedConversationCheck(native), store = createArtifactStore(pool, check), verify = createMediaVerifier(sandbox);
+      const effects = { published: [] as string[], removed: [] as string[], checks: 0 };
+      const counted = { ...storage,
+        publish: async (...args: Parameters<typeof storage.publish>) => { effects.published.push(args[0]); return storage.publish(...args); },
+        remove: async (key: string) => { effects.removed.push(key); return storage.remove(key); },
+      };
+      // The checker answers busy once, as the one-job sandbox does when another check is running.
+      let busyOnce = true;
+      const images = createGeneratedImages(pool, check, { storage: counted, capacityRetryMs: 20, verifyMedia: async input => {
+        effects.checks++;
+        if (busyOnce) { busyOnce = false; throw new MediaProcessError('capacity'); }
+        return verify(input);
+      } });
+      const save = createGeneratedImageSaver(images.save), readInputs = createImageInputReader(store, images.read);
+      const counts = async () => (await pool.query<{ versions: number; media: number; generated: number; uses: number }>('SELECT (SELECT count(*)::int FROM artifacts.versions) AS versions,(SELECT count(*)::int FROM artifacts.media_objects) AS media,(SELECT count(*)::int FROM artifacts.generated_objects) AS generated,(SELECT count(*)::int FROM artifacts.conversation_uses) AS uses')).rows[0];
+
+      const made = testPng({ seed: 5 });
+      const saved = await save(account, video, { bytes: made, contentType: 'image/png', inputs: [] });
+      assert.deepEqual(saved, { kind: 'saved', versionId: (saved as { versionId: string }).versionId, width: 64, height: 48 });
+      if (saved.kind !== 'saved') return;
+      assert.equal(effects.checks, 2, 'a busy checker is waited out, then the image is checked once');
+      const row = (await pool.query('SELECT v.created_by,v.provenance,v.revision,g.sha256,g.byte_size::int AS byte_size,u.state,u.purpose FROM artifacts.versions v JOIN artifacts.generated_objects g ON g.version_id=v.version_id JOIN artifacts.conversation_uses u ON u.version_id=v.version_id WHERE v.version_id=$1', [saved.versionId])).rows;
+      assert.deepEqual(row, [{ created_by: 'assistant', provenance: 'assistant', revision: 1, sha256: hash(made), byte_size: made.length, state: 'draft', purpose: 'reference' }]);
+      assert.deepEqual(effects.published, [`published/${effects.published[0]!.split('/')[1]}/${effects.published[0]!.split('/')[1]}`]);
+      assert.equal(hash((await storage.read(effects.published[0]!)).bytes), hash(made));
+      const workspace = await store.workspace(account, video);
+      assert.deepEqual(workspace.assets.map(asset => [asset.version.id, asset.version.createdBy, asset.state]), [[saved.versionId, 'assistant', 'Draft']]);
+      const uploads = createUploadCoordinator(pool, check, { storage, verifyMedia: verify });
+      const access = await uploads.media(account, saved.versionId), signed = await fetch(access.url, { credentials: 'omit', redirect: 'error' });
+      assert.equal(signed.status, 200); assert.equal(hash(new Uint8Array(await signed.arrayBuffer())), hash(made));
+      for (const [objectKey, generatedKey] of [[effects.published[0]!, effects.published[0]!], [null, null]]) {
+        await assert.rejects(pool.query('INSERT INTO artifacts.media_objects(owner_id,version_id,object_key,generated_key,sha256) VALUES($1,$2,$3,$4,$5)', [account, randomUUID(), objectKey, generatedKey, hash(made)]), { code: '23514' }, 'exactly one source');
+      }
+
+      await t.test('refused bytes, a foreign video and a checker that stays busy save nothing', async () => {
+        const before = await counts(), published = effects.published.length;
+        const labelled = testPng({ before: [pngChunk('tEXt', Buffer.from('Comment\0hello', 'latin1'))] });
+        assert.deepEqual(await save(account, video, { bytes: labelled, contentType: 'image/png', inputs: [] }), { kind: 'refused' });
+        assert.deepEqual(await save(foreign, video, { bytes: made, contentType: 'image/png', inputs: [] }), { kind: 'not_found' });
+        assert.deepEqual(await save(account, video, { bytes: made, contentType: 'image/png', inputs: [randomUUID()] }), { kind: 'not_found' }, 'an input that is not a readable image');
+        const busy = createGeneratedImages(pool, check, { storage: counted, capacityWaitMs: 200, capacityRetryMs: 20, verifyMedia: async () => { throw new MediaProcessError('capacity'); } });
+        const started = Date.now();
+        assert.deepEqual(await createGeneratedImageSaver(busy.save)(account, video, { bytes: made, contentType: 'image/png', inputs: [] }), { kind: 'unavailable' });
+        assert.ok(Date.now() - started < 2000, 'the wait is bounded');
+        assert.deepEqual(await counts(), before);
+        assert.equal(effects.published.length, published, 'nothing is stored');
+
+        // A save that fails after storing removes the object: here the video is at its limit of 100 uses.
+        const full = (await createNativeConversation(native, account)).id;
+        for (let index = 0; index < 100; index++) await pool.query("INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state) VALUES($1,$2,$3,$4,$5,'reference','draft')", [account, full, randomUUID(), saved.versionId, { purpose: 'reference', role: randomUUID() }]);
+        const seeded = await counts();
+        assert.deepEqual(await save(account, full, { bytes: made, contentType: 'image/png', inputs: [] }), { kind: 'unavailable' });
+        const stored = effects.published.at(-1)!;
+        assert.equal(effects.published.length, published + 1); assert.deepEqual(effects.removed, [stored]);
+        await assert.rejects(storage.read(stored), { code: 'not_found' });
+        assert.deepEqual(await counts(), seeded);
+      });
+
+      await t.test('the input read returns the exact bytes of uploaded, made and built-in images this video uses', async () => {
+        const upload = async (owner: string, target: string) => {
+          const grant = await uploads.request(owner, target, { operationId: randomUUID(), kind: 'image', filename: 'ordinary.png', contentType: 'image/png', byteSize: fixtures.png.length, intendedUse: { purpose: 'reference' } });
+          const put = await fetch(grant.url, { method: 'PUT', headers: { 'Content-Type': 'image/png' }, body: new Uint8Array(fixtures.png), signal: AbortSignal.timeout(3000) }); assert.equal(put.status, 200); await put.body?.cancel();
+          return (await uploads.confirm(owner, grant.uploadId, randomUUID())).version;
+        };
+        const uploaded = await upload(account, video), source = await upload(builtin, builtinOrigin), foreignImage = await upload(foreign, foreignVideo), otherImage = await upload(account, otherVideo);
+        await setup.query('UPDATE artifacts.artifacts SET built_in=true WHERE owner_id=$1 AND artifact_id=$2', [builtin, source.artifactId]);
+        await pool.query("INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state) VALUES($1,$2,$3,$4,$5,'reference','draft')", [account, video, randomUUID(), source.id, { purpose: 'reference' }]);
+        const read = await readInputs(account, video, [uploaded.id, saved.versionId, source.id]);
+        assert.equal(read.kind, 'read');
+        if (read.kind !== 'read') return;
+        assert.deepEqual(read.images.map(image => image.versionId), [uploaded.id, saved.versionId, source.id]);
+        assert.deepEqual(read.images.map(image => hash(Buffer.from(image.dataUrl.replace('data:image/png;base64,', ''), 'base64'))), [hash(fixtures.png), hash(made), hash(fixtures.png)]);
+        // Another account's image, or this account's image used only by another video, fails the whole call.
+        for (const id of [foreignImage.id, otherImage.id]) assert.deepEqual(await readInputs(account, video, [uploaded.id, id]), { kind: 'not_found' });
+        assert.deepEqual(await readInputs(foreign, video, [uploaded.id]), { kind: 'not_found' });
+        // A made image saved with inputs records them as its dependencies.
+        const edited = await save(account, video, { bytes: testPng({ seed: 6 }), contentType: 'image/png', inputs: [uploaded.id, source.id] });
+        assert.equal(edited.kind, 'saved');
+        if (edited.kind === 'saved') assert.deepEqual((await store.version(account, edited.versionId)).dependencies, [uploaded.id, source.id]);
+        // Stored bytes that no longer match the saved record are an error, never a data URL.
+        const tampered = createGeneratedImages(pool, check, { storage: { ...storage, read: async (...args: Parameters<typeof storage.read>) => { const stored = await storage.read(...args); const bytes = Buffer.from(stored.bytes); bytes.writeUInt8(bytes.readUInt8(bytes.length - 20) ^ 1, bytes.length - 20); return { ...stored, bytes }; } }, verifyMedia: verify });
+        assert.deepEqual(await createImageInputReader(store, tampered.read)(account, video, [saved.versionId]), { kind: 'unavailable' });
+      });
+    } finally { storage.close(); await native.close(); await pool.end(); await setup.end(); }
+  });
 });

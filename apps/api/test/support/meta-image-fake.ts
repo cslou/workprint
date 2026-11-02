@@ -5,13 +5,14 @@ import { crc32, deflateSync } from 'node:zlib';
 /** Meta's AI-generated label, as observed in live `muse-image-1.0` PNGs (2026-11-02). */
 export const metaXmp = '<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?><x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description rdf:about="" xmlns:iptcExt="http://iptc.org/std/Iptc4xmpExt/2008-02-29/" iptcExt:DigitalSourceType="http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"/></rdf:RDF></x:xmpmeta><?xpacket end="w"?>';
 
-const chunk = (type: string, data: Buffer) => {
+/** One PNG chunk with its length and CRC. */
+export const pngChunk = (type: string, data: Buffer) => {
   const head = Buffer.alloc(8); head.writeUInt32BE(data.length, 0); head.write(type, 4, 'ascii');
   const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(Buffer.concat([head.subarray(4), data])) >>> 0, 0);
   return Buffer.concat([head, data, crc]);
 };
 /** An uncompressed international-text chunk, shaped like Meta's XMP block. */
-export const itxt = (keyword: string, text: string, compressed = 0) => chunk('iTXt', Buffer.concat([Buffer.from(keyword, 'latin1'), Buffer.from([0, compressed, 0, 0, 0]), Buffer.from(text, 'utf8')]));
+export const itxt = (keyword: string, text: string, compressed = 0) => pngChunk('iTXt', Buffer.concat([Buffer.from(keyword, 'latin1'), Buffer.from([0, compressed, 0, 0, 0]), Buffer.from(text, 'utf8')]));
 
 /**
  * A small valid 8-bit RGB PNG shaped like Meta's: IHDR, Meta's XMP `iTXt` (unless `xmp` is false),
@@ -24,8 +25,8 @@ export function testPng({ width = 64, height = 48, xmp = true, before = [], afte
     const at = y * (width * 3 + 1) + 1 + x * 3;
     rows[at] = (x * 4 + seed) & 255; rows[at + 1] = (y * 5 + seed * 3) & 255; rows[at + 2] = (seed * 7) & 255;
   }
-  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', header),
-    ...(xmp ? [itxt('XML:com.adobe.xmp', metaXmp)] : []), ...before, chunk('IDAT', deflateSync(rows)), ...after, chunk('IEND', Buffer.alloc(0))]);
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), pngChunk('IHDR', header),
+    ...(xmp ? [itxt('XML:com.adobe.xmp', metaXmp)] : []), ...before, pngChunk('IDAT', deflateSync(rows)), ...after, pngChunk('IEND', Buffer.alloc(0))]);
 }
 
 /** One scripted response. Without one, the fake answers 200 with `n` test PNGs. */

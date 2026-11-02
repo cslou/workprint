@@ -33,7 +33,7 @@ describe('application migrations and database roles', { timeout: 180000 }, () =>
     assert.deepEqual(await history(db.setupUrl), migrationVersions);
     assert.deepEqual((await query(db.setupUrl, nativeCatalog)).rows, nativeBefore, 'Application migrations leave the native schema untouched');
     const tables = (await query(db.setupUrl, "SELECT tablename FROM pg_tables WHERE schemaname='artifacts' ORDER BY tablename")).rows;
-    assert.deepEqual(tables.map(row => row.tablename), ['artifacts', 'commands', 'conversation_uses', 'manual_changes', 'media_objects', 'publication_counters', 'selection_revisions', 'upload_confirmations', 'upload_objects', 'uploads', 'use_changes', 'version_dependencies', 'versions']);
+    assert.deepEqual(tables.map(row => row.tablename), ['artifacts', 'commands', 'conversation_uses', 'generated_objects', 'manual_changes', 'media_objects', 'publication_counters', 'selection_revisions', 'upload_confirmations', 'upload_objects', 'uploads', 'use_changes', 'version_dependencies', 'versions']);
     await migrate(db.setupUrl);
     assert.deepEqual(await history(db.setupUrl), migrationVersions);
     assert.deepEqual((await query(db.setupUrl, nativeCatalog)).rows, nativeBefore);
@@ -49,6 +49,7 @@ describe('application migrations and database roles', { timeout: 180000 }, () =>
       'UPDATE artifacts.upload_confirmations SET operation_id=operation_id', 'DELETE FROM artifacts.upload_confirmations',
       'UPDATE artifacts.upload_objects SET object_key=object_key', 'DELETE FROM artifacts.upload_objects',
       'UPDATE artifacts.media_objects SET object_key=object_key', 'DELETE FROM artifacts.media_objects',
+      'UPDATE artifacts.generated_objects SET object_key=object_key', 'DELETE FROM artifacts.generated_objects',
       'TRUNCATE artifacts.versions CASCADE', 'SET ROLE wp_setup', 'SET ROLE postgres',
       'SELECT * FROM supabase_migrations.schema_migrations',
     ]) await assert.rejects(query(db.servingUrl, sql), { code: '42501' }, sql);

@@ -1,13 +1,22 @@
+import { versionSchema } from '@workprint/contracts';
 import { MediaProcessError, type MediaSandbox } from '../../storage/index.js';
 import { UploadError } from './errors.js';
 import { inspectMediaBytes } from './media-bytes.js';
 import { measureMediaProbe, parseMediaProbe, verifyDecodedFrames } from './media-probe.js';
-import type { MediaVerifier } from './types.js';
+import type { MediaVerifier, MediaVersion, VerifiedMedia } from './types.js';
+
+/** The verified facts as a version's media, only when they describe the expected bytes. */
+export function measuredMedia(expected: Readonly<{ kind: 'image' | 'video'; contentType: string; byteSize: number }>, verified: VerifiedMedia): MediaVersion['media'] {
+  const { kind, poster, ...media } = verified;
+  if (kind !== expected.kind || media.contentType !== expected.contentType || media.byteSize !== expected.byteSize || (poster && (!['image/png', 'image/jpeg'].includes(poster.contentType) || !poster.bytes.byteLength || poster.bytes.byteLength > 10 * 1024 * 1024))) throw new UploadError('invalid_input');
+  const parsed = versionSchema.safeParse({ id: 'verification', artifactId: 'verification', revision: 1, kind, media, createdBy: 'human', createdAt: new Date().toISOString(), dependencies: [] });
+  if (!parsed.success || !('media' in parsed.data)) throw new UploadError('invalid_input'); return parsed.data.media;
+}
 
 /** Trusted composition capability; actual immutable byte/decode proof, never caller authority. */
 export function createMediaVerifier(sandbox:MediaSandbox):MediaVerifier {
   return async input=>{
-    const byteSize=input.bytes.byteLength,header=inspectMediaBytes(input.bytes,input.kind,input.contentType);
+    const byteSize=input.bytes.byteLength,header=inspectMediaBytes(input.bytes,input.kind,input.contentType,input.origin);
     try{return await sandbox.use(input.bytes,async job=>{
       const measured=measureMediaProbe(parseMediaProbe(await job.probe()),input.kind,input.contentType,byteSize);
       if(header.width!==undefined && (header.width!==measured.width || header.height!==measured.height))throw new UploadError('invalid_input');
