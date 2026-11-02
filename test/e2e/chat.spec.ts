@@ -540,6 +540,8 @@ test('an image the agent makes is shown under its line, opens the viewer, and st
   const { provider, meta } = backend;
   meta.reset();
   provider.script({ toolCalls: [{ name: 'generate-image', args: { prompt: 'A quiet gallery bench', showInChat: true } }] }, { text: ['Here it is.'] });
+  const reads: string[] = [];
+  page.on('request', request => { const read = /\/v1\/versions\/([^/]+)\/media$/.exec(new URL(request.url()).pathname); if (read) reads.push(read[1]!); });
   await signIn(page, account!);
   await message(page).fill('Make me an image of a gallery bench');
   await message(page).press('Enter');
@@ -559,7 +561,8 @@ test('an image the agent makes is shown under its line, opens the viewer, and st
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
 
-  // Not asked for directly: the line, and no image.
+  // Not asked for directly: the line, and no image. The shown image isn't read again as the workspace refreshes.
+  const [first] = reads, before = reads.length;
   provider.script({ toolCalls: [{ name: 'generate-image', args: { prompt: 'Another bench' } }] }, { text: ['Saved another one.'] });
   await message(page).fill('Save another bench for later');
   await message(page).press('Enter');
@@ -567,6 +570,8 @@ test('an image the agent makes is shown under its line, opens the viewer, and st
   await expect(second.getByText('Saved another one.', { exact: true })).toBeVisible({ timeout: 45_000 });
   await expect(second.getByText('Saved Image 2 · Version 1', { exact: true })).toBeVisible();
   await expect(second.locator('.wp-shown-image')).toHaveCount(0);
+  await expect(live(page).getByRole('listitem', { name: 'Assistant message' }).first().locator('img[alt="Image 1 · Version 1"]')).toBeVisible();
+  expect(first).toBeTruthy(); expect(reads.slice(before)).not.toContain(first);
 
   await page.reload();
   const replies = saved(page).getByRole('listitem', { name: 'Assistant message' });

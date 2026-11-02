@@ -11,13 +11,13 @@ export type ToolActivity = { toolCallId: string; tool: string; phrase: string; s
 const callId = /^[A-Za-z0-9_.:-]{1,128}$/;
 const summaryCharacters = 60;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-/** Only saved version ids (UUIDs), at most 10, ever reach the browser as shown images. */
+/** Only distinct saved version ids (UUIDs), at most 10, ever reach the browser as shown images. */
 const maxShownImages = 10;
 
 function shown(tool: AgentTool, output: unknown): string[] {
   let ids: unknown;
   try { ids = tool.shownImages?.(output); } catch { ids = undefined; }
-  return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string' && uuid.test(id)).slice(0, maxShownImages) : [];
+  return Array.isArray(ids) ? [...new Set(ids.filter((id): id is string => typeof id === 'string' && uuid.test(id)))].slice(0, maxShownImages) : [];
 }
 
 /**

@@ -18,7 +18,7 @@ test('a done line carries only saved version ids (UUIDs) as shown images, at mos
   const ids = Array.from({ length: 11 }, (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`);
   const registry = (shownImages: AgentTool['shownImages']): AgentTool[] => [{ id: 'generate-image', description: 'Make', inputSchema: z.strictObject({}), execute: async () => ({}), ...(shownImages ? { shownImages } : {}) }];
   const project = (registryTools: AgentTool[], state: 'running' | 'done' = 'done') => projectToolActivity(registryTools, { toolCallId: 'call_1', toolName: 'generate-image', state, output: {} });
-  assert.deepEqual(project(registry(() => ['not-a-uuid', ...ids]))?.images, ids.slice(0, 10), 'a non-UUID and the eleventh id are dropped');
+  assert.deepEqual(project(registry(() => ['not-a-uuid', ids[0]!, ...ids]))?.images, ids.slice(0, 10), 'a non-UUID, a repeat and the eleventh id are dropped');
   assert.equal(project(registry(() => ids), 'running')?.images, undefined, 'only a done line shows images');
   assert.equal(project(registry(() => []))?.images, undefined);
   assert.equal(project(registry(() => { throw new Error('bad output'); }))?.images, undefined);
