@@ -611,9 +611,9 @@ Tools call application/domain functions in process, never application HTTP route
 | 007: Script | B-013 update-script tool, B-024 tab refresh | The agent writes the script; the Script tab updates without a reload. |
 | 008: Images | B-015 Meta image generation | Generated images in the chat and Assets; a follow-up can use a saved image as input. |
 | [009: Video](../sprints/sprint-009.md) | B-025 waiting with resume, B-019 MiniMax video | The agent makes a video from a prompt or saved images; it plays in the chat and in a "Generated videos" list in Videos; Stop and restart keep the job, and the agent resumes it on request. |
-| 010: Join clips | B-020 join clips | Joined clips play as one video. |
-| 011: Reference sheets | B-017 | Character, place and prop sheets in Assets. |
-| 012: Storyboard | B-018 | Planned shots with generated panel images. |
+| [010: Subjects and reference sheets](../sprints/sprint-010.md) | B-017 | The script lists its subjects; light sheets made and revised by generate-sheet; Assets by subject; images from chosen sheet views come with Sprint 011's panels. |
+| [011: Storyboard](../sprints/sprint-011.md) | B-018, B-019 Shot videos | Planned Shots with panels made from the sheets, and each Shot's video made from its panels and text. |
+| 012: Join clips | B-020 join clips | Joined clips play as one video. |
 | 013: Questions | B-014 AskUserQuestion, B-016 image options | Option questions as in `docs/design/demo-02.html`; the chosen option resumes the agent; image choices whose exact asset the agent then uses. |
 
 **Sprint rules**
