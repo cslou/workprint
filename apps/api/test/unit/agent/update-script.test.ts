@@ -49,6 +49,9 @@ test('empty ids are new, base ids are kept through a rename, and an unknown or r
   // A partial list that leaves out a character the script still names differs; leaving the character out of both removes it.
   assert.throws(() => withSubjects(body(['Mara']), stored, [{ id: 'the-gallery', kind: 'place', name: 'The Gallery' }]), differs);
   assert.deepEqual(withSubjects(body([]), stored, [{ id: 'the-gallery', kind: 'place', name: 'The Gallery' }]).scenes[0]!.characters, []);
+  assert.throws(() => withSubjects(body([' MARA ']), stored, [{ id: 'the-gallery', kind: 'place', name: 'The Gallery' }]), differs, 'names compare ignoring case');
+  // A new subject named like a base subject the list leaves out is that subject: a forgotten id is kept.
+  assert.deepEqual(withSubjects(body(['Mara']), stored, [{ id: '', kind: 'character', name: 'MARA' }, { id: '', kind: 'place', name: 'The Gallery' }]).subjects, [{ id: 'mara', kind: 'character', name: 'MARA' }, { id: 'the-gallery', kind: 'place', name: 'The Gallery' }]);
   // A subject named "Null" never gets the id a model sends to mean none.
   assert.deepEqual(withSubjects(body([]), null, [{ id: '', kind: 'prop', name: 'Null' }]).subjects, [{ id: 'null-2', kind: 'prop', name: 'Null' }]);
 });

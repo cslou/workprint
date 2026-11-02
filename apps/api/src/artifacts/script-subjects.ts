@@ -1,4 +1,4 @@
-import { characterSubjectsMatch, newSubjectId, scriptSubjects, type ScriptSubject, type SubjectKind, type scriptBodySchema, type savedScriptContentSchema } from '@workprint/contracts';
+import { characterSubjectsMatch, newSubjectId, scriptSubjects, subjectNameKey, type ScriptSubject, type SubjectKind, type scriptBodySchema, type savedScriptContentSchema } from '@workprint/contracts';
 import type { z } from 'zod';
 
 /** A subject as the assistant sends it: an empty or whitespace id means a new subject. */
@@ -19,8 +19,9 @@ const isNew = (id: string) => id.trim() === '';
  * subjects existed stores the subjects derived from the new script, so ids are fixed from then on. Derived subjects
  * that can't match the characters (names over 80 characters, names differing only in case, more than 50) differ too.
  * A non-empty list is the full new list: ids from the base are kept, new subjects get server-made ids, and the
- * scene's characters become the character subjects' names. A list that leaves out a character subject the script
- * still names differs, so a partial list never drops characters. The result is validated by the caller.
+ * scene's characters become the character subjects' names. A new subject with the name and kind of a base subject
+ * the list leaves out is that subject, so a forgotten id is kept. A list that leaves out a character subject the
+ * script still names differs, so a partial list never drops characters. The result is validated by the caller.
  */
 export function withSubjects(body: ScriptBody, base: SavedScript | null, subjects: readonly SubjectInput[]): SavedScript {
   if (subjects.length === 0) {
@@ -43,12 +44,13 @@ export function withSubjects(body: ScriptBody, base: SavedScript | null, subject
   const resolved = subjects.map(subject => {
     const name = subject.name.trim();
     if (!isNew(subject.id)) return { id: subject.id.trim(), kind: subject.kind, name };
-    const id = newSubjectId(name, subject.kind, taken);
-    taken.add(id);
+    const same = readable.find(candidate => !kept.has(candidate.id) && candidate.kind === subject.kind && subjectNameKey(candidate.name) === subjectNameKey(name));
+    const id = same?.id ?? newSubjectId(name, subject.kind, taken);
+    kept.add(id); taken.add(id);
     return { id, kind: subject.kind, name };
   });
   const characters = resolved.filter(subject => subject.kind === 'character').map(subject => subject.name);
-  const named = new Set(body.scenes.flatMap(scene => scene.characters.map(name => name.trim())));
-  if (readable.some(subject => subject.kind === 'character' && !kept.has(subject.id) && named.has(subject.name.trim()))) throw new ScriptSubjectsError('differ');
+  const named = new Set(body.scenes.flatMap(scene => scene.characters.map(subjectNameKey)));
+  if (readable.some(subject => subject.kind === 'character' && !kept.has(subject.id) && named.has(subjectNameKey(subject.name)))) throw new ScriptSubjectsError('differ');
   return { ...body, subjects: resolved, scenes: body.scenes.map(scene => ({ ...scene, characters })) };
 }
