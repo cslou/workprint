@@ -47,3 +47,15 @@ test('Use this version on v1 survives a read that started earlier, but not a re-
   assert.deepEqual(shown(showWorkspace(read(2), 1, [], [used(1, 1)])), [1, 'approved'], 'a use confirmed while the re-read was in flight still shows');
   assert.deepEqual(shown(showWorkspace(read(2), 0, [], [used(1, 0, true)])), [2, 'approved'], 'a deferred use waits for the draft to close');
 });
+
+test('a saved video job shows its later read, back and forth between waiting and interrupted', async () => {
+  const { mergeRequestObservations } = await import('../../../src/videos/observations.js');
+  type Request = OperationResponse<'generationRequest'>;
+  const job = (status: 'running' | 'interrupted', revision: number): Request => ({ id: 'job-1', purpose: 'video', status, revision, remote: { taskId: 'task-1' } });
+  const shown = (known: Request[], ...reads: Request[]) => mergeRequestObservations(known, reads).map(request => request.status);
+  assert.deepEqual(shown([job('running', 2)], job('interrupted', 3)), ['interrupted'], 'a Stop is shown');
+  assert.deepEqual(shown([job('interrupted', 3)], job('running', 4)), ['running'], 'a resume is shown');
+  assert.deepEqual(shown([job('running', 4)], job('interrupted', 3)), ['running'], 'an older read never replaces a newer one');
+  const shot: Request = { id: 'g', batchId: 'b', proposalId: 'p', purpose: 'shot_video', target: { shotId: 's' }, status: 'running', remote: {} };
+  assert.deepEqual(shown([{ ...shot, status: 'succeeded' }], shot), ['succeeded'], 'other requests still only move forward');
+});

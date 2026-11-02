@@ -50,7 +50,7 @@ test('response contracts retain exact proposal/question targets and decode only 
   assert.equal(errorEnvelopeSchema.safeParse({ error: { code: 'invalid_input', message: 'bad', stack: 'private' } }).success, false);
   assert.equal(errorEnvelopeSchema.safeParse({ error: { code: 'invalid_input', message: 'bad', details: { token: 'private' } } }).success, false);
   // Generation jobs: the video variant has no target, batch or proposal; the others keep their shape.
-  const video = { id: 'j', purpose: 'video', status: 'interrupted', remote: { taskId: '459000874041694' } };
+  const video = { id: 'j', purpose: 'video', status: 'interrupted', revision: 3, remote: { taskId: '459000874041694' } };
   assert.deepEqual(operations.generationRequest.response.parse(video), video);
   for (const failureReason of ['expired', 'check_refused', 'outcome_unknown']) assert.equal(operations.generationRequest.response.safeParse({ ...video, status: 'failed', failureReason }).success, true, failureReason);
   for (const extra of [{ batchId: 'b' }, { proposalId: 'p' }, { target: { shotId: 's' } }]) assert.equal(operations.generationRequest.response.safeParse({ ...video, ...extra }).success, false, JSON.stringify(extra));
