@@ -15,24 +15,30 @@ const refused = (code: string) => (error: unknown) => error instanceof Generatio
 const clip = (client: Parameters<typeof publishVersion>[0]) => publishVersion(client, { accountId: owner, conversationId: conversation, kind: 'video', createdBy: 'assistant', dependencies: [],
   media: { contentType: 'video/mp4', byteSize: 4096, width: 1344, height: 768, durationMs: 4000, hasAudio: true } });
 
-/** A fresh migrated database and the serving pool over it. */
+/** A fresh migrated database, the serving pool over it and a setup pool for backdating seeds. */
 async function jobStore(t: { after(fn: () => Promise<unknown>): void }) {
   const db = await testStack().testDatabase();
   await applyArtifactMigrations(db.setupUrl);
   const pool = new Pool({ connectionString: db.servingUrl, max: 4, connectionTimeoutMillis: 1000, statement_timeout: 2000 });
-  t.after(async () => { await pool.end(); await db.close(); });
-  return { pool, jobs: createGenerationJobs(pool) };
+  const setup = new Pool({ connectionString: db.setupUrl, max: 1, connectionTimeoutMillis: 1000, statement_timeout: 2000 });
+  t.after(async () => { await pool.end(); await setup.end(); await db.close(); });
+  return { pool, setup, jobs: createGenerationJobs(pool) };
 }
-/** A job saved as if submitted `days` ago, in `status`; seeded through the serving role's insert grant. */
-async function seeded(pool: Pool, status: 'running' | 'interrupted' | 'submitting' | 'succeeded', days = 0, resultVersionId?: string) {
+type Store = Awaited<ReturnType<typeof jobStore>>;
+/** A job submitted `days` ago, then moved to `status` along its real transitions. Only setup may backdate. */
+async function seeded({ pool, setup, jobs }: Store, status: 'running' | 'interrupted' | 'submitting' | 'succeeded', days = 0) {
   const id = randomUUID();
-  await pool.query(`INSERT INTO generation.requests(owner_id,request_id,conversation_id,purpose,prompt_sha256,status,task_id,result_version_id,submitted_at)
-    VALUES($1,$2,$3,'video',repeat('a',64),$4,$5,$6,clock_timestamp() - make_interval(days => $7))`, [owner, id, conversation, status, status === 'submitting' ? null : `task-${id}`, resultVersionId ?? null, days]);
+  await setup.query(`INSERT INTO generation.requests(owner_id,request_id,conversation_id,purpose,prompt_sha256,status,submitted_at)
+    VALUES($1,$2,$3,'video',repeat('a',64),'submitting',clock_timestamp() - make_interval(days => $4))`, [owner, id, conversation, days]);
+  if (status === 'submitting') return id;
+  await jobs.started(owner, id, `task-${id}`);
+  if (status === 'interrupted') await jobs.interrupted(owner, id);
+  if (status === 'succeeded') await transaction(pool, async client => jobs.succeeded(client, owner, id, (await clip(client)).id));
   return id;
 }
 
 test('saved video jobs move only along their closed transitions', { timeout: 120000 }, async t => {
-  const { pool, jobs } = await jobStore(t);
+  const store = await jobStore(t), { pool, jobs } = store;
 
   await t.test('a job is saved submitting, then runs, is interrupted, resumes and fails only as allowed', async () => {
     const job = await jobs.begin(owner, conversation, { prompt: 'A slow push-in', inputs: ['frame-v1'] });
@@ -51,6 +57,12 @@ test('saved video jobs move only along their closed transitions', { timeout: 120
     await assert.rejects(jobs.resumed(owner, job.id), refused('stale'));
     await assert.rejects(pool.query("UPDATE generation.requests SET status='running',failure_reason=NULL,revision=revision+1 WHERE request_id=$1", [job.id]), { code: '23514' });
     await assert.rejects(pool.query('DELETE FROM generation.requests WHERE request_id=$1', [job.id]), { code: '42501' });
+    // A new row can't skip `submitting` or choose its own submission time.
+    const insert = (status: string, extra = '') => pool.query(`INSERT INTO generation.requests(owner_id,request_id,conversation_id,purpose,prompt_sha256,status${extra ? ',task_id' : ''})
+      VALUES($1,$2,$3,'video',repeat('a',64),$4${extra ? ",'task'" : ''})`, [owner, randomUUID(), conversation, status]);
+    await assert.rejects(insert('running'), { code: '23514' });
+    await assert.rejects(insert('submitting', 'task'), { code: '42501' }, 'a task id is only ever set by a move');
+    await assert.rejects(pool.query("INSERT INTO generation.requests(owner_id,request_id,conversation_id,purpose,prompt_sha256,status,submitted_at) VALUES($1,$2,$3,'video',repeat('a',64),'submitting',now() - interval '8 days')", [owner, randomUUID(), conversation]), { code: '42501' });
   });
 
   await t.test('a certainly refused or unknown create fails the submitting job with its reason', async () => {
@@ -61,6 +73,8 @@ test('saved video jobs move only along their closed transitions', { timeout: 120
     const unsent = await jobs.begin(owner, conversation, { prompt: 'Not checked yet', inputs: [] });
     await assert.rejects(jobs.failed(owner, unsent.id, 'check_refused'), refused('stale'), 'nothing was made to check');
     await assert.rejects(jobs.interrupted(owner, unsent.id), refused('stale'), 'no job is interrupted without a task id');
+    const waiting = await jobs.started(owner, unsent.id, 'task-refused');
+    assert.equal((await jobs.failed(owner, waiting.id, 'provider_error')).failureReason, 'provider_error', 'MiniMax failed or cancelled the task');
   });
 
   await t.test('a foreign account or conversation reads not-found', async () => {
@@ -77,7 +91,10 @@ test('saved video jobs move only along their closed transitions', { timeout: 120
     assert.equal((await application.operations.generationRequests({ params: { id: conversation }, query: {}, body: {} }, as(other))).error?.code, 'not_found');
     assert.equal((await application.operations.generationRequest({ params: { id: job.id }, query: {}, body: {} }, as(other))).error?.code, 'not_found');
     const one = await application.operations.generationRequest({ params: { id: job.id }, query: {}, body: {} }, as(owner));
-    assert.deepEqual(one, { id: job.id, purpose: 'video', status: 'submitting', remote: {} });
+    assert.deepEqual(one, { id: job.id, purpose: 'video', status: 'submitting', revision: 1, remote: {} });
+    for (const status of ['queued', 'cancelled'] as const) {
+      assert.deepEqual(await application.operations.generationRequests({ params: { id: conversation }, query: { status }, body: {} }, as(owner)), { items: [], nextCursor: null }, `no job is ever ${status}`);
+    }
   });
 
   await t.test('pages are newest first and bounded, and a cursor from elsewhere is refused', async () => {
@@ -93,7 +110,7 @@ test('saved video jobs move only along their closed transitions', { timeout: 120
 
   await t.test('a job waiting past 7 days is failed expired on read and resume, with no provider call', async () => {
     // This module has no network client at all: expiry is a database transition only.
-    const stale = await seeded(pool, 'running', 8), parked = await seeded(pool, 'interrupted', 8), fresh = await seeded(pool, 'interrupted', 6);
+    const stale = await seeded(store, 'running', 8), parked = await seeded(store, 'interrupted', 8), fresh = await seeded(store, 'interrupted', 6);
     assert.deepEqual([(await jobs.get(owner, stale)).status, (await jobs.get(owner, stale)).failureReason], ['failed', 'expired']);
     await assert.rejects(jobs.resumed(owner, parked), refused('stale'));
     assert.equal((await jobs.get(owner, parked)).failureReason, 'expired');
@@ -101,7 +118,7 @@ test('saved video jobs move only along their closed transitions', { timeout: 120
   });
 
   await t.test('success commits with the clip save: a failed save rolls both back, and a second success is refused', async () => {
-    const job = await seeded(pool, 'running');
+    const job = await seeded(store, 'running');
     let version = '';
     await assert.rejects(transaction(pool, async client => {
       version = (await clip(client)).id;
@@ -118,9 +135,8 @@ test('saved video jobs move only along their closed transitions', { timeout: 120
 });
 
 test('the start pass interrupts running jobs and fails submitting ones, leaving finished jobs', { timeout: 120000 }, async t => {
-  const { pool, jobs } = await jobStore(t);
-  const version = await transaction(pool, client => clip(client));
-  const running = await seeded(pool, 'running'), submitting = await seeded(pool, 'submitting'), succeeded = await seeded(pool, 'succeeded', 0, version.id);
+  const store = await jobStore(t), { jobs } = store;
+  const running = await seeded(store, 'running'), submitting = await seeded(store, 'submitting'), succeeded = await seeded(store, 'succeeded');
   assert.deepEqual(await jobs.interruptWaiting(), { interrupted: 1, failed: 1 });
   const state = async (id: string) => { const job = await jobs.get(owner, id); return [job.status, job.failureReason, job.taskId !== undefined]; };
   assert.deepEqual(await state(running), ['interrupted', undefined, true]);

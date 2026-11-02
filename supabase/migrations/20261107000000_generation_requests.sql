@@ -53,7 +53,21 @@ BEGIN
 END $$;
 CREATE TRIGGER request_transition BEFORE UPDATE ON generation.requests FOR EACH ROW EXECUTE FUNCTION generation.check_request_transition();
 
+-- Every job starts as `submitting`, before its paid call: a new row can't claim a task, an outcome or a past.
+CREATE FUNCTION generation.check_request_start() RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog AS $$
+BEGIN
+  IF NEW.status <> 'submitting' OR NEW.task_id IS NOT NULL OR NEW.failure_reason IS NOT NULL
+    OR NEW.result_version_id IS NOT NULL OR NEW.revision <> 1 THEN
+    RAISE EXCEPTION 'generation request must start submitting' USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER request_start BEFORE INSERT ON generation.requests FOR EACH ROW EXECUTE FUNCTION generation.check_request_start();
+
 REVOKE ALL ON FUNCTION generation.check_request_transition() FROM PUBLIC;
+REVOKE ALL ON FUNCTION generation.check_request_start() FROM PUBLIC;
 REVOKE ALL ON generation.requests FROM PUBLIC;
--- No DELETE: a job is never removed, only moved to a final state.
-GRANT SELECT, INSERT, UPDATE ON generation.requests TO wp_serving;
+-- No DELETE: a job is never removed, only moved to a final state. Times and revisions stay database-set.
+GRANT SELECT ON generation.requests TO wp_serving;
+GRANT INSERT (owner_id,request_id,conversation_id,purpose,prompt_sha256,inputs,status) ON generation.requests TO wp_serving;
+GRANT UPDATE (status,task_id,failure_reason,result_version_id,revision,updated_at) ON generation.requests TO wp_serving;
