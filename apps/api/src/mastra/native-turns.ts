@@ -1,14 +1,13 @@
 import type { Mastra } from '@mastra/core';
 import type { Context } from 'hono';
-import { activeNativeRun, createOwnedConversationCheck, hasNativeTurns, nameVideo, nativeAssistantId, turnLimits } from '../agent/index.js';
+import { acceptsNativeTurns, activeNativeRun, createOwnedConversationCheck, hasNativeTurns, nameVideo, nativeAssistantId, turnLimits } from '../agent/index.js';
 import { nativeControlRoutes, nativeRunAdmission } from './native-run-admission.js';
 import { markConversationStarted } from './started-conversations.js';
 
 export const nativeTurnRoutes = [...['send-message', 'threads/subscribe'].map(tail => ({ method: 'POST' as const, path: `/api/agents/${nativeAssistantId}/${tail}` })), ...nativeControlRoutes];
 export const isNativeTurnRoute = (context: Context) => nativeTurnRoutes.some(route => route.path === context.req.path && route.method === context.req.method);
-const streamTails = ['send-message', 'threads/subscribe', 'observe'].map(tail => `/api/agents/${nativeAssistantId}/${tail}`);
-/** The routes that carry a turn's stream (send, subscribe, observe); Stop is not one. */
-export const isTurnStreamRoute = (context: Context) => context.req.method === 'POST' && streamTails.includes(context.req.path);
+/** The turn routes that carry a turn's stream (send, subscribe, observe): every turn route but Stop. */
+export const isTurnStreamRoute = (context: Context) => isNativeTurnRoute(context) && !context.req.path.endsWith('/threads/abort');
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 const uuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const isSend = (context: Context) => context.req.path === `/api/agents/${nativeAssistantId}/send-message`;
@@ -64,6 +63,8 @@ export function nativeTurnAdmission(mastra: Mastra) {
       if (!hasNativeTurns(mastra)) return unavailable();
       // One active turn per video; there is no queue.
       if (!send) return undefined;
+      // Observing and Stop still work while a shutdown drains; only a new turn is refused.
+      if (!acceptsNativeTurns(mastra)) return unavailable();
       const videoId = body.threadId;
       if (starting.has(videoId) || activeNativeRun(mastra, accountId, videoId)) return fail(409, 'busy', 'The agent is still working on the last message.');
       starting.add(videoId);

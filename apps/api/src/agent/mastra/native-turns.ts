@@ -74,15 +74,17 @@ export function bindNativeTurns(mastra: Mastra, turns: NativeTurns) {
   bindings.set(mastra, { tools: turns.tools, limits, nameVideo: createVideoTitler(turns.model, storage, limits), shutdown });
 }
 
-/** True when turns are bound and the server is not shutting down, so new turns may start. */
-export function hasNativeTurns(mastra: Mastra) { const binding = bindings.get(mastra); return !!binding && !binding.shutdown.signal.aborted; }
+export function hasNativeTurns(mastra: Mastra) { return bindings.has(mastra); }
+
+/** True when turns are bound and the server is not shutting down, so a new turn may start. */
+export function acceptsNativeTurns(mastra: Mastra) { const binding = bindings.get(mastra); return !!binding && !binding.shutdown.signal.aborted; }
 
 /** The tools bound to this instance; none when turns are not bound. */
 export function nativeToolRegistry(mastra: Mastra): readonly AgentTool[] { return bindings.get(mastra)?.tools ?? []; }
 
 /**
  * Server shutdown: running tools see their signal fire with reason `shutdown`, then every active turn is
- * aborted as Stop aborts one. No new turn is admitted after, and any model call still made is refused
+ * aborted as Stop aborts one. No new turn is admitted after (`acceptsNativeTurns`), and any model call still made is refused
  * unsent, so no model step follows. Runs once; a no-op when turns are not bound.
  */
 export function stopNativeTurns(mastra: Mastra) {
