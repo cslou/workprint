@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import type { OwnedWorkspace, StoppedVideosOutcome } from '../../../src/application/index.js';
 import { productionTools, type AgentCollaborators } from '../../../src/agent/index.js';
 import { listingBounds, listWorkspace, workspaceItem } from '../../../src/agent/workspace-entries.js';
+import { unusedSheets } from '../../support/unused-sheets.js';
 
 type Version = OwnedWorkspace['assets'][number]['version'];
 const base = (id: string, revision = 1) => ({ id, artifactId: `artifact-${id}`, revision, createdBy: 'human' as const, createdAt: '2026-11-01T00:00:00.000Z', dependencies: [] });
@@ -65,7 +66,7 @@ test('the listing gives the video\'s stopped jobs with their resume ids, only wh
   const run = (stopped?: StoppedVideosOutcome) => {
     const collaborators: AgentCollaborators = {
       readWorkspace: async () => ({ kind: 'found', workspace: workspace([image('i1')]) }),
-      saveScript: async () => ({ kind: 'unavailable' }), readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }),
+      saveScript: async () => ({ kind: 'unavailable' }), sheets: unusedSheets, readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }),
       ...(stopped ? { videos: { start: async () => ({ kind: 'not_found' }), resume: async () => ({ kind: 'not_found' }), stopped: async (account: string, video: string) => { asked.push([account, video]); return stopped; } } } : {}),
     };
     const signal = new AbortController().signal;
@@ -86,7 +87,7 @@ test('the listing gives the script\'s subjects with their ids, and 50 subjects w
   const subjects = names.map((name, index) => ({ id: `${'s'.repeat(80)}-${index}`, kind: index === 0 ? 'character' as const : 'prop' as const, name }));
   const script: Version = { ...base('s'), kind: 'script', content: { schemaVersion: 1, subjects, scenes: [{ heading: { setting: 'INT.', location: 'Station', time: 'Night' }, characters: [names[0]!], script: [{ action: 'Ada waits.' }] }] } };
   const space = workspace(Array.from({ length: 40 }, (_, index) => reference(`r${index}`, `N${index}`, 'é'.repeat(400))), { script: work(script, 'script') });
-  const collaborators: AgentCollaborators = { readWorkspace: async () => ({ kind: 'found', workspace: space }), saveScript: async () => ({ kind: 'unavailable' }), readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }) };
+  const collaborators: AgentCollaborators = { readWorkspace: async () => ({ kind: 'found', workspace: space }), saveScript: async () => ({ kind: 'unavailable' }), readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }), sheets: unusedSheets };
   const signal = new AbortController().signal;
   const listed = await tool.execute({}, { scope: { accountId: 'a', videoId: 'v' }, collaborators, signal, abortReason: () => undefined }) as { subjects: unknown[]; items: { name: string }[]; truncated: boolean };
   assert.deepEqual(listed.subjects, subjects);

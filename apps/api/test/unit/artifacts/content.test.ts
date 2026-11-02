@@ -28,6 +28,9 @@ test('stored reference content has explicit kind, continuity and exact version r
     { ...reference, approved: true },
     { ...reference, references: [{ versionId: 'image-v1', view: 'Front', notes: [] }, { versionId: 'image-v1', view: 'Back', notes: [] }] },
   ]) assert.throws(() => parseContent('reference', value));
+  // People's sheets may hold more than the assistant's 5 views and stay valid.
+  const six = Array.from({ length: 6 }, (_, index) => ({ versionId: `image-v${index}`, view: `View ${index}`, notes: [] }));
+  assert.deepEqual(parseContent('reference', { ...reference, references: six }), { ...reference, references: six });
 });
 
 test('stored planning keeps stable Shot and Panel identities with unique orders and no generated-image claims', async () => {

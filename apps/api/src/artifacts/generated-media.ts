@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import type { PrivateObjectStorage } from '../storage/index.js';
+import { useRoom } from './use-room.js';
 import { UploadError, uploadError } from './uploads/errors.js';
 
 export const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
@@ -31,8 +32,7 @@ export async function withStoredObjects<T>(storage: PrivateObjectStorage, object
   }
 }
 
-/** A video holds at most 100 uses; a save that adds one refuses past that. */
+/** A save of assistant-made media that adds a use refuses when the video has no room. */
 export async function requireUseRoom(client: PoolClient, account: string, conversation: string) {
-  const count = (await client.query<{ count: number }>('SELECT count(*)::int AS count FROM artifacts.conversation_uses WHERE owner_id=$1 AND conversation_id=$2', [account, conversation])).rows[0]!.count;
-  if (count >= 100) throw new UploadError('integration_failure');
+  if (await useRoom(client, account, conversation) === 0) throw new UploadError('integration_failure');
 }
