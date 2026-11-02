@@ -5,18 +5,24 @@ import { requireStableAvc } from './media-avc.js';
 
 const invalid = () => new UploadError('invalid_input');
 const unsupported = () => new UploadError('unsupported');
+/** Who made the bytes. Only assistant-made images may carry the provider's AI-generated label. */
+export type MediaOrigin = 'upload' | 'assistant';
+const xmpKeyword = Buffer.from('XML:com.adobe.xmp\0', 'latin1');
+/** The provider's XMP label: an uncompressed `iTXt` with the XMP keyword and at most 4 KB of data. */
+const isXmpLabel = (data: Buffer) => data.length <= 4096 && data.length > xmpKeyword.length + 1 && data.subarray(0, xmpKeyword.length).equals(xmpKeyword) && data[xmpKeyword.length] === 0;
 /** Closed positively-qualified container/image variants, not MIME or filename inference. */
-export function inspectMediaBytes(bytes: Uint8Array, kind: 'image' | 'video', contentType: string): { width?: number; height?: number } {
+export function inspectMediaBytes(bytes: Uint8Array, kind: 'image' | 'video', contentType: string, origin: MediaOrigin = 'upload'): { width?: number; height?: number } {
   const b=Buffer.from(bytes.buffer,bytes.byteOffset,bytes.byteLength);
   if (!b.length || b.length>(kind==='image'?MAX_UPLOAD_IMAGE_BYTES:MAX_UPLOAD_VIDEO_BYTES)) throw unsupported();
   if(kind==='image' && contentType==='image/png') {
     if(b.length<33 || !b.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))throw invalid();
-    let p=8,count=0,seenData=false,ended=false,width=0,height=0;
+    let p=8,count=0,seenData=false,ended=false,width=0,height=0,labels=0;
     while(p<b.length) {
-      if(++count>4096 || p+12>b.length)throw invalid();const n=b.readUInt32BE(p),type=b.toString('ascii',p+4,p+8);if(n>b.length-p-12 || !['IHDR','IDAT','IEND','pHYs'].includes(type))throw unsupported();
+      if(++count>4096 || p+12>b.length)throw invalid();const n=b.readUInt32BE(p),type=b.toString('ascii',p+4,p+8);if(n>b.length-p-12 || !['IHDR','IDAT','IEND','pHYs',...(origin==='assistant'?['iTXt']:[])].includes(type))throw unsupported();
       if(crc32(b.subarray(p+4,p+8+n))!==b.readUInt32BE(p+8+n))throw invalid();
       if(type==='IHDR'){if(count!==1 || n!==13)throw invalid();width=b.readUInt32BE(p+8);height=b.readUInt32BE(p+12);if(b[p+16]!==8 || ![2,6].includes(b[p+17]!) || b[p+18]!==0 || b[p+19]!==0 || b[p+20]!==0)throw unsupported();}
       else if(!width || !height)throw invalid();
+      if(type==='iTXt' && (++labels>1 || seenData || !isXmpLabel(b.subarray(p+8,p+8+n))))throw unsupported();
       if(type==='IDAT')seenData=true;if(type==='pHYs' && n!==9)throw invalid();
       if(type==='IEND'){if(n!==0 || !seenData || p+12!==b.length)throw invalid();ended=true;}
       p+=n+12;

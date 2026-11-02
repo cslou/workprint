@@ -7,7 +7,7 @@ import type { MediaVerifier } from './types.js';
 /** Trusted composition capability; actual immutable byte/decode proof, never caller authority. */
 export function createMediaVerifier(sandbox:MediaSandbox):MediaVerifier {
   return async input=>{
-    const byteSize=input.bytes.byteLength,header=inspectMediaBytes(input.bytes,input.kind,input.contentType);
+    const byteSize=input.bytes.byteLength,header=inspectMediaBytes(input.bytes,input.kind,input.contentType,input.origin);
     try{return await sandbox.use(input.bytes,async job=>{
       const measured=measureMediaProbe(parseMediaProbe(await job.probe()),input.kind,input.contentType,byteSize);
       if(header.width!==undefined && (header.width!==measured.width || header.height!==measured.height))throw new UploadError('invalid_input');
