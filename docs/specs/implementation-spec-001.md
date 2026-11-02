@@ -654,7 +654,7 @@ The skills live in `~/projects/animation-studio/.pi/skills/` (see [source contra
 | Existing source | Hosted disposition | Sprint |
 | --- | --- | --- |
 | `create-scene-script` and its validator | Adapt the writing guidance and ordering/speaker rules. Keep Workprint's saved script schema; do not port the YAML format, file conventions or Python runtime. | 007 (B-013) |
-| `create-storyboard`: Reference Package, storyboard schema and panel-generation strategy | Adapt reference roles, Shot/Panel planning and panel dependency rules. The standalone HTML renderer is not ported. | 011–012 (B-017, B-018) |
+| `create-storyboard`: Reference Package, storyboard schema and panel-generation strategy | Adapt reference roles, Shot/Panel planning and panel dependency rules. The standalone HTML renderer is not ported. | 010–011 (B-017, B-018) |
 | `generate-image` and its prompt-preparation contract | Adapt brief, prompt and inspection guidance for Meta `muse-image-1.0`. OpenAI/MiniMax image clients are not used. | 008 (B-015) |
 | `generate-video` and its MiniMax V2 provider scripts | Adapt submit → save task → poll → download → validate and same-task resume. Hosted generation records replace the local manifest. | 009 (B-025, B-019) |
 | `assemble-video` and the shared FFmpeg/ffprobe adapters | Reuse the exact ordering, compatibility and decoded-verification rules for stream-copy joining, inside the existing media sandbox. | 012 (B-020) |

@@ -32,7 +32,7 @@ test('the model never chooses subject ids: a script.subjects key is refused, and
 });
 
 test('empty ids are new, base ids are kept through a rename, and an unknown or repeated id is refused', () => {
-  const subjects = (list: SubjectInput[]) => withSubjects(body(['ignored']), stored, list);
+  const subjects = (list: SubjectInput[]) => withSubjects(body(['Mara Vale', 'Mara']), stored, list);
   const renamed = subjects([{ id: 'mara', kind: 'character', name: ' Mara Vale ' }, { id: '', kind: 'prop', name: 'The key' }, { id: ' ', kind: 'character', name: 'Mara' }, { id: 'the-gallery', kind: 'place', name: 'The Gallery' }]);
   assert.deepEqual(renamed.subjects, [{ id: 'mara', kind: 'character', name: 'Mara Vale' }, { id: 'the-key', kind: 'prop', name: 'The key' }, { id: 'mara-2', kind: 'character', name: 'Mara' }, { id: 'the-gallery', kind: 'place', name: 'The Gallery' }]);
   assert.deepEqual(renamed.scenes[0]!.characters, ['Mara Vale', 'Mara'], 'characters follow the character subjects');
@@ -42,6 +42,11 @@ test('empty ids are new, base ids are kept through a rename, and an unknown or r
   assert.deepEqual(withSubjects(body(['Mara']), stored, []).subjects, stored.subjects);
   assert.throws(() => withSubjects(body(['Mara', 'Ben']), stored, []), (error: unknown) => error instanceof ScriptSubjectsError && error.reason === 'differ');
   assert.deepEqual(withSubjects(body(['Mara']), null, []).subjects, stored.subjects);
+  // A base saved before subjects existed keeps the subjects derived from it, so a rename needs the full list.
+  const old = body(['Mara']);
+  assert.deepEqual(withSubjects(body(['Mara']), old, []).subjects, stored.subjects);
+  assert.throws(() => withSubjects(body(['Mara Vale']), old, []), (error: unknown) => error instanceof ScriptSubjectsError && error.reason === 'differ');
+  assert.deepEqual(withSubjects(body(['Mara Vale']), old, [{ id: 'mara', kind: 'character', name: 'Mara Vale' }]).subjects, [{ id: 'mara', kind: 'character', name: 'Mara Vale' }]);
   // Derived subjects that can't equal the characters differ, so the model is told to pass the full list.
   const differs = (error: unknown) => error instanceof ScriptSubjectsError && error.reason === 'differ';
   assert.throws(() => withSubjects(body(['x'.repeat(81)]), null, []), differs);
@@ -51,6 +56,17 @@ test('empty ids are new, base ids are kept through a rename, and an unknown or r
   assert.throws(() => withSubjects(body(['Mara']), stored, [{ id: 'the-gallery', kind: 'place', name: 'The Gallery' }]), differs);
   assert.deepEqual(withSubjects(body([]), stored, [{ id: 'the-gallery', kind: 'place', name: 'The Gallery' }]).scenes[0]!.characters, []);
   assert.throws(() => withSubjects(body([' MARA ']), stored, [{ id: 'the-gallery', kind: 'place', name: 'The Gallery' }]), differs, 'names compare ignoring case');
+  // A character the script names that the list has no subject for differs, on a first save too; a kept subject's old name is allowed.
+  assert.throws(() => withSubjects(body(['Mara', 'Ben']), null, [{ id: '', kind: 'character', name: 'Mara' }]), differs);
+  assert.throws(() => withSubjects(body(['Mara', 'Ben']), stored, [{ id: 'mara', kind: 'character', name: 'Mara' }]), differs);
+  assert.deepEqual(withSubjects(body(['Mara']), stored, [{ id: 'mara', kind: 'character', name: 'Mara Vale' }]).scenes[0]!.characters, ['Mara Vale']);
+  // A base character the list drops can't hide behind another's rename, and an old name can't stand beside its new one.
+  const pair = { ...body(['Mara', 'Ben']), subjects: [{ id: 'mara', kind: 'character' as const, name: 'Mara' }, { id: 'ben', kind: 'character' as const, name: 'Ben' }] };
+  assert.throws(() => withSubjects(body(['Mara', 'Ben']), pair, [{ id: 'mara', kind: 'character', name: 'Ben' }]), differs);
+  assert.throws(() => withSubjects(body(['Mara', 'Mara Vale']), stored, [{ id: 'mara', kind: 'character', name: 'Mara Vale' }]), differs);
+  // A renamed character's lines take the new name, so the scene still names its speaker.
+  const speaks = { ...body(['Mara']), scenes: [{ ...body(['Mara']).scenes[0]!, script: [{ dialogue: { character: 'Mara', text: 'Who is there?' } }, { dialogue: { character: 'Narrator', text: 'Night.', delivery: 'voice_over' as const } }] }] };
+  assert.deepEqual(withSubjects(speaks, stored, [{ id: 'mara', kind: 'character', name: 'Mara Vale' }]).scenes[0]!.script, [{ dialogue: { character: 'Mara Vale', text: 'Who is there?' } }, { dialogue: { character: 'Narrator', text: 'Night.', delivery: 'voice_over' } }]);
   // A new subject named like a base subject the list leaves out is that subject: a forgotten id is kept.
   assert.deepEqual(withSubjects(body(['Mara']), stored, [{ id: '', kind: 'character', name: 'MARA' }, { id: '', kind: 'place', name: 'The Gallery' }]).subjects, [{ id: 'mara', kind: 'character', name: 'MARA' }, { id: 'the-gallery', kind: 'place', name: 'The Gallery' }]);
   // A subject named "Null" never gets the id a model sends to mean none.

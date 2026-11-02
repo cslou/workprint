@@ -15,17 +15,20 @@ const isNew = (id: string) => id.trim() === '';
 
 /**
  * The script content to store for an assistant save: the new body with its subjects.
- * An empty list keeps the base's stored subjects, whose characters must match; a first save or a base saved before
- * subjects existed stores the subjects derived from the new script, so ids are fixed from then on. Derived subjects
- * that can't match the characters (names over 80 characters, names differing only in case, more than 50) differ too.
+ * An empty list keeps the base's subjects, stored or derived from the base, whose characters must match, so a base
+ * saved before subjects existed keeps the ids read-workspace listed; a first save stores the subjects derived from the
+ * new script, so ids are fixed from then on. Derived subjects that can't match the characters (names over 80
+ * characters, names differing only in case, more than 50) differ too.
  * A non-empty list is the full new list: ids from the base are kept, new subjects get server-made ids, and the
  * scene's characters become the character subjects' names. A new subject with the name and kind of a base subject
- * the list leaves out is that subject, so a forgotten id is kept. A list that leaves out a character subject the
- * script still names differs, so a partial list never drops characters. The result is validated by the caller.
+ * the list leaves out is that subject, so a forgotten id is kept. A character the script names must be a character
+ * subject in the list, or the old name of one it keeps and renames (whose lines then take the new name), and a base
+ * character the list leaves out can't still be named, else the list differs, so a partial list never drops
+ * characters. The result is validated by the caller.
  */
 export function withSubjects(body: ScriptBody, base: SavedScript | null, subjects: readonly SubjectInput[]): SavedScript {
   if (subjects.length === 0) {
-    const subjects = base?.subjects ?? scriptSubjects(body);
+    const subjects = base?.subjects ?? scriptSubjects(base ?? body);
     if (!characterSubjectsMatch(subjects, body.scenes)) throw new ScriptSubjectsError('differ');
     return { ...body, subjects };
   }
@@ -39,7 +42,8 @@ export function withSubjects(body: ScriptBody, base: SavedScript | null, subject
     if (!known.has(id) || kept.has(id)) throw new ScriptSubjectsError('unknown_id');
     kept.add(id);
   }
-  // A new id never reuses one from the base, so work filed under a removed subject never moves to a new one.
+  // A new id never reuses one from the base. A subject removed in an earlier save and added back by name gets its old
+  // id again, and with it the sheet and images still filed under that id.
   const taken = new Set([...known, ...kept]);
   const resolved = subjects.map(subject => {
     const name = subject.name.trim();
@@ -50,7 +54,17 @@ export function withSubjects(body: ScriptBody, base: SavedScript | null, subject
     return { id, kind: subject.kind, name };
   });
   const characters = resolved.filter(subject => subject.kind === 'character').map(subject => subject.name);
+  const current = new Set(characters.map(subjectNameKey));
   const named = new Set(body.scenes.flatMap(scene => scene.characters.map(subjectNameKey)));
+  // A kept character's old name still in the script is that character renamed, unless the script names the new one too.
+  const renamed = new Map(readable.flatMap(subject => {
+    const now = resolved.find(candidate => candidate.id === subject.id);
+    return subject.kind === 'character' && now?.kind === 'character' && !named.has(subjectNameKey(now.name)) ? [[subjectNameKey(subject.name), now.name] as const] : [];
+  }));
   if (readable.some(subject => subject.kind === 'character' && !kept.has(subject.id) && named.has(subjectNameKey(subject.name)))) throw new ScriptSubjectsError('differ');
-  return { ...body, subjects: resolved, scenes: body.scenes.map(scene => ({ ...scene, characters })) };
+  if ([...named].some(key => !current.has(key) && !renamed.has(key))) throw new ScriptSubjectsError('differ');
+  // Lines spoken under a renamed character's old name follow the rename, as the scene's characters do.
+  const speaker = (name: string) => current.has(subjectNameKey(name)) ? name : renamed.get(subjectNameKey(name)) ?? name;
+  return { ...body, subjects: resolved, scenes: body.scenes.map(scene => ({ ...scene, characters,
+    script: scene.script.map(entry => 'dialogue' in entry ? { ...entry, dialogue: { ...entry.dialogue, character: speaker(entry.dialogue.character) } } : entry) })) };
 }

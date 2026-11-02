@@ -19,7 +19,8 @@ export type SheetOutcome =
   | { kind: 'too_long'; subjectName: string }
   /** A view the base keeps has a name longer than an assistant sheet allows, so a person must edit the sheet. */
   | { kind: 'unrevisable'; subjectName: string }
-  | { kind: 'in_other_sheet'; subjectName: string }
+  /** `passed`: the image is one this call places; otherwise the subject's sheet already shares it with another sheet. */
+  | { kind: 'in_other_sheet'; subjectName: string; passed: boolean }
   /** Nothing was saved: the first view of a new sheet failed, or no view was made at all. */
   | { kind: 'view_failed'; failure: ImageFailure }
   /** Views were made and kept as draft images, but the sheet save was refused for `reason`. */
@@ -122,7 +123,7 @@ export async function makeSheet(makers: SheetMakers, accountId: string, videoId:
   // A failed remake puts its base image back, so that image counts too.
   const listed = planned.flatMap(item => [item.versionId, item.replaces].filter((id): id is string => Boolean(id)));
   const holder = all.find(sheet => sheet !== current && sheet.views.some(reference => listed.includes(reference.versionId)));
-  if (holder) return { kind: 'in_other_sheet', subjectName: holder.subjectName };
+  if (holder) return { kind: 'in_other_sheet', subjectName: holder.subjectName, passed: holder.views.some(reference => placed.includes(reference.versionId)) };
   const toMake = planned.filter(item => item.make).length;
   const room = await sheets.useRoom(accountId, videoId);
   if (room.kind !== 'room') return { kind: 'refused', reason: 'work_unavailable' };
