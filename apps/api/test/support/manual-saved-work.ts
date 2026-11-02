@@ -39,9 +39,9 @@ export async function prepareManualVisualWork(setup: SavedWorkSetup) {
 }
 
 export type ManualSavedWork = { accountId: string; foreignAccountId: string; conversationId: string; otherConversationId: string; script: Version; reference: Version; planning: Version };
-/** Synthetic existing records through domain/native setup only, never a producer/seed route. */
 /** Subjects the script lists with `options.subjects`, as an assistant save stores them. */
 export const manualScriptSubjects = [{ id: 'ada', kind: 'character', name: 'Ada' }, { id: 'station', kind: 'place', name: 'Station' }] as const;
+/** Synthetic existing records through domain/native setup only, never a producer/seed route. */
 export async function prepareManualSavedWork({ accountIds, native, servingUrl }: SavedWorkSetup, options: { referenceApproved?: boolean; subjects?: boolean } = {}): Promise<ManualSavedWork> {
   const accountId = accountIds[0], foreignAccountId = accountIds[1];
   if (!accountId || !foreignAccountId) throw new Error('An admitted synthetic account is required');

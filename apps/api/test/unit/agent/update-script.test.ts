@@ -24,14 +24,15 @@ async function call(args: Record<string, unknown>, outcome: AssistantScriptOutco
 
 test('the model never chooses subject ids: a script.subjects key is refused, and subjects go beside the script', async () => {
   assert.equal((await call({ baseVersionId: null, script: stored })).parsed, false);
-  const sent = await call({ baseVersionId: null, script: body(['Mara']), subjects: [{ kind: 'character', name: 'Mara' }] });
-  assert.deepEqual(sent.received, [{ content: body(['Mara']), baseVersionId: null, subjects: [{ id: '', kind: 'character', name: 'Mara' }] }]);
+  const sent = await call({ baseVersionId: null, script: body(['Mara']), subjects: [{ kind: 'character', name: 'Mara' }, { id: ' NULL ', kind: 'prop', name: 'Key' }, { id: 'mara', kind: 'place', name: 'Gallery' }] });
+  // A "null" id is the model leaving the id out: it reaches the save as a new subject.
+  assert.deepEqual(sent.received, [{ content: body(['Mara']), baseVersionId: null, subjects: [{ id: '', kind: 'character', name: 'Mara' }, { id: '', kind: 'prop', name: 'Key' }, { id: 'mara', kind: 'place', name: 'Gallery' }] }]);
   assert.deepEqual((await call({ baseVersionId: null, script: body(['Mara']) })).received, [{ content: body(['Mara']), baseVersionId: null, subjects: [] }]);
 });
 
-test('"null" and empty ids are new, base ids are kept through a rename, and an unknown id is refused', () => {
+test('empty ids are new, base ids are kept through a rename, and an unknown or repeated id is refused', () => {
   const subjects = (list: SubjectInput[]) => withSubjects(body(['ignored']), stored, list);
-  const renamed = subjects([{ id: 'mara', kind: 'character', name: ' Mara Vale ' }, { id: 'null', kind: 'prop', name: 'The key' }, { id: ' ', kind: 'character', name: 'Mara' }, { id: 'the-gallery', kind: 'place', name: 'The Gallery' }]);
+  const renamed = subjects([{ id: 'mara', kind: 'character', name: ' Mara Vale ' }, { id: '', kind: 'prop', name: 'The key' }, { id: ' ', kind: 'character', name: 'Mara' }, { id: 'the-gallery', kind: 'place', name: 'The Gallery' }]);
   assert.deepEqual(renamed.subjects, [{ id: 'mara', kind: 'character', name: 'Mara Vale' }, { id: 'the-key', kind: 'prop', name: 'The key' }, { id: 'mara-2', kind: 'character', name: 'Mara' }, { id: 'the-gallery', kind: 'place', name: 'The Gallery' }]);
   assert.deepEqual(renamed.scenes[0]!.characters, ['Mara Vale', 'Mara'], 'characters follow the character subjects');
   assert.throws(() => subjects([{ id: 'ben', kind: 'character', name: 'Ben' }]), (error: unknown) => error instanceof ScriptSubjectsError && error.reason === 'unknown_id');
@@ -40,6 +41,16 @@ test('"null" and empty ids are new, base ids are kept through a rename, and an u
   assert.deepEqual(withSubjects(body(['Mara']), stored, []).subjects, stored.subjects);
   assert.throws(() => withSubjects(body(['Mara', 'Ben']), stored, []), (error: unknown) => error instanceof ScriptSubjectsError && error.reason === 'differ');
   assert.deepEqual(withSubjects(body(['Mara']), null, []).subjects, stored.subjects);
+  // Derived subjects that can't equal the characters differ, so the model is told to pass the full list.
+  const differs = (error: unknown) => error instanceof ScriptSubjectsError && error.reason === 'differ';
+  assert.throws(() => withSubjects(body(['x'.repeat(81)]), null, []), differs);
+  assert.throws(() => withSubjects(body(['Ann', 'ANN']), null, []), differs);
+  assert.throws(() => withSubjects(body(Array.from({ length: 51 }, (_, n) => `Person ${n}`)), null, []), differs);
+  // A partial list that leaves out a character the script still names differs; leaving the character out of both removes it.
+  assert.throws(() => withSubjects(body(['Mara']), stored, [{ id: 'the-gallery', kind: 'place', name: 'The Gallery' }]), differs);
+  assert.deepEqual(withSubjects(body([]), stored, [{ id: 'the-gallery', kind: 'place', name: 'The Gallery' }]).scenes[0]!.characters, []);
+  // A subject named "Null" never gets the id a model sends to mean none.
+  assert.deepEqual(withSubjects(body([]), null, [{ id: '', kind: 'prop', name: 'Null' }]).subjects, [{ id: 'null-2', kind: 'prop', name: 'Null' }]);
 });
 
 test('the mismatch and invalid lines tell the model what to change', async () => {
@@ -50,5 +61,5 @@ test('the mismatch and invalid lines tell the model what to change', async () =>
   assert.equal(invalid.summary, 'Not saved: the script isn’t valid');
   assert.match(invalid.result?.message ?? '', /every speaker must be a character subject unless voice-over/i);
   const unknown = await call({ baseVersionId: 'v1', script: body(['Mara']), subjects: [{ id: 'ben', kind: 'character', name: 'Ben' }] }, { kind: 'invalid', field: 'subjects' });
-  assert.match(unknown.result?.message ?? '', /Keep each subject's id from read-workspace/);
+  assert.match(unknown.result?.message ?? '', /or is listed twice\. Keep each subject's id from read-workspace once/);
 });

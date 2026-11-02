@@ -31,15 +31,19 @@ export const scriptSubjectSchema = z.strictObject({
 });
 /** A script without its subjects: the assistant writes this, and the server keeps the subjects' ids. */
 export const scriptBodySchema = z.strictObject({ schemaVersion: z.literal(1), scenes: z.array(scene).min(1).max(1) });
+/** Whether the character subjects are exactly the scenes' characters (trimmed): the one rule the save and the schema share. */
+export function characterSubjectsMatch(subjects: readonly Readonly<{ kind: string; name: string }>[], scenes: readonly Readonly<{ characters: readonly string[] }>[]): boolean {
+  const characters = new Set(scenes.flatMap(item => item.characters.map(name => name.trim())));
+  const named = subjects.filter(subject => subject.kind === 'character').map(subject => subject.name.trim());
+  return named.length === characters.size && named.every(name => characters.has(name));
+}
 /** Structural hosted content only: validation never grants human approval. */
 export const savedScriptContentSchema = scriptBodySchema.extend({ subjects: z.array(scriptSubjectSchema).max(50).optional() }).superRefine((value, context) => {
   if (!value.subjects) return;
   if (!unique(value.subjects.map(subject => subject.id))) context.addIssue({ code: 'custom', message: 'Subject ids must be distinct', path: ['subjects'] });
   if (!unique(value.subjects.map(subject => subjectNameKey(subject.name)))) context.addIssue({ code: 'custom', message: 'Subject names must be distinct', path: ['subjects'] });
   // The character subjects are the scene's characters: the two never disagree.
-  const characters = new Set(value.scenes.flatMap(item => item.characters.map(name => name.trim())));
-  const named = value.subjects.filter(subject => subject.kind === 'character').map(subject => subject.name.trim());
-  if (named.length !== characters.size || named.some(name => !characters.has(name))) context.addIssue({ code: 'custom', message: 'Character subjects must be the scene\'s characters', path: ['subjects'] });
+  if (!characterSubjectsMatch(value.subjects, value.scenes)) context.addIssue({ code: 'custom', message: 'Character subjects must be the scene\'s characters', path: ['subjects'] });
 });
 const referenceImage = z.strictObject({ versionId: idSchema, view: text, notes: names });
 export const savedReferenceContentSchema = z.strictObject({

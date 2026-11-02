@@ -9,15 +9,19 @@ const maxSubjects = 50, maxName = 80, maxSlug = 190;
 
 /** A subject id made from its name: a lowercase slug, or its kind when the name has no letters or digits. */
 function slugOf(name: string, kind: SubjectKind) {
-  const base = name.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, maxSlug).replace(/^-+|-+$/g, '');
+  const base = name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, maxSlug).replace(/^-+|-+$/g, '');
   return base || kind;
 }
 
-/** A new subject id from its name that is not in `taken`: the name's slug, then `-2`, `-3` and so on. */
+/**
+ * A new subject id from its name that is not in `taken`: the name's slug, then `-2`, `-3` and so on. It is never
+ * "null", which a model sends to mean no id.
+ */
 export function newSubjectId(name: string, kind: SubjectKind, taken: ReadonlySet<string>): string {
   const base = slugOf(name, kind);
-  if (!taken.has(base)) return base;
-  for (let n = 2; ; n += 1) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`;
+  const free = (id: string) => id !== 'null' && !taken.has(id);
+  if (free(base)) return base;
+  for (let n = 2; ; n += 1) if (free(`${base}-${n}`)) return `${base}-${n}`;
 }
 
 const kindOrder = (subjects: readonly ScriptSubject[]) => subjectKinds.flatMap(kind => subjects.filter(subject => subject.kind === kind));

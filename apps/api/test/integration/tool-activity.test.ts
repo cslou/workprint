@@ -287,7 +287,7 @@ test('update-script saves the video\'s current script as a draft, and never over
 
   await t.test('the script lists its subjects with server-made ids that a rename keeps, and refuses ids it never had', async () => {
     const fresh = await client(owner).newVideo();
-    const made = await saveScript(owner.id, fresh, { baseVersionId: null, content: gallery([]), subjects: [{ id: '', kind: 'character', name: 'Mara' }, { id: 'null', kind: 'place', name: 'The Gallery' }, { id: ' ', kind: 'prop', name: 'The key' }] });
+    const made = await saveScript(owner.id, fresh, { baseVersionId: null, content: gallery([]), subjects: [{ id: '', kind: 'character', name: 'Mara' }, { id: '', kind: 'place', name: 'The Gallery' }, { id: ' ', kind: 'prop', name: 'The key' }] });
     assert.ok(made.kind === 'saved', JSON.stringify(made));
     assert.deepEqual((await stored(fresh)).subjects, [{ id: 'mara', kind: 'character', name: 'Mara' }, { id: 'the-gallery', kind: 'place', name: 'The Gallery' }, { id: 'the-key', kind: 'prop', name: 'The key' }]);
     assert.deepEqual((await stored(fresh)).scenes[0]!.characters, ['Mara'], 'the server sets characters from the character subjects');

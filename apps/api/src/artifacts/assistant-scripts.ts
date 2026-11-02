@@ -5,8 +5,8 @@ import { idSchema, savedScriptContentSchema, scriptBodySchema, useSchema, type V
 import { transaction } from '../db/index.js';
 import { parseContent } from './content.js';
 import { ArtifactError } from './errors.js';
-import { withSubjects, type SubjectInput } from './script-subjects.js';
 import { lockPublicationOwner, publishVersion } from './publication.js';
+import { withSubjects, type SubjectInput } from './script-subjects.js';
 import { createArtifactStore } from './store.js';
 
 type OwnedCheck = Parameters<typeof createArtifactStore>[1];

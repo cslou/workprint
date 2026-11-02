@@ -10,7 +10,7 @@ const messages = {
   stale: 'Not saved: the script changed since you read it. Call read-workspace, then redo the change on the current script version.',
   not_found: 'Not saved: baseVersionId is not this video\'s current script. Call read-workspace, then redo the change on the current script version and pass its versionId.',
   invalid: 'Not saved: the script is not valid. Every speaker must be a character subject unless voice-over, and subject names must be distinct.',
-  unknown_subject: 'Not saved: a subject id is not in the current script. Keep each subject\'s id from read-workspace, and leave id empty for a new subject.',
+  unknown_subject: 'Not saved: a subject id is not in the current script, or is listed twice. Keep each subject\'s id from read-workspace once, and leave id empty for a new subject.',
   subjects_differ: 'Not saved: the characters and subjects differ; pass the full subjects list.',
   unavailable: 'Not saved: saving is unavailable right now. Tell the user and do not retry in this turn.',
 } as const;
@@ -45,7 +45,9 @@ export const updateScriptTool = defineTool({
   // A refusal still finishes the line. Mastra hands back an input validation failure as `{ error: true }`.
   doneSummary: (result: UpdateScriptResult | { error: true }) => 'error' in result ? summaries.invalid : result.saved ? `Saved version ${result.version}` : summaries[result.reason],
   execute: async (input, { scope, collaborators }): Promise<UpdateScriptResult> => {
-    const outcome = await collaborators.saveScript(scope.accountId, scope.videoId, { content: input.script, baseVersionId: input.baseVersionId, subjects: input.subjects });
+    // Models send "null" for an id they leave out: it means a new subject, as empty does.
+    const subjects = input.subjects.map(subject => subject.id.trim().toLowerCase() === 'null' ? { ...subject, id: '' } : subject);
+    const outcome = await collaborators.saveScript(scope.accountId, scope.videoId, { content: input.script, baseVersionId: input.baseVersionId, subjects });
     if (outcome.kind === 'saved') return { saved: true, versionId: outcome.versionId, version: outcome.revision };
     if (outcome.kind === 'invalid' && outcome.field === 'subjects') return { saved: false, reason: 'invalid', message: messages.unknown_subject };
     return { saved: false, reason: outcome.kind, message: messages[outcome.kind] };

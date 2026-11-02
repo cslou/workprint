@@ -1,7 +1,7 @@
-import { newSubjectId, scriptSubjects, type ScriptSubject, type SubjectKind, type scriptBodySchema, type savedScriptContentSchema } from '@workprint/contracts';
+import { characterSubjectsMatch, newSubjectId, scriptSubjects, type ScriptSubject, type SubjectKind, type scriptBodySchema, type savedScriptContentSchema } from '@workprint/contracts';
 import type { z } from 'zod';
 
-/** A subject as the assistant sends it: an empty, whitespace or "null" id means a new subject. */
+/** A subject as the assistant sends it: an empty or whitespace id means a new subject. */
 export type SubjectInput = Readonly<{ id: string; kind: SubjectKind; name: string }>;
 type ScriptBody = z.infer<typeof scriptBodySchema>;
 type SavedScript = z.infer<typeof savedScriptContentSchema>;
@@ -11,25 +11,26 @@ export class ScriptSubjectsError extends Error {
   constructor(readonly reason: 'unknown_id' | 'differ') { super(reason === 'unknown_id' ? 'A subject id is not in the base script' : 'The characters and subjects differ'); }
 }
 
-const isNew = (id: string) => { const value = id.trim(); return value === '' || value.toLowerCase() === 'null'; };
-const characterNames = (subjects: readonly ScriptSubject[]) => subjects.filter(subject => subject.kind === 'character').map(subject => subject.name.trim());
+const isNew = (id: string) => id.trim() === '';
 
 /**
  * The script content to store for an assistant save: the new body with its subjects.
  * An empty list keeps the base's stored subjects, whose characters must match; a first save or a base saved before
- * subjects existed stores the subjects derived from the new script, so ids are fixed from then on.
+ * subjects existed stores the subjects derived from the new script, so ids are fixed from then on. Derived subjects
+ * that can't match the characters (names over 80 characters, names differing only in case, more than 50) differ too.
  * A non-empty list is the full new list: ids from the base are kept, new subjects get server-made ids, and the
- * scene's characters become the character subjects' names. The result is validated by the caller.
+ * scene's characters become the character subjects' names. A list that leaves out a character subject the script
+ * still names differs, so a partial list never drops characters. The result is validated by the caller.
  */
 export function withSubjects(body: ScriptBody, base: SavedScript | null, subjects: readonly SubjectInput[]): SavedScript {
   if (subjects.length === 0) {
-    if (!base?.subjects) return { ...body, subjects: scriptSubjects(body) };
-    const named = characterNames(base.subjects), characters = new Set(body.scenes.flatMap(scene => scene.characters.map(name => name.trim())));
-    if (named.length !== characters.size || named.some(name => !characters.has(name))) throw new ScriptSubjectsError('differ');
-    return { ...body, subjects: base.subjects };
+    const subjects = base?.subjects ?? scriptSubjects(body);
+    if (!characterSubjectsMatch(subjects, body.scenes)) throw new ScriptSubjectsError('differ');
+    return { ...body, subjects };
   }
-  // The ids the assistant could have read: the base's stored subjects, or those derived from it.
-  const known = new Set(base ? scriptSubjects(base).map(subject => subject.id) : []);
+  // The subjects the assistant could have read: the base's stored subjects, or those derived from it.
+  const readable: readonly ScriptSubject[] = base ? scriptSubjects(base) : [];
+  const known = new Set(readable.map(subject => subject.id));
   const kept = new Set<string>();
   for (const subject of subjects) {
     if (isNew(subject.id)) continue;
@@ -46,6 +47,8 @@ export function withSubjects(body: ScriptBody, base: SavedScript | null, subject
     taken.add(id);
     return { id, kind: subject.kind, name };
   });
-  const characters = characterNames(resolved);
+  const characters = resolved.filter(subject => subject.kind === 'character').map(subject => subject.name);
+  const named = new Set(body.scenes.flatMap(scene => scene.characters.map(name => name.trim())));
+  if (readable.some(subject => subject.kind === 'character' && !kept.has(subject.id) && named.has(subject.name.trim()))) throw new ScriptSubjectsError('differ');
   return { ...body, subjects: resolved, scenes: body.scenes.map(scene => ({ ...scene, characters })) };
 }
