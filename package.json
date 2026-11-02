@@ -18,7 +18,8 @@
     "test:tooling": "node scripts/test.mjs tooling",
     "test:integration": "node scripts/test.mjs integration",
     "test:browser": "node scripts/test.mjs compile && node scripts/test-stack.mjs playwright test --config test/e2e/playwright.config.ts",
-    "live:chat": "node scripts/test.mjs compile && node scripts/test-stack.mjs node scripts/live/chat.mjs"
+    "live:chat": "node scripts/test.mjs compile && node scripts/test-stack.mjs node scripts/live/chat.mjs",
+    "live:image": "node scripts/test.mjs compile && node scripts/live/image.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
