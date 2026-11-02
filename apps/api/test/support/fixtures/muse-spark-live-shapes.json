@@ -22,6 +22,12 @@
         ]
       },
       {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
         "type": "finish",
         "payloadKeys": [
           "stepResult"
@@ -120,6 +126,104 @@
         ],
         "tool": "read-workspace",
         "state": "done"
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "finish",
+        "payloadKeys": [
+          "stepResult"
+        ],
+        "reason": "stop"
+      }
+    ],
+    "update-script": [
+      {
+        "type": "start",
+        "payloadKeys": [
+          "messageId"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "phrase",
+          "state",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "update-script",
+        "state": "running"
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "phrase",
+          "state",
+          "summary",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "update-script",
+        "state": "done"
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
       },
       {
         "type": "text-delta",
