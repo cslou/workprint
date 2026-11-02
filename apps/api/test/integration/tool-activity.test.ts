@@ -320,6 +320,13 @@ test('generate-image makes images with Meta and saves each as a draft image of t
     assert.deepEqual(result, { made: true, failed: 0, showInChat: false, images: rows.map((row, index) => ({ versionId: row.version_id, label: `Image ${index + 1} · Version 1`, width: 64, height: 48 })) });
     assert.deepEqual(lines, [['Making 2 images…', 'running', undefined], ['Making 2 images…', 'done', 'Saved 2 images']]);
     assert.deepEqual((await store.workspace(owner.id, video)).assets.map(asset => asset.state), ['Draft', 'Draft']);
+    // Saved history projects the same phrase from the stored arguments.
+    const response = await fetch(`${fixture.apiOrigin}/memory/threads/${video}/messages?page=0&perPage=20`, { headers: { Authorization: `Bearer ${await fixture.accessToken(owner)}` } });
+    const saved = (await response.json() as { messages: { content: { parts: Record<string, unknown>[] } }[] }).messages.flatMap(message => message.content.parts).filter(part => part.type === 'tool-activity');
+    assert.deepEqual(saved.map(part => [part.phrase, part.summary]), [['Making 2 images…', 'Saved 2 images']]);
+    // The model is offered no nullable field.
+    const offered = (provider.requests[0]!.body as { tools: { function: { name: string; parameters: unknown } }[] }).tools.find(entry => entry.function.name === 'generate-image');
+    assert.ok(offered); assert.ok(!JSON.stringify(offered.function.parameters).includes('"null"'));
   });
 
   await t.test('edit: an image the video uses goes to Meta as its exact bytes, with Meta\'s defaults, and becomes a dependency', async () => {

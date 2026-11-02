@@ -20,6 +20,8 @@ export function projectToolActivity(registry: readonly AgentTool[], call: { tool
   if (!tool || typeof call.toolCallId !== 'string' || !callId.test(call.toolCallId)) return null;
   let phrase: string | undefined;
   try { phrase = tool.phraseFor?.(call.input); } catch { phrase = undefined; }
+  // A phrase from arguments is bounded like a summary, so no tool can echo argument text at length.
+  if (typeof phrase !== 'string' || !phrase.trim() || graphemes(phrase).length > summaryCharacters) phrase = undefined;
   const activity: ToolActivity = { toolCallId: call.toolCallId, tool: tool.id, phrase: phrase ?? tool.phrase ?? genericToolPhrase, state: call.state };
   if (call.state !== 'done' || !tool.doneSummary) return activity;
   let summary: string | undefined;

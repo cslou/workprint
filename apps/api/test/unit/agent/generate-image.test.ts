@@ -63,6 +63,8 @@ test('each refusal has its line and a message the model can follow, with Meta\'s
   assert.equal(invalid.summary, 'Not made: the request wasn’t valid'); assert.match(invalid.message, /\(images\[0\]\.image_url\)/);
   const checks = await refusal(harness(async () => images(1), ['refused']).collaborators);
   assert.equal(checks.summary, 'Not saved: the image didn’t pass checks');
+  const stored = await refusal(harness(async () => images(1), ['unavailable']).collaborators);
+  assert.equal(stored.summary, 'Not saved: the image couldn’t be stored'); assert.match(stored.message, /do not retry/);
   assert.equal(line({}, { error: true })?.summary, 'Not made: the request wasn’t valid');
 });
 
@@ -73,6 +75,11 @@ test('Stop during the call saves nothing; Stop after one of two saves keeps that
   during.abort();
   await assert.rejects(pending, { name: 'AbortError' });
   assert.equal(waiting.calls.saves, 0);
+  // A response that arrives after Stop saves nothing.
+  const late = new AbortController();
+  const arriving = harness(async () => { late.abort(); return images(1); });
+  await assert.rejects(run(arriving.collaborators, {}, late.signal), { name: 'AbortError' });
+  assert.equal(arriving.calls.saves, 0);
 
   const after = new AbortController();
   const partway = harness(async () => images(2), [], { onSave: index => { if (index === 0) queueMicrotask(() => after.abort()); } });

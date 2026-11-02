@@ -3,9 +3,9 @@ import { MetaImageError, type ImageResult } from '../../../generation/index.js';
 import { defineTool, type ToolContext } from '../define.js';
 import { workspaceItem } from '../read-workspace/projection.js';
 
-/** One saved image, named as read-workspace names it. */
-type SavedImage = { versionId: string; label: string; width: number; height: number };
-type Reason = 'content_policy' | 'input_not_found' | 'unavailable' | 'checks' | 'invalid';
+/** One saved image, named as read-workspace names it; the name is left out when the workspace can't be read. */
+type SavedImage = { versionId: string; label?: string; width: number; height: number };
+type Reason = 'content_policy' | 'input_not_found' | 'unavailable' | 'checks' | 'not_saved' | 'invalid';
 export type GenerateImageResult =
   | { made: true; images: SavedImage[]; failed: number; showInChat: boolean }
   | { made: false; reason: Reason; message: string };
@@ -23,6 +23,7 @@ const summaries: Readonly<Record<Reason, string>> = {
   input_not_found: 'Not made: an input image wasn’t found',
   unavailable: 'Not made: Meta is unavailable',
   checks: 'Not saved: the image didn’t pass checks',
+  not_saved: 'Not saved: the image couldn’t be stored',
   invalid: 'Not made: the request wasn’t valid',
 };
 const messages: Readonly<Record<Exclude<Reason, 'invalid'>, string>> = {
@@ -30,6 +31,7 @@ const messages: Readonly<Record<Exclude<Reason, 'invalid'>, string>> = {
   input_not_found: 'Not made: an input image is not one this video uses. Call read-workspace and pass only image versionIds it lists.',
   unavailable: 'Not made: Meta image generation is unavailable right now. Tell the user; do not retry more than once in this turn.',
   checks: 'Not saved: the image Meta returned did not pass the media checks. Tell the user; you may try once more with a different size.',
+  not_saved: 'Not saved: Meta made the image but saving is unavailable right now. Tell the user and do not retry in this turn.',
 };
 const refusal = (reason: Reason, param?: string): GenerateImageResult => ({ made: false, reason,
   message: reason === 'invalid' ? `Not made: Meta found the request invalid${param ? ` (${param})` : ''}. Fix that field and try once more.` : messages[reason] });
@@ -37,7 +39,10 @@ const refusal = (reason: Reason, param?: string): GenerateImageResult => ({ made
 /** Names each saved image as read-workspace does, so the model and the user see the same name. */
 async function labelled(context: ToolContext, saved: Omit<SavedImage, 'label'>[]): Promise<SavedImage[]> {
   const read = saved.length ? await context.collaborators.readWorkspace(context.scope.accountId, context.scope.videoId) : undefined;
-  return saved.map(image => ({ ...image, label: (read?.kind === 'found' ? workspaceItem(read.workspace, image.versionId)?.name : undefined) ?? 'Image · Version 1' }));
+  return saved.map(image => {
+    const label = read?.kind === 'found' ? workspaceItem(read.workspace, image.versionId)?.name : undefined;
+    return label ? { ...image, label } : image;
+  });
 }
 
 /** Makes images with Meta, optionally from the video's saved images, and saves each as the video's draft image. */
@@ -72,7 +77,8 @@ export const generateImageTool = defineTool({
     if (!result.made) return summaries[result.reason];
     const total = result.images.length + result.failed;
     if (result.failed) return `Saved ${result.images.length} of ${total} images`;
-    return result.images.length === 1 ? `Saved ${result.images[0]!.label}` : `Saved ${result.images.length} images`;
+    const [only] = result.images;
+    return result.images.length > 1 ? `Saved ${result.images.length} images` : only?.label ? `Saved ${only.label}` : 'Saved 1 image';
   },
   execute: async (input, context): Promise<GenerateImageResult> => {
     const { scope, collaborators, signal } = context;
@@ -103,7 +109,8 @@ export const generateImageTool = defineTool({
     // One at a time in Meta's order, so names follow that order and the media checker isn't contended.
     const saved: Omit<SavedImage, 'label'>[] = [];
     let refused = 0, unsaved = 0;
-    for (const image of result.images) {
+    // Never more than asked for, even if Meta returns more.
+    for (const image of result.images.slice(0, input.count)) {
       // Nothing from a response is saved after Stop; images saved before it stay.
       signal.throwIfAborted();
       const outcome = await collaborators.saveGeneratedImage(scope.accountId, scope.videoId, { bytes: image.bytes, contentType: image.contentType, inputs: inputs.map(item => item.versionId) }, signal);
@@ -113,7 +120,7 @@ export const generateImageTool = defineTool({
       else unsaved++;
     }
     const failed = refused + unsaved;
-    if (!saved.length) return refusal(unsaved ? 'unavailable' : 'checks');
+    if (!saved.length) return refusal(unsaved ? 'not_saved' : 'checks');
     return { made: true, images: await labelled(context, saved), failed, showInChat: input.showInChat };
   },
 });
