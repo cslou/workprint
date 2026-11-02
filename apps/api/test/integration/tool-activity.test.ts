@@ -1,14 +1,17 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
+import { setTimeout as wait } from 'node:timers/promises';
 import { Pool } from 'pg';
 import { createArtifactStore, createAssistantScripts, createVersionUses } from '../../src/artifacts/index.js';
 import { createAssistantScriptSaver } from '../../src/application/index.js';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
+import { createGenerationJobs } from '../../src/generation/index.js';
 import { accountBrowserFixture } from '../support/account-browser-fixture.js';
 import { chatComposition } from '../support/chat-composition.js';
 import { metaImageFake, testPng } from '../support/meta-image-fake.js';
-import { completed, nativeTurnClient } from '../support/native-turn-client.js';
+import { generatedClip, miniMaxVideoFake } from '../support/minimax-video-fake.js';
+import { completed, nativeTurnClient, type ObservedTurn } from '../support/native-turn-client.js';
 import { scriptedProvider } from '../support/scripted-provider.js';
 import { testStack } from '../support/test-stack.js';
 
@@ -400,4 +403,274 @@ test('generate-image on a server that can\'t save images refuses before any call
   assert.ok(!result.made && result.reason === 'unsaveable', JSON.stringify(result));
   assert.equal(meta.requests.length, 0);
   assert.deepEqual(turn.chunks.filter(chunk => chunk.type === 'tool-activity').at(-1)?.payload?.summary, 'Not made: images can’t be saved on this server');
+});
+
+type VideoResult = { made: true; jobId: string; showInChat: boolean; video: { versionId: string; label: string; width: number; height: number; durationS: number } }
+  | { made: false; reason: string; message: string; jobId?: string };
+type Job = { request_id: string; status: string; task_id: string | null; failure_reason: string | null; result_version_id: string | null; inputs: string[] };
+
+const pollDeadlineMs = 1000;
+const released = () => { let release!: () => void; const promise = new Promise<void>(resolve => { release = resolve; }); return { promise, release }; };
+async function until<T>(read: () => Promise<T>, done: (value: T) => boolean, what: string, ms = 20000): Promise<T> {
+  const started = Date.now();
+  for (;;) {
+    const value = await read();
+    if (done(value)) return value;
+    if (Date.now() - started > ms) throw new Error(`Timed out waiting for ${what}: ${JSON.stringify(value)}`);
+    await wait(50);
+  }
+}
+
+// generate-video through real turns: the fake MiniMax answers, and storage and the real decode check save the clip.
+test('generate-video makes one MiniMax video, waits for it and saves it as the video\'s draft clip', { timeout: 600000 }, async t => {
+  const provider = await scriptedProvider(); t.after(provider.close);
+  const meta = await metaImageFake(); t.after(meta.close);
+  const minimax = await miniMaxVideoFake({ clip: await generatedClip() }); t.after(minimax.close);
+  const { storage, media } = testStack();
+  const fixture = await accountBrowserFixture({ artifacts: true, storage, media: media.toolchain,
+    composition: chatComposition(provider, {}, { url: meta.url }, {}, { url: minimax.url, timing: { pollIntervalMs: 50, pollDeadlineMs }, submitTimeoutMs: 1500 }) });
+  const pool = new Pool({ connectionString: fixture.servingUrl, max: 2 });
+  const setup = new Pool({ connectionString: fixture.setupUrl, max: 1 });
+  t.after(async () => { await pool.end(); await setup.end(); await fixture.close(); });
+  const store = createArtifactStore(pool, createOwnedConversationCheck(fixture.native));
+  const [owner, other] = [await fixture.auth.createAccount(), await fixture.auth.createAccount()];
+  let origin = fixture.apiOrigin;
+  const tokens = new Map(await Promise.all([owner, other].map(async user => [user.id, await fixture.accessToken(user)] as const)));
+  const client = (user: { id: string }) => nativeTurnClient(origin, tokens.get(user.id)!, user.id);
+  t.beforeEach(() => { provider.reset(); meta.reset(); minimax.reset(); });
+
+  const lines = (turn: ObservedTurn) => turn.chunks.filter(chunk => chunk.type === 'tool-activity' && chunk.payload?.tool === 'generate-video').map(chunk => [chunk.payload?.phrase, chunk.payload?.state, chunk.payload?.summary]);
+  const toolResult = () => {
+    const content = (provider.requests[1]!.body as { messages: { role: string; content: unknown }[] }).messages.findLast(message => message.role === 'tool')?.content;
+    assert.ok(content !== undefined, 'tool result sent to the model');
+    return (typeof content === 'string' ? JSON.parse(content) : content) as VideoResult;
+  };
+  /** One completed turn in which the model calls generate-video with `args`. */
+  const generate = async (user: { id: string }, video: string, args: Record<string, unknown>) => {
+    provider.reset();
+    provider.script({ toolCalls: [{ name: 'generate-video', args }] }, { text: ['Done'] });
+    const turn = await client(user).turn(video, 'Make a video', 60000);
+    assert.ok(completed(turn), JSON.stringify(turn.terminal));
+    return { turn, result: toolResult(), lines: lines(turn) };
+  };
+  /** Starts a turn that calls generate-video, and resolves its run id once accepted. */
+  const running = (user: { id: string }, video: string, args: Record<string, unknown>, timeoutMs = 60000) => {
+    provider.reset();
+    provider.script({ toolCalls: [{ name: 'generate-video', args }] }, { text: ['Done'] });
+    let accept!: (id: string) => void;
+    const accepted = new Promise<string>(resolve => { accept = resolve; });
+    return { accepted, turn: client(user).turn(video, 'Make a video', timeoutMs, id => accept(id)) };
+  };
+  const stop = (user: { id: string }, video: string, runId: string) => client(user).post('/api/agents/assistant/threads/abort', { threadId: video, resourceId: user.id, expectedRunId: runId, clearPendingSignals: false });
+  const jobs = async (video: string) => (await pool.query<Job>('SELECT request_id,status,task_id,failure_reason,result_version_id,inputs FROM generation.requests WHERE conversation_id=$1 ORDER BY submitted_at', [video])).rows;
+  const settled = (video: string, status: string) => until(() => jobs(video), rows => rows.length === 1 && rows[0]!.status === status, `a ${status} job`);
+  const clips = async (user: { id: string }, video: string) => (await store.workspace(user.id, video)).generatedVideos ?? [];
+  const historyLines = async (user: { id: string }, video: string) => {
+    const response = await client(user).get(`/memory/threads/${video}/messages?page=0&perPage=20`);
+    const body = await response.json() as { messages: { content: { parts: Record<string, unknown>[] } }[] };
+    return body.messages.flatMap(message => message.content.parts).filter(part => part.type === 'tool-activity' && part.tool === 'generate-video').map(part => [part.state, part.summary]);
+  };
+  const queried = () => minimax.requests.filter(request => request.path.startsWith('/v2/query/')).length;
+
+  await t.test('a prompt-only video is created once, polled, checked and saved as a draft clip', async () => {
+    const video = await client(owner).newVideo();
+    const { lines: line, result } = await generate(owner, video, { prompt: 'A slow push-in on a quiet gallery bench', showInChat: true });
+    assert.equal(minimax.creates, 1);
+    const create = minimax.requests[0]!;
+    assert.equal(create.authorization, 'Bearer workprint-placeholder-minimax-key');
+    assert.deepEqual(create.body, { model: 'MiniMax-H3', content: [{ type: 'text', text: 'A slow push-in on a quiet gallery bench' }], resolution: '768P', duration: 6, ratio: '16:9' });
+    const [job] = await jobs(video);
+    assert.ok(result.made, JSON.stringify(result));
+    assert.deepEqual(result, { made: true, jobId: job!.request_id, showInChat: true, video: { versionId: job!.result_version_id, label: 'Video 1 · Version 1', width: 1344, height: 768, durationS: 4 } });
+    assert.deepEqual([job!.status, job!.inputs], ['succeeded', []]); assert.match(job!.task_id ?? '', /^\d+$/);
+    assert.deepEqual(line, [['Making a video…', 'running', undefined], ['Making a video…', 'done', 'Saved Video 1 · Version 1']]);
+    const [clip] = await clips(owner, video);
+    assert.equal(clip?.version.id, result.video.versionId); assert.equal(clip?.state, 'Draft');
+    // The result URL is a credential: it never reaches the model.
+    assert.ok(!JSON.stringify(provider.requests).includes('Signature'));
+  });
+
+  await t.test('a first-and-last-frame video sends both frames as data URLs and keeps them as dependencies', async () => {
+    const video = await client(owner).newVideo();
+    const pngs = [testPng({ width: 320, height: 256, seed: 3 }), testPng({ width: 320, height: 256, seed: 4 })];
+    meta.script({ images: pngs });
+    provider.script({ toolCalls: [{ name: 'generate-image', args: { prompt: 'Two stills', count: 2 } }] }, { text: ['Made'] });
+    assert.ok(completed(await client(owner).turn(video, 'Make two stills')));
+    const [first, last] = (await store.workspace(owner.id, video)).assets.map(asset => asset.version.id);
+    const { result } = await generate(owner, video, { prompt: 'The light moves from one still to the next', firstFrame: first, lastFrame: last, ratio: '9:16' });
+    assert.ok(result.made, JSON.stringify(result));
+    assert.equal(minimax.creates, 1);
+    const body = minimax.requests[0]!.body as { content: { type: string; image_url?: { url: string }; role?: string }[]; ratio: string };
+    assert.equal(body.ratio, 'adaptive');
+    assert.deepEqual(body.content.slice(1), pngs.map((png, index) => ({ type: 'image_url', image_url: { url: `data:image/png;base64,${png.toString('base64')}` }, role: index ? 'last_frame' : 'first_frame' })));
+    assert.deepEqual((await store.version(owner.id, result.video.versionId)).dependencies, [first, last]);
+    assert.equal(result.video.label, 'Video 1 · Version 1');
+  });
+
+  await t.test('Stop while polling interrupts the job with its task id; a resume next turn saves it with no second create', async () => {
+    const video = await client(owner).newVideo();
+    const gate = released();
+    minimax.script.query({ task: 'running', after: gate.promise });
+    const { accepted, turn } = running(owner, video, { prompt: 'A pan across the bench' });
+    const runId = await accepted;
+    await until(async () => queried(), count => count === 1, 'the first poll');
+    assert.equal((await stop(owner, video, runId)).status, 200);
+    const ended = await turn;
+    gate.release();
+    const [job] = await settled(video, 'interrupted');
+    assert.ok(!completed(ended));
+    assert.ok(job!.task_id); assert.equal(minimax.creates, 1);
+    assert.deepEqual(await historyLines(owner, video), [['done', 'Stopped waiting for the video']]);
+    const { result, lines: line } = await generate(owner, video, { resume: job!.request_id });
+    assert.ok(result.made, JSON.stringify(result));
+    assert.equal(minimax.creates, 1, 'a resume never creates');
+    assert.deepEqual(line.at(-1), ['Making a video…', 'done', 'Saved Video 1 · Version 1']);
+    // Resuming a saved job refuses with its label and calls nothing.
+    const before = minimax.requests.length;
+    const again = await generate(owner, video, { resume: job!.request_id });
+    assert.ok(!again.result.made && again.result.reason === 'already_saved');
+    assert.deepEqual(again.lines.at(-1), ['Making a video…', 'done', 'That video is already saved as Video 1 · Version 1']);
+    assert.equal(minimax.requests.length, before);
+  });
+
+  await t.test('query errors keep polling; at the poll deadline the job is interrupted, and it resumes with one create', async () => {
+    const video = await client(owner).newVideo();
+    minimax.script.query({ status: 500 }, { status: 429 }, { status: 429 }, ...Array.from({ length: 200 }, () => ({ task: 'running' as const })));
+    const { result, lines: line } = await generate(owner, video, { prompt: 'Rain on the gallery window' });
+    assert.ok(!result.made && result.reason === 'stopped', JSON.stringify(result));
+    assert.match(result.message, new RegExp(`resume set to "${result.jobId}"`));
+    assert.deepEqual(line.at(-1), ['Making a video…', 'done', 'Stopped waiting for the video']);
+    const [job] = await jobs(video);
+    assert.equal(job!.status, 'interrupted'); assert.ok(queried() > 4, String(queried()));
+    minimax.reset();
+    // The fake forgot the task on reset; its next answers are scripted, as MiniMax still has it.
+    minimax.script.query({ task: 'succeeded' });
+    const resumed = await generate(owner, video, { resume: job!.request_id, prompt: 'ignored', firstFrame: randomUUID() });
+    assert.ok(resumed.result.made, JSON.stringify(resumed.result));
+    assert.equal(minimax.creates, 0);
+  });
+
+  await t.test('an expired job fails on resume with no call; another account\'s or an unknown job is not found', async () => {
+    const video = await client(owner).newVideo(), jobId = randomUUID();
+    // Only setup may backdate a job; it then moves along its real transitions.
+    await setup.query(`INSERT INTO generation.requests(owner_id,request_id,conversation_id,purpose,prompt_sha256,status,submitted_at)
+      VALUES($1,$2,$3,'video',repeat('a',64),'submitting',clock_timestamp() - interval '8 days')`, [owner.id, jobId, video]);
+    const saved = createGenerationJobs(pool);
+    await saved.started(owner.id, jobId, 'task-old'); await saved.interrupted(owner.id, jobId);
+    const foreign = await generate(other, await client(other).newVideo(), { resume: jobId });
+    assert.ok(!foreign.result.made && foreign.result.reason === 'not_found');
+    assert.deepEqual(foreign.lines.at(-1), ['Making a video…', 'done', 'Couldn’t find that video job']);
+    const unknown = await generate(owner, video, { resume: randomUUID() });
+    assert.ok(!unknown.result.made && unknown.result.reason === 'not_found');
+    const expired = await generate(owner, video, { resume: jobId });
+    assert.ok(!expired.result.made && expired.result.reason === 'not_resumable');
+    assert.deepEqual(expired.lines.at(-1), ['Making a video…', 'done', 'That video failed and can’t be resumed']);
+    assert.deepEqual(minimax.requests, []);
+    assert.deepEqual((await jobs(video)).map(job => [job.status, job.failure_reason]), [['failed', 'expired']]);
+  });
+
+  await t.test('Stop during a held create waits it out: the job is interrupted with that task id and one create', async () => {
+    const video = await client(owner).newVideo();
+    const gate = released();
+    minimax.script.create({ taskId: 'held-create-1', after: gate.promise });
+    const { accepted, turn } = running(owner, video, { prompt: 'A held create' });
+    const runId = await accepted;
+    await until(async () => minimax.creates, count => count === 1, 'the create');
+    assert.equal((await stop(owner, video, runId)).status, 200);
+    await wait(200);
+    gate.release();
+    await turn;
+    const [job] = await settled(video, 'interrupted');
+    assert.equal(job!.task_id, 'held-create-1'); assert.equal(minimax.creates, 1);
+  });
+
+  await t.test('a create that times out fails with an unknown outcome and is never sent again', async () => {
+    const video = await client(owner).newVideo();
+    minimax.script.create({ hang: true });
+    const { result, lines: line } = await generate(owner, video, { prompt: 'A lost create' });
+    assert.ok(!result.made && result.reason === 'outcome_unknown', JSON.stringify(result));
+    assert.deepEqual(line.at(-1), ['Making a video…', 'done', 'Not made: MiniMax’s answer was lost']);
+    assert.deepEqual((await jobs(video)).map(job => [job.status, job.failure_reason, job.task_id]), [['failed', 'outcome_unknown', null]]);
+    assert.equal(minimax.creates, 1);
+    const resumed = await generate(owner, video, { resume: result.jobId });
+    assert.ok(!resumed.result.made && resumed.result.reason === 'not_resumable');
+    assert.equal(minimax.creates, 1);
+  });
+
+  await t.test('a download stopped mid-way saves nothing; an unavailable download leaves the job resumable', async () => {
+    const video = await client(owner).newVideo();
+    const gate = released();
+    minimax.script.download({ declare: (await generatedClip()).length, after: gate.promise });
+    const { accepted, turn } = running(owner, video, { prompt: 'A late download' });
+    const runId = await accepted;
+    await until(async () => minimax.requests.filter(request => request.path.startsWith('/files/')).length, count => count === 1, 'the download');
+    assert.equal((await stop(owner, video, runId)).status, 200);
+    await turn;
+    gate.release();
+    await settled(video, 'interrupted');
+    await wait(500);
+    assert.deepEqual(await clips(owner, video), []);
+
+    const unavailable = await client(owner).newVideo();
+    minimax.reset(); minimax.script.download({ status: 503 });
+    const { result, lines: line } = await generate(owner, unavailable, { prompt: 'An unavailable download' });
+    assert.ok(!result.made && result.reason === 'stopped', JSON.stringify(result));
+    assert.deepEqual(line.at(-1), ['Making a video…', 'done', 'Stopped waiting for the video']);
+    assert.deepEqual((await jobs(unavailable)).map(job => job.status), ['interrupted']);
+  });
+
+  await t.test('MiniMax\'s failed task fails the job; a disconnected observer doesn\'t stop a job, which is saved', async () => {
+    const video = await client(owner).newVideo();
+    minimax.script.query({ task: 'failed', code: '1027' });
+    const { result, lines: line } = await generate(owner, video, { prompt: 'A failed task' });
+    assert.ok(!result.made && result.reason === 'task_failed', JSON.stringify(result));
+    assert.deepEqual(line.at(-1), ['Making a video…', 'done', 'Not made: MiniMax couldn’t make the video']);
+    assert.deepEqual((await jobs(video)).map(job => [job.status, job.failure_reason]), [['failed', 'provider_error']]);
+
+    const watched = await client(owner).newVideo();
+    const gate = released();
+    minimax.reset(); minimax.script.download({ declare: (await generatedClip()).length, after: gate.promise });
+    // The observer gives up after 1 s while the clip is still downloading.
+    const { turn } = running(owner, watched, { prompt: 'Nobody is watching' }, 1000);
+    const ended = await turn;
+    assert.equal(ended.terminal, undefined);
+    assert.equal(minimax.requests.filter(request => request.path.startsWith('/files/')).length, 1);
+    gate.release();
+    const [job] = await settled(watched, 'succeeded');
+    assert.equal((await clips(owner, watched))[0]?.version.id, job!.result_version_id);
+    await until(() => historyLines(owner, watched), saved => saved.length === 1 && saved[0]![1] === 'Saved Video 1 · Version 1', 'the saved line');
+  });
+
+  // Last: this restarts the server.
+  await t.test('closing the server while polling leaves the job running; the next start interrupts it and a resume saves it', async () => {
+    const video = await client(owner).newVideo();
+    minimax.script.query({ hang: true });
+    const { turn } = running(owner, video, { prompt: 'A restart' });
+    await until(async () => queried(), count => count === 1, 'the first poll');
+    await fixture.stopServer();
+    await turn;
+    assert.deepEqual((await jobs(video)).map(job => job.status), ['running']);
+    origin = await fixture.restartServer();
+    const [job] = await settled(video, 'interrupted');
+    assert.equal(minimax.creates, 1);
+    minimax.script.query({ task: 'succeeded' });
+    const { result } = await generate(owner, video, { resume: job!.request_id });
+    assert.ok(result.made, JSON.stringify(result));
+    assert.equal(minimax.creates, 1);
+  });
+});
+
+// Composition without storage or the media checker supplies no video jobs: a paid video would be lost, so none is asked for.
+test('generate-video on a server that can\'t save videos refuses before any call to MiniMax', { timeout: 300000 }, async t => {
+  const provider = await scriptedProvider(); t.after(provider.close);
+  const minimax = await miniMaxVideoFake(); t.after(minimax.close);
+  const fixture = await accountBrowserFixture({ artifacts: true, composition: chatComposition(provider, {}, undefined, {}, { url: minimax.url }) });
+  t.after(fixture.close);
+  const user = await fixture.auth.createAccount();
+  const client = nativeTurnClient(fixture.apiOrigin, await fixture.accessToken(user), user.id);
+  provider.script({ toolCalls: [{ name: 'generate-video', args: { prompt: 'A bench' } }] }, { text: ['Done'] });
+  const turn = await client.turn(await client.newVideo(), 'Make a video');
+  assert.ok(completed(turn), JSON.stringify(turn.terminal));
+  assert.equal(turn.chunks.filter(chunk => chunk.type === 'tool-activity').at(-1)?.payload?.summary, 'Not made: videos can’t be saved on this server');
+  assert.deepEqual(minimax.requests, []);
 });

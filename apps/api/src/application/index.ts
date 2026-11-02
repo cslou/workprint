@@ -59,3 +59,4 @@ export { createWorkspaceReader, type OwnedWorkspace, type OwnedWorkspaceRead, ty
 export { createAssistantScriptSaver, type AssistantScriptOutcome, type SaveAssistantScript } from './assistant-scripts.js';
 export { createGeneratedImageSaver, createImageInputReader, type GeneratedImageOutcome, type ImageInputsOutcome, type ReadImageInputs, type SaveGeneratedImage } from './generated-images.js';
 export { createGeneratedVideoSaver, type GeneratedVideoOutcome, type SaveGeneratedVideo } from './generated-videos.js';
+export { createVideoJobs, videoJobTiming, type NewVideo, type VideoAbortReason, type VideoJobCollaborators, type VideoJobOutcome, type VideoJobs, type VideoJobTiming, type VideoProviderFailure, type VideoRunControl } from './video-jobs.js';

@@ -6,7 +6,7 @@ import { Hono, type MiddlewareHandler } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { timeout } from 'hono/timeout';
 import { createAssistantModel, nativeTurnLimits, turnLimits } from '../agent/index.js';
-import { createMetaImageClient } from '../generation/index.js';
+import { createMetaImageClient, createMiniMaxVideoClient } from '../generation/index.js';
 import { createBackend } from './backend.js';
 import { loadServerConfig } from './config.js';
 import { createIngress } from './ingress.js';
@@ -120,6 +120,10 @@ export async function startServer(mastra: Mastra, start: StartOptions = {}) {
 }
 
 if (import.meta.main) {
-  const { assistant, images } = loadServerConfig(process.env);
-  await startServer(await createBackend([], { model: createAssistantModel(assistant), images: createMetaImageClient(images) }));
+  const { assistant, images, videos } = loadServerConfig(process.env);
+  await startServer(await createBackend([], {
+    model: createAssistantModel(assistant), images: createMetaImageClient(images),
+    // Without a MiniMax key the server starts and the video tool refuses before any call.
+    ...(videos ? { videos: createMiniMaxVideoClient(videos) } : {}),
+  }));
 }
