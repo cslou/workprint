@@ -4,7 +4,8 @@ const statusOrder = (request: GenerationRequest) => {
   switch (request.status) {
     case 'queued': return 0;
     case 'submitting': return 1;
-    case 'running': return 2;
+    case 'running':
+    case 'interrupted': return 2;
     default: return 3;
   }
 };
