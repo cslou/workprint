@@ -1,28 +1,28 @@
 import { savedReferenceContentSchema, savedScriptContentSchema, scriptSubjects, subjectNameKey, type ScriptSubject } from '@workprint/contracts';
-import { usedImageVersions } from '../artifacts/index.js';
+import { maxSheetViews, usedImageVersions } from '../artifacts/index.js';
 import { MetaImageError, type MetaImageClient } from '../generation/index.js';
 import type { AssistantSheets } from './assistant-references.js';
-import type { ReadImageInputs, SaveGeneratedImage } from './generated-images.js';
+import { metaImageFailure, saveFailure, type ImageFailure, type ReadImageInputs, type SaveGeneratedImage } from './generated-images.js';
 import type { OwnedWorkspace, ReadOwnedWorkspace } from './workspace-reads.js';
 
 /** One view to put in a sheet: an existing image (`image`) or one made from `prompt`. Empty means none. */
 export type SheetViewRequest = Readonly<{ view: string; prompt: string; image: string; notes: readonly string[]; size: string }>;
 /** A subject's sheet as the assistant asks for it; `identity` is an image the views keep, empty for none. */
 export type SheetRequest = Readonly<{ subject: string; description: string; continuityNotes: readonly string[]; views: readonly SheetViewRequest[]; identity: string }>;
-/** Why one view wasn't made or kept. `param` is the field Meta found invalid. */
-export type ViewFailure = Readonly<{ reason: 'content_policy' | 'invalid' | 'unavailable' | 'checks' | 'not_saved'; param?: string }>;
 export type SheetView = Readonly<{ view: string; versionId: string }>;
 export type SheetOutcome =
   /** `given` views were asked for and `landed` of them are in the sheet; `missing` names the others and why. */
-  | { kind: 'saved'; versionId: string; revision: number; subjectName: string; views: SheetView[]; given: number; landed: number; missing: (ViewFailure & { view: string })[] }
+  | { kind: 'saved'; versionId: string; revision: number; subjectName: string; views: SheetView[]; given: number; landed: number; missing: (ImageFailure & { view: string })[] }
   | { kind: 'refused'; reason: 'unsaveable' | 'no_script' | 'not_in_script' | 'image_not_found' | 'too_many_views' | 'no_room' | 'work_unavailable' }
   | { kind: 'invalid'; field: 'views' }
   | { kind: 'too_long'; subjectName: string }
+  /** A view the base keeps has a name longer than an assistant sheet allows, so a person must edit the sheet. */
+  | { kind: 'unrevisable'; subjectName: string }
   | { kind: 'in_other_sheet'; subjectName: string }
   /** Nothing was saved: the first view of a new sheet failed, or no view was made at all. */
-  | { kind: 'view_failed'; failure: ViewFailure }
+  | { kind: 'view_failed'; failure: ImageFailure }
   /** Views were made and kept as draft images, but the sheet save was refused for `reason`. */
-  | { kind: 'not_saved'; reason: 'stale' | 'in_other_sheet' | 'no_room' | 'unavailable'; subjectName?: string; kept: SheetView[] };
+  | { kind: 'not_saved'; reason: 'stale' | 'not_in_script' | 'not_found' | 'invalid' | 'in_other_sheet' | 'no_room' | 'unavailable'; subjectName?: string; kept: SheetView[] };
 
 /** What making a sheet needs; agent composition supplies these. Without `images` nothing is sent. */
 export type SheetMakers = Readonly<{
@@ -30,21 +30,23 @@ export type SheetMakers = Readonly<{
   images?: Pick<MetaImageClient, 'generate' | 'edit'> | undefined;
 }>;
 
-/** The most views a sheet the assistant makes holds in total. */
-export const sheetViewCap = 5;
+/** The most views a sheet the assistant makes holds in total: the sheet save's own limit. */
+export const sheetViewCap = maxSheetViews;
+/** The longest view name the sheet save takes. */
+const maxViewName = 80;
 
 /** An optional id: empty, whitespace or "null" means none. */
 const none = (value: string) => { const trimmed = value.trim(); return trimmed.toLowerCase() === 'null' ? '' : trimmed; };
 
 /** What a made view keeps from its identity image, by the subject's kind. */
-export const keepLines: Readonly<Record<ScriptSubject['kind'], string>> = {
+const keepLines: Readonly<Record<ScriptSubject['kind'], string>> = {
   character: 'Keep the same person as the input image: the same face, build, hair and clothing.',
   place: 'Keep the same place as the input image: the same layout, architecture and light.',
   prop: 'Keep the same object as the input image: the same design, shape and materials.',
 };
 
 /** The fixed sheet-view frame of every made view's prompt. */
-export function sheetViewFrame(subject: ScriptSubject, view: string, description: string, notes: readonly string[]) {
+function sheetViewFrame(subject: ScriptSubject, view: string, description: string, notes: readonly string[]) {
   return [
     `One reference view of ${subject.name}, a ${subject.kind}, for a reference sheet: ${view}.`,
     description.trim(),
@@ -71,13 +73,6 @@ function currentSheets(workspace: OwnedWorkspace): Sheet[] {
 /** One planned view: kept from the base or an existing image (`versionId`), or one to make. `replaces` is the base view it remakes. */
 type Planned = { view: string; notes: string[]; versionId?: string; make?: SheetViewRequest; replaces?: string };
 type Identity = { versionId: string; dataUrl: string };
-
-const failureOf = (error: unknown): ViewFailure => {
-  if (!(error instanceof MetaImageError)) throw error;
-  if (error.code === 'content_policy') return { reason: 'content_policy' };
-  if (error.code === 'invalid_request') return { reason: 'invalid', ...(error.param ? { param: error.param } : {}) };
-  return { reason: 'unavailable' };
-};
 
 /** The script subject a sheet is for, with the video's current sheets, or why there is none. */
 async function resolve(makers: SheetMakers, accountId: string, videoId: string, subjectId: string) {
@@ -126,12 +121,16 @@ export async function makeSheet(makers: SheetMakers, accountId: string, videoId:
   if (!planned) return { kind: 'invalid', field: 'views' };
   if (current && current.references.length > sheetViewCap) return { kind: 'too_long', subjectName: subject.name };
   if (planned.length > sheetViewCap) return { kind: 'refused', reason: 'too_many_views' };
+  // A person's sheet can hold names the save refuses; checked here, before any paid view.
+  if (planned.some(item => !item.make && item.view.trim().length > maxViewName)) return { kind: 'unrevisable', subjectName: subject.name };
 
   // Existing images must be ones the video uses, and each is in one sheet only.
   const used = usedImageVersions(workspace), identity = none(request.identity);
   const placed = planned.flatMap(item => item.versionId && !current?.references.some(reference => reference.versionId === item.versionId) ? [item.versionId] : []);
   if ([identity, ...placed].some(id => id && !used.has(id))) return { kind: 'refused', reason: 'image_not_found' };
-  const holder = all.find(sheet => sheet !== current && sheet.references.some(reference => placed.includes(reference.versionId)));
+  // Every view's image, kept ones too, is in this sheet only: people's sheets can share an image.
+  const listed = planned.flatMap(item => item.versionId ? [item.versionId] : []);
+  const holder = all.find(sheet => sheet !== current && sheet.references.some(reference => listed.includes(reference.versionId)));
   if (holder) return { kind: 'in_other_sheet', subjectName: subjects.find(candidate => candidate.id === holder.subjectId)?.name ?? holder.subjectId };
   const toMake = planned.filter(item => item.make).length;
   const room = await sheets.useRoom(accountId, videoId);
@@ -149,12 +148,12 @@ export async function makeSheet(makers: SheetMakers, accountId: string, videoId:
     input = read.images[0];
   }
 
-  const made: SheetView[] = [], missing: (ViewFailure & { view: string })[] = [];
+  const made: SheetView[] = [], missing: (ImageFailure & { view: string })[] = [];
   for (const item of planned) {
     if (!item.make) continue;
     signal.throwIfAborted();
     const meta = { prompt: sheetViewPrompt(subject, request, item.make, Boolean(input)), n: 1, size: item.make.size, outputFormat: 'png' as const, reasoningStrength: 'high' as const, tools: { imageSearch: true, webSearch: true, shell: true } };
-    let failure: ViewFailure | undefined;
+    let failure: ImageFailure | undefined;
     try {
       const result = input ? await images.edit({ ...meta, images: [{ dataUrl: input.dataUrl }] }, signal) : await images.generate(meta, signal);
       const image = result.images[0];
@@ -169,11 +168,11 @@ export async function makeSheet(makers: SheetMakers, accountId: string, videoId:
           made.push({ view: item.view, versionId: saved.versionId });
           // A new sheet's first made view, with no identity given, is the identity of the views after it.
           input ??= { versionId: saved.versionId, dataUrl: `data:${image.contentType};base64,${Buffer.from(image.bytes).toString('base64')}` };
-        } else failure = { reason: saved.kind === 'refused' ? 'checks' : 'not_saved' };
+        } else failure = saveFailure(saved);
       }
     } catch (error) {
       if (error instanceof MetaImageError && error.code === 'aborted') signal.throwIfAborted();
-      failure = failureOf(error);
+      failure = metaImageFailure(error);
     }
     delete item.make;
     if (!failure) continue;
@@ -193,5 +192,6 @@ export async function makeSheet(makers: SheetMakers, accountId: string, videoId:
     return { kind: 'saved', versionId: outcome.versionId, revision: outcome.revision, subjectName: outcome.subjectName, views: views.map(({ view, versionId }) => ({ view, versionId })), given: request.views.length, landed: request.views.length - missing.length, missing };
   }
   if (outcome.kind === 'in_other_sheet') return { kind: 'not_saved', reason: 'in_other_sheet', subjectName: outcome.subjectName, kept: made };
-  return { kind: 'not_saved', reason: outcome.kind === 'stale' || outcome.kind === 'no_room' ? outcome.kind : 'unavailable', kept: made };
+  // The script or the video's work changed while the views were made.
+  return { kind: 'not_saved', reason: outcome.kind === 'no_script' ? 'not_in_script' : outcome.kind, kept: made };
 }

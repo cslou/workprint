@@ -1,43 +1,57 @@
 import { z } from 'zod';
-import { makeSheet, sheetViewCap, type SheetOutcome, type ViewFailure } from '../../../application/index.js';
+import { makeSheet, sheetViewCap, type ImageFailure, type SheetOutcome } from '../../../application/index.js';
 import { defineTool } from '../define.js';
 import { imageFailure, imageSize } from '../image-shared.js';
 
-type Missing = { view: string; reason: ViewFailure['reason']; message: string };
+type Refused = Extract<SheetOutcome, { kind: 'refused' }>['reason'];
+type NotSaved = Extract<SheetOutcome, { kind: 'not_saved' }>['reason'];
+/** Every reason a sheet wasn't made or saved: a refusal before any paid call, a view's failure, or the sheet save's. */
+export type SheetReason = Refused | 'invalid' | 'too_long' | 'unrevisable' | 'in_other_sheet' | ImageFailure['reason'] | Exclude<NotSaved, 'unavailable'>;
+type Missing = { view: string; reason: ImageFailure['reason']; message: string };
 type SheetView = { view: string; versionId: string };
 export type GenerateSheetResult =
   | { made: true; sheet: { versionId: string; label: string }; views: SheetView[]; given: number; landed: number; missing: Missing[] }
-  | { made: false; reason: string; summary: string; message: string; kept?: SheetView[] };
+  | { made: false; reason: SheetReason; summary: string; message: string; kept?: SheetView[] };
 
-const refusal = (reason: string, summary: string, message: string, kept?: SheetView[]): GenerateSheetResult => ({ made: false, reason, summary, message, ...(kept ? { kept } : {}) });
+const refusal = (reason: SheetReason, summary: string, message: string, kept?: SheetView[]): GenerateSheetResult => ({ made: false, reason, summary, message, ...(kept ? { kept } : {}) });
+
+/** The line and the message for a refusal before any paid call. */
+function before(reason: Refused): GenerateSheetResult {
+  switch (reason) {
+    case 'unsaveable': { const line = imageFailure({ reason }); return refusal(reason, line.summary, line.message); }
+    case 'no_script': return refusal(reason, 'Not made: there is no script yet; write it first', 'Not made: this video has no script, and a sheet is for a subject the script lists. Write the script with update-script first. Nothing was sent.');
+    case 'not_in_script': return refusal(reason, 'Not made: that subject isn’t in the script', 'Not made: subject is not a subject id from read-workspace. Pass one it lists, or add the subject to the script with update-script first. Nothing was sent.');
+    case 'image_not_found': return refusal(reason, 'Not made: an image wasn’t found', 'Not made: identity or a view\'s image is not an image this video uses. Call read-workspace and pass only image versionIds it lists. Nothing was sent.');
+    case 'too_many_views': return refusal(reason, `Not made: a sheet holds at most ${sheetViewCap} views`, `Not made: with the sheet's current views, this call would give it more than ${sheetViewCap} views. Redo views by their names, or ask the user which views to keep. Nothing was sent.`);
+    case 'no_room': return refusal(reason, 'Not made: this video has too many saved items', 'Not made: this video has no room for these images and the sheet. Tell the user; do not retry. Nothing was sent.');
+    case 'work_unavailable': return refusal(reason, 'Not made: saved work is unavailable', 'Not made: saved work could not be reached, so nothing was sent to Meta. Tell the user; do not retry in this turn.');
+  }
+}
+
+/** The line and the message when made views were kept as draft images but the sheet wasn't saved. */
+function unsaved(outcome: Extract<SheetOutcome, { kind: 'not_saved' }>): GenerateSheetResult {
+  const kept = outcome.kept, ids = kept.length ? ` The views were kept as draft images: ${kept.map(view => `${view.view} (${view.versionId})`).join(', ')}; call again with each as a view's image to put them in the sheet.` : '';
+  switch (outcome.reason) {
+    case 'stale': return refusal('stale', 'Not saved: the sheet changed; views kept as images', `Not saved: the sheet changed while the views were being made.${ids}`, kept);
+    case 'not_in_script': return refusal('not_in_script', 'Not saved: the subject left the script; views kept', `Not saved: the subject is no longer in the script.${ids} Ask the user before adding it back.`, kept);
+    case 'not_found': return refusal('not_found', 'Not saved: an image wasn’t found; views kept as images', `Not saved: an image in the sheet is no longer one this video uses.${ids}`, kept);
+    case 'invalid': return refusal('invalid', 'Not saved: the sheet wasn’t valid; views kept as images', `Not saved: the sheet's text or views were refused.${ids}`, kept);
+    case 'in_other_sheet': return refusal('in_other_sheet', `Not saved: an image is already in ${outcome.subjectName ?? 'another'}’s sheet`, `Not saved: an image is already in another subject's sheet.${ids}`, kept);
+    case 'no_room': return refusal('no_room', 'Not saved: this video has too many saved items', `Not saved: this video ran out of room for the sheet.${ids}`, kept);
+    case 'unavailable': return refusal('not_saved', 'Not saved: the sheet couldn’t be saved', `Not saved: saving the sheet is unavailable right now. Tell the user; do not retry in this turn.${ids}`, kept);
+  }
+}
 
 /** The line and the message the model can follow, for every outcome but a saved sheet. */
 function refused(outcome: Exclude<SheetOutcome, { kind: 'saved' }>): GenerateSheetResult {
   switch (outcome.kind) {
-    case 'refused': switch (outcome.reason) {
-      case 'unsaveable': { const line = imageFailure({ reason: 'unsaveable' }); return refusal('unsaveable', line.summary, line.message); }
-      case 'no_script': return refusal('no_script', 'Not made: there is no script yet; write it first', 'Not made: this video has no script, and a sheet is for a subject the script lists. Write the script with update-script first. Nothing was sent.');
-      case 'not_in_script': return refusal('not_in_script', 'Not made: that subject isn’t in the script', 'Not made: subject is not a subject id from read-workspace. Pass one it lists, or add the subject to the script with update-script first. Nothing was sent.');
-      case 'image_not_found': return refusal('image_not_found', 'Not made: an image wasn’t found', 'Not made: identity or a view\'s image is not an image this video uses. Call read-workspace and pass only image versionIds it lists. Nothing was sent.');
-      case 'too_many_views': return refusal('too_many_views', 'Not made: a sheet holds at most 5 views', `Not made: with the sheet's current views, this call would give it more than ${sheetViewCap} views. Redo views by their names, or ask the user which views to keep. Nothing was sent.`);
-      case 'no_room': return refusal('no_room', 'Not made: this video has too many saved items', 'Not made: this video has no room for these images and the sheet. Tell the user; do not retry. Nothing was sent.');
-      case 'work_unavailable': return refusal('work_unavailable', 'Not made: saved work is unavailable', 'Not made: saved work could not be reached, so nothing was sent to Meta. Tell the user; do not retry in this turn.');
-    }
-    // Every refusal reason returns above.
-    // falls through
-    case 'invalid': return refusal('invalid', 'Not made: the sheet wasn’t valid (views)', 'Not made: each view needs a name and either an image or a prompt, and two views can\'t share a name. Fix views and try once more. Nothing was sent.');
-    case 'too_long': return refusal('too_long', `Not made: ${outcome.subjectName}’s sheet has over 5 views; trim it first`, `Not made: ${outcome.subjectName}'s sheet has more than ${sheetViewCap} views, so it can't be changed here. Ask the user to remove views in Assets first. Nothing was sent.`);
+    case 'refused': return before(outcome.reason);
+    case 'invalid': return refusal('invalid', 'Not made: the sheet wasn’t valid (views)', 'Not made: each view needs a name and either an image or a prompt, and two views can\'t share a name or an image. Fix views and try once more. Nothing was sent.');
+    case 'too_long': return refusal('too_long', `Not made: ${outcome.subjectName}’s sheet has over ${sheetViewCap} views; trim it first`, `Not made: ${outcome.subjectName}'s sheet has more than ${sheetViewCap} views, so it can't be changed here. Ask the user to remove views in Assets first. Nothing was sent.`);
+    case 'unrevisable': return refusal('unrevisable', `Not made: ${outcome.subjectName}’s sheet can’t be changed here`, `Not made: a view in ${outcome.subjectName}'s sheet has a name longer than 80 characters, so it can't be changed here. Ask the user to rename that view in Assets first. Nothing was sent.`);
     case 'in_other_sheet': return refusal('in_other_sheet', `Not made: that image is already in ${outcome.subjectName}’s sheet`, `Not made: a view's image is already in ${outcome.subjectName}'s sheet, and an image is in one sheet only. Make a new view instead. Nothing was sent.`);
     case 'view_failed': { const failure = imageFailure(outcome.failure); return refusal(outcome.failure.reason, failure.summary, `${failure.message} No sheet was saved.`); }
-    case 'not_saved': {
-      const kept = outcome.kept, ids = kept.length ? ` The views were kept as draft images: ${kept.map(view => `${view.view} (${view.versionId})`).join(', ')}; call again with each as a view's image to put them in the sheet.` : '';
-      switch (outcome.reason) {
-        case 'stale': return refusal('stale', 'Not saved: the sheet changed; views kept as images', `Not saved: the sheet changed while the views were being made.${ids}`, kept);
-        case 'in_other_sheet': return refusal('in_other_sheet', `Not saved: an image is already in ${outcome.subjectName ?? 'another'}’s sheet`, `Not saved: an image is already in another subject's sheet.${ids}`, kept);
-        case 'no_room': return refusal('no_room', 'Not saved: this video has too many saved items', `Not saved: this video ran out of room for the sheet.${ids}`, kept);
-        case 'unavailable': return refusal('not_saved', 'Not saved: the sheet couldn’t be saved', `Not saved: saving the sheet is unavailable right now. Tell the user; do not retry in this turn.${ids}`, kept);
-      }
-    }
+    case 'not_saved': return unsaved(outcome);
   }
 }
 

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { metaImageFailure } from '../../../application/index.js';
 import { MetaImageError, type ImageResult } from '../../../generation/index.js';
 import { defineTool, type ToolContext } from '../define.js';
 import { workspaceItem } from '../../workspace-entries.js';
@@ -95,9 +96,8 @@ export const generateImageTool = defineTool({
       if (!(error instanceof MetaImageError)) throw error;
       // Stop: the run's own handling ends the line as incomplete.
       if (error.code === 'aborted') signal.throwIfAborted();
-      if (error.code === 'content_policy') return refusal('content_policy');
-      if (error.code === 'invalid_request') return refusal('invalid', error.param);
-      return refusal('unavailable');
+      const failure = metaImageFailure(error);
+      return refusal(failure.reason, failure.param);
     }
     // One at a time in Meta's order, so names follow that order and the media checker isn't contended.
     const saved: Omit<SavedImage, 'label'>[] = [];

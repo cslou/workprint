@@ -937,7 +937,11 @@ test('generate-sheet makes a script subject\'s views one at a time with Meta and
     const result = toolResult();
     assert.ok(!result.made && result.reason === 'stale', JSON.stringify(result));
     assert.deepEqual(result.kept?.map(item => item.view), ['Full-body front', 'Face close-up', 'Hands']);
-    assert.equal((await made(video)).length, 5); assert.equal(await sheetVersions(video), 2);
+    const images = (await made(video)).map(row => row.version_id);
+    assert.equal(images.length, 5); assert.equal(await sheetVersions(video), 2);
+    assert.deepEqual(result.kept?.map(item => item.versionId), images.slice(2), 'the kept ids are the saved draft images');
+    const states = (await pool.query<{ state: string }>('SELECT state FROM artifacts.conversation_uses WHERE version_id = ANY($1::text[])', [images.slice(2)])).rows.map(row => row.state);
+    assert.deepEqual(states, ['draft', 'draft', 'draft']);
     assert.equal((await sheetOf(video))?.content.subject.description, 'Revised by hand.');
     assert.equal(sheetLines(ended).at(-1)?.payload?.summary, 'Not saved: the sheet changed; views kept as images');
   });
