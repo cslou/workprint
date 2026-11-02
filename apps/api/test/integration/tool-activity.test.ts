@@ -1059,7 +1059,7 @@ test('save-storyboard saves the Shot plan from the current script, and read-work
 
   type Listed = { storyboard: { versionId: string; detail: string; shots: { shotId: string; intent: string; framing?: string; references?: unknown[]; panels: { panelId: string; description: string }[] }[] } };
   const listed = (await turn<Listed>(video, 'read-workspace', {})).result.storyboard;
-  assert.deepEqual([listed.versionId, listed.detail], [first.result.versionId, 'full']);
+  assert.deepEqual([listed.versionId, listed.detail], [first.result.versionId, 'panels']);
   assert.deepEqual(listed.shots.map(shot => [shot.shotId, shot.intent, shot.framing, shot.panels.map(panel => [panel.panelId, panel.description])]), board.shots.map(shot => [shot.shotId, shot.intent, shot.framing, shot.panels.map(panel => [panel.panelId, panel.description])]));
   assert.deepEqual(listed.shots[0]!.references, [{ subjectId: 'mara', role: 'identity' }, { subjectId: 'the-gallery', role: 'environment' }]);
 

@@ -184,7 +184,7 @@ test('the listing gives the storyboard once, with each Shot\'s ids, text, refere
   const board = boardVersion(shots);
   const space = workspace([], { storyboard: { work: work(board, 'storyboard'), shots } } as Partial<OwnedWorkspace>);
   const listed = await reading(space, async () => ({ kind: 'not_found' }))({}) as { storyboard: unknown; items: { name: string; use: string }[] };
-  assert.deepEqual(listed.storyboard, { name: 'Storyboard · Version 2', versionId: 'board', state: 'Draft', detail: 'full', truncated: false, shots: [
+  assert.deepEqual(listed.storyboard, { name: 'Storyboard · Version 2', versionId: 'board', state: 'Draft', detail: 'panels', truncated: false, shots: [
     { shotId: 's1', intent: 'Mara arrives.', framing: 'wide', references: [{ subjectId: 'mara', role: 'identity' }], panels: [
       { panelId: 'p1', description: 'In the doorway.', imageVersionId: 'panel-v2' }, { panelId: 'p2', description: 'At the desk.', imageVersionId: 'view-1' },
     ] },
@@ -207,9 +207,13 @@ test('a 100-Shot storyboard with 200-character intents steps down, says truncate
     return listed.storyboard;
   };
   const full = await list(shotsOf(3, 'Mara arrives.'));
-  assert.deepEqual([full.detail, full.truncated, full.shots.length], ['full', false, 3]);
-  const intents = await list(shotsOf(20, 'i'.repeat(60)));
-  assert.deepEqual([intents.detail, intents.truncated, intents.shots.length, Object.keys(intents.shots[0]!)], ['intents', true, 20, ['shotId', 'intent']]);
+  assert.deepEqual([full.detail, full.truncated, full.shots.length], ['panels', false, 3]);
+  // Twelve Shots with panels fit beside the items: the storyboard takes the room the listing has left.
+  const twelve = await list(shotsOf(12, 'Mara arrives.'));
+  assert.deepEqual([twelve.detail, twelve.truncated, twelve.shots.length], ['panels', false, 12]);
+  const intents = await list(shotsOf(40, 'i'.repeat(250)));
+  assert.deepEqual([intents.detail, intents.truncated, intents.shots.length, Object.keys(intents.shots[0]!)], ['intents', true, 40, ['shotId', 'intent']]);
+  assert.ok(intents.shots.every(shot => (shot.intent as string).length === listingBounds.text), 'each intent is clipped to 200 characters');
   const ids = await list(shotsOf(100, 'é'.repeat(200)));
   assert.deepEqual([ids.detail, ids.truncated, ids.shots.length, Object.keys(ids.shots[0]!)], ['ids', true, 100, ['shotId']]);
   // Shot ids of up to 200 characters: only the first Shots fit.
@@ -217,4 +221,20 @@ test('a 100-Shot storyboard with 200-character intents steps down, says truncate
   assert.equal(first.detail, 'ids'); assert.ok(first.truncated);
   assert.ok(first.shots.length > 0 && first.shots.length < 100, String(first.shots.length));
   assert.deepEqual(first.shots.map(shot => shot.shotId), shotsOf(first.shots.length, '', 190).map(shot => shot.shotId), 'the first Shots in order');
+});
+
+test('beside subjects with sheets and stopped videos, a 100-Shot storyboard steps down and the listing stays within 16 KiB', async () => {
+  const subjects = Array.from({ length: 30 }, (_, index) => ({ id: `${'m'.repeat(60)}-${index}`, kind: 'character' as const, name: `${'N'.repeat(70)}${index}` }));
+  const sheets = subjects.map((subject, index) => ({ ...sheetVersion(`sh${index}`, subject.id, [[`v${index}a`, 'Full-body front'], [`v${index}b`, 'Face close-up']]) }));
+  const shots = Array.from({ length: 100 }, (_, index) => ({ shotId: `${'s'.repeat(30)}-${index}`, order: index, intent: 'i'.repeat(200), framing: 'wide',
+    panels: [{ panelId: `${'p'.repeat(30)}-${index}`, order: 0, description: 'd'.repeat(200), references: [], candidateImageVersions: [], approvedImageVersionId: null }], chosenVideoVersionId: null }));
+  const views = sheets.flatMap((_, index) => [image(`v${index}a`), image(`v${index}b`)]);
+  const space = workspace([...views, ...sheets, ...Array.from({ length: 20 }, (_, index) => image(`i${index}`))], { script: work(subjectScript(subjects), 'script'), storyboard: { work: work(boardVersion(shots), 'storyboard'), shots } } as Partial<OwnedWorkspace>);
+  const collaborators: AgentCollaborators = { readWorkspace: async () => ({ kind: 'found', workspace: space }), saveScript: async () => ({ kind: 'unavailable' }), saveStoryboard: async () => ({ kind: 'unavailable' }), readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }), sheets: unusedSheets,
+    videos: { start: async () => ({ kind: 'not_found' }), resume: async () => ({ kind: 'not_found' }), stopped: async () => ({ kind: 'read', jobs: Array.from({ length: 10 }, (_, index) => ({ jobId: `job-${index}`, frames: [`i${index}`], submittedAt: new Date('2026-11-03T16:34:37Z') })) }) } };
+  const listed = await readTool.execute({}, { scope: { accountId: 'a', videoId: 'v' }, collaborators, signal: new AbortController().signal, abortReason: () => undefined }) as { subjects: unknown[]; stoppedVideos: unknown[]; storyboard: { detail: string; truncated: boolean; shots: unknown[] }; items: unknown[] };
+  assert.equal(listed.subjects.length, 30); assert.equal(listed.stoppedVideos.length, 10);
+  assert.ok(Buffer.byteLength(JSON.stringify(listed)) <= listingBounds.bytes, String(Buffer.byteLength(JSON.stringify(listed))));
+  assert.ok(listed.storyboard.truncated && listed.storyboard.detail !== 'panels' && listed.storyboard.shots.length > 0);
+  assert.ok(listed.items.length > 0, 'items still fit beside the storyboard');
 });

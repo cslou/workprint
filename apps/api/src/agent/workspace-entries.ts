@@ -78,28 +78,33 @@ export function workspaceSubjects(workspace: OwnedWorkspace): WorkspaceSubject[]
 /** The image versions listed as views under the subjects, which the listing then leaves out of its items. */
 export const subjectViewIds = (subjects: readonly WorkspaceSubject[]): ReadonlySet<string> => new Set(subjects.flatMap(subject => subject.sheet?.views?.map(view => view.versionId) ?? []));
 
-/** A storyboard Shot as the model sees it in a listing: everything at `full` detail, less as the listing steps down. */
+/**
+ * A storyboard Shot as the model sees it in a listing. It never has the Shot's action, dialogue, camera note or
+ * reference purposes, and long text is clipped: item mode on the storyboard gives those.
+ */
 export type ListedShot = {
   shotId: string; intent?: string; framing?: string; references?: { subjectId: string; role: string }[];
   panels?: { panelId: string; description: string; imageVersionId?: string }[];
 };
 /**
- * The current storyboard, listed once: its version and its Shots in order. `detail` says how much each Shot gives, and
- * `truncated` says details or Shots were left out; item mode on its versionId gives it in full.
+ * The current storyboard, listed once: its version and its Shots in order. `detail` says what each Shot gives: `panels`
+ * (ids, text, references and panels), `intents` or `ids`; `truncated` says panels or Shots were left out.
  */
-export type WorkspaceStoryboard = { name: string; versionId: string; state: State; detail: 'full' | 'intents' | 'ids'; truncated: boolean; shots: ListedShot[] };
+export type WorkspaceStoryboard = { name: string; versionId: string; state: State; detail: 'panels' | 'intents' | 'ids'; truncated: boolean; shots: ListedShot[] };
 
-/** The most of the listing's byte bound the storyboard may take, and what it always leaves for the items beside it. */
-export const storyboardShare = Object.freeze({ bytes: listingBounds.bytes * 3 / 8, itemReserve: listingBounds.bytes / 8 });
+/** What the storyboard always leaves of the listing's byte bound for the items beside it. */
+const itemReserve = listingBounds.bytes / 8;
 
 const byOrder = <T extends { order: number }>(items: readonly T[]) => [...items].sort((a, b) => a.order - b.order);
 
 /**
- * The video's storyboard within `budget` bytes: each Shot with its id, intent, framing, subject references and panels
- * (id, description and current image); past the budget, Shot ids and intents; then Shot ids; then the first Shot ids
- * that fit. Undefined when the video has no storyboard.
+ * The video's storyboard within the listing's byte bound, beside the rest of `envelope` and a reserve for items: each
+ * Shot with its id, intent, framing, subject references and panels (id, description and current image); when that
+ * doesn't fit, Shot ids and intents; then Shot ids; then the first Shot ids that fit. Undefined with no storyboard.
  */
-export function workspaceStoryboard(workspace: OwnedWorkspace, budget: number): WorkspaceStoryboard | undefined {
+export function workspaceStoryboard(workspace: OwnedWorkspace, envelope: Readonly<Record<string, unknown>> = {}): WorkspaceStoryboard | undefined {
+  // `,"storyboard":` joins it to the envelope.
+  const budget = listingBounds.bytes - itemReserve - bytesOf(envelope) - 14;
   const work = workspace.storyboard.work;
   if (!work) return undefined;
   const shots = byOrder(workspace.storyboard.shots);
@@ -110,9 +115,9 @@ export function workspaceStoryboard(workspace: OwnedWorkspace, budget: number): 
     panels: byOrder(shot.panels).map(panel => { const image = currentPanelImage(panel); return { panelId: panel.panelId, description: clip(panel.description), ...(image ? { imageVersionId: image.id } : {}) }; }),
   }));
   const head = { name: `Storyboard · Version ${work.version.revision}`, versionId: work.version.id, state: work.state };
-  const steps: [WorkspaceStoryboard['detail'], ListedShot[]][] = [['full', full], ['intents', shots.map(shot => ({ shotId: shot.shotId, ...intent(shot) }))], ['ids', shots.map(shot => ({ shotId: shot.shotId }))]];
+  const steps: [WorkspaceStoryboard['detail'], ListedShot[]][] = [['panels', full], ['intents', shots.map(shot => ({ shotId: shot.shotId, ...intent(shot) }))], ['ids', shots.map(shot => ({ shotId: shot.shotId }))]];
   for (const [detail, listed] of steps) {
-    const candidate: WorkspaceStoryboard = { ...head, detail, truncated: detail !== 'full', shots: listed };
+    const candidate: WorkspaceStoryboard = { ...head, detail, truncated: detail !== 'panels', shots: listed };
     if (bytesOf(candidate) <= budget) return candidate;
   }
   const fitted: WorkspaceStoryboard = { ...head, detail: 'ids', truncated: true, shots: [] };

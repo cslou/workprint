@@ -1,7 +1,7 @@
 import { sheetViews } from '@workprint/contracts';
 import { z } from 'zod';
 import { defineTool } from '../define.js';
-import { listingBounds, listWorkspace, sheetViewItem, storyboardShare, subjectViewIds, workspaceItem, workspaceStoryboard, workspaceSubjects, type WorkspaceItemDetail, type WorkspaceListing, type WorkspaceStoryboard, type WorkspaceSubject } from '../../workspace-entries.js';
+import { listWorkspace, sheetViewItem, subjectViewIds, workspaceItem, workspaceStoryboard, workspaceSubjects, type WorkspaceItemDetail, type WorkspaceListing, type WorkspaceStoryboard, type WorkspaceSubject } from '../../workspace-entries.js';
 
 /** A video job that stopped waiting, as the model sees it: `jobId` is what generate-video's `resume` takes. */
 type StoppedVideoItem = { jobId: string; frames: string[]; submittedAt: string };
@@ -18,7 +18,8 @@ export const readWorkspaceTool = defineTool({
     'Call it with no arguments for a compact list of every exact version, with its name, kind, versionId, use, state and short text.',
     'Pass a versionId from that list to read that one item in full.',
     'The list also gives subjects: the characters, places and props the script names, each with the id that update-script keeps, and its sheet\'s versionId and views when it has one (pass a sheet\'s versionId to read its views when they are left out). A sheet\'s images are listed under its subject, not again as items; pass a view\'s versionId to read that image. An image filed under a subject has its subjectId.',
-    'The list also gives storyboard: its versionId and its Shots in order, each with its shotId, intent, framing, subject references and panels (panelId, description, and imageVersionId, the panel\'s current image). When it says truncated, details or Shots were left out; pass its versionId to read it in full.',
+    'The list also gives storyboard: its versionId and its Shots in order, each with its shotId, intent, framing, subject references and panels (panelId, description, and imageVersionId, the panel\'s current image); when truncated, panels or Shots were left out.',
+    'The list never gives a Shot\'s action, dialogue or camera note and clips long text, so pass the storyboard\'s versionId to read it in full before save-storyboard.',
     'The list also gives stoppedVideos: videos that stopped waiting, newest first, each with the jobId to pass as generate-video resume when the user asks to continue one and the image versionIds it started from (frames).',
   ].join(' '),
   inputSchema: z.strictObject({ versionId: z.string().min(1).max(200).optional().describe('An exact versionId from the listing, to read that item in full.') }),
@@ -35,9 +36,7 @@ export const readWorkspaceTool = defineTool({
       const stoppedVideos = stopped?.kind === 'read' ? stopped.jobs.map(job => ({ jobId: job.jobId, frames: [...job.frames], submittedAt: job.submittedAt.toISOString() })) : [];
       const subjects = workspaceSubjects(read.workspace);
       const rest = { found: true, mode: 'listing', ...(subjects.length ? { subjects } : {}), ...(stoppedVideos.length ? { stoppedVideos } : {}) } as const;
-      // The storyboard takes at most its share, and always leaves room for items beside the rest of the envelope.
-      const budget = Math.min(storyboardShare.bytes, listingBounds.bytes - storyboardShare.itemReserve - Buffer.byteLength(JSON.stringify(rest)));
-      const storyboard = workspaceStoryboard(read.workspace, budget);
+      const storyboard = workspaceStoryboard(read.workspace, rest);
       const envelope = { found: true, mode: 'listing', ...(subjects.length ? { subjects } : {}), ...(storyboard ? { storyboard } : {}), ...(stoppedVideos.length ? { stoppedVideos } : {}) } as const;
       return { ...envelope, ...listWorkspace(read.workspace, envelope, subjectViewIds(subjects), storyboard?.versionId) };
     }
