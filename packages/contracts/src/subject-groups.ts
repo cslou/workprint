@@ -1,5 +1,5 @@
-import type { ScriptSubject } from './script-subjects.js';
-import { currentSheets, currentSubjects, sheetViews } from './sheet-views.js';
+import { currentSubjects, type ScriptSubject } from './script-subjects.js';
+import { currentSheets, sheetViews } from './sheet-views.js';
 
 type VersionLike = Readonly<{ id: string; artifactId: string; kind: string; content?: unknown }>;
 type AssetLike = Readonly<{ version: VersionLike; subjectId?: string | undefined }>;

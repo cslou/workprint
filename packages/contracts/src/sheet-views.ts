@@ -1,5 +1,5 @@
-import { savedReferenceContentSchema, savedScriptContentSchema } from './saved-content.js';
-import { scriptSubjects, type ScriptSubject } from './script-subjects.js';
+import { savedReferenceContentSchema } from './saved-content.js';
+import { currentSubjects } from './script-subjects.js';
 
 type VersionLike = Readonly<{ id: string; artifactId: string; kind: string; content?: unknown }>;
 type WorkspaceLike = Readonly<{ script: Readonly<{ version: VersionLike }> | null; assets: readonly Readonly<{ version: VersionLike }>[] }>;
@@ -8,12 +8,6 @@ type WorkspaceLike = Readonly<{ script: Readonly<{ version: VersionLike }> | nul
 export type CurrentSheet = Readonly<{ versionId: string; artifactId: string; subjectId: string; subjectName: string; views: readonly Readonly<{ versionId: string; view: string; notes: readonly string[] }>[] }>;
 /** The sheet an image version is in, and its view there. */
 export type SheetViewName = Readonly<{ sheetArtifactId: string; sheetVersionId: string; subjectId: string; subjectName: string; view: string }>;
-
-/** The current script's subjects in Assets order; none when the video has no script or it doesn't parse. */
-export function currentSubjects(workspace: Pick<WorkspaceLike, 'script'>): ScriptSubject[] {
-  const script = workspace.script && 'content' in workspace.script.version ? savedScriptContentSchema.safeParse(workspace.script.version.content) : null;
-  return script?.success ? scriptSubjects(script.data) : [];
-}
 
 /** The video's current sheets in workspace order. A sheet whose content doesn't parse is not a sheet. */
 export function currentSheets(workspace: WorkspaceLike): CurrentSheet[] {

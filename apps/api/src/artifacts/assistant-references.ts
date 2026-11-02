@@ -7,7 +7,7 @@ import { parseContent } from './content.js';
 import { ArtifactError } from './errors.js';
 import { lockPublicationOwner, publishVersion } from './publication.js';
 import { verifiedMedia } from './references.js';
-import { scriptSubjectsNow } from './script-subjects.js';
+import { scriptSubjectsNow } from './script-reads.js';
 import { createArtifactStore } from './store.js';
 import { useRoom as roomLeft } from './use-room.js';
 import { usedImageVersions } from './workspace-images.js';

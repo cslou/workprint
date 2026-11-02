@@ -7,7 +7,7 @@ import type { PrivateObjectStorage } from '../storage/index.js';
 import { digest, requireUseRoom, withStoredObjects } from './generated-media.js';
 import { protectedMediaObjects } from './media-objects.js';
 import { lockPublicationOwner, publishVersion } from './publication.js';
-import { scriptSubjectsNow } from './script-subjects.js';
+import { scriptSubjectsNow } from './script-reads.js';
 import { BUILT_IN_OWNER, createArtifactStore } from './store.js';
 import { UploadError, uploadError } from './uploads/errors.js';
 import { measuredMedia, verifyWhenFree } from './uploads/media-verifier.js';
