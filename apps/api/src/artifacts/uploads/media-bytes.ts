@@ -20,6 +20,8 @@ export const assistantVideoAllowance = Object.freeze({
   missingSampleAspectRatio: true,
   /** Either orientation: long side at most 1920, short side at most 1080, so a portrait 768P clip fits. */
   longSide: 1920, shortSide: 1080,
+  /** The High-profile `avcC` tail: 4:2:0, 8-bit, no SPS extension (checked in `requireStableAvc`). */
+  highProfileAvcC: true,
 });
 const xmpKeyword = Buffer.from('XML:com.adobe.xmp\0', 'latin1');
 /**
@@ -81,7 +83,7 @@ export function inspectMediaBytes(bytes: Uint8Array, kind: 'image' | 'video', co
       if(type==='ftyp'){if(p!==0 || n<16 || n%4 || b.toString('ascii',p+8,p+12)!=='isom')throw unsupported();for(let q=p+16;q<p+n;q+=4)if(!['isom','iso2','avc1','mp41'].includes(b.toString('ascii',q,q+4)))throw unsupported();}
       boxes.push(type);p+=n;
     }
-    if(['ftyp','moov','mdat'].some(t=>boxes.filter(x=>x===t).length!==1))throw invalid();requireStableAvc(b);return{};
+    if(['ftyp','moov','mdat'].some(t=>boxes.filter(x=>x===t).length!==1))throw invalid();requireStableAvc(b,origin==='assistant'&&assistantVideoAllowance.highProfileAvcC);return{};
   }
   throw unsupported();
 }

@@ -27,3 +27,15 @@ test('AVC sample ranges cannot alias or run backward and amplify byte inspection
   alias.writeUInt32BE(alias.readUInt32BE(offset+12),offset+16);
   assert.throws(()=>requireStableAvc(alias),{code:'invalid_input'});
 });
+
+test('a High-profile avcC tail passes only for assistant clips, and only as 4:2:0 8-bit with no SPS extension',async()=>{
+  const { readFile } = await import('node:fs/promises');
+  const clip=await readFile('apps/api/test/support/fixtures/minimax-clip.mp4');
+  requireStableAvc(clip,true);
+  assert.throws(()=>requireStableAvc(clip),{code:'unsupported'},'uploads keep the Baseline record');
+  const tail=clip.indexOf(Buffer.from([0xfd,0xf8,0xf8,0x00]),clip.indexOf(Buffer.from('avcC')));
+  for(const [at,value] of [[0,0xfe],[1,0xf9],[2,0xf9],[3,0x01]] as const){
+    const changed=Buffer.from(clip);changed[tail+at]=value;
+    assert.throws(()=>requireStableAvc(changed,true),{code:'unsupported'},`byte ${at}`);
+  }
+});

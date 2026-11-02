@@ -1,5 +1,11 @@
 import { UploadError } from './errors.js';
 
+/**
+ * A High-profile `avcC` ends with 4 more bytes after its PPS (ISO/IEC 14496-15). Only 4:2:0, 8-bit and no SPS
+ * extension are allowed, the values of MiniMax's clips; Constrained Baseline records have none.
+ */
+const isHighProfileTail = (tail: Buffer) => tail.length === 4 && tail[0] === 0xfd && tail[1] === 0xf8 && tail[2] === 0xf8 && tail[3] === 0;
+
 type Box = { type: string; data: number; end: number };
 const invalid = () => new UploadError('invalid_input');
 const unsupported = () => new UploadError('unsupported');
@@ -8,7 +14,7 @@ const unsupported = () => new UploadError('unsupported');
  * Initial ffprobe geometry alone cannot authorize later in-band parameter changes.
  * Walk bounded sample tables, not raw mdat bytes (which can also contain AAC).
  */
-export function requireStableAvc(bytes: Buffer) {
+export function requireStableAvc(bytes: Buffer, allowHighProfile = false) {
   let boxCount=0,nalCount=0;
   // Native avcC can retain Annex-B trailing_zero_8bits that samples omit.
   // SPS/PPS RBSP stop bits end in a nonzero byte; only zero padding is ignored.
@@ -49,7 +55,9 @@ export function requireStableAvc(bytes: Buffer) {
       if(!size||p+size>avcc.end||(bytes[p]!&31)!==type)throw invalid();
       const value=parameterBytes(bytes.subarray(p,p+size));p+=size;return value;
     };
-    const sps=parameter(7);if(p>=avcc.end||bytes[p++]!==1)throw unsupported();const pps=parameter(8);if(p!==avcc.end)throw unsupported();
+    const profile=bytes[avcc.data+1];
+    const sps=parameter(7);if(p>=avcc.end||bytes[p++]!==1)throw unsupported();const pps=parameter(8);
+    if(p!==avcc.end&&!(allowHighProfile&&profile===100&&isHighProfileTail(bytes.subarray(p,avcc.end))))throw unsupported();
     const stsz=one(stbl,'stsz');
     if(stsz.data+12>stsz.end||bytes.readUInt32BE(stsz.data)!==0)throw invalid();
     const fixed=bytes.readUInt32BE(stsz.data+4),samples=bytes.readUInt32BE(stsz.data+8);
