@@ -1,11 +1,11 @@
-import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import type { z } from 'zod';
 import { idSchema, savedReferenceContentSchema, sheetViews, useSchema, type Version } from '@workprint/contracts';
 import { transaction } from '../db/index.js';
+import { publishDraftUse } from './assistant-base.js';
 import { parseContent } from './content.js';
 import { ArtifactError } from './errors.js';
-import { lockPublicationOwner, publishVersion } from './publication.js';
+import { lockPublicationOwner } from './publication.js';
 import { verifiedMedia } from './references.js';
 import { scriptSubjectsNow } from './script-reads.js';
 import { currentSheets, type Sheet } from './sheet-reads.js';
@@ -125,12 +125,7 @@ export function createAssistantReferences(pool: Pool, checkOwnedConversation: Ow
         } catch { throw new SheetSaveError('invalid', 'text'); }
         // A new sheet adds a use; a next version moves the sheet's own use.
         if (!current && await roomLeft(client, account, conversation) === 0) throw new SheetSaveError('no_room');
-        // The next version of the account's own sheet; a built-in sheet in use starts an owned one on the same use.
-        const artifactId = current && current.version_owner_id === account ? current.artifact_id : undefined;
-        const version = await publishVersion(client, { accountId: account, conversationId: conversation, artifactId, kind: 'reference', content, dependencies: ids, createdBy: 'assistant' });
-        const useId = current?.use_id ?? randomUUID();
-        if (current) await client.query("UPDATE artifacts.conversation_uses SET version_id=$1,state='draft' WHERE owner_id=$2 AND use_id=$3", [version.id, account, useId]);
-        else await client.query("INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state) VALUES($1,$2,$3,$4,$5,'reference','draft')", [account, conversation, useId, version.id, binding]);
+        const { version, useId } = await publishDraftUse(client, account, conversation, current, { kind: 'reference', content, dependencies: ids, purpose: 'reference', binding });
         return { version, use: useSchema.parse({ id: useId, versionId: version.id, binding: current?.binding ?? binding, state: 'draft' }), subjectName: subject.name };
       });
     },

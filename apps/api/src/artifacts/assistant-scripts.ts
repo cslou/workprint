@@ -1,14 +1,14 @@
-import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import type { z } from 'zod';
 import { idSchema, savedScriptContentSchema, scriptBodySchema, useSchema, type Version } from '@workprint/contracts';
 import { transaction } from '../db/index.js';
 import { parseContent } from './content.js';
 import { ArtifactError } from './errors.js';
-import { assertBase, lockedUse, namedBase } from './assistant-base.js';
-import { lockPublicationOwner, publishVersion } from './publication.js';
+import { assertBase, lockedUse, namedBase, publishDraftUse } from './assistant-base.js';
+import { lockPublicationOwner } from './publication.js';
 import { withSubjects, type SubjectInput } from './script-subjects.js';
 import { createArtifactStore } from './store.js';
+import { useRoom } from './use-room.js';
 
 type OwnedCheck = Parameters<typeof createArtifactStore>[1];
 /** `content` is the script without its subjects; `subjects` is the full new list, or empty to keep the base's. */
@@ -45,17 +45,9 @@ export function createAssistantScripts(pool: Pool, checkOwnedConversation: Owned
         let content: ReturnType<typeof parseContent>;
         const next = withSubjects(body.data, baseContent, input.subjects ?? []);
         try { content = parseContent('script', next); } catch { throw new ArtifactError('invalid_input'); }
-        // The next revision of the account's own script; a built-in script in use starts a new owned one.
-        const artifactId = current && current.version_owner_id === account ? current.artifact_id : undefined;
-        const version = await publishVersion(client, { accountId: account, conversationId: conversation, artifactId, kind: 'script', content, dependencies: [], createdBy: 'assistant' });
-        const useId = current?.use_id ?? randomUUID();
-        if (current) await client.query("UPDATE artifacts.conversation_uses SET version_id=$1,state='draft' WHERE owner_id=$2 AND use_id=$3", [version.id, account, useId]);
-        else {
-          const count = (await client.query<{ count: number }>('SELECT count(*)::int AS count FROM artifacts.conversation_uses WHERE owner_id=$1 AND conversation_id=$2', [account, conversation])).rows[0]!.count;
-          // The video's use limit is not the script's fault: report it as unavailable, not invalid.
-          if (count >= 100) throw new ArtifactError('integration_failure');
-          await client.query("INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state) VALUES($1,$2,$3,$4,$5,'script','draft')", [account, conversation, useId, version.id, binding]);
-        }
+        // The video's use limit is not the script's fault: report it as unavailable, not invalid.
+        if (!current && await useRoom(client, account, conversation) === 0) throw new ArtifactError('integration_failure');
+        const { version, useId } = await publishDraftUse(client, account, conversation, current, { kind: 'script', content, dependencies: [], purpose: 'script', binding });
         return { version, use: useSchema.parse({ id: useId, versionId: version.id, binding, state: 'draft' }) };
       });
     },

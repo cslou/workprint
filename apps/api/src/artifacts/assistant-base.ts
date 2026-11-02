@@ -1,6 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { idSchema, type Version } from '@workprint/contracts';
+import type { parseContent } from './content.js';
 import { ArtifactError } from './errors.js';
+import { publishVersion } from './publication.js';
 import type { createArtifactStore } from './store.js';
 
 type Reads = ReturnType<typeof createArtifactStore>;
@@ -38,4 +41,24 @@ export function assertBase(current: CurrentUse | undefined, baseVersionId: strin
   if (named.lookupFailure !== undefined) throw named.lookupFailure;
   if (!named.base || named.base.kind !== kind || current.artifact_id !== named.base.artifactId) throw new ArtifactError('not_found');
   if (current.version_id !== named.base.id) throw new ArtifactError('stale_revision');
+}
+
+/** What an assistant save publishes and the use it puts it on. */
+export type DraftUse = Readonly<{
+  kind: 'script' | 'reference' | 'storyboard'; content: ReturnType<typeof parseContent>; dependencies: readonly string[];
+  purpose: 'script' | 'reference' | 'storyboard'; binding: Readonly<Record<string, unknown>>;
+}>;
+
+/**
+ * Publishes the assistant's next version and makes it the video's draft. It is the next revision of the account's own
+ * artifact in use; a built-in one in use starts a new owned artifact. The current use moves to it as a draft, or a new
+ * draft use is added: the caller checks the video has room for that first.
+ */
+export async function publishDraftUse(client: PoolClient, account: string, conversation: string, current: Pick<CurrentUse, 'use_id' | 'version_owner_id' | 'artifact_id'> | undefined, draft: DraftUse): Promise<{ version: Version; useId: string }> {
+  const artifactId = current && current.version_owner_id === account ? current.artifact_id : undefined;
+  const version = await publishVersion(client, { accountId: account, conversationId: conversation, artifactId, kind: draft.kind, content: draft.content, dependencies: draft.dependencies, createdBy: 'assistant' });
+  const useId = current?.use_id ?? randomUUID();
+  if (current) await client.query("UPDATE artifacts.conversation_uses SET version_id=$1,state='draft' WHERE owner_id=$2 AND use_id=$3", [version.id, account, useId]);
+  else await client.query('INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state) VALUES($1,$2,$3,$4,$5,$6,\'draft\')', [account, conversation, useId, version.id, draft.binding, draft.purpose]);
+  return { version, useId };
 }
