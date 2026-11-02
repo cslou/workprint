@@ -7,6 +7,7 @@ import { createApplication, createAssistantScriptSaver, createWorkspaceReader, w
 import { createArtifactStore, createArtifactWriters, createAssistantScripts, createVersionUses, createStoryboardEdits, createMediaVerifier, createUploadCoordinator } from '../artifacts/index.js';
 import { configuredMediaSandbox, configuredObjectStorage } from '../storage/index.js';
 import { assertRestrictedRole } from '../db/index.js';
+import type { MetaImageClient } from '../generation/index.js';
 import { loadServerConfig } from './config.js';
 import { verifyAccount } from './auth.js';
 import { applicationRoutes } from './application-routes.js';
@@ -15,9 +16,10 @@ import { createAdmissionPolicy, decorateCors } from './admission.js';
 import { nativeNavigationRoutes } from './native-navigation.js';
 import { nativeTurnRoutes, isNativeTurnRoute } from './native-turns.js';
 
-/** Turn composition. Production supplies only the model; a test composition may add tools and override limits. */
+/** Turn composition. Production supplies the model and the Meta image client; a test composition may point them at fakes, add tools and override limits. */
 export interface TurnComposition {
   readonly model: NativeTurnModel;
+  readonly images?: MetaImageClient;
   readonly tools?: readonly AgentTool[];
   readonly limits?: TurnLimits;
 }
