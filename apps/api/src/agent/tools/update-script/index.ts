@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { savedScriptContentSchema } from '@workprint/contracts';
-import { defineTool, type ToolContext } from '../define.js';
+import { defineTool } from '../define.js';
 
 type UpdateScriptResult =
   | { saved: true; versionId: string; version: number }
@@ -8,26 +8,18 @@ type UpdateScriptResult =
 
 const messages = {
   stale: 'Not saved: the script changed since you read it. Call read-workspace, then redo the change on the current script version.',
-  not_found: 'Not saved: baseVersionId is not this video\'s current script. Call read-workspace for the current versionId, or pass null only when the video has no script.',
+  not_found: 'Not saved: baseVersionId is not this video\'s current script. Call read-workspace, then redo the change on the current script version and pass its versionId.',
   invalid: 'Not saved: the script is not valid. Check that every speaker is listed in characters unless the line is voice-over.',
   unavailable: 'Not saved: saving is unavailable right now. Tell the user and do not retry in this turn.',
 } as const;
 const summaries = { stale: 'Not saved: the script changed', not_found: 'Not saved: script not found', invalid: 'Not saved: the script isn’t valid', unavailable: 'Not saved: saving is unavailable' } as const;
-
-/** A wrong base gets the concrete recovery for this run's own video: its current script's versionId. */
-async function notFoundMessage(collaborators: ToolContext['collaborators'], scope: ToolContext['scope']): Promise<string> {
-  const read = await collaborators.readWorkspace(scope.accountId, scope.videoId);
-  const script = read.kind === 'found' ? read.workspace.script : null;
-  if (!script) return messages.not_found;
-  return `Not saved: baseVersionId is not this video's current script. The current script is version ${script.version.revision}, versionId "${script.version.id}". Call read-workspace, then redo your change on that version and save it with that baseVersionId.`;
-}
 
 /** Saves the video's script as a new version that becomes the current script, for the run's own account and video. */
 export const updateScriptTool = defineTool({
   id: 'update-script',
   description: [
     'Save the script for this video. Send the complete script: it becomes the current script as a new version, and earlier versions stay in the version history.',
-    'Pass baseVersionId: the versionId of the current script from read-workspace, or null when the video has no script yet (the first save ignores it). If a save is refused, follow the result message: it names the exact baseVersionId to use next.',
+    'Pass baseVersionId: the versionId of the current script from read-workspace, or null when the video has no script yet (the first save ignores it). If a save is refused, follow the result message.',
     'A script has exactly one scene. Write only what the audience can see or hear, in story order, with action and dialogue interleaved as they happen.',
     'Turn narration and inner thought into visible action, dialogue or voice-over, or leave them out. List in characters everyone physically present in the scene.',
     'Every speaker must be in characters, except a voice-over speaker who is absent. Set delivery only to voice_over or off_screen when the story needs it.',
@@ -43,6 +35,6 @@ export const updateScriptTool = defineTool({
   execute: async (input, { scope, collaborators }): Promise<UpdateScriptResult> => {
     const outcome = await collaborators.saveScript(scope.accountId, scope.videoId, { content: input.script, baseVersionId: input.baseVersionId });
     if (outcome.kind === 'saved') return { saved: true, versionId: outcome.versionId, version: outcome.revision };
-    return { saved: false, reason: outcome.kind, message: outcome.kind === 'not_found' ? await notFoundMessage(collaborators, scope) : messages[outcome.kind] };
+    return { saved: false, reason: outcome.kind, message: messages[outcome.kind] };
   },
 });

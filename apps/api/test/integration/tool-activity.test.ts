@@ -209,9 +209,11 @@ test('update-script saves the video\'s current script as a draft, and never over
       const { lines, result } = await updateScript(owner, video, { baseVersionId, script: script('Mara stops.') });
       assert.ok('saved' in result && !result.saved && result.reason === 'not_found', JSON.stringify(result));
       assert.deepEqual(lines.at(-1), ['Updating the script…', 'done', 'Not saved: script not found']);
-      // The refusal names this video's current script, so the model can recover; never the base's own video.
-      assert.match(result.message, new RegExp(`version 2, versionId "${second}"`));
+      // The model must read what it would replace: the refusal sends it to read-workspace and names no id.
+      assert.match(result.message, /Call read-workspace/); assert.ok(!result.message.includes(second));
     }
+    // The malformed base Muse Spark sent, on a video that has a script, is not found too.
+    assert.deepEqual(await saveScript(owner.id, video, { baseVersionId: 'script-v1', content: script('Mara stops.') }), { kind: 'not_found' });
     assert.equal(await versions(owner.id, video), 2); assert.deepEqual(await current(video), [second, second, 'draft']);
     assert.ok(!JSON.stringify(provider.requests).includes('Private.'));
   });
