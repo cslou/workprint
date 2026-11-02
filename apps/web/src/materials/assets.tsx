@@ -1,6 +1,5 @@
 import { Button as AriaButton } from 'react-aria-components';
-import { assetLabels, currentSheets, mediaVersionName, savedReferenceContentSchema, sheetViews, subjectGroups, type OperationResponse, type ScriptSubject, type Version } from '@workprint/contracts';
-import { StatusPill } from '../ui/status.js';
+import { assetLabels, currentSheets, mediaVersionName, sheetViews, subjectGroups, type OperationResponse, type Version } from '@workprint/contracts';
 import { WorkspaceEmpty } from '../ui/panel.js';
 import { ViewerDialog } from '../ui/overlays.js';
 import { ManualVersionEditor } from '../versions/manual-editor.js';
@@ -9,7 +8,8 @@ import { VersionReview } from '../versions/review.js';
 import { ReferenceSheet } from './sheet.js';
 import { MediaReceipt } from '../ui/media-receipt.js';
 import type { ScriptProps } from './script.js';
-import { savedMaterialPresentation } from './content.js';
+import { kindLabel, savedMaterialPresentation } from './content.js';
+import type { MaterialPresentation } from './presentation.js';
 import { useOwnedImage } from '../api/use-owned-image.js';
 import { useNearViewport } from '../ui/use-near-viewport.js';
 import { useSavedMedia } from '../versions/use-saved-media.js';
@@ -17,43 +17,57 @@ import './assets.css';
 
 type Workspace = OperationResponse<'workspace'>;
 type Work = Workspace['assets'][number];
-const subjectKind = { character: 'Character', place: 'Place', prop: 'Prop' } as const satisfies Record<ScriptSubject['kind'], string>;
+type Sheet = MaterialPresentation & { sheet: NonNullable<MaterialPresentation['sheet']> };
+type Presented = { work: Work; facts?: Sheet };
+
+/** What a reference version shows: its supplied or validated presentation, only when it is a sheet with a name. */
+const presentation = (prerequisites: ScriptProps['prerequisites'], version: Version) => {
+  const facts = prerequisites?.presentations.find((item) => item.versionId === version.id && item.revision === version.revision) ?? savedMaterialPresentation(version);
+  return facts?.name && facts.sheet ? facts as Sheet : undefined;
+};
 
 /**
  * Assets by subject (the shared `subjectGroups` rule): each script subject in Assets order with its sheets, then its
- * other images; then "Other", only when it holds something. Sheets and images show no status pill: nothing approves
- * them yet. An empty subject reads Empty.
+ * other images; then "Other", only when it shows something. Nothing shows a status pill, as in the demo's subject
+ * rows without their pill: nothing approves a sheet or image yet. A subject with nothing to show reads Empty.
  */
 export function Assets(props: ScriptProps) {
-  const { workspace } = props;
-  const groups = subjectGroups(workspace).filter(group => group.subject || !group.empty);
+  const { workspace, prerequisites } = props;
+  // Only rows that render count: a reference that isn't a sheet shows nothing, as before subjects.
+  const shown = (work: Work): Presented[] => {
+    if (work.version.kind === 'image' || work.version.kind === 'video') return [{ work }];
+    const facts = work.version.kind === 'reference' ? presentation(prerequisites, work.version) : undefined;
+    return facts ? [{ work, facts }] : [];
+  };
+  const groups = subjectGroups(workspace).map(group => ({ subject: group.subject, sheets: group.sheets.flatMap(shown), items: group.items.flatMap(shown) }))
+    .map(group => ({ ...group, empty: !group.sheets.length && !group.items.length })).filter(group => group.subject || !group.empty);
   if (!groups.length) return <WorkspaceEmpty tab="assets" />;
   const names = { labels: assetLabels(workspace.assets), views: sheetViews(workspace), sheets: new Map(currentSheets(workspace).map(sheet => [sheet.versionId, sheet.subjectName])) };
+  const row = ({ work, facts }: Presented) => facts ? <SheetRow key={work.use?.id ?? work.version.id} {...props} work={work} facts={facts} subjectName={names.sheets.get(work.version.id)} />
+    : <MediaRow key={work.use?.id ?? work.version.id} {...props} work={work} name={mediaVersionName(names.labels, work.version, names.views)} />;
   return <div className="wp-assets">{groups.map(group => {
     const title = group.subject?.name ?? 'Other';
     return <section key={group.subject?.id ?? ''} className="wp-subject" aria-label={title}>
-      <div className="wp-subject-entry"><span><b>{title}</b>{group.subject && <small>{subjectKind[group.subject.kind]}</small>}</span>{group.empty && <StatusPill state="empty" />}</div>
-      {group.sheets.map(work => <SheetRow key={work.use?.id ?? work.version.id} {...props} work={work} subjectName={names.sheets.get(work.version.id)} />)}
-      {group.items.map(work => work.version.kind === 'reference' ? <SheetRow key={work.use?.id ?? work.version.id} {...props} work={work} subjectName={undefined} />
-        : <MediaRow key={work.use?.id ?? work.version.id} {...props} work={work} name={mediaVersionName(names.labels, work.version, names.views)} />)}
+      <div className="wp-subject-entry"><span><b>{title}</b>{group.subject && <small>{kindLabel[group.subject.kind]}</small>}</span>{group.empty && <span className="wp-subject-empty">Empty</span>}</div>
+      {group.sheets.map(row)}{group.items.map(row)}
     </section>;
   })}</div>;
 }
 
-/** A sheet's row, named by its subject's current name; it opens the sheet with its views. A reference that isn't a sheet shows only what validates. */
-function SheetRow({ connection, scope, workspace, prerequisites, onSaved, work, subjectName }: ScriptProps & { work: Work; subjectName: string | undefined }) {
-  const facts = prerequisites?.presentations.find((item) => item.versionId === work.version.id && item.revision === work.version.revision) ?? savedMaterialPresentation(work.version);
-  if (!facts?.name || !facts.sheet) return null;
-  const parsed = 'content' in work.version ? savedReferenceContentSchema.safeParse(work.version.content) : null;
-  const views = parsed?.success ? parsed.data.references : [];
-  const name = `${subjectName ?? facts.name} · Version ${work.version.revision}`;
+/**
+ * A sheet's row and its opened sheet, both named by the subject's current script name (or the sheet's own when the
+ * script doesn't list it); the sheet shows its views.
+ */
+function SheetRow({ connection, scope, workspace, prerequisites, onSaved, work, facts, subjectName }: ScriptProps & { work: Work; facts: Sheet; subjectName: string | undefined }) {
+  const views = facts.sheet.views ?? [];
+  const subject = subjectName ?? facts.name ?? facts.sheet.name;
+  const name = `${subject} · Version ${work.version.revision}`;
   const key = facts.thumbnail ? <img src={facts.thumbnail.src} alt={facts.thumbnail.alt} /> : views[0] ? <SheetKeyImage connection={connection} scope={scope} workspace={workspace} versionId={views[0].versionId} /> : <span className="wp-asset-no-image" aria-hidden="true">No image</span>;
   return <ViewerDialog size="sheet" title={name} trigger={<AriaButton className="wp-asset-row" data-sheet-version-id={work.version.id}>{key}<span><b>{name}</b><small>{`${facts.description} sheet · ${views.length} ${views.length === 1 ? 'view' : 'views'}`}</small></span></AriaButton>}>
     <VersionReview connection={connection} scope={scope} version={work.version} binding={work.use?.binding.purpose === 'reference' ? work.use.binding : { purpose: 'reference' }} currentUse={work.use} selectionRevision={workspace.selectionRevision} {...(onSaved ? { onSaved } : {})} {...(prerequisites?.history ? { historyPrerequisite: prerequisites.history } : {})}>{(version, editable, selection) => {
-      const exact = prerequisites?.presentations.find((item) => item.versionId === version.id && item.revision === version.revision) ?? savedMaterialPresentation(version);
-      const content = 'content' in version ? savedReferenceContentSchema.safeParse(version.content) : null;
-      const shown = content?.success && content.data.references.length ? content.data.references.map(view => <SheetView key={view.versionId} connection={connection} scope={scope} workspace={workspace} versionId={view.versionId} view={view.view} />) : undefined;
-      return exact?.sheet ? <ReferenceSheet sheet={exact.sheet} views={shown} {...(savedTextTarget({ kind: 'reference-description' }).read(version) !== null ? { description: <ManualVersionEditor connection={connection} scope={scope} version={version} target={{ kind: 'reference-description' }} label="Description" currentUse={selection.currentUse} readOnly={!editable} onSaved={selection.onSaved} /> } : {})} /> : <WorkspaceEmpty tab="assets" />;
+      const exact = presentation(prerequisites, version);
+      const shown = exact?.sheet.views?.length ? exact.sheet.views.map(view => <SheetView key={view.versionId} connection={connection} scope={scope} workspace={workspace} versionId={view.versionId} view={view.view} />) : undefined;
+      return exact ? <ReferenceSheet sheet={{ ...exact.sheet, name: subject }} views={shown} {...(savedTextTarget({ kind: 'reference-description' }).read(version) !== null ? { description: <ManualVersionEditor connection={connection} scope={scope} version={version} target={{ kind: 'reference-description' }} label="Description" currentUse={selection.currentUse} readOnly={!editable} onSaved={selection.onSaved} /> } : {})} /> : <WorkspaceEmpty tab="assets" />;
     }}</VersionReview>
   </ViewerDialog>;
 }
@@ -85,8 +99,9 @@ function SheetView({ connection, scope, workspace, versionId, view }: Pick<Scrip
 
 /** A sheet row's key image: its first view, read like any key image once the row is near view. */
 function SheetKeyImage({ connection, scope, workspace, versionId }: Pick<ScriptProps, 'connection' | 'scope' | 'workspace'> & { versionId: string }) {
-  const { version } = useSavedMedia(connection, scope, workspace, versionId, 'image');
-  return version ? <AssetKeyImage connection={connection} version={version} /> : <span className="wp-asset-no-image" aria-hidden="true">Image</span>;
+  const [placeholder, near] = useNearViewport<HTMLSpanElement>();
+  const { version } = useSavedMedia(connection, scope, workspace, versionId, 'image', near);
+  return version ? <AssetKeyImage connection={connection} version={version} /> : <span ref={placeholder} className="wp-asset-no-image" aria-hidden="true">Image</span>;
 }
 
 /**

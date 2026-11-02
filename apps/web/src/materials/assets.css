@@ -8,3 +8,4 @@
 .wp-subject-entry { display: grid; grid-template-columns: 1fr auto; gap: var(--space-12); align-items: center; padding: var(--space-6) var(--space-2); margin-bottom: var(--space-8); }
 .wp-subject-entry b { display: block; font-weight: var(--font-weight-semibold); }
 .wp-subject-entry small { display: block; color: var(--color-text-subtle); font-size: var(--font-size-12); }
+.wp-subject-empty { color: var(--color-text-subtle); font-size: var(--font-size-12); }

@@ -533,7 +533,7 @@ The temporary aggregation reference uses native checkbox/label sections so its r
 
 **Images and videos show no status pill** (Lou, Sprint 008 QA, 2026-11-02): in Assets rows, the upload receipt and the media viewer. Every saved image is a draft and nothing approves one yet, so the pill told the person nothing. Media gets a status again when images can be approved or chosen.
 
-**Sheets show no status pill either** (Lou, Sprint 010, 2026-11-03): no Draft or Ready on a sheet's row in Assets or on the opened [reference sheet](#reference-sheet), and no approval step before a sheet is used. Sheets get a status when they can be approved. The one pill left in Assets is Empty, on a subject with nothing made yet.
+**Sheets show no status pill either** (Lou, Sprint 010, 2026-11-03): no Draft or Ready on a sheet's row in Assets or on the opened [reference sheet](#reference-sheet), and no approval step before a sheet is used. Sheets get a status when they can be approved. Assets shows no pill at all: a subject with nothing made yet reads Empty as plain text.
 
 ### Chips and pills
 
@@ -549,7 +549,7 @@ The temporary aggregation reference uses native checkbox/label sections so its r
 
 The Assets tab lists the video's subjects, as the script names them (Sprint 010). Each subject is a group:
 
-- **Subject entry** (`.wp-subject-entry`): the name in 600 and a 12px kind line, "Character", "Place" or "Prop", as in the demo's subject rows (`demo-03.html`). A subject with nothing made yet shows an Empty [status pill](#status-pills) and nothing else.
+- **Subject entry** (`.wp-subject-entry`): the name in 600 and a 12px kind line, "Character", "Place" or "Prop", as in the demo's subject rows (`demo-03.html`). A subject with nothing to show reads "Empty" in plain 12px `--color-text-subtle` text at the right, with no pill (the demo's row without its status pill).
 - **Order:** characters, then places, then props, each in script order. Within a subject, its sheet rows come first, then its other image rows.
 - **Other:** a last group headed "Other", only when it holds something. It holds images filed under no subject or under one since removed from the script, uploads, uploaded videos, and sheets for a subject the script doesn't list.
 - **Sheet row** (`.wp-asset-row`): the sheet's first view as the key image, the name "Mara · Version 1", and a 12px line such as "Character sheet · 3 views". Each sheet is listed once, under its subject. Clicking the row opens the [reference sheet](#reference-sheet).

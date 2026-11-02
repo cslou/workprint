@@ -1,8 +1,8 @@
 import { savedReferenceContentSchema, savedScriptContentSchema, type Version } from '@workprint/contracts';
 import type { MaterialPresentation } from './presentation.js';
 
-/** A sheet's kind as people read it. */
-export const sheetKindLabel = { character: 'Character', environment: 'Place', prop: 'Prop', style: 'Style' } as const;
+/** A subject's or sheet's kind as people read it; a sheet stores a place as `environment`. */
+export const kindLabel = { character: 'Character', place: 'Place', environment: 'Place', prop: 'Prop', style: 'Style' } as const;
 
 /** Public validated content only; opaque fields and identifiers never supply display facts. */
 export function savedMaterialPresentation(version: Version): MaterialPresentation | null {
@@ -16,10 +16,10 @@ export function savedMaterialPresentation(version: Version): MaterialPresentatio
     const parsed = savedReferenceContentSchema.safeParse(version.content);
     if (!parsed.success) return null;
     const subject = parsed.data.subject;
-    // A place is stored as `environment`.
-    const kind = sheetKindLabel[subject.kind];
+    const kind = kindLabel[subject.kind];
     return { versionId: version.id, revision: version.revision, name: subject.name, description: kind,
-      sheet: { kicker: kind, name: subject.name, summary: subject.description, sections: [{ title: 'Identity', text: subject.continuityNotes.join('\n\n') }] } };
+      sheet: { kicker: kind, name: subject.name, summary: subject.description, sections: [{ title: 'Identity', text: subject.continuityNotes.join('\n\n') }],
+        views: parsed.data.references.map(({ versionId, view }) => ({ versionId, view })) } };
   }
   return null;
 }
