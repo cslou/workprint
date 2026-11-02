@@ -66,10 +66,11 @@ export function createGeneratedImages(pool: Pool, checkOwnedConversation: OwnedC
             await lockPublicationOwner(client, account);
             // An edit of one of this video's own images is that image's next version, in the same place in the video.
             // A built-in image, or one the video doesn't use as an image, can't be revised: the edit is a new image.
+            // So is an approved one: a person's approval is never replaced by an assistant draft.
             const revised = input.revises && input.inputs.includes(input.revises) ? (await client.query<{ use_id: string; artifact_id: string }>(`SELECT u.use_id,v.artifact_id
               FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.version_owner_id AND v.version_id=u.version_id
               JOIN artifacts.versions r ON r.owner_id=$1 AND r.version_id=$3 AND r.artifact_id=v.artifact_id
-              WHERE u.owner_id=$1 AND u.conversation_id=$2 AND u.purpose='reference' AND u.version_owner_id=$1 AND v.kind='image'
+              WHERE u.owner_id=$1 AND u.conversation_id=$2 AND u.purpose='reference' AND u.state='draft' AND u.version_owner_id=$1 AND v.kind='image'
               ORDER BY u.created_at,u.use_id LIMIT 1 FOR UPDATE OF u`, [account, conversation, input.revises])).rows[0] : undefined;
             if (!revised) {
               const count = (await client.query<{ count: number }>('SELECT count(*)::int AS count FROM artifacts.conversation_uses WHERE owner_id=$1 AND conversation_id=$2', [account, conversation])).rows[0]!.count;
