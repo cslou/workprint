@@ -533,6 +533,8 @@ The temporary aggregation reference uses native checkbox/label sections so its r
 
 **Images and videos show no status pill** (Lou, Sprint 008 QA, 2026-11-02): in Assets rows, the upload receipt and the media viewer. Every saved image is a draft and nothing approves one yet, so the pill told the person nothing. Media gets a status again when images can be approved or chosen.
 
+**Sheets show no status pill either** (Lou, Sprint 010, 2026-11-03): no Draft or Ready on a sheet's row in Assets or on the opened [reference sheet](#reference-sheet), and no approval step before a sheet is used. Sheets get a status when they can be approved. Assets shows no pill at all: a subject with nothing made yet reads Empty as plain text.
+
 ### Chips and pills
 
 - **Chip** (`.chip`): 28px high, 12px text, `--color-border-strong`, `--radius-pill`, with a × remove button. Chip types:
@@ -545,11 +547,15 @@ The temporary aggregation reference uses native checkbox/label sections so its r
 
 ### Item rows
 
-`.need` and `a.need.asset`: one row per character, place or prop in the Assets tab.
+The Assets tab lists the video's subjects, as the script names them (Sprint 010). Each subject is a group:
 
-- **Layout:** a 56px key image, then the name in 600 with an 12px type and source line ("Character sheet · in your Library"), then a [status pill](#status-pills).
-- **Shape:** `--color-bg-canvas`, `--color-border-default`, `--radius-md`, 10px 12px padding.
-- **Hover:** `--color-border-strong`. Clicking the row opens the [reference sheet](#reference-sheet).
+- **Subject entry** (`.wp-subject-entry`): the name in 600 and a 12px kind line, "Character", "Place" or "Prop", as in the demo's subject rows (`demo-03.html`). A subject with nothing to show reads "Empty" in plain 12px `--color-text-subtle` text at the right, with no pill (the demo's row without its status pill).
+- **Order:** characters, then places, then props, each in script order. Within a subject, its sheet rows come first, then its other image rows.
+- **Other:** a last group headed "Other", only when it holds something. It holds images filed under no subject or under one since removed from the script, uploads, uploaded videos, and sheets for a subject the script doesn't list.
+- **Sheet row** (`.wp-asset-row`): the sheet's first view as the key image, the name "Mara · Version 1", and a 12px line such as "Character sheet · 3 views". Each sheet is listed once, under its subject. Clicking the row opens the [reference sheet](#reference-sheet).
+- **Image row:** the 56px key image, the name ("Image 4 · Version 1"), and its size. An image in a sheet has no row of its own while its current version is one of the sheet's views. Clicking it opens the media viewer with its version history.
+- **Rows:** a 56px key image, then the name and the 12px line; `--color-bg-canvas`, `--color-border-default`, `--radius-md`, 10px 12px padding; hover `--color-border-strong`. No status pill (see above).
+- **Empty tab:** with no script and nothing saved, the tab keeps its empty text.
 
 ### Script
 
@@ -803,16 +809,17 @@ The ignored `outputs/verification/sprint-003/design-proposals/story4/` previews 
 
 ### Phase 3 saved-work reads
 
-**Provisionally approved by the orchestrator on 2026-10-29 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff.** Fourteen states reuse the approved Script sections, reference rows and sheets, Version/Use history rows, Library fallback tiles and shared buttons, with no token changes. Version history: a secondary `Load earlier versions` after the loaded rows loads only when activated and appends; loading keeps the rows, disables the button and adds `Loading earlier versions…`; failure keeps the rows, restores the button and adds `Earlier versions could not be loaded. The versions already shown are unchanged.`; the button is removed only when there is no next page, and only then does the summary show `Version history · N earlier`. The initial read shows `Loading version history…`, or on failure the button `Load version history` with `Version history could not be loaded.` An earlier version shows `Viewing version N` with a quiet `Back to current version`, read-only with no edit pencil; viewing or returning approves or selects nothing. Library pagination: a secondary `Load more`, with `Loading more Library items…` and `More Library items could not be loaded. The items already shown are unchanged.`, sits inside the scrolling grid directly after the last row of tiles, left-aligned, not in a fixed band above the unchanged selection tray; no Examples switch or Draft/Ready pills on Library tiles. An empty Library reads `Nothing saved yet` / `Your saved work will appear here.` A reference without an image keeps its Asset row with a dashed `No image` thumbnail and is never hidden; its Ready pill comes from the exact conversation use, not Library membership, and its sheet says `No images are supplied.`, with section text only from validated exact-version content. Enter/Space activates the pagination buttons, loading is announced politely and repeat activation is disabled; when the last page arrives, focus moves to the first newly added control before the button is removed, otherwise focus stays on the button, with no unexpected scroll jumps. Account, conversation, resource or filter changes discard loaded pages and late responses, with no replayed action.
+**Provisionally approved by the orchestrator on 2026-10-29 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff.** Fourteen states reuse the approved Script sections, reference rows and sheets, Version/Use history rows, Library fallback tiles and shared buttons, with no token changes. Version history: a secondary `Load earlier versions` after the loaded rows loads only when activated and appends; loading keeps the rows, disables the button and adds `Loading earlier versions…`; failure keeps the rows, restores the button and adds `Earlier versions could not be loaded. The versions already shown are unchanged.`; the button is removed only when there is no next page, and only then does the summary show `Version history · N earlier`. The initial read shows `Loading version history…`, or on failure the button `Load version history` with `Version history could not be loaded.` An earlier version shows `Viewing version N` with a quiet `Back to current version`, read-only with no edit pencil; viewing or returning approves or selects nothing. Library pagination: a secondary `Load more`, with `Loading more Library items…` and `More Library items could not be loaded. The items already shown are unchanged.`, sits inside the scrolling grid directly after the last row of tiles, left-aligned, not in a fixed band above the unchanged selection tray; no Examples switch or Draft/Ready pills on Library tiles. An empty Library reads `Nothing saved yet` / `Your saved work will appear here.` A reference without an image keeps its Asset row with a dashed `No image` thumbnail and is never hidden; its sheet shows section text only from validated exact-version content. (Sprint 010 replaced this state's Ready pill and its `No images are supplied.` line: sheets show no status, and a sheet with no images shows no Views section; see [Status pills](#status-pills).) Enter/Space activates the pagination buttons, loading is announced politely and repeat activation is disabled; when the last page arrives, focus moves to the first newly added control before the button is removed, otherwise focus stays on the button, with no unexpected scroll jumps. Account, conversation, resource or filter changes discard loaded pages and late responses, with no replayed action.
 
 ### Reference sheet
 
 `.livesheet`: a character or place sheet drawn from its structured record. The images are separate files; a PNG or PDF is only an export.
 
 - **Page:** `--color-bg-paper`, 24px 28px padding.
-- **Header:** an uppercase kicker, the name in `typography.display-xl`, a summary and a status pill.
-- **Sections:** a 3-column grid of sections, each with a `typography.display-sm` heading and figures with 12px captions.
-- **Missing images:** dashed 130 × 96 slots.
+- **Header:** an uppercase kicker with the kind ("Character", "Place" or "Prop"), the name in `typography.display-xl` and the description. No status pill.
+- **Sections:** a 3-column grid of sections, each with a `typography.display-sm` heading: Identity holds the continuity notes, then Views, full width.
+- **Views:** the sheet's images laid out together, each captioned with its view in 12px, read only once near view. Selecting one opens the media viewer on that exact version. There is no stitched image and no view count.
+- **An image that can't be shown:** a dashed 4:3 slot reading "This image couldn’t be shown", in its place only; the other views still show.
 
 ### Placeholders
 
