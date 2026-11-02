@@ -140,25 +140,25 @@ These tests use Docker, a browser build or a paid call. Each is listed once for 
 - **As a** developer, **I want** a server-only client for MiniMax Video V2, a fake MiniMax for tests and one live check, **so that** the tool can submit, follow and download a video, and every routine test runs without paid calls.
 - **Dependencies:** None
 - **Acceptance criteria:**
-  - [ ] **Client.** `apps/api/src/generation/minimax-video.ts`, exported through `generation/index.ts`, provides `createMiniMaxVideoClient({ apiKey, baseUrl, timeoutMs?, fetch?, download? })` with:
+  - [x] **Client.** `apps/api/src/generation/minimax-video.ts`, exported through `generation/index.ts`, provides `createMiniMaxVideoClient({ apiKey, baseUrl, timeoutMs?, fetch?, download? })` with:
     - `submit(request, signal)` returning `{ taskId }`. The request type is `{ prompt, durationS, ratio?, firstFrame?, lastFrame? }`, frames as `{ dataUrl, width, height }`. `validateVideoRequest(request)` is exported separately, and `submit` runs it too, so a refusal sends nothing: prompt 1–7000 characters, duration an integer from 4 to 15, `ratio` one of the six documented values and required without frames, a last frame only with a first frame, and each data URL a PNG or JPEG of at most 30 MB. Frames carry their saved width and height, and each side must be 256–5760 px with a width-to-height ratio of 0.4–2.5. The client sends `model: 'MiniMax-H3'`, `resolution: '768P'`, and `ratio: 'adaptive'` with frames.
     - `query(taskId, signal)` returning one of `{ status: 'queued' | 'running' }`, `{ status: 'succeeded', result: { url, durationS?, resolution? } }`, `{ status: 'failed', failure: { code } }` (MiniMax's `task.error.code`) or `{ status: 'cancelled' }`. The URL is returned to the caller and never logged.
     - `download(url, signal, maxBytes)` streaming at most `maxBytes` (100 MiB) with no API credentials sent, `redirect: 'manual'` re-checking each hop, and refusing non-HTTPS URLs and private or loopback addresses. Tests pass a loopback-allowing seam through the composition, never production.
-  - [ ] **Errors** map to a closed set: `invalid_request` (local validation with no code, or 400 and 422 carrying MiniMax's status code only), `unauthorized` (401), `payment_required` (402), `rate_limited` (429, after one retry with an injectable backoff, 2 s by default), `unavailable` (5xx, network error, timeout), `failed` (malformed body, oversize body or download, refused redirect), `aborted` (the caller's signal). Bodies are size-bounded. No error or log contains the key, the prompt, a frame or a result URL.
-  - [ ] **No retry of a create** that may have reached MiniMax: `submit` times out after 20 s by default, and a timeout, network error, 5xx, or a malformed or oversize 2xx body maps to `outcome: 'unknown'` and is never retried. Only a 429 before acceptance is retried.
-  - [ ] **Config.** `loadServerConfig` reads the server-only `MINIMAX_API_KEY` and `https://api.minimax.io` as the base URL. Without the key, the server still starts and composition supplies no video client (as with storage for images). The client lives under `apps/api/`, which `browser-no-server` keeps out of the browser.
-  - [ ] **Fake MiniMax** (`apps/api/test/support/minimax-video-fake.ts`): serves create, query and the download with the reference's shapes; steps each task `queued → running → succeeded` over scripted queries, or to `failed` with an error; can hang, refuse with 400, 402, 429 or 500, serve an oversize or redirecting download; records each request with its parsed body; counts creates.
-  - [ ] **Live check.** `pnpm live:video` (`scripts/live/video.mjs`) runs dry against the fake by default. With `--live` it makes one prompt-only 768P 5 s call through the client, polls to completion, downloads the clip, and saves the sanitized create and query shapes (task id kept, URL removed), the clip and its probe from the pinned toolchain to `outputs/verification/sprint-009/`. It reads the key only from the root `.env` and never prints it. No gate, hook or `pnpm test` script runs it.
+  - [x] **Errors** map to a closed set: `invalid_request` (local validation with no code, or 400 and 422 carrying MiniMax's status code only), `unauthorized` (401), `payment_required` (402), `rate_limited` (429, after one retry with an injectable backoff, 2 s by default), `unavailable` (5xx, network error, timeout), `failed` (malformed body, oversize body or download, refused redirect), `aborted` (the caller's signal). Bodies are size-bounded. No error or log contains the key, the prompt, a frame or a result URL.
+  - [x] **No retry of a create** that may have reached MiniMax: `submit` times out after 20 s by default, and a timeout, network error, 5xx, or a malformed or oversize 2xx body maps to `outcome: 'unknown'` and is never retried. Only a 429 before acceptance is retried.
+  - [x] **Config.** `loadServerConfig` reads the server-only `MINIMAX_API_KEY` and `https://api.minimax.io` as the base URL. Without the key, the server still starts and composition supplies no video client (as with storage for images). The client lives under `apps/api/`, which `browser-no-server` keeps out of the browser.
+  - [x] **Fake MiniMax** (`apps/api/test/support/minimax-video-fake.ts`): serves create, query and the download with the reference's shapes; steps each task `queued → running → succeeded` over scripted queries, or to `failed` with an error; can hang, refuse with 400, 402, 429 or 500, serve an oversize or redirecting download; records each request with its parsed body; counts creates.
+  - [x] **Live check.** `pnpm live:video` (`scripts/live/video.mjs`) runs dry against the fake by default. With `--live` it makes one prompt-only 768P 5 s call through the client, polls to completion, downloads the clip, and saves the sanitized create and query shapes (task id kept, URL removed), the clip and its probe from the pinned toolchain to `outputs/verification/sprint-009/`. It reads the key only from the root `.env` and never prints it. No gate, hook or `pnpm test` script runs it.
 - **Functional verification:**
-  - [ ] Unit tests against the fake MiniMax: request bodies match the documented field names for prompt-only, first-frame and first-and-last-frame; query maps each status; each error code maps as listed, with one retry on 429 and none on 400, 402 or 500; a create that times out, and one answered with a malformed 2xx, each return `outcome: 'unknown'` and the fake counts one create; an aborted signal returns `aborted`.
-  - [ ] Download: an oversize stream fails after reading at most `maxBytes` plus one chunk; a redirect to a private address and a non-HTTPS URL are refused; no `Authorization` header reaches the download host.
-  - [ ] Refused before any request (the fake records zero): duration 3 or 16, a 7001-character prompt, a missing ratio without frames, a last frame without a first, a WebP data URL, a 200 px frame and a 3:1 frame.
-  - [ ] Query maps a `cancelled` task to `{ status: 'cancelled' }`.
-  - [ ] With a sentinel key, prompt, frame and result URL, no error message or log line contains any of them.
-  - [ ] `pnpm live:video` dry mode passes against the fake.
+  - [x] Unit tests against the fake MiniMax: request bodies match the documented field names for prompt-only, first-frame and first-and-last-frame; query maps each status; each error code maps as listed, with one retry on 429 and none on 400, 402 or 500; a create that times out, and one answered with a malformed 2xx, each return `outcome: 'unknown'` and the fake counts one create; an aborted signal returns `aborted`.
+  - [x] Download: an oversize stream fails after reading at most `maxBytes` plus one chunk; a redirect to a private address and a non-HTTPS URL are refused; no `Authorization` header reaches the download host.
+  - [x] Refused before any request (the fake records zero): duration 3 or 16, a 7001-character prompt, a missing ratio without frames, a last frame without a first, a WebP data URL, a 200 px frame and a 3:1 frame.
+  - [x] Query maps a `cancelled` task to `{ status: 'cancelled' }`.
+  - [x] With a sentinel key, prompt, frame and result URL, no error message or log line contains any of them.
+  - [x] `pnpm live:video` dry mode passes against the fake.
 - **Regression verification:**
-  - [ ] `pnpm check` and the unit suite pass. The config unit test still refuses to start without `META_API_KEY` and now starts without `MINIMAX_API_KEY`.
-  - [ ] `pnpm live:image` and `pnpm live:chat` dry modes still pass.
+  - [x] `pnpm check` and the unit suite pass. The config unit test still refuses to start without `META_API_KEY` and now starts without `MINIMAX_API_KEY`.
+  - [x] `pnpm live:image` and `pnpm live:chat` dry modes still pass.
 - **Editorial/design verification:** N/A — no visible change.
 - **Manual-only behavior verification:** The one approved `pnpm live:video --live` run. Pass: the saved shapes parse through the client, the clip downloads within the limit, and its pinned-toolchain probe is recorded for Story 4. If the shapes differ from the reference, the client and fake follow the live shape and the PR records the difference.
 - **Planned commits:**
@@ -185,17 +185,17 @@ These tests use Docker, a browser build or a paid call. Each is listed once for 
 - **As a** creator, **I want** a turn to stay open while a tool waits several minutes, and to see how long it has waited, **so that** a video job can finish in the same turn.
 - **Dependencies:** None
 - **Acceptance criteria:**
-  - [ ] **Route timeout.** The native turn stream routes are exempt from the global 180 s Hono timeout and bounded instead by the turn deadline (35 min) plus 60 s. Every other route keeps 180 s. Both values come from `startServer` options, so tests can shrink them.
-  - [ ] **Why a tool's signal fired.** `ToolContext` gains `abortReason(): 'stop' | 'deadline' | 'shutdown' | undefined`, set from the exact-turn Stop, the turn deadline and server shutdown. The story first records, in the PR, how Mastra 1.79 reports each case (signal reason, whether `timeout.totalMs` aborts a running tool) and builds the reason on that evidence.
-  - [ ] **Shutdown.** A shutdown aborts running tools with reason `shutdown` within the existing 7 s shutdown budget (`shutdownLimits.totalMs`), and the turn ends as incomplete, as today.
-  - [ ] **Node timeouts.** The PR records Node's server `requestTimeout`, `headersTimeout` and `keepAliveTimeout` for the API server, and sets any that would end a 35-minute streamed response. They are `startServer` options, so a test can shrink them.
-  - [ ] **Minutes.** The activity line shows `· 45s` under a minute and whole minutes rounded down from 60 s (`· 1 min` at 60–119 s, `· 2 min` at 120 s), in tabular figures, live only (design.md activity-line rules).
+  - [x] **Route timeout.** The native turn stream routes are exempt from the global 180 s Hono timeout and bounded instead by the turn deadline (35 min) plus 60 s. Every other route keeps 180 s. Both values come from `startServer` options, so tests can shrink them.
+  - [x] **Why a tool's signal fired.** `ToolContext` gains `abortReason(): 'stop' | 'deadline' | 'shutdown' | undefined`, set from the exact-turn Stop, the turn deadline and server shutdown. The story first records, in the PR, how Mastra 1.79 reports each case (signal reason, whether `timeout.totalMs` aborts a running tool) and builds the reason on that evidence.
+  - [x] **Shutdown.** A shutdown aborts running tools with reason `shutdown` within the existing 7 s shutdown budget (`shutdownLimits.totalMs`), and the turn ends as incomplete, as today.
+  - [x] **Node timeouts.** The PR records Node's server `requestTimeout`, `headersTimeout` and `keepAliveTimeout` for the API server, and sets any that would end a 35-minute streamed response. They are `startServer` options, so a test can shrink them.
+  - [x] **Minutes.** The activity line shows `· 45s` under a minute and whole minutes rounded down from 60 s (`· 1 min` at 60–119 s, `· 2 min` at 120 s), in tabular figures, live only (design.md activity-line rules).
 - **Functional verification:**
-  - [ ] Integration: with the global route timeout set to 1 s and a held test tool (`chat-tools.ts` `test-gated`) released after 2 s, the turn completes and its reply is saved; a non-turn route still times out at 1 s; with Node's request and headers timeouts also shrunk to 1 s, the held turn still completes.
-  - [ ] Integration: Stop during the held tool gives `abortReason() === 'stop'`; a 2 s turn deadline gives `'deadline'`; closing the server gives `'shutdown'`. The test tool records what it saw.
-  - [ ] Unit: the activity line formats 59 s as `· 59s`, 60 s and 119 s as `· 1 min`, and 120 s as `· 2 min`.
+  - [x] Integration: with the global route timeout set to 1 s and a held test tool (`chat-tools.ts` `test-gated`) released after 2 s, the turn completes and its reply is saved; a non-turn route still times out at 1 s; with Node's request and headers timeouts also shrunk to 1 s, the held turn still completes.
+  - [x] Integration: Stop during the held tool gives `abortReason() === 'stop'`; a 2 s turn deadline gives `'deadline'`; closing the server gives `'shutdown'`. The test tool records what it saw.
+  - [x] Unit: the activity line formats 59 s as `· 59s`, 60 s and 119 s as `· 1 min`, and 120 s as `· 2 min`.
 - **Regression verification:**
-  - [ ] `apps/api/test/integration/stop.test.ts` (Stop during a held tool aborts it; disconnect only ends viewing) and the chat journeys in `test/e2e/chat.spec.ts` pass.
+  - [x] `apps/api/test/integration/stop.test.ts` (Stop during a held tool aborts it; disconnect only ends viewing) and the chat journeys in `test/e2e/chat.spec.ts` pass.
 - **Editorial/design verification:** design.md's activity-line bullet gains the minute form; checked against the existing tabular-figures rule.
 - **Manual-only behavior verification:** N/A.
 - **Planned commits:**
@@ -219,28 +219,28 @@ These tests use Docker, a browser build or a paid call. Each is listed once for 
 - **As a** creator, **I want** every paid video job saved before it is waited on, with an honest status, **so that** Stop, a deadline or a restart never loses a job or pays for it twice.
 - **Dependencies:** None
 - **Acceptance criteria:**
-  - [ ] **Store.** A migration adds `generation.requests`, the jobs table, owned by account and video: purpose, prompt digest, inputs (exact image version ids), status, task id, submitted-at, failure reason, result version id and a revision. The `generation` module owns its SQL and calls no peer domain; `application` coordinates it.
-  - [ ] **States.** The allowed transitions, checked in SQL so a stale writer can't move a finished job:
+  - [x] **Store.** A migration adds `generation.requests`, the jobs table, owned by account and video: purpose, prompt digest, inputs (exact image version ids), status, task id, submitted-at, failure reason, result version id and a revision. The `generation` module owns its SQL and calls no peer domain; `application` coordinates it.
+  - [x] **States.** The allowed transitions, checked in SQL so a stale writer can't move a finished job:
     - `submitting` (written before the paid create) → `running` with the task id; → `failed` `outcome_unknown` when the create's outcome is unknown; → `failed` with `invalid_input` or `provider_error` when the create was certainly refused (400, 422, 401, 402, or 429 after its retry).
     - `running` → `succeeded` with the result clip, written in the same transaction as the clip's save so a crash can't leave a saved clip on a `running` job; → `failed` only for MiniMax's `failed` or `cancelled` task status or `check_refused`; → `interrupted` (task id kept).
     - `interrupted` → `running` only through resume; → `failed` `expired`.
     - **Failure reasons, closed:** `invalid_input` (MiniMax refused the request), `provider_error` (MiniMax failed or cancelled the task, or refused for payment or rate), `outcome_unknown` (the create may have reached MiniMax), `expired` (past MiniMax's 7-day window), `check_refused` (the clip didn't pass checks).
-  - [ ] **Contract.** `generationStatusSchema` gains `interrupted`. `failureReason` gains `expired` and `check_refused`. `generationRequestSchema` gains a `video` variant with no target and no `batchId` or `proposalId` (the MVP has no batches or proposals). Only that variant omits them; existing variants keep their shape.
-  - [ ] **Reads.** `generationRequests` and `generationRequest` return the video's jobs through owned, bounded reads; a foreign or missing id is not-found. `cancelGeneration` stays `not_implemented` (B-029).
-  - [ ] **Expiry.** Reading or resuming a job interrupted or running past 7 days from submission moves it to `failed` `expired` first, with no MiniMax call.
-  - [ ] **Restart.** At server start, before serving turns, `running` jobs become `interrupted` and `submitting` jobs become `failed` with `outcome_unknown`. No job is polled or resubmitted.
-  - [ ] **Videos tab.** Job cards show the saved status after a reload. A `video` job's card is titled `Video request`. Copy per state:
+  - [x] **Contract.** `generationStatusSchema` gains `interrupted`. `failureReason` gains `expired` and `check_refused`. `generationRequestSchema` gains a `video` variant with no target and no `batchId` or `proposalId` (the MVP has no batches or proposals). Only that variant omits them; existing variants keep their shape.
+  - [x] **Reads.** `generationRequests` and `generationRequest` return the video's jobs through owned, bounded reads; a foreign or missing id is not-found. `cancelGeneration` stays `not_implemented` (B-029).
+  - [x] **Expiry.** Reading or resuming a job interrupted or running past 7 days from submission moves it to `failed` `expired` first, with no MiniMax call.
+  - [x] **Restart.** At server start, before serving turns, `running` jobs become `interrupted` and `submitting` jobs become `failed` with `outcome_unknown`. No job is polled or resubmitted.
+  - [x] **Videos tab.** Job cards show the saved status after a reload. A `video` job's card is titled `Video request`. Copy per state:
     - `Interrupted`: "Stopped waiting. Ask the agent to resume it."
     - `failed`: `outcome_unknown` "MiniMax may have started this video, but its result is unknown." `expired` "MiniMax no longer keeps this video." `check_refused` "The video didn't pass checks." `invalid_input` and `provider_error` "MiniMax couldn't make this video."
     - "Cancel request" is hidden for every job, since cancellation is not implemented.
     - A job whose Shot isn't in the current storyboard no longer blanks the list: that card alone shows "This request can't be shown".
 - **Functional verification:**
-  - [ ] Integration: the state transitions above, including a stale transition refused and a certainly refused create; a foreign account's job is not-found; an expired job is `failed` `expired` with no network (the network guard would fail any call).
-  - [ ] Integration: a save that fails after the clip is stored rolls back both the clip rows and the `succeeded` transition; a second success for the same job is refused, so a resume never saves a second clip.
-  - [ ] Integration: the boot step on a database with one running, one submitting and one succeeded job leaves interrupted, failed `outcome_unknown` and succeeded.
-  - [ ] Browser (`test/e2e/shots.spec.ts`): three seeded jobs, an interrupted `video` job, a `shot_video` job for an existing Shot and one for a missing Shot. After a reload the first shows its card and copy, the second shows normally, the third alone shows "This request can't be shown", and no card has a Cancel button.
+  - [x] Integration: the state transitions above, including a stale transition refused and a certainly refused create; a foreign account's job is not-found; an expired job is `failed` `expired` with no network (the network guard would fail any call).
+  - [x] Integration: a save that fails after the clip is stored rolls back both the clip rows and the `succeeded` transition; a second success for the same job is refused, so a resume never saves a second clip.
+  - [x] Integration: the boot step on a database with one running, one submitting and one succeeded job leaves interrupted, failed `outcome_unknown` and succeeded.
+  - [x] Browser (`test/e2e/shots.spec.ts`): three seeded jobs, an interrupted `video` job, a `shot_video` job for an existing Shot and one for a missing Shot. After a reload the first shows its card and copy, the second shows normally, the third alone shows "This request can't be shown", and no card has a Cancel button.
 - **Regression verification:**
-  - [ ] Contract unit tests for the existing generation variants; `test/e2e/shots.spec.ts` Videos journeys pass.
+  - [x] Contract unit tests for the existing generation variants; `test/e2e/shots.spec.ts` Videos journeys pass.
 - **Editorial/design verification:** The interrupted copy and the single-card fallback follow design.md's generation-request rules (existing tokens, the one line about remote charges unchanged); recorded in the PR and design.md.
 - **Manual-only behavior verification:** N/A.
 - **Planned commits:**
@@ -264,20 +264,20 @@ These tests use Docker, a browser build or a paid call. Each is listed once for 
 - **As a** creator, **I want** videos the agent makes checked and saved privately as my video's generated clips, **so that** they are as safe as uploads and stay in my work.
 - **Dependencies:** Story 1 (the live clip's probe)
 - **Acceptance criteria:**
-  - [ ] **Check.** For `origin: 'assistant'` videos only, the check accepts an explicit list of allowances taken from Story 1's pinned-toolchain probe and recorded in the PR: H.264 Main or High profile, a missing `sample_aspect_ratio` (treated as 1:1), the clip's top-level box order, and either orientation (long side at most 1920, short side at most 1080, so a portrait 768P clip fits). Any other trait the live clip fails goes back to Lou before it is allowed. Everything else stays: full decode with matching frame count and duration, constant frame rate, at most 120 s, AAC-LC. Uploads keep every current rule, including 1920×1080 landscape.
-  - [ ] **Save.** `artifacts/generated-videos.ts` (or a video branch of the generated-media save) checks ownership and that each frame input is an image this video uses, verifies with `verifyWhenFree`, stores the clip and its poster privately, and in one transaction writes the assistant-made video version with the frames as dependencies, its `generated_objects` and `media_objects` rows and a draft `video` use. It removes stored objects on failure. A migration widens `generated_objects` to `video/mp4` up to 100 MiB with a poster, and adds the `video` binding purpose to the uses check and `useBindingSchema`.
-  - [ ] **Application.** A wrapper maps the save to `saved | refused | not_found | unavailable`, taking the job id so the save and the job's `succeeded` transition commit together (Story 3). Frames reuse `createImageInputReader`, which also returns each image's saved width and height with its data URL.
-  - [ ] **Reads.** The `media` read serves the clip and its poster. read-workspace lists clips as `Video N · Version R` with exact version ids (`assetLabels` counts videos per kind).
-  - [ ] **Assets.** Assistant-made clips are not listed in Assets; they appear in Videos (Story 7).
-  - [ ] **Time.** The 5 s live clip verifies in under 6 s in the sandbox, so a 15 s clip fits the 20 s verify attempt. If it doesn't, the tool's `durationS` maximum drops to what fits, and the PR records it.
+  - [x] **Check.** For `origin: 'assistant'` videos only, the check accepts an explicit list of allowances taken from Story 1's pinned-toolchain probe and recorded in the PR: H.264 Main or High profile, a missing `sample_aspect_ratio` (treated as 1:1), the clip's top-level box order, and either orientation (long side at most 1920, short side at most 1080, so a portrait 768P clip fits). Any other trait the live clip fails goes back to Lou before it is allowed. Everything else stays: full decode with matching frame count and duration, constant frame rate, at most 120 s, AAC-LC. Uploads keep every current rule, including 1920×1080 landscape.
+  - [x] **Save.** `artifacts/generated-videos.ts` (or a video branch of the generated-media save) checks ownership and that each frame input is an image this video uses, verifies with `verifyWhenFree`, stores the clip and its poster privately, and in one transaction writes the assistant-made video version with the frames as dependencies, its `generated_objects` and `media_objects` rows and a draft `video` use. It removes stored objects on failure. A migration widens `generated_objects` to `video/mp4` up to 100 MiB with a poster, and adds the `video` binding purpose to the uses check and `useBindingSchema`.
+  - [x] **Application.** A wrapper maps the save to `saved | refused | not_found | unavailable`, taking the job id so the save and the job's `succeeded` transition commit together (Story 3). Frames reuse `createImageInputReader`, which also returns each image's saved width and height with its data URL.
+  - [x] **Reads.** The `media` read serves the clip and its poster. read-workspace lists clips as `Video N · Version R` with exact version ids (`assetLabels` counts videos per kind).
+  - [x] **Assets.** Assistant-made clips are not listed in Assets; they appear in Videos (Story 7).
+  - [x] **Time.** The 5 s live clip verifies in under 6 s in the sandbox, so a 15 s clip fits the 20 s verify attempt. If it doesn't, the tool's `durationS` maximum drops to what fits, and the PR records it.
 - **Functional verification:**
-  - [ ] Integration (real sandbox): the MiniMax-shaped clip saves as an assistant video with a poster, a draft `video` use and its frame dependencies; its signed media URL serves the exact bytes, and the poster's URL serves the saved poster image.
-  - [ ] Unit (media-probe tests): for the assistant, a long side over 1920 or a variable frame rate is refused, and a portrait 768×1344 probe passes; for uploads, High profile and a missing SAR are still refused.
-  - [ ] Integration: the same clip as an upload is still refused; a frame that isn't this video's image is not-found and nothing is stored; a busy checker is waited out.
-  - [ ] Measured: the sandbox verify time of Story 1's live clip, recorded in the PR against the 6 s bar. If the bar is missed, Story 5's unit test asserts the lowered `durationS` maximum.
-  - [ ] Unit: read-workspace names a generated video `Video 1 · Version 1`.
+  - [x] Integration (real sandbox): the MiniMax-shaped clip saves as an assistant video with a poster, a draft `video` use and its frame dependencies; its signed media URL serves the exact bytes, and the poster's URL serves the saved poster image.
+  - [x] Unit (media-probe tests): for the assistant, a long side over 1920 or a variable frame rate is refused, and a portrait 768×1344 probe passes; for uploads, High profile and a missing SAR are still refused.
+  - [x] Integration: the same clip as an upload is still refused; a frame that isn't this video's image is not-found and nothing is stored; a busy checker is waited out.
+  - [x] Measured: the sandbox verify time of Story 1's live clip, recorded in the PR against the 6 s bar. If the bar is missed, Story 5's unit test asserts the lowered `durationS` maximum.
+  - [x] Unit: read-workspace names a generated video `Video 1 · Version 1`.
 - **Regression verification:**
-  - [ ] `apps/api/test/integration/image-upload.test.ts` (uploads and generated images) and the media-probe unit tests pass unchanged for uploads; `test/e2e/uploads.spec.ts` Assets journeys pass.
+  - [x] `apps/api/test/integration/image-upload.test.ts` (uploads and generated images) and the media-probe unit tests pass unchanged for uploads; `test/e2e/uploads.spec.ts` Assets journeys pass.
 - **Editorial/design verification:** N/A — no visible change in this story.
 - **Manual-only behavior verification:** N/A (the live clip from Story 1 is the qualification evidence, recorded in the PR).
 - **Planned commits:**
@@ -300,22 +300,22 @@ These tests use Docker, a browser build or a paid call. Each is listed once for 
 - **As a** creator, **I want** to ask the agent for a video, optionally from my images, and have it wait for the result, **so that** I get a saved clip without leaving the chat.
 - **Dependencies:** Stories 1–4
 - **Acceptance criteria:**
-  - [ ] **Tool.** `apps/api/src/agent/tools/generate-video/` with input `prompt`, `durationS` (4–15, default 6), `ratio` (default `16:9`, ignored with frames), `firstFrame` and `lastFrame` (image version ids from read-workspace, empty for none), `resume` (a job id, empty for a new job) and `showInChat`. With `resume` set, `prompt` may be empty and the prompt, frames, duration and ratio are ignored; `showInChat` still applies. No input is nullable, and a wrong optional value is harmless or refused with a readable message. The description says how to write a motion prompt and when to resume.
-  - [ ] **New job.** Frames resolve through the owned input read, and the request passes `validateVideoRequest`, before anything is saved; a foreign or unused id is "an input image wasn’t found", and a refused request is "the request wasn’t valid" with the reason, each with no job and no create. The tool then saves `submitting`, calls `submit`, saves `running` with the task id, polls every 10 s (injectable) up to 30 minutes (injectable), downloads the result, saves it through Story 4, and marks the job `succeeded` with the version. After MiniMax succeeds, a download or storage that is `unavailable` leaves the job `interrupted` and resumable (MiniMax keeps the task for 7 days); a clip the check refuses fails the job `check_refused`. The line reads "Making a video…", then "Saved Video N · Version 1".
-  - [ ] **Stop and deadlines.** Stop, the turn deadline or the poll deadline mark the job `interrupted` and end the line as "Stopped waiting for the video". Shutdown leaves it `running` for Story 3's start step. A create already sent is waited out first, so no interrupted job lacks a task id (Shared context). Nothing is saved from a download that finishes after Stop.
-  - [ ] **Resume.** With `resume`, the job must be this account's and video's (else not-found). It is expired first if due. An `interrupted` job returns to `running` and is polled with the same task id; no create is sent. Other states refuse with a line: `submitting` or `running` "That video is still being made", `succeeded` "That video is already saved" (with its label), `failed` "That video failed and can't be resumed".
-  - [ ] **Failures.** Each client error and a MiniMax `failed` or `cancelled` task has its own line and a message the agent follows; a create with an unknown outcome is `failed` with `outcome_unknown` and is never retried.
-  - [ ] **Composition.** The video client is supplied only with storage, the checker and the key; otherwise the tool refuses before any MiniMax call, as generate-image does.
+  - [x] **Tool.** `apps/api/src/agent/tools/generate-video/` with input `prompt`, `durationS` (4–15, default 6), `ratio` (default `16:9`, ignored with frames), `firstFrame` and `lastFrame` (image version ids from read-workspace, empty for none), `resume` (a job id, empty for a new job) and `showInChat`. With `resume` set, `prompt` may be empty and the prompt, frames, duration and ratio are ignored; `showInChat` still applies. No input is nullable, and a wrong optional value is harmless or refused with a readable message. The description says how to write a motion prompt and when to resume.
+  - [x] **New job.** Frames resolve through the owned input read, and the request passes `validateVideoRequest`, before anything is saved; a foreign or unused id is "an input image wasn’t found", and a refused request is "the request wasn’t valid" with the reason, each with no job and no create. The tool then saves `submitting`, calls `submit`, saves `running` with the task id, polls every 10 s (injectable) up to 30 minutes (injectable), downloads the result, saves it through Story 4, and marks the job `succeeded` with the version. After MiniMax succeeds, a download or storage that is `unavailable` leaves the job `interrupted` and resumable (MiniMax keeps the task for 7 days); a clip the check refuses fails the job `check_refused`. The line reads "Making a video…", then "Saved Video N · Version 1".
+  - [x] **Stop and deadlines.** Stop, the turn deadline or the poll deadline mark the job `interrupted` and end the line as "Stopped waiting for the video". Shutdown leaves it `running` for Story 3's start step. A create already sent is waited out first, so no interrupted job lacks a task id (Shared context). Nothing is saved from a download that finishes after Stop.
+  - [x] **Resume.** With `resume`, the job must be this account's and video's (else not-found). It is expired first if due. An `interrupted` job returns to `running` and is polled with the same task id; no create is sent. Other states refuse with a line: `submitting` or `running` "That video is still being made", `succeeded` "That video is already saved" (with its label), `failed` "That video failed and can't be resumed".
+  - [x] **Failures.** Each client error and a MiniMax `failed` or `cancelled` task has its own line and a message the agent follows; a create with an unknown outcome is `failed` with `outcome_unknown` and is never retried.
+  - [x] **Composition.** The video client is supplied only with storage, the checker and the key; otherwise the tool refuses before any MiniMax call, as generate-image does.
 - **Functional verification:**
-  - [ ] Integration against the fake MiniMax: a prompt-only job and a first-and-last-frame job each end saved, with one create; the frames reach the fake as data URLs and become dependencies.
-  - [ ] Integration: Stop while polling leaves the job interrupted with its task id and one create; a resume in the next turn completes it with still one create; a poll deadline of 1 s gives interrupted; a resume of an expired job fails it with no call; a foreign job id is not-found.
-  - [ ] Integration: a disconnected observer doesn't stop the job; the video is saved and the turn ends normally.
-  - [ ] Integration: Stop during a hung create (released after Stop with a task id) leaves the job `interrupted` with that task id and one create; a create that times out leaves `failed` `outcome_unknown`, one create and nothing resumable.
-  - [ ] Integration: closing the server during a held poll leaves the job `running` with one create; the next start marks it `interrupted`, and a resume saves the clip with still one create.
-  - [ ] Integration: a download released after Stop saves nothing; a MiniMax `failed` task fails the job `provider_error`; an `unavailable` download after success leaves it `interrupted`; a query 500 and a 429 mid-poll keep polling, and at the poll deadline the job is `interrupted` and resumes with still one create; resuming a `succeeded` job refuses with no call.
-  - [ ] Unit: a last frame without a first and a 200 px frame are refused with no job and no create; the refusal lines, the harmless-optional rule (`firstFrame: "null"` is refused with a readable message; `resume: ""` is a new job) and the no-client refusal with zero creates.
+  - [x] Integration against the fake MiniMax: a prompt-only job and a first-and-last-frame job each end saved, with one create; the frames reach the fake as data URLs and become dependencies.
+  - [x] Integration: Stop while polling leaves the job interrupted with its task id and one create; a resume in the next turn completes it with still one create; a poll deadline of 1 s gives interrupted; a resume of an expired job fails it with no call; a foreign job id is not-found.
+  - [x] Integration: a disconnected observer doesn't stop the job; the video is saved and the turn ends normally.
+  - [x] Integration: Stop during a hung create (released after Stop with a task id) leaves the job `interrupted` with that task id and one create; a create that times out leaves `failed` `outcome_unknown`, one create and nothing resumable.
+  - [x] Integration: closing the server during a held poll leaves the job `running` with one create; the next start marks it `interrupted`, and a resume saves the clip with still one create.
+  - [x] Integration: a download released after Stop saves nothing; a MiniMax `failed` task fails the job `provider_error`; an `unavailable` download after success leaves it `interrupted`; a query 500 and a 429 mid-poll keep polling, and at the poll deadline the job is `interrupted` and resumes with still one create; resuming a `succeeded` job refuses with no call.
+  - [x] Unit: a last frame without a first and a 200 px frame are refused with no job and no create; the refusal lines, the harmless-optional rule (`firstFrame: "null"` is refused with a readable message; `resume: ""` is a new job) and the no-client refusal with zero creates.
 - **Regression verification:**
-  - [ ] `apps/api/test/integration/tool-activity.test.ts` generate-image cases and `stop.test.ts` pass.
+  - [x] `apps/api/test/integration/tool-activity.test.ts` generate-image cases and `stop.test.ts` pass.
 - **Editorial/design verification:** Tool-line phrases follow design.md's activity-line rules ("Making a video…", "· 2 min", "Stopped waiting for the video").
 - **Manual-only behavior verification:** N/A. A live tool run happens at QA, where Lou makes real videos.
 - **Planned commits:**
@@ -339,14 +339,14 @@ These tests use Docker, a browser build or a paid call. Each is listed once for 
 - **As a** creator, **I want** a video I asked for shown under its line in the chat, **so that** I can watch it where I asked.
 - **Dependencies:** Story 5
 - **Acceptance criteria:**
-  - [ ] When `showInChat` is set, the done line carries the saved video id through the same projection and allowlists as shown images (`agent/tool-activity.ts`, `packages/api-client/src/native-activity.ts`, `apps/web/src/conversation/chat-session.ts`).
-  - [ ] The chat shows the video's poster under the line, sized from the version before it loads, at most 240px tall, with a play mark and the alt text `Video N · Version 1`. It loads lazily through the shared owned-image copy (the poster). Clicking opens `SingleClipViewer`, which plays the clip.
-  - [ ] Saved history shows the same after a reload. A failed poster read shows "This video couldn’t be shown", and the line stays.
+  - [x] When `showInChat` is set, the done line carries the saved video id through the same projection and allowlists as shown images (`agent/tool-activity.ts`, `packages/api-client/src/native-activity.ts`, `apps/web/src/conversation/chat-session.ts`).
+  - [x] The chat shows the video's poster under the line, sized from the version before it loads, at most 240px tall, with a play mark and the alt text `Video N · Version 1`. It loads lazily through the shared owned-image copy (the poster). Clicking opens `SingleClipViewer`, which plays the clip.
+  - [x] Saved history shows the same after a reload. A failed poster read shows "This video couldn’t be shown", and the line stays.
 - **Functional verification:**
-  - [ ] Browser (`test/e2e/chat.spec.ts`): a scripted turn calls generate-video against the fake MiniMax with `showInChat`; the poster shows under the line, the viewer plays (the player reports `playing` or advances `currentTime`), and both again after reload; a turn without `showInChat` shows no video; with the poster read refused once, the line stays and shows "This video couldn’t be shown".
+  - [x] Browser (`test/e2e/chat.spec.ts`): a scripted turn calls generate-video against the fake MiniMax with `showInChat`; the poster shows under the line, the viewer plays (the player reports `playing` or advances `currentTime`), and both again after reload; a turn without `showInChat` shows no video; with the poster read refused once, the line stays and shows "This video couldn’t be shown".
 - **Regression verification:**
-  - [ ] The chat image journeys in `test/e2e/chat.spec.ts` pass.
-  - [ ] Unit (projection and browser parse): a done line saved before this sprint, in the old `shownImages` shape, still shows its images.
+  - [x] The chat image journeys in `test/e2e/chat.spec.ts` pass.
+  - [x] Unit (projection and browser parse): a done line saved before this sprint, in the old `shownImages` shape, still shows its images.
 - **Editorial/design verification:** Follows design.md's shown-images rules extended to video (one bullet added for the play mark); the play mark reuses the Videos thumbnail overlay. Lou ratifies at QA.
 - **Manual-only behavior verification:** N/A.
 - **Planned commits:**
@@ -368,13 +368,13 @@ These tests use Docker, a browser build or a paid call. Each is listed once for 
 - **As a** creator, **I want** every video the agent made listed in the Videos tab, **so that** I can find and play them later.
 - **Dependencies:** Stories 3–6 (it reuses the scripted generate-video turn helper Story 6 adds to `test/e2e/fixtures.ts`)
 - **Acceptance criteria:**
-  - [ ] `workspace()` returns the video's `video` uses, and the Videos tab shows a "Generated videos" list above the Shot rows: one row per clip, named `Video N · Version R`, with its poster (lazy, shared copy), duration and a button that plays it in `SingleClipViewer`. No status pill.
-  - [ ] The list updates after the tool finishes without a reload (the existing `onToolDone` refresh) and is the same after a reload. With no clips and no Shots, the tab shows its existing empty state.
-  - [ ] Job cards (Story 3) stay under the list.
+  - [x] `workspace()` returns the video's `video` uses, and the Videos tab shows a "Generated videos" list above the Shot rows: one row per clip, named `Video N · Version R`, with its poster (lazy, shared copy), duration and a button that plays it in `SingleClipViewer`. No status pill.
+  - [x] The list updates after the tool finishes without a reload (the existing `onToolDone` refresh) and is the same after a reload. With no clips and no Shots, the tab shows its existing empty state.
+  - [x] Job cards (Story 3) stay under the list.
 - **Functional verification:**
-  - [ ] Browser (`test/e2e/shots.spec.ts`): its own scripted generate-video turn; the Videos tab lists `Video 1 · Version 1` with its duration (the fixture's, `0:04`) without a reload; it plays; after reload it is still listed, above the job cards in DOM order.
+  - [x] Browser (`test/e2e/shots.spec.ts`): its own scripted generate-video turn; the Videos tab lists `Video 1 · Version 1` with its duration (the fixture's, `0:04`) without a reload; it plays; after reload it is still listed, above the job cards in DOM order.
 - **Regression verification:**
-  - [ ] `test/e2e/shots.spec.ts` Shot video journeys pass.
+  - [x] `test/e2e/shots.spec.ts` Shot video journeys pass.
 - **Editorial/design verification:** The list reuses the Videos row treatment (`.wp-video-row`, thumbnail, number badge omitted); design.md gains a "Generated videos" bullet under Videos. Lou ratifies at QA.
 - **Manual-only behavior verification:** N/A.
 - **Planned commits:**
