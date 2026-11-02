@@ -4,20 +4,22 @@ import type { AddressInfo } from 'node:net';
 /** A scripted create answer. Without one, the fake starts a task and answers its id. */
 export type FakeCreateStep =
   | { readonly taskId?: string }
-  | { readonly status: number; readonly code?: number }
+  | { readonly status: number; readonly code?: number; readonly message?: string }
   | { readonly raw: string };
 /** A scripted query answer. Without one, each task moves `queued → running → succeeded` over its queries. */
 export type FakeQueryStep =
   | { readonly task: 'queued' | 'running' | 'succeeded' | 'cancelled' }
   | { readonly task: 'failed'; readonly code?: string }
-  | { readonly status: number; readonly code?: number }
+  | { readonly status: number; readonly code?: number; readonly message?: string }
   | { readonly raw: string };
 /** A scripted download answer. Without one, the fake serves the clip. */
 export type FakeDownloadStep =
   | { readonly status: number }
   | { readonly redirect: string }
   /** Serves this many bytes, declaring no length, so only the reader's limit stops it. */
-  | { readonly oversize: number };
+  | { readonly oversize: number }
+  /** Declares this length but sends the clip, so only the declared length can refuse it. */
+  | { readonly declare: number };
 /** Any step may wait for `after` before it answers; `hang` never answers until the fake closes. */
 type Timed<T> = T & { readonly after?: Promise<unknown> } | { readonly hang: true };
 export type FakeVideoRequest = { readonly method: string; readonly path: string; readonly authorization: string | undefined; readonly body: Record<string, unknown> };
@@ -27,10 +29,11 @@ const codes: Record<number, [string, string]> = {
   402: ['insufficient_balance_error', 'insufficient balance (1008)'], 422: ['invalid_request_error', 'sensitive content (1026)'],
   429: ['rate_limit_error', 'rate limit exceeded (1002)'], 500: ['api_error', 'internal error (1000)'],
 };
-function error(response: ServerResponse, status: number, code?: number) {
-  const [type, message] = codes[status] ?? ['api_error', 'scripted failure (1000)'];
-  response.writeHead(status, { 'content-type': 'application/json' })
-    .end(JSON.stringify({ type: 'error', error: { type, message: code ? message.replace(/\(\d+\)/, `(${code})`) : message, http_code: String(status) } }));
+function error(response: ServerResponse, step: { status: number; code?: number; message?: string }) {
+  const [type, standard] = codes[step.status] ?? ['api_error', 'scripted failure (1000)'];
+  const message = step.message ?? (step.code ? standard.replace(/\(\d+\)/, `(${step.code})`) : standard);
+  response.writeHead(step.status, { 'content-type': 'application/json' })
+    .end(JSON.stringify({ type: 'error', error: { type, message, http_code: String(step.status) } }));
 }
 
 /**
@@ -44,7 +47,7 @@ export async function miniMaxVideoFake(options: { clip?: Buffer } = {}) {
   const requests: FakeVideoRequest[] = [];
   const tasks = new Map<string, { queries: number; ratio: string }>();
   let clip = options.clip ?? Buffer.from('fake clip bytes');
-  let next = 424010985738600;
+  let next = 424010985738600, served = 0;
   const open = new Set<ServerResponse>();
   const server = createServer((request, response) => {
     let raw = '';
@@ -65,7 +68,7 @@ export async function miniMaxVideoFake(options: { clip?: Buffer } = {}) {
     if (step?.after) { open.add(response); await step.after; open.delete(response); }
     if (create) {
       const scripted = step as FakeCreateStep | undefined;
-      if (scripted && 'status' in scripted) return error(response, scripted.status, scripted.code);
+      if (scripted && 'status' in scripted) return error(response, scripted);
       if (scripted && 'raw' in scripted) return void response.writeHead(200, { 'content-type': 'application/json' }).end(scripted.raw);
       const taskId = scripted?.taskId ?? String(next++);
       tasks.set(taskId, { queries: 0, ratio: typeof body.ratio === 'string' ? body.ratio : '16:9' });
@@ -73,10 +76,10 @@ export async function miniMaxVideoFake(options: { clip?: Buffer } = {}) {
     }
     if (query) {
       const taskId = query[1]!, scripted = step as FakeQueryStep | undefined;
-      if (scripted && 'status' in scripted) return error(response, scripted.status, scripted.code);
+      if (scripted && 'status' in scripted) return error(response, scripted);
       if (scripted && 'raw' in scripted) return void response.writeHead(200, { 'content-type': 'application/json' }).end(scripted.raw);
       const seen = tasks.get(taskId);
-      if (seen === undefined && !scripted) return error(response, 400);
+      if (seen === undefined && !scripted) return error(response, { status: 400 });
       const queries = seen?.queries ?? 0;
       tasks.set(taskId, { queries: queries + 1, ratio: seen?.ratio ?? '16:9' });
       const status = scripted?.task ?? (['queued', 'running', 'succeeded'] as const)[Math.min(queries, 2)];
@@ -98,10 +101,19 @@ export async function miniMaxVideoFake(options: { clip?: Buffer } = {}) {
         response.writeHead(200, { 'content-type': 'video/mp4' });
         const chunk = Buffer.alloc(64 * 1024);
         let left = scripted.oversize;
-        const write = () => { while (left > 0) { const part = chunk.subarray(0, Math.min(left, chunk.length)); left -= part.length; if (!response.write(part)) { response.once('drain', write); return; } } response.end(); };
-        response.on('error', () => { left = 0; });
+        served = 0;
+        // Stops as soon as the reader goes away, so `served` shows how much it took before refusing.
+        const write = () => {
+          while (left > 0 && !response.destroyed) {
+            const part = chunk.subarray(0, Math.min(left, chunk.length)); left -= part.length; served += part.length;
+            if (!response.write(part)) { response.once('drain', write); return; }
+          }
+          if (!response.destroyed) response.end();
+        };
+        response.on('close', () => { left = 0; });
         return write();
       }
+      if (scripted && 'declare' in scripted) return void response.writeHead(200, { 'content-type': 'video/mp4', 'content-length': String(scripted.declare) }).end(clip);
       return void response.writeHead(200, { 'content-type': 'video/mp4', 'content-length': String(clip.length) }).end(clip);
     }
     response.writeHead(404).end();
@@ -115,6 +127,8 @@ export async function miniMaxVideoFake(options: { clip?: Buffer } = {}) {
       query(...steps: Timed<FakeQueryStep>[]) { queries.push(...steps); },
       download(...steps: Timed<FakeDownloadStep>[]) { downloads.push(...steps); },
     },
+    /** Bytes written by the last `oversize` download before the reader stopped it. */
+    get served() { return served; },
     /** How many create requests reached the fake. */
     get creates() { return requests.filter(request => request.method === 'POST').length; },
     requests,
