@@ -36,6 +36,8 @@ test('generate and edit send Meta\'s field names, and each returned image is a r
   assert.equal(fake.requests[1]!.path, '/v1/images/edits');
   // Omitted fields take Meta's defaults: nothing is sent for them.
   assert.deepEqual(fake.requests[1]!.body, { model: 'muse-image-1.0', prompt: 'Evening light', response_format: 'b64_json', output_format: 'png', images: [{ image_url: input }] });
+  await client().edit({ prompt: 'x', outputFormat: 'png', tools: { shell: false }, images: [{ url: 'https://example.invalid/a.png' }] });
+  assert.deepEqual(fake.requests[2]!.body, { model: 'muse-image-1.0', prompt: 'x', response_format: 'b64_json', output_format: 'png', tool_enablement: { enable_shell: false }, images: [{ image_url: 'https://example.invalid/a.png' }] });
 });
 
 test('invalid requests are refused before anything is sent', async () => {
@@ -47,12 +49,16 @@ test('invalid requests are refused before anything is sent', async () => {
   await refusal(client().generate({ prompt: 'x', size: 'wide' }), 'invalid_request', 'size');
   await refusal(client().edit({ prompt: 'x', images: Array.from({ length: 11 }, () => image) }), 'invalid_request', 'images');
   await refusal(client().edit({ prompt: 'x', images: [{ url: 'http://example.invalid/a.png' }] }), 'invalid_request', 'images[0]');
+  // Model-supplied values are checked at runtime, not only by type.
+  await refusal(client().edit({ prompt: 'x', images: [{}] } as never), 'invalid_request', 'images[0]');
+  await refusal(client().edit({ prompt: 'x' } as never), 'invalid_request', 'images');
+  await refusal(client().generate({ prompt: 'x', outputFormat: 'toString' } as never), 'invalid_request', 'output_format');
   assert.equal(fake.requests.length, 0);
-  await client().generate({ prompt: 'x', size: '1600x100' });
+  await client().generate({ prompt: 'x', size: '1600x100', outputFormat: 'png' });
   assert.equal(fake.requests.length, 1, 'a 16:1 ratio is allowed');
 });
 
-test('errors map to a closed set: one retry for 503, none for 400 or 500', async () => {
+test('errors map to a closed set: one retry for 503 or 429, none for 400 or 500', async () => {
   fake.script({ status: 400, error: { type: 'invalid_request_error', code: 'content_policy_violation', param: 'prompt', message: 'echo A bench' } });
   await refusal(client().generate({ prompt: 'A bench' }), 'content_policy');
   fake.script({ status: 400, error: { type: 'invalid_request_error', param: 'size', message: 'bad' } });
@@ -64,8 +70,8 @@ test('errors map to a closed set: one retry for 503, none for 400 or 500', async
   assert.equal(fake.requests.length, 4, 'no retries');
 
   fake.reset();
-  fake.script({ status: 503 });
-  assert.equal((await client().generate({ prompt: 'x' })).images.length, 1);
+  fake.script({ status: 429 });
+  assert.equal((await client().generate({ prompt: 'x', outputFormat: 'png' })).images.length, 1);
   assert.equal(fake.requests.length, 2, 'one retry, then success');
   fake.reset();
   fake.script({ status: 503 }, { status: 503 });
@@ -88,6 +94,12 @@ test('Stop aborts as aborted, and a request that never answers times out as unav
   await refusal(pending, 'aborted');
   fake.script({ hang: true });
   await refusal(client({ timeoutMs: 50 }).generate({ prompt: 'x' }), 'unavailable');
+  fake.script({ status: 503 });
+  const waiting = new AbortController();
+  const retry = createMetaImageClient({ apiKey: key, baseUrl: fake.url, retryDelayMs: 60_000 }).generate({ prompt: 'x' }, waiting.signal);
+  await new Promise(resolve => setTimeout(resolve, 20));
+  waiting.abort();
+  await refusal(retry, 'aborted');
   await refusal(client().generate({ prompt: 'x' }, AbortSignal.abort()), 'aborted');
 });
 
@@ -103,7 +115,7 @@ test('no error carries the key, the prompt or image bytes', async () => {
     fake.script(step);
     await assert.rejects(client().edit({ prompt, images: [{ dataUrl: `data:image/png;base64,${bytes}` }] }), (error: unknown) => {
       assert.ok(error instanceof MetaImageError);
-      for (const secret of [key, prompt, bytes.slice(0, 40)]) assert.ok(!`${error.message} ${error.param ?? ''} ${error.stack ?? ''}`.includes(secret));
+      for (const secret of [key, prompt, bytes.slice(-80, -40)]) assert.ok(!`${error.message} ${error.param ?? ''} ${error.stack ?? ''}`.includes(secret));
       return true;
     });
   }

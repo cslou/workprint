@@ -84,15 +84,18 @@ function body(request: ImageRequest, images?: readonly ImageInput[]): Record<str
     const [width, height] = match ? [Number(match[1]), Number(match[2])] : [0, 0];
     if (!width || !height || Math.max(width, height) / Math.min(width, height) > maxRatio) invalid('size');
   }
-  if (request.outputFormat !== undefined && !(request.outputFormat in formats)) invalid('output_format');
+  if (request.outputFormat !== undefined && !Object.hasOwn(formats, request.outputFormat)) invalid('output_format');
   if (request.reasoningStrength !== undefined && request.reasoningStrength !== 'high' && request.reasoningStrength !== 'low') invalid('reasoning_strength');
   const tools = request.tools ?? {};
   const toolEnablement = Object.fromEntries(([['imageSearch', 'enable_image_search'], ['webSearch', 'enable_web_search'], ['shell', 'enable_shell']] as const)
     .filter(([name]) => tools[name] !== undefined).map(([name, field]) => [field, tools[name] === true]));
   if (images !== undefined) {
-    if (images.length < 1 || images.length > maxImages) invalid('images');
-    images.forEach((image, index) => {
-      if ('dataUrl' in image ? !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(image.dataUrl) : !/^https:\/\/\S+$/.test(image.url)) invalid(`images[${index}]`);
+    if (!Array.isArray(images) || images.length < 1 || images.length > maxImages) invalid('images');
+    images.forEach((image: unknown, index) => {
+      const item = record(image), keys = item ? Object.keys(item) : [];
+      const valid = keys.length === 1 && (typeof item?.dataUrl === 'string' ? /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(item.dataUrl)
+        : typeof item?.url === 'string' && /^https:\/\/\S+$/.test(item.url));
+      if (!valid) invalid(`images[${index}]`);
     });
   }
   return {
@@ -124,7 +127,7 @@ function result(text: string, requested: ImageOutputFormat | undefined, requestI
   try { parsed = record(JSON.parse(text)); } catch { parsed = undefined; }
   const data = parsed?.data;
   const format = parsed?.output_format ?? requested ?? 'webp';
-  if (!Array.isArray(data) || !data.length || typeof format !== 'string' || !(format in formats)) throw new MetaImageError('failed');
+  if (!Array.isArray(data) || !data.length || typeof format !== 'string' || !Object.hasOwn(formats, format)) throw new MetaImageError('failed');
   const contentType = formats[format as ImageOutputFormat];
   const images = data.map(item => {
     const encoded = record(item)?.b64_json;
@@ -166,8 +169,9 @@ export function createMetaImageClient(options: MetaImageClientOptions): MetaImag
     let response = await attempt(path, payload, signal);
     if (response.status === 503 || response.status === 429) {
       await new Promise<void>(resolve => {
-        const timer = setTimeout(resolve, retryDelayMs);
-        signal?.addEventListener('abort', () => { clearTimeout(timer); resolve(); }, { once: true });
+        const stop = () => { clearTimeout(timer); resolve(); };
+        const timer = setTimeout(() => { signal?.removeEventListener('abort', stop); resolve(); }, retryDelayMs);
+        signal?.addEventListener('abort', stop, { once: true });
       });
       if (signal?.aborted) throw new MetaImageError('aborted');
       response = await attempt(path, payload, signal);
@@ -178,6 +182,6 @@ export function createMetaImageClient(options: MetaImageClientOptions): MetaImag
 
   return {
     generate: (request, signal) => call('/images/generations', request, undefined, signal),
-    edit: (request, signal) => call('/images/edits', request, request.images, signal),
+    edit: (request, signal) => call('/images/edits', request, request.images ?? [], signal),
   };
 }

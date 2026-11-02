@@ -61,8 +61,8 @@ export async function metaImageFake() {
       if ('status' in step) { response.writeHead(step.status, { 'content-type': 'application/json' }).end(JSON.stringify({ error: step.error ?? { type: 'server_error', message: 'scripted failure' } })); return; }
       response.writeHead(200, { 'content-type': 'application/json', 'x-request-id': `fake-${requests.length}` }).end(JSON.stringify({
         created: 1793588678, data: step.images.map(image => ({ b64_json: image.toString('base64') })),
-        // The fake's images are PNGs, so it labels them png unless a step says otherwise.
-        output_format: step.outputFormat ?? 'png', background: 'opaque',
+        // Like Meta, the label follows the request and defaults to webp, so a missing format fails the signature check.
+        output_format: step.outputFormat ?? (typeof body.output_format === 'string' ? body.output_format : 'webp'), background: 'opaque',
         usage: { input_tokens: 10, output_tokens: 20, total_tokens: 30 },
       }));
     });
@@ -73,7 +73,7 @@ export async function metaImageFake() {
     url: `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`,
     script(...next: FakeImageStep[]) { steps.push(...next); },
     requests,
-    reset() { steps.length = 0; requests.length = 0; },
+    reset() { steps.length = 0; requests.length = 0; seed = 0; },
     close: () => new Promise<void>(resolve => { server.closeAllConnections(); server.close(() => resolve()); }),
   };
 }
