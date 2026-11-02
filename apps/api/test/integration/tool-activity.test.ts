@@ -1013,3 +1013,70 @@ test('generate-sheet makes a script subject\'s views one at a time with Meta and
     assert.deepEqual(parts.filter(part => part.type === 'tool-activity' && part.tool === 'generate-sheet').map(part => part.state), ['incomplete']);
   });
 });
+
+// save-storyboard through real turns: the save, the line, and the agent's view of it in read-workspace.
+test('save-storyboard saves the Shot plan from the current script, and read-workspace lists its Shots and panel ids', { timeout: 300000 }, async t => {
+  const provider = await scriptedProvider(); t.after(provider.close);
+  const fixture = await accountBrowserFixture({ artifacts: true, composition: chatComposition(provider) });
+  const pool = new Pool({ connectionString: fixture.servingUrl, max: 4 });
+  t.after(async () => { await pool.end(); await fixture.close(); });
+  const check = createOwnedConversationCheck(fixture.native);
+  const store = createArtifactStore(pool, check);
+  const saveScript = createAssistantScriptSaver(createAssistantScripts(pool, check).save);
+  const owner = await fixture.auth.createAccount();
+  const client = nativeTurnClient(fixture.apiOrigin, await fixture.accessToken(owner), owner.id);
+  /** One turn in which the model calls `tool` with `args`; returns what the tool gave the model and the activity lines. */
+  const turn = async <Result>(video: string, tool: string, args: Record<string, unknown>) => {
+    provider.reset();
+    provider.script({ toolCalls: [{ name: tool, args }] }, { text: ['Done'] });
+    const observed = await client.turn(video, 'Storyboard the script');
+    assert.ok(completed(observed), JSON.stringify(observed.terminal));
+    const messages = (provider.requests[1]!.body as { messages: { role: string; content: unknown }[] }).messages;
+    const content = messages.findLast(message => message.role === 'tool')?.content;
+    assert.ok(content !== undefined, 'tool result sent to the model');
+    const lines = observed.chunks.filter(chunk => chunk.type === 'tool-activity').map(chunk => [chunk.payload?.phrase, chunk.payload?.state, chunk.payload?.summary]);
+    return { observed, lines, result: (typeof content === 'string' ? JSON.parse(content) : content) as Result };
+  };
+
+  const video = await client.newVideo();
+  const scene = { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'The Gallery', time: 'night' }, characters: ['Mara'], script: [{ action: 'Mara waits.' }, { dialogue: { character: 'Mara', text: 'Anyone here?' } }] }] };
+  const scripted = await saveScript(owner.id, video, { baseVersionId: null, content: scene, subjects: [{ id: '', kind: 'character', name: 'Mara' }, { id: '', kind: 'place', name: 'The Gallery' }] });
+  assert.equal(scripted.kind, 'saved');
+  const shots = [
+    { shotId: '', intent: 'Mara arrives.', framing: 'wide', action: 'Mara steps in.', dialogue: [{ character: 'Mara', text: 'Anyone here?', delivery: '' }], cameraNote: 'null',
+      references: [{ subjectId: 'mara', role: 'identity', purpose: 'Her face.' }, { subjectId: 'the-gallery', role: 'environment', purpose: 'The room.' }],
+      panels: [{ panelId: '', description: 'Mara in the doorway.' }, { panelId: '', description: 'Mara at the desk.' }] },
+    { shotId: '', intent: 'The lights go out.', panels: [{ panelId: '', description: 'Darkness.' }] },
+  ];
+
+  type Saved = { saved: true; versionId: string; version: number } | { saved: false; reason: string; message: string };
+  const first = await turn<Saved>(video, 'save-storyboard', { base: '', shots });
+  assert.ok(first.result.saved, JSON.stringify(first.result));
+  assert.deepEqual(first.lines, [['Saving the storyboard…', 'running', undefined], ['Saving the storyboard…', 'done', 'Saved Storyboard · Version 1']]);
+  assert.ok(!JSON.stringify(first.observed.chunks).includes('Mara in the doorway'), 'no storyboard text leaves the server');
+  const board = (await store.workspace(owner.id, video)).storyboard;
+  assert.deepEqual([board.work?.version.id, board.work?.version.createdBy, board.work?.use?.state], [first.result.versionId, 'assistant', 'draft']);
+
+  type Listed = { storyboard: { versionId: string; detail: string; shots: { shotId: string; intent: string; framing?: string; references?: unknown[]; panels: { panelId: string; description: string }[] }[] } };
+  const listed = (await turn<Listed>(video, 'read-workspace', {})).result.storyboard;
+  assert.deepEqual([listed.versionId, listed.detail], [first.result.versionId, 'full']);
+  assert.deepEqual(listed.shots.map(shot => [shot.shotId, shot.intent, shot.framing, shot.panels.map(panel => [panel.panelId, panel.description])]), board.shots.map(shot => [shot.shotId, shot.intent, shot.framing, shot.panels.map(panel => [panel.panelId, panel.description])]));
+  assert.deepEqual(listed.shots[0]!.references, [{ subjectId: 'mara', role: 'identity' }, { subjectId: 'the-gallery', role: 'environment' }]);
+
+  // The next save on the current version keeps the given ids, in the new order.
+  const [opening, closing] = listed.shots;
+  const second = await turn<Saved>(video, 'save-storyboard', { base: listed.versionId, shots: [
+    { shotId: closing!.shotId, intent: 'The lights go out.', panels: [{ panelId: closing!.panels[0]!.panelId, description: 'Darkness falls.' }] },
+    { ...shots[0], shotId: opening!.shotId, panels: [{ panelId: opening!.panels[0]!.panelId, description: 'Mara in the doorway.' }, { panelId: '', description: 'Mara turns.' }] },
+  ] });
+  assert.ok(second.result.saved, JSON.stringify(second.result));
+  assert.equal(second.lines.at(-1)?.[2], 'Saved Storyboard · Version 2');
+  const next = (await store.workspace(owner.id, video)).storyboard.shots;
+  assert.deepEqual(next.map(shot => shot.shotId), [closing!.shotId, opening!.shotId]);
+  assert.equal(next[1]!.panels[0]!.panelId, opening!.panels[0]!.panelId);
+  assert.notEqual(next[1]!.panels[1]!.panelId, opening!.panels[1]!.panelId, 'a panel sent with no id is a new panel');
+
+  // A stale base gets its line, and nothing is saved.
+  const stale = await turn<Saved>(video, 'save-storyboard', { base: first.result.versionId, shots });
+  assert.deepEqual([stale.result.saved, stale.lines.at(-1)?.[2]], [false, 'Not saved: the storyboard changed since you read it']);
+});

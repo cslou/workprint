@@ -66,7 +66,7 @@ test('the listing gives the video\'s stopped jobs with their resume ids, only wh
   const run = (stopped?: StoppedVideosOutcome) => {
     const collaborators: AgentCollaborators = {
       readWorkspace: async () => ({ kind: 'found', workspace: workspace([image('i1')]) }),
-      saveScript: async () => ({ kind: 'unavailable' }), sheets: unusedSheets, readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }),
+      saveScript: async () => ({ kind: 'unavailable' }), saveStoryboard: async () => ({ kind: 'unavailable' }), sheets: unusedSheets, readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }),
       ...(stopped ? { videos: { start: async () => ({ kind: 'not_found' }), resume: async () => ({ kind: 'not_found' }), stopped: async (account: string, video: string) => { asked.push([account, video]); return stopped; } } } : {}),
     };
     const signal = new AbortController().signal;
@@ -87,7 +87,7 @@ test('the listing gives the script\'s subjects with their ids, and 50 subjects w
   const subjects = names.map((name, index) => ({ id: `${'s'.repeat(80)}-${index}`, kind: index === 0 ? 'character' as const : 'prop' as const, name }));
   const script: Version = { ...base('s'), kind: 'script', content: { schemaVersion: 1, subjects, scenes: [{ heading: { setting: 'INT.', location: 'Station', time: 'Night' }, characters: [names[0]!], script: [{ action: 'Ada waits.' }] }] } };
   const space = workspace(Array.from({ length: 40 }, (_, index) => reference(`r${index}`, `N${index}`, 'é'.repeat(400))), { script: work(script, 'script') });
-  const collaborators: AgentCollaborators = { readWorkspace: async () => ({ kind: 'found', workspace: space }), saveScript: async () => ({ kind: 'unavailable' }), readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }), sheets: unusedSheets };
+  const collaborators: AgentCollaborators = { readWorkspace: async () => ({ kind: 'found', workspace: space }), saveScript: async () => ({ kind: 'unavailable' }), saveStoryboard: async () => ({ kind: 'unavailable' }), readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }), sheets: unusedSheets };
   const signal = new AbortController().signal;
   const listed = await tool.execute({}, { scope: { accountId: 'a', videoId: 'v' }, collaborators, signal, abortReason: () => undefined }) as { subjects: unknown[]; items: { name: string }[]; truncated: boolean };
   assert.deepEqual(listed.subjects, subjects);
@@ -102,7 +102,7 @@ const sheetVersion = (id: string, subject: string, views: [string, string][]): V
   subject: { id: subject, kind: 'character', name: 'Old name', description: 'A courier.', continuityNotes: ['n'] }, references: views.map(([versionId, view]) => ({ versionId, view, notes: [] })) } });
 const readTool = productionTools.find(candidate => candidate.id === 'read-workspace')!;
 const reading = (space: OwnedWorkspace, readView: AgentCollaborators['sheets']['readView']) => {
-  const collaborators: AgentCollaborators = { readWorkspace: async () => ({ kind: 'found', workspace: space }), saveScript: async () => ({ kind: 'unavailable' }), readImageInputs: async () => ({ kind: 'not_found' }),
+  const collaborators: AgentCollaborators = { readWorkspace: async () => ({ kind: 'found', workspace: space }), saveScript: async () => ({ kind: 'unavailable' }), saveStoryboard: async () => ({ kind: 'unavailable' }), readImageInputs: async () => ({ kind: 'not_found' }),
     saveGeneratedImage: async () => ({ kind: 'unavailable' }), sheets: { ...unusedSheets, readView } };
   const signal = new AbortController().signal;
   return (input: Record<string, unknown>) => readTool.execute(input, { scope: { accountId: 'a', videoId: 'v' }, collaborators, signal, abortReason: () => undefined }) as Promise<Record<string, unknown>>;
@@ -166,4 +166,55 @@ test('an image is listed with its subjectId only while the script lists that sub
   assert.deepEqual(filed([{ id: 'mara', kind: 'character', name: 'Mara' }, { id: 'gallery', kind: 'place', name: 'Gallery' }]), [['i1', 'mara'], ['i2', 'gallery'], ['i3', undefined]]);
   // The Gallery left the script: its image is listed unfiled, under Other.
   assert.deepEqual(filed([{ id: 'mara', kind: 'character', name: 'Mara' }]), [['i1', 'mara'], ['i2', undefined], ['i3', undefined]]);
+});
+
+const boardVersion = (shots: unknown[]): Version => ({ ...base('board', 2), createdBy: 'assistant', kind: 'storyboard', content: { schemaVersion: 1, sourceScriptVersionId: 's', shots } } as Version);
+const madeImage = (id: string, revision: number, at: string): Version => ({ ...image(id), artifactId: 'artifact-panel', revision, createdBy: 'assistant', createdAt: at });
+
+test('the listing gives the storyboard once, with each Shot\'s ids, text, references and current panel images', async () => {
+  const person = image('view-1'), first = madeImage('panel-v1', 1, '2026-11-02T00:00:00.000Z'), second = madeImage('panel-v2', 2, '2026-11-03T00:00:00.000Z');
+  const shots = [
+    { shotId: 's2', order: 1, intent: 'The key turns.', panels: [{ panelId: 'p3', order: 0, description: 'The key.', references: [], candidateImageVersions: [], approvedImageVersionId: null }], chosenVideoVersionId: null },
+    { shotId: 's1', order: 0, intent: 'Mara arrives.', framing: 'wide', action: 'Rain.', references: [{ subjectId: 'mara', role: 'identity', purpose: 'Her face.' }],
+      panels: [
+        { panelId: 'p2', order: 1, description: 'At the desk.', references: [], candidateImageVersions: [person, second, first], approvedImageVersionId: 'view-1' },
+        { panelId: 'p1', order: 0, description: 'In the doorway.', references: [], candidateImageVersions: [first, second], approvedImageVersionId: null },
+      ], chosenVideoVersionId: null },
+  ];
+  const board = boardVersion(shots);
+  const space = workspace([], { storyboard: { work: work(board, 'storyboard'), shots } } as Partial<OwnedWorkspace>);
+  const listed = await reading(space, async () => ({ kind: 'not_found' }))({}) as { storyboard: unknown; items: { name: string; use: string }[] };
+  assert.deepEqual(listed.storyboard, { name: 'Storyboard · Version 2', versionId: 'board', state: 'Draft', detail: 'full', truncated: false, shots: [
+    { shotId: 's1', intent: 'Mara arrives.', framing: 'wide', references: [{ subjectId: 'mara', role: 'identity' }], panels: [
+      { panelId: 'p1', description: 'In the doorway.', imageVersionId: 'panel-v2' }, { panelId: 'p2', description: 'At the desk.', imageVersionId: 'view-1' },
+    ] },
+    { shotId: 's2', intent: 'The key turns.', panels: [{ panelId: 'p3', description: 'The key.' }] },
+  ] });
+  // The storyboard is not listed again as an item; each panel's images stay items.
+  assert.ok(!listed.items.some(item => item.use === 'storyboard'));
+  assert.deepEqual(listed.items.map(item => item.name), ['Shot 1 · Panel 1.1 · Version 1', 'Shot 1 · Panel 1.1 · Version 2', 'Shot 1 · Panel 1.2 · Version 1']);
+  assert.deepEqual(((await reading(space, async () => ({ kind: 'not_found' }))({ versionId: 'board' })) as { item: { content: unknown } }).item.content, 'content' in board ? board.content : undefined);
+});
+
+test('a 100-Shot storyboard with 200-character intents steps down, says truncated, and stays within 16 KiB', async () => {
+  const shotsOf = (count: number, intent: string, idLength = 30) => Array.from({ length: count }, (_, index) => ({ shotId: `${'s'.repeat(idLength)}-${String(index).padStart(3, '0')}`, order: index, intent, framing: 'wide',
+    panels: [{ panelId: `${'p'.repeat(30)}-${index}a`, order: 0, description: 'd'.repeat(200), references: [], candidateImageVersions: [], approvedImageVersionId: null }], chosenVideoVersionId: null }));
+  const list = async (shots: ReturnType<typeof shotsOf>) => {
+    const space = workspace(Array.from({ length: 30 }, (_, index) => image(`i${index}`)), { storyboard: { work: work(boardVersion(shots), 'storyboard'), shots } } as Partial<OwnedWorkspace>);
+    const listed = await reading(space, async () => ({ kind: 'not_found' }))({}) as { storyboard: { detail: string; truncated: boolean; shots: Record<string, unknown>[] }; items: unknown[] };
+    assert.ok(Buffer.byteLength(JSON.stringify(listed)) <= listingBounds.bytes, String(Buffer.byteLength(JSON.stringify(listed))));
+    assert.ok(listed.items.length > 0, 'items still fit beside the storyboard');
+    return listed.storyboard;
+  };
+  const full = await list(shotsOf(3, 'Mara arrives.'));
+  assert.deepEqual([full.detail, full.truncated, full.shots.length], ['full', false, 3]);
+  const intents = await list(shotsOf(20, 'i'.repeat(60)));
+  assert.deepEqual([intents.detail, intents.truncated, intents.shots.length, Object.keys(intents.shots[0]!)], ['intents', true, 20, ['shotId', 'intent']]);
+  const ids = await list(shotsOf(100, 'é'.repeat(200)));
+  assert.deepEqual([ids.detail, ids.truncated, ids.shots.length, Object.keys(ids.shots[0]!)], ['ids', true, 100, ['shotId']]);
+  // Shot ids of up to 200 characters: only the first Shots fit.
+  const first = await list(shotsOf(100, 'é'.repeat(200), 190));
+  assert.equal(first.detail, 'ids'); assert.ok(first.truncated);
+  assert.ok(first.shots.length > 0 && first.shots.length < 100, String(first.shots.length));
+  assert.deepEqual(first.shots.map(shot => shot.shotId), shotsOf(first.shots.length, '', 190).map(shot => shot.shotId), 'the first Shots in order');
 });
