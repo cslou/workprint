@@ -1,13 +1,29 @@
 import { MAX_UPLOAD_IMAGE_BYTES, MAX_UPLOAD_VIDEO_BYTES } from '@workprint/contracts';
 import type { ClientResult } from './types.js';
-type Policy={types:readonly string[];maxBytes:number;exactBytes?:number;timeoutMs:number;slots:{active:number;max:number}};
-const images={active:0,max:2},downloads={active:0,max:1};
+type Slots={active:number;max:number;waiting:(()=>void)[]};
+type Policy={types:readonly string[];maxBytes:number;exactBytes?:number;timeoutMs:number;slots:Slots};
+const images:Slots={active:0,max:2,waiting:[]},downloads:Slots={active:0,max:1,waiting:[]};
+/** Reads past the cap wait their turn in order, at most this many; leaving (abort) gives up the place. */
+const MAX_WAITING=64;
+function acquire(slots:Slots,signal:AbortSignal):Promise<boolean>{
+  if(signal.aborted)return Promise.resolve(false);
+  if(slots.active<slots.max){slots.active++;return Promise.resolve(true);}
+  if(slots.waiting.length>=MAX_WAITING)return Promise.resolve(false);
+  return new Promise(resolve=>{
+    const grant=()=>{signal.removeEventListener('abort',leave);slots.active++;resolve(true);};
+    const leave=()=>{const index=slots.waiting.indexOf(grant);if(index>=0)slots.waiting.splice(index,1);resolve(false);};
+    slots.waiting.push(grant);signal.addEventListener('abort',leave,{once:true});
+  });
+}
+const release=(slots:Slots)=>{slots.active--;slots.waiting.shift()?.();};
 const fail=():ClientResult<never>=>({ok:false,error:{code:'transport_failure',message:'Private object unavailable'}});
 /** Bounded signed-object GET. Never forwards API credentials or automatically reacquires access. */
 async function readPrivateObject(value:string,signal:AbortSignal,policy:Policy):Promise<ClientResult<Blob>>{
   let url:URL;try{url=new URL(value);}catch{return fail();}
-  if(signal.aborted || policy.slots.active>=policy.slots.max || url.username || url.password || url.hash || !url.searchParams.has('X-Amz-Signature') || (url.protocol!=='https:' && !(url.protocol==='http:' && ['127.0.0.1','localhost','[::1]'].includes(url.hostname))))return fail();
-  policy.slots.active++;let completed=false;const controller=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;let onAbort=()=>{};
+  if(signal.aborted || url.username || url.password || url.hash || !url.searchParams.has('X-Amz-Signature') || (url.protocol!=='https:' && !(url.protocol==='http:' && ['127.0.0.1','localhost','[::1]'].includes(url.hostname))))return fail();
+  // The deadline starts once the read has its turn.
+  if(!await acquire(policy.slots,signal))return fail();
+  let completed=false;const controller=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;let onAbort=()=>{};
   const interrupted=new Promise<ClientResult<never>>(resolve=>{onAbort=()=>{controller.abort();resolve(fail());};signal.addEventListener('abort',onAbort,{once:true});timer=setTimeout(onAbort,policy.timeoutMs);});
   const work=async():Promise<ClientResult<Blob>>=>{
     try{
@@ -18,7 +34,7 @@ async function readPrivateObject(value:string,signal:AbortSignal,policy:Policy):
       try{for(;;){const {value,done}=await reader.read();if(done)break;size+=value.byteLength;if(size>length || size>policy.maxBytes){await reader.cancel();return fail();}chunks.push(new Uint8Array(value));}}finally{reader.releaseLock();}
       completed=size===length;
       return completed?{ok:true,value:new Blob(chunks,{type:type!})}:fail();
-    }catch{return fail();}finally{policy.slots.active--;}
+    }catch{return fail();}finally{release(policy.slots);}
   };
   try{return await Promise.race([work(),interrupted]);}finally{clearTimeout(timer);signal.removeEventListener('abort',onAbort);if(!completed)controller.abort();}
 }
