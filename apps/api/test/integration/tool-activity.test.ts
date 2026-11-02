@@ -209,9 +209,25 @@ test('update-script saves the video\'s current script as a draft, and never over
       const { lines, result } = await updateScript(owner, video, { baseVersionId, script: script('Mara stops.') });
       assert.ok('saved' in result && !result.saved && result.reason === 'not_found', JSON.stringify(result));
       assert.deepEqual(lines.at(-1), ['Updating the script…', 'done', 'Not saved: script not found']);
+      // The refusal names this video's current script, so the model can recover; never the base's own video.
+      assert.match(result.message, new RegExp(`version 2, versionId "${second}"`));
     }
     assert.equal(await versions(owner.id, video), 2); assert.deepEqual(await current(video), [second, second, 'draft']);
     assert.ok(!JSON.stringify(provider.requests).includes('Private.'));
+  });
+
+  await t.test('on a video with no script, a wrong base is refused with "pass null", and the retry in the same turn saves version 1', async () => {
+    const fresh = await client(owner).newVideo();
+    provider.reset();
+    const valid = script('Mara dives in.');
+    provider.script({ toolCalls: [{ name: 'update-script', args: { baseVersionId: 'script-v1', script: valid } }] }, { toolCalls: [{ name: 'update-script', args: { baseVersionId: null, script: valid } }] }, { text: ['Saved'] });
+    const turn = await client(owner).turn(fresh, 'Write the script');
+    assert.ok(completed(turn), JSON.stringify(turn.terminal));
+    const refusal = (provider.requests[1]!.body as { messages: { role: string; content: unknown }[] }).messages.findLast(message => message.role === 'tool')?.content;
+    assert.match(typeof refusal === 'string' ? refusal : JSON.stringify(refusal), /has no script yet\. Call update-script again now with baseVersionId null/);
+    const summaries = turn.chunks.filter(chunk => chunk.type === 'tool-activity' && chunk.payload?.state === 'done').map(chunk => chunk.payload?.summary);
+    assert.deepEqual(summaries, ['Not saved: script not found', 'Saved version 1']);
+    assert.equal(await versions(owner.id, fresh), 1);
   });
 
   await t.test('content the saved-script schema refuses is not saved, and the line says so', async () => {
