@@ -2,7 +2,7 @@
 
 **Date:** Start 2026-11-02, from `main` after PR #84 (`3c7a048`) – End after completion gates and Lou's QA
 **Goal:** In a local build, a signed-in user asks the agent for an image. The agent calls Meta `muse-image-1.0`, and the image is checked, saved privately as an assistant-made image, and shown in the chat and in the Assets tab, live and after a reload. The tool also accepts saved images as inputs with the prompt, using every option Meta's image API offers that our storage can keep.
-**Status:** 🟢 Complete (Lou's QA and the merge to main pending)
+**Status:** 🟢 Complete (Lou's QA passed 2026-11-02; the merge to main follows)
 
 ---
 
@@ -484,47 +484,43 @@ For descriptive-only work, use editorial review and applicable existing checks. 
   - Story 3, #87 (generate-image tool).
   - Story 5, #88 (Assets key images).
   - Story 4, #89 (image in the chat): 5/5 after two fix rounds. The first review found that every chat and Assets image was read again and blanked on each workspace refresh, and `useOwnedImage` now keeps one object per version id. Its positive control fails without the fix.
-- **Combined-branch verification:** deep gate at `9d611b3` (`.checks/regression.sh --tier=deep`, 238 s): PASS.
-  - Results: unit 165/165, tooling 6/6, integration 110/110, browser 28/28. The chat flake seen once in Story 4 did not recur.
+- **Combined-branch verification:** deep gate at `13a2144`, after the QA fixes (`.checks/regression.sh --tier=deep`, 242 s): PASS. The `main` pre-merge at `13a2144` also passed (deep, 245 s).
+  - Results: unit 171/171, tooling 6/6, integration 113/113, browser 29/29.
+  - The first deep gate, at `9d611b3`, passed too (unit 165, tooling 6, integration 110, browser 28; logs `outputs/verification/sprint-008/deep-9d611b3/`). The `main` pre-merge at `406fdbe` then failed on the pending-dot journey, which #92 fixed (diagnosis in `.checks/.logs/run-kvv1whq8/diagnosis.md`).
   - Audit is NON-PASS, as approved: the same 2 moderate advisories, `@hono/node-server` GHSA-rmxm-3fg6-px4f (B-004) and `minimatch` GHSA-g3hv-75wg-m249 (B-008). There are no high or critical advisories.
-  - Logs: `outputs/verification/sprint-008/deep-9d611b3/`.
-  - `9d611b3` is the code of `sprint-008` at `786d2e5` plus the spec fold. The `main` pre-merge gate runs deep again on the final head.
+  - Logs: `outputs/verification/sprint-008/deep-13a2144/`.
 - **Manual-only steps, recorded in the story PRs:**
   - "This image couldn’t be shown": a 404 on the chat image's media read (#89). Pass.
   - The Assets row placeholder on a failed read (#88). Pass.
 - **Not run (optional, not requested):** `pnpm live:image --live` and `pnpm live:chat --live`. Their dry and scripted modes passed (#85, #87). Live image shapes are not yet re-confirmed through the tool; the QA build stands in for them.
-- **QA build for Lou:** running at `9d611b3`.
-  - Web is http://127.0.0.1:4179 and the API is :4180, with live Muse Spark 1.3 and live Meta `muse-image-1.0` (paid calls).
-  - Private loopback object storage and the pinned media decode sandbox are on, so uploads work too.
-  - It uses a dedicated synthetic account. Its credentials are in the 0600 file `outputs/qa/sprint-008/9d611b37084e/credentials.json`.
-  - Stop it with `node outputs/qa/sprint-008/9d611b37084e/stop.mjs`. It expires after 8 hours.
-  - Lou ratifies the Story 4 chat-image design at QA.
+- **QA build for Lou:** first at `9d611b3`, then, after the QA fixes, at `13a2144` (http://127.0.0.1:4179, API :4180, live Muse Spark 1.3 and live Meta `muse-image-1.0`, paid calls; private loopback storage and the pinned decode sandbox; a dedicated synthetic account in a 0600 file under `outputs/qa/sprint-008/13a2144840ca/`). Lou's QA on 2026-11-02 passed: "all works", which also ratifies the Story 4 chat-image design.
 - **Deviations, recorded:**
   - **Story 1:** the fake ships with the client, so two commits instead of three.
   - **Story 2:**
-    - The save returns no label; the tool takes "Image N · Version 1" from read-workspace, because `application` can't import its naming.
+    - The save returns no label; the tool takes the image's name from the shared workspace projection. Since #92 the name comes from `assetLabels` in contracts, the same as the web.
     - The busy-checker and tampered-bytes cases are integration cases, not unit cases.
     - Two commits instead of three: the save and the read share their integration setup.
   - **Story 4:** the `img` element appears once its private bytes are ready. Before that, a box sized from the version's width and height holds the space. So the Functional item "before the image loads its `img` already has the width and height" is left unchecked: it is met by the box, not the element.
-- **Pending:** Lou's QA, including ratifying the Story 4 chat-image design.
+- **Pending:** the merge to `main` on Lou's command.
 - **Unresolved issues, accepted:**
   - Stop ends our request but cannot cancel the generation or its charge at Meta (B-029). Nothing from a late response is saved (Lou, by design).
   - A publish that fails after the storage write can leave an orphaned object if the removal fails too; the save reports it.
   - Story 4 accepted P2s:
     - a 240×240 placeholder until the version is known;
     - no automated pre-load box check;
-    - the UUID pattern, the limit of 10 and the "Image N" ordinal are duplicated between the server and the browser.
+    - the UUID pattern and the limit of 10 are duplicated between the server and the browser. #92 moved the "Image N" ordinal into `assetLabels`.
   - Story 3 open P2s from the #87 re-review:
     - the count cap past Meta's returned images is untested;
     - the label fallback and the phrase bound are untested;
     - the no-null schema check lacks a positive control.
   - Deleting generated images is B-037.
-- **Review:** completion records, pending the resulting-head review. The sprint-integration PR is reviewed on its own head.
+- **Review:** the sprint-integration PR #91 was re-reviewed on `13a2144` after the QA fixes: 4/5, no P0/P1. These records were reviewed in their own PR.
 - **Spec/flow changes:** the agent image flow is folded into §8.3, with a cross-reference from §8.2. The generated-objects storage and the assistant XMP allowance are in §4's `artifacts` and `storage` rows and the upload-confirm row. The `generation`, `storage`, `model-catalog` and §5 qualification sprint numbers follow the new order.
 - **QA follow-up (Lou's QA at `9d611b3`, 2026-11-02):** generating, Assets and editing worked. Four issues were fixed in two PRs into `sprint-008`. Each PR merges only after an independent review of its final head at 4/5 or better with no open P0/P1:
-  - **"Image service unavailable" on three images**, and **a third image not shown, none after a refresh:** server storage and browser reads both refused past two at once, and every image, including those in the hidden Assets panel, loaded together. Fixed in #92: bounded queues on both sides, lazy loading near view and one shared copy per version per session. The upload confirm now waits out a busy checker, which closes the accepted issue above.
-  - **Draft badge in Assets:** images and videos show no status pill until they can be approved or chosen (#92, `design.md`).
+  - **"Image service unavailable" on three images**, and **a third image not shown, none after a refresh:** server storage and browser reads both refused past two at once, and every image, including those in the hidden Assets panel, loaded together. Fixed in #92: bounded queues on both sides, lazy loading near view and one shared copy per version per session. The upload confirm now waits out a busy checker, so the accepted issue about uploads during an image save is closed.
+  - **Draft badge in Assets:** images and videos show no status pill (#92, `design.md`). #93's "Use this version" in an image's history can now approve an image, which nothing shows; B-040 owns that and the texts that still say images can't be approved.
   - **Everything "Version 1":** an edit of one image is now its next version, with history in the Assets viewer. Variations stay separate images until the looks picker (Sprint 012). Fixed in #93.
   - **Also in #92:** chat and Assets use one name per image, a server that can't save images makes no paid call, a repeated input is read once, the Meta fetch refuses redirects and oversized bodies, and the flaky pending-dot journey that failed #91's deep pre-merge waits for the hold.
   - **Backlog, after video generation (Lou):** small previews (B-038) and caching across reloads (B-039).
+  - **After the fixes (Lou's QA at `13a2144`):** all works. Lou couldn't find an image's version history, and "Use this version" didn't seem to work. That is B-040 in the Inbox: the history sits only in the Assets viewer, closed by default; the chat viewer has none; the workspace doesn't refresh after "Use this version"; and that button approves the image, which nothing shows.
 - **New Dependencies:** None.
