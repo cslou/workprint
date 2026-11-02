@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
-import { idSchema, operations, savedStoryboardContentSchema, type OperationRequest, type OperationResponse, type Version } from '@workprint/contracts';
+import { idSchema, operations, savedReferenceContentSchema, savedStoryboardContentSchema, type OperationRequest, type OperationResponse, type Version } from '@workprint/contracts';
 import { transaction } from '../db/index.js';
 import { assertContentDependencies, parseContent } from './content.js';
 import { ArtifactError } from './errors.js';
@@ -8,6 +8,7 @@ import { canonicalJson } from './manual-content.js';
 import { publishVersion } from './publication.js';
 import { affectedVersions, advanceSelectionRevision, changedShots, selectionRevision, shotOrderChanged } from './selection.js';
 import { createArtifactStore } from './store.js';
+import { panelReferences, shotSubjects, storyboardDependencies } from './storyboard-dependencies.js';
 
 type Command = OperationRequest<'editStoryboard'>['body'];
 type Result = OperationResponse<'editStoryboard'>;
@@ -72,14 +73,23 @@ export function createStoryboardEdits(pool: Pool, checkOwnedConversation: Parame
         throw new ArtifactError('stale_revision');
       }
       const before = savedStoryboardContentSchema.parse(current.content);
-      const content = editedPlan(savedStoryboardContentSchema.parse(base.content), body.shots);
-      if (canonicalJson(content) === canonicalJson(before)) throw new ArtifactError('invalid_input');
-      const references = [...new Set(content.shots.flatMap(shot => shot.panels.flatMap(panel => panel.references)))];
-      // The base's other dependencies (its Shots' subject sheets) carry over unchanged.
       const basePlan = savedStoryboardContentSchema.parse(base.content);
-      const baseLinks = new Set([basePlan.sourceScriptVersionId, ...basePlan.shots.flatMap(shot => shot.panels.flatMap(panel => panel.references))]);
-      const sheets = base.dependencies.filter(id => id !== content.sourceScriptVersionId && !baseLinks.has(id) && !references.includes(id));
-      const dependencies = [content.sourceScriptVersionId, ...references, ...sheets];
+      const content = editedPlan(basePlan, body.shots);
+      if (canonicalJson(content) === canonicalJson(before)) throw new ArtifactError('invalid_input');
+      // The base's Shot-subject sheets carry over unchanged. A base dependency that wasn't a panel reference is one of
+      // them; a panel reference this edit drops stays only when it is a sheet of a subject the Shots still name.
+      const references = panelReferences(content), baseLinks = new Set(panelReferences(basePlan)), subjects = new Set(shotSubjects(content));
+      const sheets: string[] = [];
+      for (const id of base.dependencies) {
+        if (id === content.sourceScriptVersionId || references.includes(id)) continue;
+        if (!baseLinks.has(id)) sheets.push(id);
+        else if (subjects.size) {
+          const dropped = await reads.version(account, id);
+          const sheet = 'content' in dropped ? savedReferenceContentSchema.safeParse(dropped.content).data : undefined;
+          if (sheet && subjects.has(sheet.subject.id)) sheets.push(id);
+        }
+      }
+      const dependencies = storyboardDependencies(content, sheets);
       if (dependencies.length > 100) throw new ArtifactError('invalid_input');
       const resolved = new Map<string, Version>();
       for (const id of dependencies) resolved.set(id, await reads.version(account, id));

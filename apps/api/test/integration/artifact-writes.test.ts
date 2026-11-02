@@ -8,7 +8,7 @@ import { createOwnedConversationCheck } from '../../src/agent/index.js';
 import { BUILT_IN_OWNER } from '../../src/artifacts/store.js';
 import { createArtifactStore, createArtifactWriters, createAssistantReferences, createAssistantScripts, createAssistantStoryboards, createGeneratedImages, createMediaVerifier } from '../../src/artifacts/index.js';
 import { publishVersion } from '../../src/artifacts/publication.js';
-import { createAssistantScriptSaver, createAssistantSheets, createAssistantStoryboardSaver, type AssistantSheetOutcome, type AssistantStoryboardOutcome, createGeneratedImageSaver, createImageInputReader } from '../../src/application/index.js';
+import { createAssistantScriptSaver, createAssistantSheets, createAssistantStoryboardSaver, createWorkspaceReader, type AssistantSheetOutcome, type AssistantStoryboardOutcome, createGeneratedImageSaver, createImageInputReader } from '../../src/application/index.js';
 import { transaction } from '../../src/db/index.js';
 import { createMediaSandbox, createPrivateObjectStorage } from '../../src/storage/index.js';
 import { testPng } from '../support/meta-image-fake.js';
@@ -365,10 +365,11 @@ test('the assistant saves a storyboard from the current script as a draft, keepi
   const account = 'board-owner';
   const conversation = async (owner = account) => (await createNativeConversation(native, owner)).id;
   const scene = { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'The Gallery', time: 'night' }, characters: ['Mara'], script: [{ action: 'Mara waits.' }, { dialogue: { character: 'Mara', text: 'Anyone here?' } }] }] };
-  const scripted = async (video: string) => {
-    const saved = await saveScript(account, video, { baseVersionId: null, content: scene, subjects: [{ id: '', kind: 'character', name: 'Mara' }, { id: '', kind: 'place', name: 'The Gallery' }, { id: '', kind: 'prop', name: 'The key' }] });
+  const scriptedFor = async (owner: string, video: string) => {
+    const saved = await saveScript(owner, video, { baseVersionId: null, content: scene, subjects: [{ id: '', kind: 'character', name: 'Mara' }, { id: '', kind: 'place', name: 'The Gallery' }, { id: '', kind: 'prop', name: 'The key' }] });
     assert.equal(saved.kind, 'saved'); return (saved as { versionId: string }).versionId;
   };
+  const scripted = (video: string) => scriptedFor(account, video);
   const sheet = (video: string, subject: string, kind: 'character' | 'environment') => store.insert({ accountId: account, conversationId: video, kind: 'reference', createdBy: 'human', dependencies: [], content: { schemaVersion: 1, subject: { id: subject, kind, name: subject, description: 'Drawn.', continuityNotes: ['n'] }, references: [] }, use: { binding: { purpose: 'reference' }, state: 'approved' } });
   const opening = (ids: { shot?: string; panels?: string[] } = {}) => ({ shotId: ids.shot ?? '', intent: 'Mara arrives.', framing: 'wide', action: 'Mara steps in out of the rain.', cameraNote: 'Slow push in.',
     dialogue: [{ character: 'Mara', text: 'Anyone here?' }, { character: 'Narrator', text: 'It was late.', delivery: 'voice_over' as const }],
@@ -396,9 +397,12 @@ test('the assistant saves a storyboard from the current script as a draft, keepi
   assert.equal(use1?.state, 'draft');
   assert.equal(await revision(video), 1, 'the first save is a change of the Shot sequence');
   assert.equal(Number((await pool.query<{ count: string }>('SELECT count(*) FROM artifacts.manual_changes WHERE conversation_id=$1', [video])).rows[0]!.count), 0, 'no journal row (B-036)');
-  const workspace = await store.workspace(account, video);
-  assert.deepEqual(workspace.storyboard.shots[0]!.references, opening().references, 'the workspace projection carries every Shot field');
-  assert.deepEqual([workspace.storyboard.shots[0]!.action, workspace.storyboard.shots[0]!.cameraNote, workspace.storyboard.shots[0]!.dialogue], [opening().action, opening().cameraNote, opening().dialogue]);
+  // The in-process read applies the strict workspace contract, as the browser's does.
+  const read = await createWorkspaceReader(store)(account, video);
+  assert.equal(read.kind, 'found', 'a workspace holding an agent storyboard passes the strict contract');
+  const [shown] = (read as Extract<typeof read, { kind: 'found' }>).workspace.storyboard.shots;
+  const asked = opening();
+  assert.deepEqual([shown!.intent, shown!.framing, shown!.action, shown!.dialogue, shown!.cameraNote, shown!.references], [asked.intent, asked.framing, asked.action, asked.dialogue, asked.cameraNote, asked.references]);
   const [shotA, shotB] = plan1.shots;
 
   await t.test('a revision keeping a Shot\'s ids keeps its panel images, moves the same use as a draft, and advances the revision only on a sequence change', async () => {
@@ -419,6 +423,15 @@ test('the assistant saves a storyboard from the current script as a draft, keepi
     assert.deepEqual(await save(account, video, { baseVersionId: v1.versionId, shots: [closing()] }), { kind: 'stale' });
     assert.deepEqual(await save(account, video, { baseVersionId: null, shots: [closing()] }), { kind: 'stale' });
     assert.deepEqual(await save(account, video, { baseVersionId: maraSheet.id, shots: [closing()] }), { kind: 'not_found' });
+    // Another account's video, or its storyboard as the base, is not found and writes nothing.
+    const foreign = await conversation('board-other');
+    await scriptedFor('board-other', foreign);
+    const theirs = saved(await save('board-other', foreign, { baseVersionId: null, shots: [closing()] }));
+    const versions = async () => (await pool.query('SELECT 1 FROM artifacts.versions')).rowCount;
+    const count = await versions();
+    assert.deepEqual(await save(account, foreign, { baseVersionId: theirs.versionId, shots: [closing()] }), { kind: 'not_found' });
+    assert.deepEqual(await save(account, video, { baseVersionId: theirs.versionId, shots: [closing()] }), { kind: 'not_found' });
+    assert.equal(await versions(), count);
     // An id the base doesn't have, or a panel moved under another Shot, would silently detach work.
     assert.deepEqual(await save(account, video, { baseVersionId: added.versionId, shots: [closing(randomUUID())] }), { kind: 'invalid', field: 'shots[0].shotId' });
     assert.deepEqual(await save(account, video, { baseVersionId: added.versionId, shots: [closing(shotB!.shotId, shotA!.panels[0]!.panelId)] }), { kind: 'invalid', field: 'shots[0].panels[0].panelId' });
@@ -454,6 +467,19 @@ test('the assistant saves a storyboard from the current script as a draft, keepi
     assert.deepEqual([owned.revision, read.artifactId === sealed.artifactId, (read.content as { sourceScriptVersionId: string }).sourceScriptVersionId], [1, false, source]);
     assert.deepEqual((read.content as { shots: { shotId: string; panels: { panelId: string }[] }[] }).shots.map(shot => [shot.shotId, shot.panels[0]!.panelId]), [['shared-shot', 'shared-panel']]);
     assert.deepEqual((await boardUse(shared)).map(use => [use.use_id, use.version_id, use.state]), [[useId, owned.versionId, 'draft']]);
+  });
+
+  await t.test('a kept panel keeps the reference versions a person gave it', async () => {
+    const given = await conversation();
+    const source = await scripted(given);
+    const lead = await sheet(given, 'mara', 'character');
+    const placed = await store.insert({ accountId: account, conversationId: given, kind: 'storyboard', createdBy: 'human', dependencies: [source, lead.id], use: { binding: { purpose: 'storyboard' }, state: 'approved' },
+      content: { schemaVersion: 1, sourceScriptVersionId: source, shots: [{ shotId: 'given-shot', order: 0, intent: 'Mara waits.', panels: [{ panelId: 'given-panel', order: 0, description: 'Mara alone.', references: [lead.id] }] }] } });
+    const kept = saved(await save(account, given, { baseVersionId: placed.id, shots: [closing('given-shot', 'given-panel'), closing()] }));
+    const read = await store.version(account, kept.versionId);
+    assert.ok('content' in read);
+    assert.deepEqual((read.content as { shots: { panels: { references: string[] }[] }[] }).shots.map(shot => shot.panels[0]!.references), [[lead.id], []]);
+    assert.deepEqual(read.dependencies, [source, lead.id]);
   });
 
   await t.test('at the use limit a first storyboard has no room and a revision still saves', async () => {

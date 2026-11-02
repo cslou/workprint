@@ -3,13 +3,14 @@ import type { Pool } from 'pg';
 import { z } from 'zod';
 import { idSchema, roleKinds, savedStoryboardContentSchema, scriptSubjects, useSchema, type dialogueLineSchema, type shotReferenceSchema, type Version } from '@workprint/contracts';
 import { transaction } from '../db/index.js';
-import { assertBase, lockedUse, namedBase } from './assistant-base.js';
+import { assertBase, lockedUse, namedBase, publishDraftUse } from './assistant-base.js';
 import { assertContentDependencies, parseContent } from './content.js';
 import { ArtifactError } from './errors.js';
-import { lockPublicationOwner, publishVersion } from './publication.js';
+import { lockPublicationOwner } from './publication.js';
 import { scriptNow, type ScriptNow } from './script-reads.js';
 import { advanceSelectionRevision, selectionRevision, shotOrderChanged } from './selection.js';
 import { currentSheets } from './sheet-reads.js';
+import { shotSubjects, storyboardDependencies } from './storyboard-dependencies.js';
 import { createArtifactStore } from './store.js';
 import { useRoom } from './use-room.js';
 
@@ -66,7 +67,8 @@ function plannedShots(input: AssistantStoryboardInput, base: Plan | null, script
       // A panel keeps its id only under its own Shot; one moved under another Shot is refused.
       if (id && (!old?.panels.some(item => item.panelId === id) || keptPanels.has(id))) throw invalid(`${at}.panels[${order}].panelId`);
       if (id) keptPanels.add(id);
-      return { panelId: id || randomUUID(), order, description: panel.description, references: [] };
+      // A kept panel keeps the reference versions a person gave it; a new panel has none.
+      return { panelId: id || randomUUID(), order, description: panel.description, references: [...(old?.panels.find(item => item.panelId === id)?.references ?? [])] };
     });
     shot.references?.forEach((reference, position) => {
       const subject = subjects.get(reference.subjectId);
@@ -115,18 +117,14 @@ export function createAssistantStoryboards(pool: Pool, checkOwnedConversation: O
 
         // Each referenced subject's current sheet (the first in workspace order) as it is now.
         const sheets = await currentSheets(client, account, conversation);
-        const referenced = [...new Set(content.shots.flatMap(shot => (shot.references ?? []).map(reference => reference.subjectId)))];
-        const sheetVersions = referenced.flatMap(subject => { const sheet = sheets.find(item => item.sheet.subject.id === subject); return sheet ? [sheet.version_id] : []; });
-        const dependencies = [script.versionId, ...new Set(sheetVersions)];
-        assertContentDependencies(content, new Map([[script.versionId, { kind: 'script' }], ...sheetVersions.map(id => [id, { kind: 'reference' }] as const)]));
+        const sheetVersions = shotSubjects(content).flatMap(subject => { const sheet = sheets.find(item => item.sheet.subject.id === subject); return sheet ? [sheet.version_id] : []; });
+        const dependencies = storyboardDependencies(content, sheetVersions);
+        if (dependencies.length > 100) throw invalid('shots');
+        // Kept panel references come from the base, whose save already required them to be reference versions.
+        assertContentDependencies(content, new Map(dependencies.map(id => [id, { kind: id === script.versionId ? 'script' : 'reference' }] as const)));
 
         if (!current && await useRoom(client, account, conversation) === 0) throw new StoryboardSaveError('no_room');
-        // The next revision of the account's own storyboard; a built-in storyboard in use starts a new owned one.
-        const artifactId = current && current.version_owner_id === account ? current.artifact_id : undefined;
-        const version = await publishVersion(client, { accountId: account, conversationId: conversation, artifactId, kind: 'storyboard', content, dependencies, createdBy: 'assistant' });
-        const useId = current?.use_id ?? randomUUID();
-        if (current) await client.query("UPDATE artifacts.conversation_uses SET version_id=$1,state='draft' WHERE owner_id=$2 AND use_id=$3", [version.id, account, useId]);
-        else await client.query("INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state) VALUES($1,$2,$3,$4,$5,'storyboard','draft')", [account, conversation, useId, version.id, binding]);
+        const { version, useId } = await publishDraftUse(client, account, conversation, current, { kind: 'storyboard', content, dependencies, purpose: 'storyboard', binding });
         const revision = shotOrderChanged(before, content) ? await advanceSelectionRevision(client, account, conversation) : await selectionRevision(client, account, conversation);
         return { version, use: useSchema.parse({ id: useId, versionId: version.id, binding, state: 'draft' }), selectionRevision: revision };
       });

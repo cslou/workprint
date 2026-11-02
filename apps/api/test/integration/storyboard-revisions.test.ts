@@ -199,12 +199,18 @@ test('storyboard edits keep stable Shot and Panel identities and one forward-onl
       const sheet = await store.insert({ accountId: owner, conversationId: video, kind: 'reference', content: reference('Ada'), createdBy: 'assistant', dependencies: [], use: { binding: { purpose: 'reference' }, state: 'draft' } });
       const fields = { framing: 'close-up', action: 'Ada checks the clock.', cameraNote: 'Hold.', dialogue: [{ character: 'Ada', text: 'Late again.' }], references: [{ subjectId: 'ada', role: 'identity' as const, purpose: 'Her face.' }] };
       const planned = await store.insert({ accountId: owner, conversationId: video, kind: 'storyboard', createdBy: 'assistant', dependencies: [told.id, sheet.id], use: { binding: { purpose: 'storyboard' }, state: 'draft' },
-        content: { schemaVersion: 1, sourceScriptVersionId: told.id, shots: [{ shotId: 'a1', order: 0, intent: 'Ada waits.', ...fields, panels: [{ panelId: 'a1-p1', order: 0, description: 'Ada under the clock.', references: [] }] }] } });
+        content: { schemaVersion: 1, sourceScriptVersionId: told.id, shots: [{ shotId: 'a1', order: 0, intent: 'Ada waits.', ...fields, panels: [{ panelId: 'a1-p1', order: 0, description: 'Ada under the clock.', references: [sheet.id] }] }] } });
       const edited = await edits.editStoryboard(owner, video, { operationId: randomUUID(), baseVersionId: planned.id, shots: [{ shotId: 'a1', order: 0, intent: 'Ada waits, worried.', panels: [{ panelId: 'a1-p1', order: 0, references: [] }] }] });
       assert.ok('content' in edited.version);
       const [shot] = (edited.version.content as { shots: Record<string, unknown>[] }).shots;
       assert.deepEqual({ ...shot, panels: undefined }, { shotId: 'a1', order: 0, intent: 'Ada waits, worried.', ...fields, panels: undefined });
-      assert.deepEqual(edited.version.dependencies, [told.id, sheet.id], 'the sheet the plan was made from stays a dependency');
+      assert.deepEqual(edited.version.dependencies, [told.id, sheet.id], 'the sheet stays a dependency after its panel reference is dropped, since the Shot still names Ada');
+      // A person's next version of Ada's sheet reaches the panel images of every Shot that names Ada.
+      const drawn = await transaction(pool, client => publishVersion(client, { accountId: owner, conversationId: video, kind: 'image', createdBy: 'human', dependencies: [], media: { contentType: 'image/png', byteSize: 4096, width: 64, height: 36 } }));
+      await use(drawn.id, 'a1', 'a1-p1', owner, video);
+      const redrawn = await createArtifactWriters(pool, check).human.save(owner, video, { operationId: randomUUID(), artifactId: sheet.artifactId, baseVersionId: sheet.id, kind: 'reference', content: { ...reference('Ada'), subject: { ...reference('Ada').subject, description: 'Ada in a red coat.' } }, dependencies: [] });
+      const affected = (await pool.query<{ affected_version_ids: string[] }>('SELECT affected_version_ids FROM artifacts.manual_changes WHERE version_id=$1', [redrawn.version.id])).rows[0]?.affected_version_ids;
+      assert.deepEqual(affected, [edited.version.id, drawn.id].sort());
     });
   } finally { await native.close(); if (!pool.ended) await pool.end(); await setup.close(); await db.close(); }
 });

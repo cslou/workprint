@@ -50,10 +50,16 @@ export async function upstreamAffected(client: Query, account: string, conversat
     JOIN artifacts.version_dependencies d ON d.owner_id=u.version_owner_id AND d.version_id=u.version_id
     JOIN artifacts.versions v ON v.owner_id=u.version_owner_id AND v.version_id=u.version_id
     WHERE u.owner_id=$1 AND u.conversation_id=$2 AND d.dependency_id=$3`, [account, conversation, upstream])).rows;
+  // A superseded sheet also reaches every Shot that names its subject: those Shots' panels were made from it.
+  const subject = dependents.some(row => row.purpose === 'storyboard')
+    ? (await client.query<{ subject: string | null }>("SELECT content->'subject'->>'id' AS subject FROM artifacts.versions WHERE version_id=$1 AND kind='reference'", [upstream])).rows[0]?.subject ?? null : null;
   const shots = new Set<string>();
   for (const row of dependents) {
     const plan = row.purpose === 'storyboard' ? savedStoryboardContentSchema.safeParse(row.content).data : undefined;
-    for (const shot of plan?.shots ?? []) if (plan!.sourceScriptVersionId === upstream || shot.panels.some(panel => panel.references.includes(upstream))) shots.add(shot.shotId);
+    for (const shot of plan?.shots ?? []) {
+      if (plan!.sourceScriptVersionId === upstream || shot.panels.some(panel => panel.references.includes(upstream))
+        || (subject !== null && shot.references?.some(reference => reference.subjectId === subject))) shots.add(shot.shotId);
+    }
   }
   return [...new Set([...dependents.map(row => row.version_id), ...await affectedVersions(client, account, conversation, shots)])].sort();
 }
