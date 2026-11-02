@@ -98,3 +98,17 @@ test('an input named twice is read once, and with no way to save nothing is sent
   assert.equal(line({}, result)?.summary, 'Not made: images can’t be saved on this server'); assert.match(result.message, /nothing was sent to Meta/);
   assert.equal(calls.meta, 1, 'only the first call reached Meta'); assert.equal(read.length, 1, 'no input is read without a way to save');
 });
+
+test('revises reaches the save only for one image made from that very image', async () => {
+  const id = randomUUID(), other = randomUUID(), revises: (string | undefined)[] = [];
+  const { collaborators } = harness(async () => images(2));
+  const recording: AgentCollaborators = { ...collaborators,
+    readImageInputs: async (_account, _video, ids) => ({ kind: 'read', images: ids.map(versionId => ({ versionId, dataUrl: 'data:image/png;base64,AA==' })) }),
+    saveGeneratedImage: async (account, video, input, signal) => { revises.push(input.revises); return collaborators.saveGeneratedImage(account, video, input, signal); } };
+  await run(recording, { inputImages: [id], revises: id, count: 1 });
+  await run(recording, { inputImages: [id], revises: other, count: 1 });
+  await run(recording, { inputImages: [], revises: id, count: 1 });
+  await run(recording, { inputImages: [id], revises: 'null', count: 1 });
+  await run(recording, { inputImages: [id], revises: id, count: 2 });
+  assert.deepEqual(revises, [id, undefined, undefined, undefined, undefined, undefined]);
+});

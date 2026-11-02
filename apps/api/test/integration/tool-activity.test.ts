@@ -340,6 +340,30 @@ test('generate-image makes images with Meta and saves each as a draft image of t
     assert.deepEqual(lines.at(-1), ['Making an image…', 'done', 'Saved Image 3 · Version 1']);
   });
 
+  await t.test('an edit that revises one image is its next version in the same place; variations stay new images', async () => {
+    const fresh = await client(owner).newVideo();
+    // `generate` reads the turn's result from the provider's second request, so each turn starts from a reset.
+    const turn = (args: Record<string, unknown>) => { provider.reset(); meta.reset(); return generate(owner, fresh, args); };
+    await turn({ prompt: 'A quiet gallery bench' });
+    const [first] = await made(fresh);
+    const before = (await store.workspace(owner.id, fresh)).assets;
+    const { lines, result } = await turn({ prompt: 'The same bench at dusk', inputImages: [first!.version_id], revises: first!.version_id });
+    assert.ok(result.made);
+    const revised = await store.version(owner.id, result.images[0]!.versionId);
+    assert.equal(revised.artifactId, before[0]!.version.artifactId); assert.equal(revised.revision, 2);
+    assert.deepEqual(revised.dependencies, [first!.version_id]);
+    const after = (await store.workspace(owner.id, fresh)).assets;
+    assert.deepEqual(after.map(asset => [asset.use?.id, asset.version.id, asset.state]), [[before[0]!.use?.id, revised.id, 'Draft']]);
+    assert.deepEqual(lines.at(-1), ['Making an image…', 'done', 'Saved Image 1 · Version 2']);
+    // With count above 1, or revises not among the inputs, each result is a new image.
+    const variations = await turn({ prompt: 'Two takes at dusk', inputImages: [revised.id], revises: revised.id, count: 2 });
+    const stray = await turn({ prompt: 'Another bench', revises: revised.id });
+    assert.ok(variations.result.made && stray.result.made);
+    const assets = (await store.workspace(owner.id, fresh)).assets;
+    assert.equal(assets.length, 4); assert.equal(new Set(assets.map(asset => asset.version.artifactId)).size, 4);
+    assert.deepEqual(stray.lines.at(-1), ['Making an image…', 'done', 'Saved Image 4 · Version 1']);
+  });
+
   await t.test('another account\'s image is not found, and nothing is sent to Meta', async () => {
     const [input] = await made(video);
     const { lines, result } = await generate(other, foreignVideo, { prompt: 'Borrow it', inputImages: [input!.version_id] });

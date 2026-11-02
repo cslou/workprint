@@ -11,7 +11,8 @@ import { UploadError, uploadError } from './uploads/errors.js';
 import { measuredMedia, verifyWhenFree } from './uploads/media-verifier.js';
 import type { MediaVerifier, OwnedCheck } from './uploads/types.js';
 
-export type GeneratedImageInput = Readonly<{ bytes: Uint8Array; contentType: string; inputs: readonly string[] }>;
+/** `revises`, one of `inputs`, names the image this one changes: it is saved as that image's next version. */
+export type GeneratedImageInput = Readonly<{ bytes: Uint8Array; contentType: string; inputs: readonly string[]; revises?: string | undefined }>;
 export type GeneratedImageSave = Readonly<{ version: Extract<Version, { kind: 'image' | 'video' }>; use: z.infer<typeof useSchema> }>;
 /** One saved image's exact bytes, checked against its record. */
 export type StoredImage = Readonly<{ versionId: string; contentType: string; bytes: Buffer }>;
@@ -63,15 +64,26 @@ export function createGeneratedImages(pool: Pool, checkOwnedConversation: OwnedC
           if (object.sha256 !== sha256 || object.byteSize !== bytes.length) throw new UploadError('integration_failure');
           return await transaction(pool, async client => {
             await lockPublicationOwner(client, account);
-            const count = (await client.query<{ count: number }>('SELECT count(*)::int AS count FROM artifacts.conversation_uses WHERE owner_id=$1 AND conversation_id=$2', [account, conversation])).rows[0]!.count;
-            if (count >= 100) throw new UploadError('integration_failure');
-            const version = await publishVersion(client, { accountId: account, conversationId: conversation, kind: 'image', media, dependencies: input.inputs, createdBy: 'assistant' });
+            // An edit of one of this video's own images is that image's next version, in the same place in the video.
+            // A built-in image, or one the video doesn't use as an image, can't be revised: the edit is a new image.
+            const revised = input.revises && input.inputs.includes(input.revises) ? (await client.query<{ use_id: string; artifact_id: string }>(`SELECT u.use_id,v.artifact_id
+              FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.version_owner_id AND v.version_id=u.version_id
+              JOIN artifacts.versions r ON r.owner_id=$1 AND r.version_id=$3 AND r.artifact_id=v.artifact_id
+              WHERE u.owner_id=$1 AND u.conversation_id=$2 AND u.purpose='reference' AND u.version_owner_id=$1 AND v.kind='image'
+              ORDER BY u.created_at,u.use_id LIMIT 1 FOR UPDATE OF u`, [account, conversation, input.revises])).rows[0] : undefined;
+            if (!revised) {
+              const count = (await client.query<{ count: number }>('SELECT count(*)::int AS count FROM artifacts.conversation_uses WHERE owner_id=$1 AND conversation_id=$2', [account, conversation])).rows[0]!.count;
+              if (count >= 100) throw new UploadError('integration_failure');
+            }
+            // No base check: edits made at once land as successive versions, and none is lost.
+            const version = await publishVersion(client, { accountId: account, conversationId: conversation, artifactId: revised?.artifact_id, kind: 'image', media, dependencies: input.inputs, createdBy: 'assistant' });
             if (version.kind !== 'image') throw new UploadError('integration_failure');
             await client.query('INSERT INTO artifacts.generated_objects(owner_id,object_key,version_id,sha256,byte_size,content_type) VALUES($1,$2,$3,$4,$5,$6)', [account, key, version.id, sha256, bytes.length, input.contentType]);
             await client.query('INSERT INTO artifacts.media_objects(owner_id,version_id,generated_key,sha256) VALUES($1,$2,$3,$4)', [account, version.id, key, sha256]);
             // A made image is a draft: technical success never grants approval.
-            const use = useSchema.parse({ id: randomUUID(), versionId: version.id, binding, state: 'draft' });
-            await client.query("INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state) VALUES($1,$2,$3,$4,$5,'reference','draft')", [account, conversation, use.id, version.id, binding]);
+            const use = useSchema.parse({ id: revised?.use_id ?? randomUUID(), versionId: version.id, binding, state: 'draft' });
+            if (revised) await client.query("UPDATE artifacts.conversation_uses SET version_id=$1,state='draft' WHERE owner_id=$2 AND use_id=$3", [version.id, account, use.id]);
+            else await client.query("INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state) VALUES($1,$2,$3,$4,$5,'reference','draft')", [account, conversation, use.id, version.id, binding]);
             return { version, use };
           });
         } catch (error) {

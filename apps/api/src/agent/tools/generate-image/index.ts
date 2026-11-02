@@ -59,6 +59,7 @@ export const generateImageTool = defineTool({
     'Then critique and simplify it: remove details the user did not ask for, repetition and contradictions, but keep every requirement. Do not invent story facts or force a style such as photorealism. Ask the user first only if a missing choice would change the image materially.',
     'size sets the shape, not exact pixels: "auto", or WxH such as 1536x1024. Keep the long side at 2048 or less.',
     'For variations of one prompt, make one call with count; make separate calls only for different prompts.',
+    'When the user asks to change one existing image, set revises to its versionId (also one of inputImages) and count to 1: the result becomes that image\'s next version. Variations and new images leave revises empty.',
     'Set showInChat to true when the user asked for an image directly, so it is shown in the chat.',
   ].join(' '),
   inputSchema: z.strictObject({
@@ -71,6 +72,7 @@ export const generateImageTool = defineTool({
     webSearch: z.boolean().default(true).describe('Let Meta search the web.'),
     shell: z.boolean().default(true).describe('Let Meta use its code tool.'),
     showInChat: z.boolean().default(false).describe('True when the user asked for an image directly, to show it in the chat.'),
+    revises: z.string().max(200).default('').describe('The versionId of the one image this call changes, also listed in inputImages; empty for a new image.'),
   }),
   phrase: 'Making an image…',
   phraseFor: input => input.count > 1 ? `Making ${input.count} images…` : 'Making an image…',
@@ -93,6 +95,8 @@ export const generateImageTool = defineTool({
     let inputs: { versionId: string; dataUrl: string }[] = [];
     // An input named twice is the same input.
     const inputImages = [...new Set(input.inputImages)];
+    // Only one image made from that very image can be its next version; anything else is a new image.
+    const revises = input.count === 1 && inputImages.includes(input.revises) ? input.revises : undefined;
     if (inputImages.length) {
       const read = await collaborators.readImageInputs(scope.accountId, scope.videoId, inputImages);
       if (read.kind === 'not_found') return refusal('input_not_found');
@@ -122,7 +126,7 @@ export const generateImageTool = defineTool({
     for (const image of result.images.slice(0, input.count)) {
       // Nothing from a response is saved after Stop; images saved before it stay.
       signal.throwIfAborted();
-      const outcome = await collaborators.saveGeneratedImage(scope.accountId, scope.videoId, { bytes: image.bytes, contentType: image.contentType, inputs: inputs.map(item => item.versionId) }, signal);
+      const outcome = await collaborators.saveGeneratedImage(scope.accountId, scope.videoId, { bytes: image.bytes, contentType: image.contentType, inputs: inputs.map(item => item.versionId), ...(revises ? { revises } : {}) }, signal);
       signal.throwIfAborted();
       if (outcome.kind === 'saved') saved.push({ versionId: outcome.versionId, width: outcome.width, height: outcome.height });
       else if (outcome.kind === 'refused') refused++;
