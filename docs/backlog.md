@@ -215,6 +215,20 @@ Moved after video (Lou, 2026-11-02): AskUserQuestion (B-014) and image options (
   - Do not guess identity from labels or untyped content. Same principle as B-003.
 - References: B-014; B-003; `packages/contracts/src/models.ts` `questionSchema`.
 
+After video generation (Lou, 2026-11-02, from Sprint 008 QA): B-038 and B-039 wait until B-025, B-019 and B-020 are done.
+
+### B-038 — Small server-made image previews
+- Problem: Chat, Assets and the viewer all read each image's full stored bytes, up to 10 MiB, even where it is shown at most 240px tall or as a 56px key image. Sprint 008 QA fixes made reads lazy and shared within a session, but a page with many images still downloads every full image it shows.
+- Outcome: When an image is saved, the server also makes a small preview under the same media checks. Chat and Assets show the preview, and only the viewer reads the full image. Pass: a chat with many images downloads only previews until one is opened.
+- Constraint: A preview belongs to its exact version and is never a separate asset or version. It must not weaken the private-media rules: signed, short-lived and owned reads only.
+- References: `apps/web/src/api/owned-image-cache.ts` and `apps/web/src/ui/use-near-viewport.ts` (PR #92); `apps/api/src/artifacts/generated-images.ts`; the media sandbox in `apps/api/src/storage/media/`.
+
+### B-039 — Keep images across reloads
+- Problem: Each reload reads every shown image again, because the shared copy lasts only for the page session (PR #92). Storage reads are signed, uncached (`cache: 'no-store'`) and short-lived.
+- Outcome: Images already seen are not downloaded again after a reload, within a privacy decision Lou makes first: what may be kept on the device, for how long, and that it is cleared on sign-out or account change. Pass: reloading a chat with images makes no new full image reads, and signing out leaves nothing readable.
+- Constraint: This is a privacy decision before an implementation choice. Private bytes must never be visible to another account on the same browser.
+- References: `packages/api-client/src/private-image.ts` (`no-store`, credential-free reads); `apps/web/src/main.tsx` (clears the session copy on account change); B-038.
+
 ## In progress
 
 ## Later

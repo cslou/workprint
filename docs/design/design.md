@@ -396,6 +396,7 @@ Each component has the same anchor here and on the [Components page](brand-book/
   - Each image is at most 240px tall, keeps its aspect ratio (never cropped beyond its own shape) and has `--radius-lg` with a 1px default border on `--color-bg-sunken`. Several images wrap with 8px gaps.
   - Its box takes the image's shape before it loads, so a late image never moves the thread.
   - The alt text is the image's name, as the assistant and Assets name it ("Image 2 · Version 1"): N counts images in the video's Assets order. Clicking opens the media viewer.
+  - An edit of one image is its next version, so "Image 1 · Version 2" replaces "Image 1 · Version 1" in Assets. The viewer opened from Assets keeps the version history, with "Use this version" on earlier versions. Variations stay separate images until the looks picker.
   - An image is read only when it comes within about one screen of view, and chat, Assets and the viewer share one copy of each version for the session, within a memory limit. Nothing is kept across reloads. Assets images load when the tab opens.
   - A failed read shows "This image couldn’t be shown" in 13px `--color-text-subtle`, and the line stays.
   - A line the user didn't ask to see, or a refusal, shows no image.
