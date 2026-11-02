@@ -2,7 +2,7 @@
 
 **Date:** Start 2026-11-02, from `main` after PR #84 (`3c7a048`) – End after completion gates and Lou's QA
 **Goal:** In a local build, a signed-in user asks the agent for an image. The agent calls Meta `muse-image-1.0`, and the image is checked, saved privately as an assistant-made image, and shown in the chat and in the Assets tab, live and after a reload. The tool also accepts saved images as inputs with the prompt, using every option Meta's image API offers that our storage can keep.
-**Status:** 🟡 Planning
+**Status:** 🔵 In Progress
 
 ---
 
@@ -80,7 +80,7 @@
     - The system prompt and tool list stay static.
     - Every image id from the model resolves through an account- and video-scoped query, or the result is not-found.
     - Muse Spark doesn't reliably send `null` for optional arguments (Sprint 007), so no tool input is nullable and a wrong optional value is harmless or refused with a readable message.
-  - **The AI-generated label is kept (pending Lou's confirmation, which gates "Ready for Lou").** The PNG byte rule accepts exactly one bounded XMP `iTXt` chunk for images the assistant saves. Uploads stay as strict as today. If Lou chooses to strip the label instead, Story 2's byte rule is replaced by removing that chunk before the checks, and its unit cases change to match.
+  - **The AI-generated label is kept (Lou, 2026-11-02).** The PNG byte rule accepts exactly one bounded XMP `iTXt` chunk for images the assistant saves. Uploads stay as strict as today.
 - **Non-goals:**
   - Images as question options and AskUserQuestion (B-014, B-016), which come after video.
   - Deleting images or other saved work (B-037).
@@ -168,7 +168,7 @@ These tests use Docker, a browser build or paid calls. Each is listed once for t
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: Pass 1 (2/5 overall): P1 live-call rule inconsistent; P1 timeout, config and redaction unverified; P2 module location open; cross-story P1 live check needed Story 2's byte rule. Pass 2 (4/5): none.
   - Resolution: Story makes no paid call; live:image checks parsing only and has a free dry mode; unit cases for timeout, redaction and config; module named `generation/meta-image.ts`.
@@ -227,7 +227,7 @@ These tests use Docker, a browser build or paid calls. Each is listed once for t
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: Pass 1: P1 read-workspace marker unverified; P2 migration constraint, built-in input, capacity timeout, migrations test; cross-story P1 media access didn't cover generated images; P1 stub decode claim wrong. Pass 2 (4/5): none.
   - Resolution: Marker dropped; one-source constraint with a database refusal case; built-in input and capacity-timeout cases; migrations test in the run; media access widened and tested; real decode stated.
@@ -295,7 +295,7 @@ These tests use Docker, a browser build or paid calls. Each is listed once for t
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: Pass 1: P1 partial saves, refusals and model messages unverified; P1 Stop not an AC; P2 size over 4096, partial-save summary, collaborator name. Pass 2 (4/5): P2 stub-decode wording; P2 failed-check line and two model messages unasserted.
   - Resolution: Stop AC added; unit tests of `execute` cover partial save, every refusal line and message, and Stop; size guidance documented; names aligned; wording fixed.
@@ -367,7 +367,7 @@ These tests use Docker, a browser build or paid calls. Each is listed once for t
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: Pass 1: P2 filter vs refuse unclear; P2 failure copy, viewer and reserved box unverified. Pass 2 (4/5): P2 manual review step lacked a pass condition.
   - Resolution: Projection filters and validator refuses, each unit-tested; journey checks viewer and preset size; failure copy is a recorded manual step with a pass condition.
@@ -418,7 +418,7 @@ These tests use Docker, a browser build or paid calls. Each is listed once for t
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: Pass 1: P2 placeholders and alt text unspecified. Pass 2 (4/5): P2 manual review step lacked a pass condition.
   - Resolution: Key image is `alt=""`; failed-read fallback is a recorded manual step with a pass condition.
