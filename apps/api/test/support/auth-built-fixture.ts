@@ -138,6 +138,8 @@ export async function verifyBuiltAdmission(t: FixtureContext) {
         assert.deepEqual(result, { ok: false, error: { code: 'not_found', message: 'Saved work not found' } }, 'Unknown and foreign reads share their denial');
       } else if (name === 'saveVersion') {
         assert.deepEqual(result, { ok: false, error: { code: 'invalid_input', message: 'Invalid saved-work request' } }, 'Unsupported initial/empty save creates no effects');
+      } else if (name === 'generationRequest' || name === 'generationRequests') {
+        assert.deepEqual(result, { ok: false, error: { code: 'not_found', message: 'Not found' } }, 'Unknown and foreign video jobs are not found');
       } else assert.deepEqual(result, { ok: false, error: { code: 'not_implemented', message: 'This operation is not implemented' } }, name);
     }
   }
