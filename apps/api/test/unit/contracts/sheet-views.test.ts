@@ -8,14 +8,14 @@ const sheet = (id: string, subject: string, name: string, views: [string, string
 const script = (name: string) => ({ version: { id: 'script', artifactId: 'art-script', kind: 'script', revision: 1,
   content: { schemaVersion: 1, subjects: [{ id: 'mara', kind: 'character', name }], scenes: [{ heading: { setting: 'interior', location: 'The Gallery', time: 'night' }, characters: [name], script: [{ action: 'She waits.' }] }] } } });
 
-test('a current sheet\'s images are its views, named by the script subject\'s current name; an image a later version drops leaves it', () => {
+test('a current sheet\'s images are its views, named by the script subject\'s current name; an image it doesn\'t list is an image', () => {
   const assets = [image('i1'), image('i2'), image('i3'), sheet('s2', 'mara', 'Mara', [['i1', 'Full-body front'], ['i3', 'face close-up']], 'art-sheet')];
   const views = sheetViews({ script: script('Mara Vale'), assets });
   assert.deepEqual([...views.entries()], [
     ['i1', { sheetArtifactId: 'art-sheet', sheetVersionId: 's2', subjectId: 'mara', subjectName: 'Mara Vale', view: 'Full-body front' }],
     ['i3', { sheetArtifactId: 'art-sheet', sheetVersionId: 's2', subjectId: 'mara', subjectName: 'Mara Vale', view: 'face close-up' }],
   ]);
-  // Only the version the video uses counts: i2 was in an earlier version of the sheet, so it is an image again.
+  // Only the sheet version the video uses counts: it doesn't list i2 (as when a later version drops it), so i2 is an image.
   const labels = workspaceMediaLabels({ assets });
   assert.deepEqual(assets.slice(0, 3).map(({ version }) => mediaVersionName(labels, version, views)), ['Mara Vale · Full-body front', 'Image 2 · Version 1', 'Mara Vale · face close-up']);
   // With no script, or a subject the script doesn't list, the sheet's own name is used.

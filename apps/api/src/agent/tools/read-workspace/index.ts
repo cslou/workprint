@@ -1,7 +1,7 @@
 import { sheetViews } from '@workprint/contracts';
 import { z } from 'zod';
 import { defineTool } from '../define.js';
-import { listWorkspace, sheetViewItem, workspaceItem, workspaceSubjects, type WorkspaceItemDetail, type WorkspaceListing, type WorkspaceSubject } from '../../workspace-entries.js';
+import { listWorkspace, sheetViewItem, subjectViewIds, workspaceItem, workspaceSubjects, type WorkspaceItemDetail, type WorkspaceListing, type WorkspaceSubject } from '../../workspace-entries.js';
 
 /** A video job that stopped waiting, as the model sees it: `jobId` is what generate-video's `resume` takes. */
 type StoppedVideoItem = { jobId: string; frames: string[]; submittedAt: string };
@@ -34,7 +34,7 @@ export const readWorkspaceTool = defineTool({
       const stoppedVideos = stopped?.kind === 'read' ? stopped.jobs.map(job => ({ jobId: job.jobId, frames: [...job.frames], submittedAt: job.submittedAt.toISOString() })) : [];
       const subjects = workspaceSubjects(read.workspace);
       const envelope = { found: true, mode: 'listing', ...(subjects.length ? { subjects } : {}), ...(stoppedVideos.length ? { stoppedVideos } : {}) } as const;
-      return { ...envelope, ...listWorkspace(read.workspace, envelope) };
+      return { ...envelope, ...listWorkspace(read.workspace, envelope, subjectViewIds(subjects)) };
     }
     const item = workspaceItem(read.workspace, input.versionId);
     if (item) return { found: true, mode: 'item', item };

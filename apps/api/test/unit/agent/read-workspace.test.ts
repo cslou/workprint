@@ -134,12 +134,26 @@ test('a sheet\'s images are listed under its subject by name, and item mode read
   assert.deepEqual(await reading(space, async () => ({ kind: 'unavailable' }))({ versionId: 'v3' }), { found: false, reason: 'unavailable' });
 });
 
-test('50 subjects with full sheets stay within 16 KiB: sheets past the subjects\' share give their version id only', async () => {
-  const subjects = Array.from({ length: 50 }, (_, index) => ({ id: `subject-${index}`, kind: 'prop' as const, name: `${'n'.repeat(70)}${index}` }));
-  const sheets = subjects.map((subject, index) => sheetVersion(`sheet-${index}`, subject.id, Array.from({ length: 5 }, (_, view) => [`${'v'.repeat(40)}-${index}-${view}`, `${'w'.repeat(76)} ${view}`] as [string, string])));
-  const listed = await reading(workspace(sheets, { script: work(subjectScript(subjects), 'script') }), async () => ({ kind: 'not_found' }))({}) as { subjects: { sheet?: { versionId: string; views?: unknown[] } }[]; items: unknown[] };
-  assert.ok(Buffer.byteLength(JSON.stringify(listed)) <= listingBounds.bytes);
-  assert.ok(listed.subjects[0]?.sheet?.views, 'the first sheets keep their views');
-  assert.deepEqual(listed.subjects.at(-1)?.sheet, { versionId: 'sheet-49' });
-  assert.ok(listed.items.length > 0, 'items still fit beside the subjects');
+test('50 subjects with full sheets stay within 16 KiB, and every sheet image is listed under a subject or as an item', async () => {
+  for (const long of [true, false]) {
+    const subjects = Array.from({ length: 50 }, (_, index) => ({ id: long ? `${'s'.repeat(80)}-${index}` : `subject-${index}`, kind: 'prop' as const, name: long ? `${String(index).padStart(2, '0')}${'n'.repeat(78)}` : `Prop ${index}` }));
+    const views = (index: number) => Array.from({ length: 5 }, (_, view) => [`00000000-0000-4000-8000-${String(index * 10 + view).padStart(12, '0')}`, `${'w'.repeat(76)} ${view}`] as [string, string]);
+    const sheets = subjects.map((subject, index) => sheetVersion(`sheet-${index}`, subject.id, views(index)));
+    const images = subjects.flatMap((_, index) => views(index).map(([id]) => image(id)));
+    // A second sheet for the first subject, and a sheet for a subject the script doesn't list.
+    const extra = [sheetVersion('second', subjects[0]!.id, [['x1', 'Back']]), sheetVersion('orphan', 'gone', [['x2', 'Front']])];
+    const space = workspace([image('x1'), image('x2'), ...images, ...sheets, ...extra], { script: work(subjectScript(subjects), 'script') });
+    const listed = await reading(space, async () => ({ kind: 'not_found' }))({}) as { subjects: { sheet?: { versionId: string; views?: { versionId: string }[] } }[]; items: { name: string; versionId: string }[]; total: number };
+    assert.ok(Buffer.byteLength(JSON.stringify(listed)) <= listingBounds.bytes, `long ${long}`);
+    assert.equal(listed.subjects.length, 50);
+    assert.equal(listed.items[0]?.name, 'Script · Version 1', 'the script still fits beside the subjects');
+    // Views listed under a subject aren't items; every other sheet image still is, named by its sheet.
+    const underSubjects = new Set(listed.subjects.flatMap(subject => subject.sheet?.views?.map(view => view.versionId) ?? []));
+    assert.equal(underSubjects.size > 0, !long, 'short subjects leave room for views; the longest leave none');
+    assert.equal(listed.total, 1 + images.length + 2 + sheets.length + extra.length - underSubjects.size);
+    assert.ok(!listed.items.some(item => underSubjects.has(item.versionId)));
+    const names = new Map(listed.items.map(item => [item.versionId, item.name]));
+    assert.deepEqual([names.get('x1'), names.get('x2')], [`${subjects[0]!.name} · Back`, 'Old name · Front'], 'a second sheet\'s and an unlisted subject\'s images are items');
+    if (!long) assert.deepEqual(listed.subjects.at(-1)?.sheet, undefined, 'a sheet past the share is left to the items');
+  }
 });

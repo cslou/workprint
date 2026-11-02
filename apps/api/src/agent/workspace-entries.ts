@@ -45,27 +45,38 @@ function summary(version: Version): string {
 }
 
 /**
- * A script subject as the model sees it, with its current sheet's version id and views when it has one. A sheet past
- * the listing's share for subjects gives its version id only; item mode on it gives its views.
+ * A script subject as the model sees it, with its current sheet's version id and views when it has one. Past the
+ * subjects' byte share a sheet gives its version id only, or nothing; it is then an item, and item mode gives its views.
  */
 export type WorkspaceSubject = ScriptSubject & { sheet?: { versionId: string; views?: { view: string; versionId: string }[] } };
 
-/** The share of the listing's byte bound that subjects' sheet views may take, so items still fit beside them. */
-const subjectViewBytes = listingBounds.bytes / 2;
+/** The share of the listing's byte bound the whole subject list may take with its sheets, so items still fit beside it. */
+const subjectBytes = listingBounds.bytes * 5 / 8;
+const bytesOf = (value: unknown) => Buffer.byteLength(JSON.stringify(value));
 
-/** The video's subjects from its current script, in Assets order, each with its first current sheet; none without a script. */
+/**
+ * The video's subjects from its current script, in Assets order, each with its first current sheet; none without a
+ * script. Subjects themselves are always listed; sheets are added in order while the list stays within its share.
+ */
 export function workspaceSubjects(workspace: OwnedWorkspace): WorkspaceSubject[] {
   const content = workspace.script ? savedScriptContentSchema.safeParse('content' in workspace.script.version ? workspace.script.version.content : null) : null;
-  const sheets = currentSheets(workspace);
-  let bytes = 0;
-  return (content?.success ? scriptSubjects(content.data) : []).map(subject => {
+  const sheets = currentSheets(workspace), subjects: WorkspaceSubject[] = content?.success ? scriptSubjects(content.data) : [];
+  let bytes = bytesOf(subjects);
+  return subjects.map(subject => {
     const sheet = sheets.find(candidate => candidate.subjectId === subject.id);
     if (!sheet) return subject;
-    const views = sheet.views.map(({ view, versionId }) => ({ view, versionId }));
-    bytes += Buffer.byteLength(JSON.stringify(views));
-    return { ...subject, sheet: { versionId: sheet.versionId, ...(bytes <= subjectViewBytes ? { views } : {}) } };
+    const full = { versionId: sheet.versionId, views: sheet.views.map(({ view, versionId }) => ({ view, versionId })) }, short = { versionId: sheet.versionId };
+    // `,"sheet":` joins each sheet to its subject.
+    for (const listed of [full, short]) {
+      const added = bytesOf(listed) + 9;
+      if (bytes + added <= subjectBytes) { bytes += added; return { ...subject, sheet: listed }; }
+    }
+    return subject;
   });
 }
+
+/** The image versions listed as views under the subjects, which the listing then leaves out of its items. */
+export const subjectViewIds = (subjects: readonly WorkspaceSubject[]): ReadonlySet<string> => new Set(subjects.flatMap(subject => subject.sheet?.views?.map(view => view.versionId) ?? []));
 
 /** Every exact version the video uses, in workspace order, each once, with a name a person would recognise. */
 export function workspaceEntries(workspace: OwnedWorkspace): Entry[] {
@@ -98,10 +109,9 @@ export function workspaceEntries(workspace: OwnedWorkspace): Entry[] {
  * A compact listing within the item, byte and text bounds; `truncated` says items were left out.
  * The byte bound covers the whole tool result the model receives, including its envelope.
  */
-export function listWorkspace(workspace: OwnedWorkspace, envelope: Readonly<Record<string, unknown>> = {}): WorkspaceListing {
-  // A sheet's images are listed under its subject, not again as items; item mode still reads them.
-  const views = sheetViews(workspace);
-  const entries = workspaceEntries(workspace).filter(entry => !(entry.use === 'reference' && entry.version.kind === 'image' && views.has(entry.version.id)));
+export function listWorkspace(workspace: OwnedWorkspace, envelope: Readonly<Record<string, unknown>> = {}, listedViews: ReadonlySet<string> = new Set()): WorkspaceListing {
+  // Images listed as views under a subject are not listed again as items; item mode still reads them.
+  const entries = workspaceEntries(workspace).filter(entry => !(entry.use === 'reference' && entry.version.kind === 'image' && listedViews.has(entry.version.id)));
   const listing: WorkspaceListing = { items: [], total: entries.length, truncated: false };
   for (const entry of entries) {
     const item: WorkspaceItem = { name: clip(entry.name), kind: entry.version.kind, versionId: entry.version.id, use: entry.use, state: entry.state, text: summary(entry.version) };
