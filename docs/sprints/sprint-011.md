@@ -1,15 +1,15 @@
 # Sprint 011 — Storyboard
 
-**Date:** Start after Sprint 010 merges into `main` and Lou approves this plan – End after completion gates and Lou's QA
+**Date:** 2026-11-03, stacked on `sprint-010` (Lou: "Go: 010 then 011 stacked") – End after completion gates and Lou's QA
 **Goal:** In a local build, a signed-in user asks the agent to storyboard the script. The agent saves a storyboard of Shots from the current script: each Shot carries its purpose, framing, action, dialogue, camera note, the reference sheets it uses with each one's job, and one or two panels, whose images become the video's first and last frames. The agent makes each panel's image from that Shot's chosen sheet views (and, for a second panel, the first panel's image), then makes each Shot's video from its panel images and the Shot's text. The Storyboard tab shows the Shots and panel images, and the Videos tab plays each Shot's video, live and after a reload.
-**Status:** 🟡 Planning
+**Status:** 🟡 In progress
 
 ---
 
 ## Handoff
 
 ### Project Context
-- **Repo:** `/Users/lou/projects/workprint`. Branch `sprint-011` from `main` after Sprint 010; story branches from `sprint-011`. This doc was drafted with Sprint 010's and is committed there; it is re-checked against Sprint 010's Final Review before this sprint starts.
+- **Repo:** `/Users/lou/projects/workprint`. Branch `sprint-011` from `sprint-010` at `514c033` (Sprint 010 complete and under Lou's QA, PR #113 open into `main`), stacked so this sprint starts before 010 merges; story branches from `sprint-011`. If Sprint 010 changes after QA, those commits are merged into `sprint-011`. This doc was drafted with Sprint 010's and re-checked against its Final Review below.
 - **Tech stack:** as Sprint 010, plus MiniMax Video V2 (`MiniMax-H3`, 768P, 24 fps) from Sprint 009.
 - **Current state (expected after Sprint 010):**
   - **Subjects and sheets.** The script lists its subjects (`subjects: [{id, kind: character | place | prop, name}]`, read through `scriptSubjects`), with ids kept across versions. The agent makes a subject's light reference sheet with `generate-sheet` (the later views made from the first) and files other images under subjects. Images in a sheet are named "Mara · Face close-up", and read-workspace lists each subject with its sheet's `views: [{view, versionId}]`; Assets shows each subject with its sheet and images (`subjectGroups`). Nothing yet turns chosen sheet views into image inputs: generate-image takes only plain `inputImages` (Lou, 2026-11-03), and that step is this sprint's Story 3.
@@ -20,6 +20,15 @@
   - **Panel images and Shot videos are uses.** `panel_image {shotId, panelId}` and `shot_video {shotId}` bindings must target the storyboard the video currently uses (`apps/api/src/artifacts/uses.ts:47-82`). The workspace projects them as each panel's `candidateImageVersions` and `approvedImageVersionId`, and each Shot's `candidateVideoVersions` and `chosenVideoVersionId` (`apps/api/src/artifacts/store.ts:121-130`). Only people create these uses today, and a person's use always approves.
   - **UI.** The Storyboard tab (`apps/web/src/storyboard/storyboard.tsx`) shows Shots and panels with image candidates and "Use". The Videos tab lists Shot rows from `shot_video` candidates and the Generated videos list (`apps/web/src/videos/`).
   - **Video jobs (Sprint 009).** `application/video-jobs.ts` runs a MiniMax job to its end with Stop, deadlines, restart and resume; `generation.requests` stores the job with its frames, but no target (`supabase/migrations/20261107000000_generation_requests.sql`). A finished clip is saved as a draft `video` use (`apps/api/src/artifacts/generated-videos.ts`). Panel images already count as images the video uses, so they can be frames.
+- **Re-check against Sprint 010's Final Review (2026-11-03):** what 010 actually shipped, and what it changes here:
+  - **The room check.** Sprint 010 has no shared room error: `artifacts/use-room.ts` (`useRoom`, read-only) counts the room, and only the sheet save raises its own `no_room` (`SheetSaveError`). Stories 1, 4 and 5 use `useRoom` and raise their own save's `no_room`; `requireUseRoom` still reports `integration_failure`. The `useRoom` collaborator sits on `AssistantSheets`; generate-panel and generate-shot get their room check through their own application capability, not the sheets one.
+  - **Subjects read under the lock.** `artifacts/script-reads.ts` (`scriptSubjectsNow`) is the locked read of the current script's subjects; Story 1 uses it to check Shot references. `currentSubjects` (contracts) reads them from a workspace.
+  - **Optional ids.** `application/optional-id.ts` (`optionalId`) is the shared rule for an empty, whitespace or `"null"` id; every new tool uses it.
+  - **The listing's budget.** read-workspace gives the subjects with their sheets at most 10 KiB (5/8) of its 16 KiB. Story 2's storyboard listing steps down within what remains after the script and subjects, with a budget case holding 50 full subjects and a 100-Shot storyboard.
+  - **Sheets in the listing.** read-workspace lists each subject's first current sheet only; a second current sheet (possible only from people's sheets) is an item. Story 3 resolves a reference through `subjectGroups`' first sheet, which is the same sheet.
+  - **The sheet recheck.** Sprint 010's sheet save rechecks used images by accepting any `panel_image` use (Story 2's accepted P2). Story 4 narrows it to panel uses of the current storyboard when it adds the assistant's panel uses.
+  - **Re-added subjects.** A subject removed from the script and added back by name gets its old id again, so a Shot reference to it resolves again (Lou's open question; nothing here depends on the answer).
+  - **Names.** `mediaVersionName(labels, version, sheetViews)` names sheet views "Mara · Face close-up" (Story 3's labels); the web's `kindLabel` gives "Character", "Place" and "Prop" (Story 6).
 - **Implementation spec:** `docs/specs/implementation-spec-001.md` (§8.3, §8.5 storyboard, §8.7 video jobs, §10 Agent tool guidance). Sources: `~/projects/animation-studio/.pi/skills/create-storyboard/SKILL.md`, `references/storyboard-schema.md` (Shot fields, reference assignments with roles) and `references/panel-generation-strategy.md` (anchor first, narrow responsibilities, preserve / change only / reject if).
 
 ### Sprint-Wide Context
@@ -152,7 +161,7 @@ This sprint has 6 stories: the storyboard save, its tool, panel inputs, generate
 - **Planned commits:**
   1. `Feat(contracts): Add Shot fields to the storyboard`
   2. `Feat(artifacts): Save the assistant's storyboards`
-- **Technical notes:** Follow `artifacts/assistant-scripts.ts` (owner lock, base, stale versus not-found) with an `application/assistant-storyboards.ts` saver wired in `mastra/backend.ts`. Extend `assertContentDependencies` (`artifacts/content.ts`) for Shot references. Reuse `selection.ts`'s `shotOrderChanged` and `advanceSelectionRevision` as `storyboard.ts:90` does, without its `manual_changes` insert. A first save at the use cap raises Sprint 010's room error, which the saver maps to `no_room` (`requireUseRoom` alone reports `integration_failure`); a revision needs no room. Add `artifact-reads.test.ts` to the regression run.
+- **Technical notes:** Follow `artifacts/assistant-scripts.ts` (owner lock, base, stale versus not-found) with an `application/assistant-storyboards.ts` saver wired in `mastra/backend.ts`. Extend `assertContentDependencies` (`artifacts/content.ts`) for Shot references. Reuse `selection.ts`'s `shotOrderChanged` and `advanceSelectionRevision` as `storyboard.ts:90` does, without its `manual_changes` insert. A first save at the use cap (`useRoom` read under the owner lock, as `assistant-references.ts` does) raises the storyboard save's own room error, which the saver maps to `no_room` (`requireUseRoom` alone reports `integration_failure`); a revision needs no room. Add `artifact-reads.test.ts` to the regression run.
 
 #### Story 2: save-storyboard tool and the agent's view of it
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
@@ -277,7 +286,7 @@ This sprint has 6 stories: the storyboard save, its tool, panel inputs, generate
     It then reads the images through `readImageInputs` and sends Meta the inputs in order, with the preface before the model's prompt.
   - [ ] **Save.** The image is checked and stored as generate-image does, with its inputs as dependencies, but saved as the next version of that panel's own image artifact (its derived id, Shared context), with a `panel_image` use by Shared context's use rule. It gets no `reference` use, so it never appears in Assets. An assistant use never approves, and a person's chosen version stays chosen. The line reads "Saved Shot 1 · Panel 1.2 · Version N"; the image shows under the line.
   - [ ] **The panel is gone.** If the panel left the current storyboard while Meta worked, the image is saved as a plain draft image instead, and the line reads "Saved Image 7 · Version 1 (its panel is gone)"; paid work is never lost.
-  - [ ] **Use cap.** When a new use is needed and the video's saved-use limit is reached (Sprint 010's `useRoom`), nothing is sent: "Not made: this video has too many saved items". If the last use is taken while Meta works, the line is the same and the result says the image was made but not kept; no version or use is added.
+  - [ ] **Use cap.** When a new use is needed and the video's saved-use limit is reached (`artifacts/use-room.ts` `useRoom`, see the re-check above), nothing is sent: "Not made: this video has too many saved items". If the last use is taken while Meta works, the line is the same and the result says the image was made but not kept; no version or use is added.
   - [ ] **Guidance.** The description says to pick only the images the panel needs, as an artist would: usually the relevant views of the Shot's sheets, not whole sheets; other images, such as one from a character's group, when the person asks; and how to write a panel prompt from the Shot: what to preserve, what changes only, and what to reject (camera drift, changed clothing, duplicate props), after the animation-studio panel strategy.
 - **Functional verification:**
   - [ ] Integration (`tool-activity.test.ts`): with sheets and a saved storyboard:
