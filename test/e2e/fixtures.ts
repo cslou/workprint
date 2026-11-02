@@ -107,9 +107,11 @@ export async function makeVideo(page: Page, backend: { provider: { script(...ste
   const text = options.text ?? 'Here it is.';
   backend.provider.script({ toolCalls: [{ name: 'generate-video', args: { prompt: 'A slow push-in on a quiet gallery bench', showInChat: options.showInChat ?? true } }] }, { text: [text] });
   const box = page.getByRole('textbox', { name: 'Message' });
+  // This turn's reply is the one after those already shown, never an earlier reply's line.
+  const replies = page.getByRole('list', { name: 'New messages' }).getByRole('listitem', { name: 'Assistant message' });
+  const reply = replies.nth(await replies.count());
   await box.fill('Make a short video of the gallery bench');
   await box.press('Enter');
-  const reply = page.getByRole('list', { name: 'New messages' }).getByRole('listitem', { name: 'Assistant message' }).last();
   await expect(reply.getByText(/^Saved Video \d+ · Version 1$/)).toBeVisible({ timeout: 60_000 });
   await expect(reply.getByText(text, { exact: true })).toBeVisible();
   return reply;

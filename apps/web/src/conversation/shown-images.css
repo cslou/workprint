@@ -3,6 +3,4 @@
 .wp-shown-image img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .wp-shown-image[data-focus-visible] { outline: var(--border-width-focus) solid var(--color-border-focus); outline-offset: var(--border-width-focus-offset); }
 .wp-shown-image[data-kind="video"] { position: relative; }
-.wp-shown-play { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: var(--radius-pill); background: var(--color-media-scrim); color: var(--color-media-on-scrim); display: grid; place-items: center; pointer-events: none; }
-.wp-shown-play svg { width: 20px; height: 20px; fill: currentColor; }
 .wp-shown-image-failed { margin: var(--space-6) 0 var(--space-10); font-size: var(--font-size-13); color: var(--color-text-subtle); }

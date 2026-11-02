@@ -604,7 +604,7 @@ test('a video the agent makes shows its poster under the line and plays in the v
   // The poster carries the clip's own size, so its box is held before it loads, and it is at most 240 px tall.
   await expect(poster(reply)).toHaveAttribute('width', '1344');
   expect((await reply.locator('.wp-shown-image[data-kind="video"]').boundingBox())!.height).toBeLessThanOrEqual(240);
-  await expect(reply.locator('.wp-shown-play')).toBeVisible();
+  await expect(reply.locator('.wp-clip-mark')).toBeVisible();
 
   /** Opens the clip from its poster, plays it, and closes the viewer. */
   const plays = async (root: typeof reply) => {
@@ -612,10 +612,9 @@ test('a video the agent makes shows its poster under the line and plays in the v
     const dialog = page.getByRole('dialog');
     await expect(dialog.locator('.wp-clip-surface[data-ready="true"]')).toHaveCount(1);
     await dialog.getByRole('button', { name: 'Play', exact: true }).click();
-    await expect.poll(() => dialog.locator('.wp-clip-media').evaluate(node => {
-      const video = node as HTMLVideoElement;
-      return video.getVideoPlaybackQuality().totalVideoFrames > 0 || video.currentTime > 0;
-    }), { timeout: 10_000 }).toBe(true);
+    // Played, not only loaded: the player reports playing or ended, or the clip has moved on.
+    await expect.poll(async () => ['playing', 'ended'].includes(await dialog.locator('.wp-clip-surface').getAttribute('data-player-status') ?? '')
+      || await dialog.locator('.wp-clip-media').evaluate(node => (node as HTMLVideoElement).currentTime > 0), { timeout: 10_000 }).toBe(true);
     // A clip seen in the chat is only viewed: the viewer offers no use or choice.
     await expect(dialog.getByRole('button', { name: /^Use / })).toHaveCount(0);
     await page.keyboard.press('Escape');

@@ -23,6 +23,11 @@ test('a Shot video choice survives reload and can be changed to another exact ve
   await openVideos();
   // Candidates are shown, but nothing is chosen until the person picks one.
   await expect(chosen).toHaveCount(0);
+  // The viewer opened from a Shot's row still offers the use, unlike one opened from the chat.
+  await row(second).getByRole('button', { name: 'View Shot 1 version 2', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('button', { name: 'Use this version', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await choose(second);
 
   await page.reload();

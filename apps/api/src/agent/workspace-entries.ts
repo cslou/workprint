@@ -1,4 +1,4 @@
-import { assetLabels } from '@workprint/contracts';
+import { workspaceMediaLabels } from '@workprint/contracts';
 import type { OwnedWorkspace } from '../application/index.js';
 
 type Version = OwnedWorkspace['assets'][number]['version'];
@@ -46,9 +46,8 @@ function summary(version: Version): string {
 
 /** Every exact version the video uses, in workspace order, each once, with a name a person would recognise. */
 export function workspaceEntries(workspace: OwnedWorkspace): Entry[] {
-  // Clips count with the assets, so a made clip and any other video never share a number.
   const clips = workspace.generatedVideos ?? [];
-  const entries: Entry[] = [], seen = new Set<string>(), labels = assetLabels([...workspace.assets, ...clips]);
+  const entries: Entry[] = [], seen = new Set<string>(), labels = workspaceMediaLabels(workspace);
   const add = (entry: Entry) => { if (!seen.has(entry.version.id)) { seen.add(entry.version.id); entries.push(entry); } };
   const revision = (version: Version) => `Version ${version.revision}`;
   if (workspace.script) add({ name: `Script · ${revision(workspace.script.version)}`, use: 'script', state: workspace.script.state, version: workspace.script.version });

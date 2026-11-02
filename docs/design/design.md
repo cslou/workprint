@@ -400,7 +400,7 @@ Each component has the same anchor here and on the [Components page](brand-book/
   - An image is read only when it comes within about one screen of view, and chat, Assets and the viewer share one copy of each version for the session, within a memory limit. Nothing is kept across reloads. Assets images load when the tab opens.
   - A failed read shows "This image couldn’t be shown" in 13px `--color-text-subtle`, and the line stays.
   - A line the user didn't ask to see, or a refusal, shows no image.
-  - **A made video (Sprint 009 Story 6)** shows its poster the same way, named "Video N · Version 1" (N counts videos in the same order). A 40px play mark sits at its centre: the player's play control, smaller, on `--color-media-scrim`. Clicking opens the single-clip viewer, which plays it and offers no use or choice. A failed poster read shows "This video couldn’t be shown".
+  - **A made video (Sprint 009 Story 6)** shows its poster the same way, named "Video N · Version 1" (N counts videos in the same order). A 40px play mark sits at its centre: the player's play control, smaller, sharing its icon and `--color-media-scrim` circle. Clicking opens the single-clip viewer, which plays it and offers no use or choice. A failed poster read shows "This video couldn’t be shown".
 
 ### Chat box
 

@@ -1,13 +1,13 @@
 import { createContext, useContext } from 'react';
 import { Button as AriaButton } from 'react-aria-components';
 import type { NativeShownMedia } from '@workprint/api-client';
-import { assetLabels, type OperationResponse, type Version } from '@workprint/contracts';
+import { workspaceMediaLabels, type OperationResponse, type Version } from '@workprint/contracts';
 import type { BrowserClient } from '../api/client.js';
 import type { ReadScope } from '../api/use-scoped-read.js';
 import { useOwnedImage } from '../api/use-owned-image.js';
 import { ViewerDialog } from '../ui/overlays.js';
 import { MediaReceipt, type MediaVersion } from '../ui/media-receipt.js';
-import { SingleClipViewer } from '../media/viewer.js';
+import { PlayMark, SingleClipViewer } from '../media/viewer.js';
 import { useExactVersion } from '../versions/reads.js';
 import { useNearViewport } from '../ui/use-near-viewport.js';
 import './shown-images.css';
@@ -29,10 +29,10 @@ function inWorkspace(workspace: Workspace | null, id: string, kind: Kind): Media
 }
 /**
  * Named as the assistant, Assets and Videos name it ("Image 2 · Version 1", "Video 1 · Version 1"); an earlier
- * version keeps its number. Generated videos are counted with the assets, as read-workspace counts them.
+ * version keeps its number.
  */
 const mediaName = (workspace: Workspace | null, version: MediaVersion) =>
-  `${(workspace && assetLabels([...workspace.assets, ...(workspace.generatedVideos ?? [])]).get(version.artifactId)) ?? (version.kind === 'video' ? 'Video' : 'Image')} · Version ${version.revision}`;
+  `${(workspace && workspaceMediaLabels(workspace).get(version.artifactId)) ?? (version.kind === 'video' ? 'Video' : 'Image')} · Version ${version.revision}`;
 
 /** The saved images and videos a done tool line shows under it; each image, or video poster, is read through the owned-image read. */
 export function ShownMedia({ items }: { items: readonly NativeShownMedia[] }) {
@@ -64,6 +64,4 @@ function ShownItem({ id, kind, images }: { id: string; kind: Kind; images: ChatI
     {close => <MediaReceipt connection={images.connection} version={version} close={close} />}</ViewerDialog>;
 }
 
-/** The player's play mark, small, over a video's poster. */
-const PlayMark = () => <span className="wp-shown-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7Z" /></svg></span>;
 const Failed = ({ kind }: { kind: Kind }) => <p className="wp-shown-image-failed">{kind === 'video' ? 'This video couldn’t be shown' : 'This image couldn’t be shown'}</p>;

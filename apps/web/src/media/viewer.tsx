@@ -124,7 +124,7 @@ function ClipPlayer({ source }: { source: PlayerSource }) {
     <video ref={media} className="wp-clip-media" playsInline preload="metadata" aria-label="Video" />
     {ready ? <>
       <button type="button" className="wp-clip-toggle" aria-label={playing ? 'Pause' : 'Play'} onClick={() => { if (!player.current) return; if (playing) player.current.pause(); else player.current.play(); }}>
-        {playing ? <svg className="wp-clip-pause-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg> : <svg className="wp-clip-play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7Z" /></svg>}
+        {playing ? <svg className="wp-clip-pause-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg> : <PlayIcon />}
       </button>
       <span className="wp-clip-bar" aria-hidden="true"><i style={{ width: `${progress}%` }} /></span>
       <input type="range" className="wp-clip-seek" aria-label="Seek" min={0} max={Math.max(duration, 1)} step={50} value={position} disabled={duration <= 0} onChange={(event) => player.current?.seek(Number(event.currentTarget.value))} style={{ '--wp-clip-progress': `${progress}%` } as CSSProperties} />
@@ -132,3 +132,7 @@ function ClipPlayer({ source }: { source: PlayerSource }) {
     </> : <p className="wp-clip-note" role="status">{snapshot.status === 'failed' ? copy.failed : copy.loading}</p>}
   </div>;
 }
+
+const PlayIcon = () => <svg className="wp-clip-play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7Z" /></svg>;
+/** The player's play control as a mark, smaller, over a poster that opens the player. */
+export const PlayMark = () => <span className="wp-clip-toggle wp-clip-mark" aria-hidden="true"><PlayIcon /></span>;
