@@ -137,7 +137,9 @@ test('a turn outlasts the route and Node timeouts, and tools learn why they were
     const started = Date.now();
     await fixture.stopServer();
     assert.ok(Date.now() - started < 7000, `stopped after ${Date.now() - started} ms`);
-    assert.ok(!completed(await turn));
+    assert.deepEqual(fixture.serverTermination(), { code: 0, signal: null }, 'a clean exit, with no shutdown step failing');
+    const ended = await turn;
+    assert.ok(interrupted(ended), JSON.stringify(ended.terminal));
     assert.deepEqual(provider.gate().reasons(), ['shutdown']);
     assert.equal(provider.requests.length + provider.unscripted.length, 1, 'no model step after the shutdown');
   });

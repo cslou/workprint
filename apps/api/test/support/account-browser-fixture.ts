@@ -53,6 +53,8 @@ export async function accountBrowserFixture(options: AppFixtureOptions = {}, bro
     return { auth, apiOrigin: server.origin, close, native: store, servingUrl: db.servingUrl, setupUrl: db.setupUrl,
       /** Stops the API process with SIGTERM, as a shutdown does; later calls and `close` don't repeat it. */
       stopServer: server.server.stop,
+      /** How the API process exited, once it has. */
+      serverTermination: () => server.server.termination,
       /** The API process log, for leak checks. */
       serverLog: join(env.logs, 'account-api.log'),
       /** A fresh access token for an account this fixture created. */
