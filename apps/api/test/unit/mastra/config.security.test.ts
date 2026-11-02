@@ -49,6 +49,8 @@ test('missing or malformed configuration fails without echoing values', () => {
   }
   assert.equal(loadServerConfig(valid).port, 4111);
   assert.deepEqual(loadServerConfig(valid).assistant, { model: 'meta/muse-spark-1.3', apiKey: valid.META_API_KEY });
+  // The image client uses the same server-only key, against Meta's API.
+  assert.deepEqual(loadServerConfig(valid).images, { apiKey: valid.META_API_KEY, baseUrl: 'https://api.meta.ai/v1' });
   assert.equal(loadServerConfig({ ...valid, SUPABASE_URL: 'https://auth.example.invalid' }).supabase.url, 'https://auth.example.invalid');
 });
 

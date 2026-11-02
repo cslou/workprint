@@ -1,5 +1,6 @@
 import { databaseUrl } from '../db/index.js';
 import { assistantModels } from '../agent/index.js';
+import { metaImageBaseUrl } from '../generation/index.js';
 import { loadSupabaseConfig } from './auth.js';
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -29,5 +30,5 @@ export function loadServerConfig(env: Environment) {
       browserOrigin = url.origin;
     } catch { invalid('WORKPRINT_BROWSER_ORIGIN'); }
   }
-  return { connectionString, assistant: { model, apiKey }, port: Number(port), supabase: loadSupabaseConfig(env), browserOrigin };
+  return { connectionString, assistant: { model, apiKey }, images: { apiKey, baseUrl: metaImageBaseUrl }, port: Number(port), supabase: loadSupabaseConfig(env), browserOrigin };
 }
