@@ -319,11 +319,11 @@ For descriptive-only work, use editorial review and applicable existing checks. 
     - There is no save journal (B-036).
     - The seam has a different name.
     - The first save ignores the base (#82).
+    - A base lookup failure other than not found matters only once the video has a script (sprint PR review).
     - No selection-revision bump: the plan's assumption was wrong.
   - **Story 3:**
     - Own effects are ordered by a refresh count, not `selectionRevision`.
     - A re-read waits while an editor is open, so Version history lists v2 during the edit and v1 after it closes. The wait uses the shell-wide draft guard, the same one deferred uses already rely on, so an editor open in any tab (Assets or Storyboard too) holds the Script tab's re-read until it closes.
-    - A re-read that fails for any reason except a not-found base is ignored on a first save, which ignores the base anyway (sprint PR review).
     - One re-read follows each confirmed use.
     - A failed background re-read keeps the shown value, except when the session has ended.
 - **For Lou to confirm in QA:**
