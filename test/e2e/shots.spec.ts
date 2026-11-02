@@ -1,4 +1,4 @@
-import { test, expect, loadSupport, signIn } from './fixtures.js';
+import { test, expect, loadSupport, makeVideo, signIn } from './fixtures.js';
 import type * as ShotWork from '../../apps/api/test/support/shot-choice-work.js';
 
 test('a Shot video choice survives reload and can be changed to another exact version', async ({ page, backend }) => {
@@ -85,4 +85,44 @@ test('saved video jobs show their status and failure after a reload, one unreada
   await check();
   await page.reload();
   await check();
+});
+
+test('a video the agent makes is listed in Generated videos without a reload, plays there, and stays above the job cards', async ({ page, backend }) => {
+  test.slow();
+  backend.provider.reset();
+  const [account] = await backend.accounts(1);
+  await signIn(page, account!);
+  // Not shown in the chat, so the Videos tab is where it is found.
+  await makeVideo(page, backend, { showInChat: false });
+  const list = page.locator('.wp-panel-section').filter({ hasText: 'Generated videos' });
+  const clip = list.locator('.wp-video-row');
+  const listed = async () => {
+    await page.getByRole('tab', { name: 'Videos', exact: true }).click();
+    await expect(clip).toHaveCount(1);
+    await expect(clip.locator('.wp-video-title')).toHaveText('Video 1 · Version 1');
+    // The fixture clip is 4.04 s long.
+    await expect(clip.locator('.wp-video-metadata')).toHaveText('0:04');
+    await expect.poll(() => clip.locator('img').evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+    // Seen, not chosen: the row has no status.
+    await expect(clip.locator('.wp-status')).toHaveCount(0);
+  };
+  await listed();
+  await expect(page.getByText('No videos yet.', { exact: true })).toHaveCount(0);
+
+  await clip.getByRole('button', { name: 'Play Video 1 · Version 1', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.locator('.wp-clip-surface[data-ready="true"]')).toHaveCount(1);
+  await dialog.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect.poll(async () => ['playing', 'ended'].includes(await dialog.locator('.wp-clip-surface').getAttribute('data-player-status') ?? '')
+    || await dialog.locator('.wp-clip-media').evaluate(node => (node as HTMLVideoElement).currentTime > 0), { timeout: 10_000 }).toBe(true);
+  await expect(dialog.getByRole('button', { name: 'Use this version', exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+
+  await page.reload();
+  await listed();
+  // The list sits above the job cards, and the job that made the clip is one of them.
+  const card = page.locator('.wp-request-card').filter({ hasText: 'Video request' });
+  await expect(card).toHaveCount(1);
+  expect(await clip.evaluate((row, other) => !!(row.compareDocumentPosition(other!) & Node.DOCUMENT_POSITION_FOLLOWING), await card.elementHandle())).toBe(true);
 });
