@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react';
 import { Button as AriaButton } from 'react-aria-components';
 import type { NativeShownMedia } from '@workprint/api-client';
-import { workspaceMediaLabels, type OperationResponse, type Version } from '@workprint/contracts';
+import { mediaVersionName, workspaceMediaLabels, type OperationResponse, type Version } from '@workprint/contracts';
 import type { BrowserClient } from '../api/client.js';
 import type { ReadScope } from '../api/use-scoped-read.js';
 import { useOwnedImage } from '../api/use-owned-image.js';
@@ -31,8 +31,7 @@ function inWorkspace(workspace: Workspace | null, id: string, kind: Kind): Media
  * Named as the assistant, Assets and Videos name it ("Image 2 · Version 1", "Video 1 · Version 1"); an earlier
  * version keeps its number.
  */
-const mediaName = (workspace: Workspace | null, version: MediaVersion) =>
-  `${(workspace && workspaceMediaLabels(workspace).get(version.artifactId)) ?? (version.kind === 'video' ? 'Video' : 'Image')} · Version ${version.revision}`;
+const mediaName = (workspace: Workspace | null, version: MediaVersion) => mediaVersionName(workspace ? workspaceMediaLabels(workspace) : new Map(), version);
 
 /** The saved images and videos a done tool line shows under it; each image, or video poster, is read through the owned-image read. */
 export function ShownMedia({ items }: { items: readonly NativeShownMedia[] }) {

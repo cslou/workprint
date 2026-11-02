@@ -42,6 +42,14 @@ test('a Shot video choice survives reload and can be changed to another exact ve
   await expect(chosen).toHaveCount(1);
   await expect(chosen).toContainText('Version 1');
   expect(await persisted()).toEqual([['platform-shot', first.id], ['arrival-shot', null]]);
+
+  // A clip the agent makes is listed above the Shot rows, which still show.
+  backend.provider.reset();
+  await makeVideo(page, backend, { showInChat: false });
+  await openVideos();
+  const generated = page.locator('.wp-video-row[data-version-id]');
+  await expect(generated).toHaveCount(1);
+  expect(await generated.evaluate((clip, shot) => !!(clip.compareDocumentPosition(shot!) & Node.DOCUMENT_POSITION_FOLLOWING), await rows.first().elementHandle())).toBe(true);
 });
 
 test('saved video jobs show their status and failure after a reload, one unreadable card alone, and no Cancel', async ({ page, backend }) => {
@@ -91,23 +99,37 @@ test('a video the agent makes is listed in Generated videos without a reload, pl
   test.slow();
   backend.provider.reset();
   const [account] = await backend.accounts(1);
+  const reads: string[] = [];
+  page.on('request', request => { if (/\/v1\/versions\/[^/]+\/media$/.test(new URL(request.url()).pathname)) reads.push(request.url()); });
   await signIn(page, account!);
-  // Not shown in the chat, so the Videos tab is where it is found.
+  const videosTab = page.getByRole('tab', { name: 'Videos', exact: true });
+  const panel = page.getByRole('tabpanel');
+  // Generated rows carry their version; Shot rows carry their Shot.
+  const clip = page.locator('.wp-video-row[data-version-id]');
+
+  // A video with no clips and no Shots keeps the tab's own empty state.
+  backend.provider.script({ text: ['Hello.'] });
+  await page.getByRole('textbox', { name: 'Message' }).fill('Hi');
+  await page.getByRole('textbox', { name: 'Message' }).press('Enter');
+  await expect(page.getByRole('list', { name: 'New messages' }).getByText('Hello.', { exact: true })).toBeVisible({ timeout: 45_000 });
+  await videosTab.click();
+  await expect(panel.getByText('No videos yet.', { exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'Script', exact: true }).click();
+
+  // Not shown in the chat, so no poster is read until the Videos tab shows it.
   await makeVideo(page, backend, { showInChat: false });
-  const list = page.locator('.wp-panel-section').filter({ hasText: 'Generated videos' });
-  const clip = list.locator('.wp-video-row');
-  const listed = async () => {
-    await page.getByRole('tab', { name: 'Videos', exact: true }).click();
-    await expect(clip).toHaveCount(1);
-    await expect(clip.locator('.wp-video-title')).toHaveText('Video 1 · Version 1');
-    // The fixture clip is 4.04 s long.
-    await expect(clip.locator('.wp-video-metadata')).toHaveText('0:04');
-    await expect.poll(() => clip.locator('img').evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
-    // Seen, not chosen: the row has no status.
-    await expect(clip.locator('.wp-status')).toHaveCount(0);
-  };
-  await listed();
-  await expect(page.getByText('No videos yet.', { exact: true })).toHaveCount(0);
+  await page.waitForTimeout(500);
+  expect(reads).toHaveLength(0);
+  // A refused poster read leaves the clip playable and says so.
+  await page.route('**/v1/versions/*/media', route => route.fulfill({ status: 503, body: '' }), { times: 1 });
+  await videosTab.click();
+  await expect(clip.locator('.wp-video-title')).toHaveText('Video 1 · Version 1');
+  // The fixture clip is 4.04 s long.
+  await expect(clip.locator('.wp-video-metadata')).toHaveText('0:04 · The poster couldn’t be shown');
+  await expect(panel.getByText('No videos yet.', { exact: true })).toHaveCount(0);
+  // Seen, not chosen: the row has no status.
+  await expect(clip.locator('.wp-status')).toHaveCount(0);
+  expect(reads).toHaveLength(1);
 
   await clip.getByRole('button', { name: 'Play Video 1 · Version 1', exact: true }).click();
   const dialog = page.getByRole('dialog');
@@ -120,7 +142,11 @@ test('a video the agent makes is listed in Generated videos without a reload, pl
   await expect(dialog).toHaveCount(0);
 
   await page.reload();
-  await listed();
+  await videosTab.click();
+  await expect(clip).toHaveCount(1);
+  await expect(clip.locator('.wp-video-title')).toHaveText('Video 1 · Version 1');
+  await expect(clip.locator('.wp-video-metadata')).toHaveText('0:04');
+  await expect.poll(() => clip.locator('img').evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   // The list sits above the job cards, and the job that made the clip is one of them.
   const card = page.locator('.wp-request-card').filter({ hasText: 'Video request' });
   await expect(card).toHaveCount(1);
