@@ -1,15 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import type { z } from 'zod';
-import { idSchema, useSchema, type Version } from '@workprint/contracts';
+import { idSchema, savedScriptContentSchema, scriptBodySchema, useSchema, type Version } from '@workprint/contracts';
 import { transaction } from '../db/index.js';
 import { parseContent } from './content.js';
 import { ArtifactError } from './errors.js';
+import { withSubjects, type SubjectInput } from './script-subjects.js';
 import { lockPublicationOwner, publishVersion } from './publication.js';
 import { createArtifactStore } from './store.js';
 
 type OwnedCheck = Parameters<typeof createArtifactStore>[1];
-export type AssistantScriptInput = Readonly<{ content: unknown; baseVersionId: string | null }>;
+/** `content` is the script without its subjects; `subjects` is the full new list, or empty to keep the base's. */
+export type AssistantScriptInput = Readonly<{ content: unknown; baseVersionId: string | null; subjects?: readonly SubjectInput[] }>;
 export type AssistantScriptSave = Readonly<{ version: Version; use: z.infer<typeof useSchema> }>;
 const binding = { purpose: 'script' } as const;
 
@@ -19,6 +21,7 @@ const binding = { purpose: 'script' } as const;
  * The base is the exact version the assistant last read. A save on any other base never overwrites newer work:
  * an earlier version of the current script is stale, and any other version is not found. A video with no script
  * has nothing to overwrite, so its first save ignores the base (models do not reliably send null).
+ * The subjects' ids are resolved against the base inside the owner lock (see `withSubjects`).
  */
 export function createAssistantScripts(pool: Pool, checkOwnedConversation: OwnedCheck) {
   const reads = createArtifactStore(pool, checkOwnedConversation);
@@ -27,8 +30,8 @@ export function createAssistantScripts(pool: Pool, checkOwnedConversation: Owned
       if (!idSchema.safeParse(account).success || !idSchema.safeParse(conversation).success) throw new ArtifactError('invalid_input');
       const owned = await checkOwnedConversation(account, conversation);
       if (owned.kind !== 'owned') throw new ArtifactError(owned.kind === 'not_found' ? 'not_found' : 'integration_failure');
-      let content: ReturnType<typeof parseContent>;
-      try { content = parseContent('script', input.content); } catch { throw new ArtifactError('invalid_input'); }
+      const body = scriptBodySchema.safeParse(input.content);
+      if (!body.success) throw new ArtifactError('invalid_input');
       // Native ownership of the base is checked outside SQL. A foreign, missing or malformed id resolves to
       // nothing, which is not found only when the video has a script to protect. Any other lookup failure
       // matters only then too: a first save ignores the base.
@@ -48,6 +51,10 @@ export function createAssistantScripts(pool: Pool, checkOwnedConversation: Owned
           if (!base || base.kind !== 'script' || current.artifact_id !== base.artifactId) throw new ArtifactError('not_found');
           if (current.version_id !== base.id) throw new ArtifactError('stale_revision');
         }
+        const baseContent = current && base && 'content' in base ? savedScriptContentSchema.parse(base.content) : null;
+        let content: ReturnType<typeof parseContent>;
+        const next = withSubjects(body.data, baseContent, input.subjects ?? []);
+        try { content = parseContent('script', next); } catch { throw new ArtifactError('invalid_input'); }
         // The next revision of the account's own script; a built-in script in use starts a new owned one.
         const artifactId = current && current.version_owner_id === account ? current.artifact_id : undefined;
         const version = await publishVersion(client, { accountId: account, conversationId: conversation, artifactId, kind: 'script', content, dependencies: [], createdBy: 'assistant' });

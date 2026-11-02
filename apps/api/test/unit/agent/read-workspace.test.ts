@@ -79,3 +79,18 @@ test('the listing gives the video\'s stopped jobs with their resume ids, only wh
     assert.equal('stoppedVideos' in quiet, false); assert.equal(quiet.total, 1);
   }
 });
+
+test('the listing gives the script\'s subjects with their ids, and 50 subjects with 80-character names stay within 16 KiB', async () => {
+  const tool = productionTools.find(candidate => candidate.id === 'read-workspace')!;
+  const names = Array.from({ length: 50 }, (_, index) => `${String(index).padStart(2, '0')}${'n'.repeat(78)}`);
+  const subjects = names.map((name, index) => ({ id: `${'s'.repeat(80)}-${index}`, kind: index === 0 ? 'character' as const : 'prop' as const, name }));
+  const script: Version = { ...base('s'), kind: 'script', content: { schemaVersion: 1, subjects, scenes: [{ heading: { setting: 'INT.', location: 'Station', time: 'Night' }, characters: [names[0]!], script: [{ action: 'Ada waits.' }] }] } };
+  const space = workspace(Array.from({ length: 40 }, (_, index) => reference(`r${index}`, `N${index}`, 'é'.repeat(400))), { script: work(script, 'script') });
+  const collaborators: AgentCollaborators = { readWorkspace: async () => ({ kind: 'found', workspace: space }), saveScript: async () => ({ kind: 'unavailable' }), readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }) };
+  const signal = new AbortController().signal;
+  const listed = await tool.execute({}, { scope: { accountId: 'a', videoId: 'v' }, collaborators, signal, abortReason: () => undefined }) as { subjects: unknown[]; items: { name: string }[]; truncated: boolean };
+  assert.deepEqual(listed.subjects, subjects);
+  assert.ok(Buffer.byteLength(JSON.stringify(listed)) <= listingBounds.bytes);
+  assert.equal(listed.items[0]?.name, 'Script · Version 1', 'the script still fits beside the subjects');
+  assert.ok(listed.truncated);
+});

@@ -1,4 +1,4 @@
-import { mediaVersionName, workspaceMediaLabels } from '@workprint/contracts';
+import { mediaVersionName, savedScriptContentSchema, scriptSubjects, workspaceMediaLabels, type ScriptSubject } from '@workprint/contracts';
 import type { OwnedWorkspace } from '../application/index.js';
 
 type Version = OwnedWorkspace['assets'][number]['version'];
@@ -42,6 +42,12 @@ function summary(version: Version): string {
   const heading = record(scene.heading);
   const lines = list(scene.script).map(record).map(line => line.action !== undefined ? strings(line.action) : `${strings(record(line.dialogue).character)}: ${strings(record(line.dialogue).text)}`);
   return clip([`${strings(heading.setting)} ${strings(heading.location)} - ${strings(heading.time)}`, ...lines].join(' '));
+}
+
+/** The video's subjects from its current script, in Assets order; none without a script. */
+export function workspaceSubjects(workspace: OwnedWorkspace): ScriptSubject[] {
+  const content = workspace.script ? savedScriptContentSchema.safeParse('content' in workspace.script.version ? workspace.script.version.content : null) : null;
+  return content?.success ? scriptSubjects(content.data) : [];
 }
 
 /** Every exact version the video uses, in workspace order, each once, with a name a person would recognise. */

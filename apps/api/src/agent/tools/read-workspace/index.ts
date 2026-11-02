@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import { defineTool } from '../define.js';
-import { listWorkspace, workspaceItem, type WorkspaceItemDetail, type WorkspaceListing } from '../../workspace-entries.js';
+import type { ScriptSubject } from '@workprint/contracts';
+import { listWorkspace, workspaceItem, workspaceSubjects, type WorkspaceItemDetail, type WorkspaceListing } from '../../workspace-entries.js';
 
 /** A video job that stopped waiting, as the model sees it: `jobId` is what generate-video's `resume` takes. */
 type StoppedVideoItem = { jobId: string; frames: string[]; submittedAt: string };
 type ReadWorkspaceResult =
-  | ({ found: true; mode: 'listing'; stoppedVideos?: StoppedVideoItem[] } & WorkspaceListing)
+  | ({ found: true; mode: 'listing'; subjects?: ScriptSubject[]; stoppedVideos?: StoppedVideoItem[] } & WorkspaceListing)
   | { found: true; mode: 'item'; item: WorkspaceItemDetail }
   | { found: false; reason: 'not_found' | 'unavailable' };
 
@@ -16,6 +17,7 @@ export const readWorkspaceTool = defineTool({
     'Read the saved work in this video: the script, references and uploaded images, the storyboard and shot versions.',
     'Call it with no arguments for a compact list of every exact version, with its name, kind, versionId, use, state and short text.',
     'Pass a versionId from that list to read that one item in full.',
+    'The list also gives subjects: the characters, places and props the script names, each with the id that update-script keeps.',
     'The list also gives stoppedVideos: videos that stopped waiting, newest first, each with the jobId to pass as generate-video resume when the user asks to continue one and the image versionIds it started from (frames).',
   ].join(' '),
   inputSchema: z.strictObject({ versionId: z.string().min(1).max(200).optional().describe('An exact versionId from the listing, to read that item in full.') }),
@@ -30,7 +32,8 @@ export const readWorkspaceTool = defineTool({
       // Stopped jobs are listed only when the server can make videos; a failed read of them leaves the list as it is.
       const stopped = await collaborators.videos?.stopped(scope.accountId, scope.videoId);
       const stoppedVideos = stopped?.kind === 'read' ? stopped.jobs.map(job => ({ jobId: job.jobId, frames: [...job.frames], submittedAt: job.submittedAt.toISOString() })) : [];
-      const envelope = { found: true, mode: 'listing', ...(stoppedVideos.length ? { stoppedVideos } : {}) } as const;
+      const subjects = workspaceSubjects(read.workspace);
+      const envelope = { found: true, mode: 'listing', ...(subjects.length ? { subjects } : {}), ...(stoppedVideos.length ? { stoppedVideos } : {}) } as const;
       return { ...envelope, ...listWorkspace(read.workspace, envelope) };
     }
     const item = workspaceItem(read.workspace, input.versionId);
