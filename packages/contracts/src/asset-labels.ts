@@ -1,3 +1,5 @@
+import type { SheetViewName } from './sheet-views.js';
+
 /**
  * The plain name of each artifact the video uses as an asset: "Image 2", "Video 1" or "Reference 3".
  * It counts per kind in workspace order, once per artifact, so every version of one artifact keeps its number.
@@ -22,7 +24,12 @@ export function workspaceMediaLabels(workspace: Readonly<{ assets: Parameters<ty
   return assetLabels([...workspace.assets, ...(workspace.generatedVideos ?? [])]);
 }
 
-/** One exact media version's name, as the assistant, the chat, Assets and Videos show it ("Video 1 · Version 2"). */
-export function mediaVersionName(labels: ReadonlyMap<string, string>, version: Readonly<{ artifactId: string; kind: string; revision: number }>): string {
+/**
+ * One exact media version's name, as the assistant, the chat, Assets and Videos show it ("Video 1 · Version 2").
+ * A version a current sheet lists (`views`, from `sheetViews`) is named by its subject and view: "Mara · Face close-up".
+ */
+export function mediaVersionName(labels: ReadonlyMap<string, string>, version: Readonly<{ id: string; artifactId: string; kind: string; revision: number }>, views?: ReadonlyMap<string, SheetViewName>): string {
+  const member = views?.get(version.id);
+  if (member) return `${member.subjectName} · ${member.view}`;
   return `${labels.get(version.artifactId) ?? (version.kind === 'video' ? 'Video' : 'Image')} · Version ${version.revision}`;
 }
