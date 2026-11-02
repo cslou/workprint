@@ -19,13 +19,33 @@ const scene = z.strictObject({
   });
 });
 
+const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export const subjectKinds = ['character', 'place', 'prop'] as const;
+/** The trimmed, case-folded form two subject names are compared in. */
+export const subjectNameKey = (name: string) => name.trim().toLowerCase();
+/** One character, place or prop the script names; its id is server-made and kept across script versions. */
+export const scriptSubjectSchema = z.strictObject({
+  id: z.string().max(200).regex(slug),
+  kind: z.enum(subjectKinds),
+  name: z.string().max(80).refine(value => value.trim().length > 0, 'Name is required'),
+});
+/** A script without its subjects: the assistant writes this, and the server keeps the subjects' ids. */
+export const scriptBodySchema = z.strictObject({ schemaVersion: z.literal(1), scenes: z.array(scene).min(1).max(1) });
 /** Structural hosted content only: validation never grants human approval. */
-export const savedScriptContentSchema = z.strictObject({ schemaVersion: z.literal(1), scenes: z.array(scene).min(1).max(1) });
+export const savedScriptContentSchema = scriptBodySchema.extend({ subjects: z.array(scriptSubjectSchema).max(50).optional() }).superRefine((value, context) => {
+  if (!value.subjects) return;
+  if (!unique(value.subjects.map(subject => subject.id))) context.addIssue({ code: 'custom', message: 'Subject ids must be distinct', path: ['subjects'] });
+  if (!unique(value.subjects.map(subject => subjectNameKey(subject.name)))) context.addIssue({ code: 'custom', message: 'Subject names must be distinct', path: ['subjects'] });
+  // The character subjects are the scene's characters: the two never disagree.
+  const characters = new Set(value.scenes.flatMap(item => item.characters.map(name => name.trim())));
+  const named = value.subjects.filter(subject => subject.kind === 'character').map(subject => subject.name.trim());
+  if (named.length !== characters.size || named.some(name => !characters.has(name))) context.addIssue({ code: 'custom', message: 'Character subjects must be the scene\'s characters', path: ['subjects'] });
+});
 const referenceImage = z.strictObject({ versionId: idSchema, view: text, notes: names });
 export const savedReferenceContentSchema = z.strictObject({
   schemaVersion: z.literal(1),
   subject: z.strictObject({
-    id: z.string().max(200).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+    id: z.string().max(200).regex(slug),
     kind: z.enum(['character', 'environment', 'prop', 'style']),
     name: text, description: text, continuityNotes: names.min(1),
   }),
