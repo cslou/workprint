@@ -23,8 +23,8 @@ export type VideoJobOutcome =
   | { kind: 'input_not_found' } | { kind: 'invalid'; detail?: string } | { kind: 'not_started' }
   /** Resume refusals: an unknown job, one still being made, one already saved, one that failed. */
   | { kind: 'not_found' } | { kind: 'busy'; jobId: string } | { kind: 'already_saved'; jobId: string; versionId: string } | { kind: 'not_resumable'; jobId: string; reason: JobFailure }
-  /** The saved jobs or an input read couldn't be reached. After a create, the job may still be waiting at MiniMax. */
-  | { kind: 'unavailable' };
+  /** Saved work couldn't be reached. `created`: the create was already sent, so the task may be waiting at MiniMax. */
+  | { kind: 'unavailable'; created: boolean };
 
 export type VideoJobTiming = Readonly<{ pollIntervalMs: number; pollDeadlineMs: number }>;
 /** MiniMax suggests polling about every 10 s; a job is waited on for at most 30 minutes per turn. */
@@ -94,7 +94,7 @@ export function createVideoJobs(collaborators: VideoJobCollaborators) {
       if (signal.aborted) return stopped(account, jobId, control);
       // A clip too large to accept stays too large: the job fails. Any other download error stays resumable, since
       // MiniMax keeps the task for 7 days and a fresh query gives a fresh URL (an expired one is refused).
-      if (error.detail === 'download.size') return refused(account, jobId);
+      if (error.tooLarge) return refused(account, jobId);
       await jobs.interrupted(account, jobId);
       return { kind: 'interrupted', jobId };
     }
@@ -103,30 +103,33 @@ export function createVideoJobs(collaborators: VideoJobCollaborators) {
     const saved = await saveVideo(account, video, { bytes, frames, jobId }, signal);
     if (saved.kind === 'saved') return { kind: 'saved', jobId, versionId: saved.versionId, width: saved.width, height: saved.height, durationMs: saved.durationMs };
     if (signal.aborted) return stopped(account, jobId, control);
-    // A clip the check refuses, or one whose frames this video no longer uses, would be refused on every resume.
-    if (saved.kind === 'refused' || saved.kind === 'not_found') return refused(account, jobId);
+    if (saved.kind === 'refused') return refused(account, jobId);
+    // Unavailable, or a frame this video no longer uses (the user can use it again): the job stays resumable.
     await jobs.interrupted(account, jobId);
     return { kind: 'interrupted', jobId };
   }
 
-  /** Keeps each step's own outcome; anything unexpected from storage is logged and reported as unavailable. */
-  async function guarded(label: string, run: () => Promise<VideoJobOutcome>): Promise<VideoJobOutcome> {
-    try { return await run(); } catch (error) {
+  /**
+   * Keeps each step's own outcome; anything unexpected from storage is logged and reported as unavailable, saying
+   * whether the create had been sent. `run` calls `sent` just before it sends one.
+   */
+  async function guarded(label: string, run: (sent: () => void) => Promise<VideoJobOutcome>, created = false): Promise<VideoJobOutcome> {
+    try { return await run(() => { created = true; }); } catch (error) {
       logFailure(label, error);
-      return { kind: 'unavailable' };
+      return { kind: 'unavailable', created };
     }
   }
 
   return Object.freeze({
     /** Starts a new job: its frames and request are checked before anything is saved or sent. */
-    start: (account: string, video: string, input: NewVideo, control: VideoRunControl) => guarded('Video job failed', async () => {
+    start: (account: string, video: string, input: NewVideo, control: VideoRunControl) => guarded('Video job failed', async sent => {
       const ids = [input.firstFrame, input.lastFrame].filter((id): id is string => id !== undefined);
       // A job and a clip's dependencies name each image once, so one image can't be both frames.
       if (ids.length === 2 && ids[0] === ids[1]) return { kind: 'invalid', detail: 'lastFrame' };
       let frames: VideoFrame[] = [];
       if (ids.length) {
         const read = await readImageInputs(account, video, ids);
-        if (read.kind !== 'read') return read.kind === 'not_found' ? { kind: 'input_not_found' } : { kind: 'unavailable' };
+        if (read.kind !== 'read') return read.kind === 'not_found' ? { kind: 'input_not_found' } : { kind: 'unavailable', created: false };
         frames = read.images.map(image => ({ dataUrl: image.dataUrl, width: image.width, height: image.height }));
       }
       const [first, last] = input.firstFrame === undefined ? [undefined, frames[0]] : [frames[0], frames[1]];
@@ -143,6 +146,7 @@ export function createVideoJobs(collaborators: VideoJobCollaborators) {
       const job = await jobs.begin(account, video, { prompt: request.prompt, inputs: ids });
       let taskId: string;
       // The create is never cut off by Stop: it ends with a task id or an unknown outcome within its own timeout.
+      sent();
       try { taskId = (await client.submit(request)).taskId; } catch (error) {
         if (!(error instanceof MiniMaxVideoError)) throw error;
         const failure = createFailure(error);
@@ -154,6 +158,7 @@ export function createVideoJobs(collaborators: VideoJobCollaborators) {
     }),
 
     /** Waits on an interrupted job's same task again; nothing is created. Other states refuse. */
+    // A resumed job's task was created by an earlier call.
     resume: (account: string, video: string, jobId: string, control: VideoRunControl) => guarded('Video job resume failed', async () => {
       let job;
       try { job = await jobs.get(account, jobId); } catch (error) {
@@ -162,10 +167,10 @@ export function createVideoJobs(collaborators: VideoJobCollaborators) {
       }
       if (job.conversationId !== video) return { kind: 'not_found' };
       if (job.status === 'submitting' || job.status === 'running') return { kind: 'busy', jobId };
-      if (job.status === 'succeeded') return job.resultVersionId ? { kind: 'already_saved', jobId, versionId: job.resultVersionId } : { kind: 'unavailable' };
+      if (job.status === 'succeeded') return job.resultVersionId ? { kind: 'already_saved', jobId, versionId: job.resultVersionId } : { kind: 'unavailable', created: true };
       if (job.status === 'failed') return { kind: 'not_resumable', jobId, reason: job.failureReason ?? 'provider_error' };
       // An interrupted job always has its task id: the create is never cut off.
-      if (!job.taskId) return { kind: 'unavailable' };
+      if (!job.taskId) return { kind: 'unavailable', created: true };
       let resumed;
       try { resumed = await jobs.resumed(account, jobId); } catch (error) {
         if (!(error instanceof GenerationJobError)) throw error;
@@ -176,7 +181,7 @@ export function createVideoJobs(collaborators: VideoJobCollaborators) {
         return { kind: 'busy', jobId };
       }
       return wait(account, video, jobId, job.taskId, resumed.inputs, control);
-    }),
+    }, true),
   });
 }
 export type VideoJobs = ReturnType<typeof createVideoJobs>;

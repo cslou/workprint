@@ -26,7 +26,7 @@ const run = (collaborators: AgentCollaborators, input: Record<string, unknown>, 
 const summary = (output: unknown) => projectToolActivity(productionTools, { toolCallId: 'call_1', toolName: 'generate-video', state: 'done', input: {}, output })?.summary;
 
 test('without video jobs the tool refuses before any call', async () => {
-  const { collaborators, calls } = harness({ kind: 'unavailable' }, false);
+  const { collaborators, calls } = harness({ kind: 'unavailable', created: false }, false);
   const result = await run(collaborators, { prompt: 'A bench' });
   assert.equal(summary(result), 'Not made: videos can’t be saved on this server');
   assert.match(result.message!, /nothing was sent to MiniMax/);
@@ -65,7 +65,8 @@ test('each outcome has its own line and a message the model can follow', async (
     [{ kind: 'busy', jobId }, 'That video is still being made', /do not start it again/],
     [{ kind: 'already_saved', jobId, versionId: randomUUID() }, 'That video is already saved', /already saved\. Do not resume/],
     [{ kind: 'not_resumable', jobId, reason: 'expired' }, 'That video failed and can’t be resumed', /cannot be resumed/],
-    [{ kind: 'unavailable' }, 'Not made: saved video jobs are unavailable', /MiniMax may have started it/],
+    [{ kind: 'unavailable', created: true }, 'Not saved: saved video jobs are unavailable', /MiniMax may have started it/],
+    [{ kind: 'unavailable', created: false }, 'Not made: saved work is unavailable', /nothing was sent to MiniMax/],
   ];
   for (const [outcome, line, message] of cases) {
     const result = await run(harness(outcome).collaborators, { prompt: 'A bench' });

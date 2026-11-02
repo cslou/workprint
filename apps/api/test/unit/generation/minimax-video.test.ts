@@ -11,13 +11,14 @@ const key = 'harmless-minimax-key-sentinel';
 const client = (options: Partial<MiniMaxVideoClientOptions> = {}) => createMiniMaxVideoClient({ apiKey: key, baseUrl: fake.url, retryDelayMs: 1, download: createSafeDownload({ allowLoopback: true }), ...options });
 const frame = (width = 1376, height = 768, data = 'AAAA') => ({ dataUrl: `data:image/png;base64,${data}`, width, height });
 const prompt: VideoRequest = { prompt: 'A slow push-in on a bench', durationS: 5, ratio: '16:9' };
-const refusal = async (promise: Promise<unknown>, code: MiniMaxVideoErrorCode, check: { detail?: string; outcomeUnknown?: boolean } = {}) => {
+const refusal = async (promise: Promise<unknown>, code: MiniMaxVideoErrorCode, check: { detail?: string; outcomeUnknown?: boolean; tooLarge?: boolean } = {}) => {
   let caught: MiniMaxVideoError | undefined;
   await assert.rejects(promise, (error: unknown) => {
     assert.ok(error instanceof MiniMaxVideoError, String(error));
     assert.equal(error.code, code);
     if ('detail' in check) assert.equal(error.detail, check.detail);
     assert.equal(error.outcomeUnknown, check.outcomeUnknown ?? false);
+    assert.equal(error.tooLarge, check.tooLarge ?? false);
     caught = error;
     return true;
   });
@@ -121,9 +122,9 @@ test('a download is bounded, sends no key, and refuses non-HTTPS, private hosts 
   assert.equal(Buffer.from(await client().download(url)).toString(), 'a clip');
   assert.equal(fake.requests.at(-1)!.authorization, undefined);
   fake.script.download({ oversize: 8 * 1024 * 1024 }, { declare: 2 * 1024 * 1024 });
-  await refusal(client().download(url, undefined, 1024 * 1024), 'failed', { detail: 'download.size' });
+  await refusal(client().download(url, undefined, 1024 * 1024), 'failed', { detail: 'download', tooLarge: true });
   assert.ok(fake.served < 4 * 1024 * 1024, `the reader stopped early (${fake.served} bytes served)`);
-  await refusal(client().download(url, undefined, 1024 * 1024), 'failed', { detail: 'download.size' });
+  await refusal(client().download(url, undefined, 1024 * 1024), 'failed', { detail: 'download', tooLarge: true });
   for (const bad of [Number.NaN, 0, 1.5]) await refusal(client().download(url, undefined, bad), 'invalid_request', { detail: 'maxBytes' });
   const hop = `${fake.url}/files/${taskId}.mp4`;
   fake.script.download({ redirect: hop }, { redirect: hop }, { redirect: hop }, { redirect: hop });

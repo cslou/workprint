@@ -7,7 +7,7 @@ import { workspaceItem } from '../../workspace-entries.js';
 type Reason =
   | 'unsaveable' | 'input_not_found' | 'invalid' | 'stopped' | 'outcome_unknown' | 'refused' | 'unauthorized' | 'payment_required'
   | 'rate_limited' | 'unavailable' | 'task_failed' | 'task_cancelled' | 'checks' | 'not_found' | 'busy' | 'already_saved' | 'not_resumable'
-  | 'jobs_unavailable';
+  | 'jobs_unavailable' | 'work_unavailable';
 /** One saved clip, named as read-workspace names it; the name is left out when the workspace can't be read. */
 type SavedClip = { versionId: string; label?: string; width: number; height: number; durationS: number };
 export type GenerateVideoResult =
@@ -31,7 +31,8 @@ const summaries: Readonly<Record<Exclude<Reason, 'already_saved'>, string>> = {
   not_found: 'Couldn’t find that video job',
   busy: 'That video is still being made',
   not_resumable: 'That video failed and can’t be resumed',
-  jobs_unavailable: 'Not made: saved video jobs are unavailable',
+  jobs_unavailable: 'Not saved: saved video jobs are unavailable',
+  work_unavailable: 'Not made: saved work is unavailable',
 };
 const messages: Readonly<Record<Exclude<Reason, 'invalid' | 'stopped' | 'already_saved'>, string>> = {
   unsaveable: 'Not made: this server cannot save videos, so nothing was sent to MiniMax. Tell the user; do not retry.',
@@ -49,6 +50,7 @@ const messages: Readonly<Record<Exclude<Reason, 'invalid' | 'stopped' | 'already
   busy: 'That video job is still being made in another turn. Tell the user; do not start it again.',
   not_resumable: 'That video job failed and cannot be resumed. Tell the user; make a new video only if they ask.',
   jobs_unavailable: 'Saved video jobs are unavailable right now, so this video job could not be tracked; MiniMax may have started it. Tell the user; do not retry in this turn.',
+  work_unavailable: 'Not made: saved work could not be reached, so nothing was sent to MiniMax. Tell the user; do not retry in this turn.',
 };
 const providerReasons: Readonly<Record<VideoProviderFailure, Exclude<Reason, 'invalid' | 'stopped' | 'already_saved'>>> = {
   invalid_request: 'refused', unauthorized: 'unauthorized', payment_required: 'payment_required', rate_limited: 'rate_limited',
@@ -88,7 +90,7 @@ async function result(context: ToolContext, outcome: VideoJobOutcome, showInChat
         message: `That video job is already saved${label ? ` as ${label}` : ''}. Do not resume it again.` };
     }
     case 'not_resumable': return refusal('not_resumable', outcome.jobId);
-    case 'unavailable': return refusal('jobs_unavailable');
+    case 'unavailable': return refusal(outcome.created ? 'jobs_unavailable' : 'work_unavailable');
     // A call whose signal fired ends before this; were it to reach here, nothing was sent.
     case 'not_started': return { made: false, reason: 'stopped', message: 'Stopped before the video was started; nothing was sent to MiniMax.' };
   }

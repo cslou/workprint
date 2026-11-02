@@ -54,10 +54,13 @@ export class MiniMaxVideoError extends Error {
   readonly detail: string | undefined;
   /** True when a create may have reached MiniMax, so it must never be sent again. */
   readonly outcomeUnknown: boolean;
-  constructor(readonly code: MiniMaxVideoErrorCode, options: { detail?: string | undefined; outcomeUnknown?: boolean } = {}) {
+  /** True when a download was refused because the clip itself is too large, so fetching it again can't help. */
+  readonly tooLarge: boolean;
+  constructor(readonly code: MiniMaxVideoErrorCode, options: { detail?: string | undefined; outcomeUnknown?: boolean; tooLarge?: boolean } = {}) {
     super(options.detail ? `${messages[code]} (${options.detail})` : messages[code]);
     this.detail = options.detail;
     this.outcomeUnknown = options.outcomeUnknown ?? false;
+    this.tooLarge = options.tooLarge ?? false;
   }
 }
 
@@ -205,8 +208,7 @@ export function createMiniMaxVideoClient(options: MiniMaxVideoClientOptions): Mi
       if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) invalid('maxBytes');
       try { return await download(url, signal, Math.min(maxBytes, maxVideoDownloadBytes)); } catch (error) {
         if (signal?.aborted) throw new MiniMaxVideoError('aborted');
-        // `download.size` says the clip itself is too large, so fetching it again can't help.
-        throw new MiniMaxVideoError(error instanceof DownloadError ? downloadCodes[error.reason] : 'unavailable', { detail: error instanceof DownloadError && error.reason === 'too_large' ? 'download.size' : 'download' });
+        throw new MiniMaxVideoError(error instanceof DownloadError ? downloadCodes[error.reason] : 'unavailable', { detail: 'download', tooLarge: error instanceof DownloadError && error.reason === 'too_large' });
       }
     },
   };
