@@ -1,5 +1,5 @@
 export { createOwnedConversationCheck } from './mastra/owned-conversation.js';
-export { activeNativeRun, bindNativeTurns, hasNativeTurns, nameVideo, nativeAssistantId, nativeToolRegistry, systemPrompt, type NativeTurns } from './mastra/native-turns.js';
+export { activeNativeRun, bindNativeTurns, hasNativeTurns, nameVideo, nativeAssistantId, nativeToolRegistry, nativeTurnLimits, systemPrompt, type NativeTurns } from './mastra/native-turns.js';
 export { createAssistantModel, type NativeTurnModel } from './mastra/model.js';
 export { ModelStallError } from './mastra/stall-limit.js';
 export { cleanTitle, titleInstructions, titleLength } from './mastra/video-title.js';

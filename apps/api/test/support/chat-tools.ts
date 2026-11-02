@@ -1,5 +1,14 @@
+import { registerApiRoute } from '@mastra/core/server';
 import { z } from 'zod';
 import type { AgentTool } from '../../src/agent/index.js';
+
+/** Test-only routes registered through the backend's route seam. `/test/slow` answers after 2 s. */
+export function chatTestRoutes() {
+  return [registerApiRoute('/test/slow', {
+    method: 'GET',
+    handler: async context => { await new Promise(resolve => setTimeout(resolve, 2000)); return context.json({ slow: true }); },
+  })];
+}
 
 /**
  * Test-only tools registered through the turn composition seam. Production never registers these.

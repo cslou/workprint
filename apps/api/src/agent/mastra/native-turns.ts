@@ -28,7 +28,7 @@ export const systemPrompt = [
 
 // What each Mastra instance was bound with: its tools, so stream and history redaction use the same phrases,
 // and its video titler.
-const bindings = new WeakMap<Mastra, { tools: readonly AgentTool[]; nameVideo: NameVideo }>();
+const bindings = new WeakMap<Mastra, { tools: readonly AgentTool[]; limits: TurnLimits; nameVideo: NameVideo }>();
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 
 /**
@@ -70,13 +70,16 @@ export function bindNativeTurns(mastra: Mastra, turns: NativeTurns) {
     },
     durable: { cleanupTimeoutMs: limits.cleanupMs },
   }));
-  bindings.set(mastra, { tools: turns.tools, nameVideo: createVideoTitler(turns.model, storage, limits) });
+  bindings.set(mastra, { tools: turns.tools, limits, nameVideo: createVideoTitler(turns.model, storage, limits) });
 }
 
 export function hasNativeTurns(mastra: Mastra) { return bindings.has(mastra); }
 
 /** The tools bound to this instance; none when turns are not bound. */
 export function nativeToolRegistry(mastra: Mastra): readonly AgentTool[] { return bindings.get(mastra)?.tools ?? []; }
+
+/** The limits this instance's turns were bound with; none when turns are not bound. */
+export function nativeTurnLimits(mastra: Mastra): TurnLimits | undefined { return bindings.get(mastra)?.limits; }
 
 /** After an accepted send: name the video from its message if it has no title yet. Never rejects. */
 export function nameVideo(mastra: Mastra, accountId: string, videoId: string, message: string): Promise<void> {

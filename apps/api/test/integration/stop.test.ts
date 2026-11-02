@@ -86,3 +86,33 @@ test('Stop ends exactly the turn it names, including a running tool, and nothing
     assert.ok(completed(await turn));
   });
 });
+
+// Long turns (Sprint 009 Story 2) on a server whose route and Node timeouts are shrunk to 1 s.
+test('a turn outlasts the route and Node timeouts while other routes keep theirs', { timeout: 300000 }, async t => {
+  const provider = await scriptedProvider(); t.after(provider.close);
+  const node = { requestTimeout: 1000, headersTimeout: 1000, keepAliveTimeout: 1000, connectionsCheckingInterval: 100 };
+  const fixture = await accountBrowserFixture({ composition: chatComposition(provider, { turnMs: 5000 }, undefined, { routeTimeoutMs: 1000, node, slowRoute: true }) }); t.after(fixture.close);
+  const owner = await fixture.auth.createAccount(), token = await fixture.accessToken(owner);
+  const client = nativeTurnClient(fixture.apiOrigin, token, owner.id);
+  t.beforeEach(() => provider.reset());
+
+  await t.test('a tool held for 2 s finishes and its reply is saved', async () => {
+    const video = await client.newVideo();
+    provider.script({ toolCalls: [{ name: 'test-gated', args: {} }] }, { text: ['Finished ', 'after the wait'] });
+    const started = Date.now();
+    const turn = client.turn(video, 'Run the gated tool');
+    await provider.gate().reached; await wait(2000); provider.openGate();
+    const ended = await turn;
+    assert.ok(completed(ended), JSON.stringify(ended.terminal)); assert.equal(ended.text, 'Finished after the wait');
+    assert.ok(Date.now() - started >= 2000);
+    const saved = await (await client.get(`/memory/threads/${video}/messages?page=0&perPage=20`)).json() as { messages: { role: string }[] };
+    assert.deepEqual(saved.messages.map(message => message.role).sort(), ['assistant', 'user']);
+  });
+
+  await t.test('a route that is not a turn still times out at 1 s', async () => {
+    const started = Date.now();
+    const response = await client.get('/test/slow');
+    assert.equal(response.status, 504); await response.body?.cancel();
+    assert.ok(Date.now() - started < 1900, `answered after ${Date.now() - started} ms`);
+  });
+});
