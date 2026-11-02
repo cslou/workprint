@@ -402,7 +402,7 @@ After all implementation stories are complete, perform this checklist before spr
 For descriptive-only work, use editorial review and applicable existing checks. Preserve applicable design checks and approval gates. Failed, ambiguous, or unrun required checks remain non-pass.
 
 Sprint-specific completion items:
-- [x] Fold the subjects, reference sheet and filing flows into spec §8.3 (a Subjects and reference sheets block) and the §4 `contracts`, `artifacts` and `agent` rows.
+- [x] Fold the subjects, reference sheet and filing flows into spec §8.3 (a Subjects and reference sheets block) and the §4 `contracts`, `application`, `artifacts` and `agent` rows.
 - [x] Deep gate (`.checks/regression.sh --tier=deep`) on the combined branch.
 - [x] `pnpm live:image` passes dry.
 - [ ] A QA build for Lou with live Muse Spark and Meta: write a short script, ask for a character's sheet and a place's sheet, ask to redo one view, and ask for a one-off image of the character. Pass:
@@ -434,7 +434,7 @@ Sprint-specific completion items:
 
 - **Outcome:** the goal is met in the scripted build. Lou's live QA is pending: Lou asked for no QA build until he says so (2026-11-03). Every story AC and verification item is met, with the deviations recorded below. Each story merged into `sprint-010` after an independent review of its final head scored at least 4/5 with no open P0/P1. The verdicts come from the orchestrator's review runs and are recorded in the PR bodies:
   - Story 1, #106 (subjects in the script): 4/5, then 5/5 after two fix cycles. All nine P2s were fixed.
-  - Story 2, #107 (save the assistant's sheets): 4/5, then 4/5 after two fix cycles.
+  - Story 2, #107 (save the assistant's sheets): 4/5, then 4/5 after two fix cycles. Review-fix cycle 1 found a P1: the workspace read under the owner lock took a second pool connection, so a parallel save could fail. Commit 3 fixed it, and cycle 2 confirmed it.
   - Story 3, #108 (generate-sheet): 4/5, then 4/5 after two fix cycles. Eleven of twelve P2s were fixed.
   - Story 4, #109 (sheet names and the agent's view): 3/5, then 4/5. The first review's P1 was a subject listing that could push the script out of read-workspace's 16 KiB.
   - Story 5, #110 (images filed under subjects): 4/5, then 5/5.
@@ -449,8 +449,10 @@ Sprint-specific completion items:
   - Logs: `outputs/verification/sprint-010/deep-da42e3d/` (run `.checks/.logs/run-5geqrwj0`).
 - **Cross-story checks:** none beyond the deep gate. The planned browser journey (Story 6) and the integration blocks (Stories 1–5) are in it.
 - **Live checks:** at `da42e3d`, `pnpm live:image` passes in dry mode (`"mode": "dry", "pass": true`, the loopback Meta fake). Log: `outputs/verification/sprint-010/live-dry-da42e3d/`. No paid call was made this sprint.
-- **Spec:** §8.3 gains a "Subjects and reference sheets" block, and the §4 `contracts`, `agent` and `artifacts` rows name this sprint's parts.
+- **Spec:** §8.3 gains a "Subjects and reference sheets" block, and the §4 `contracts`, `application`, `agent` and `artifacts` rows name this sprint's parts. Joining clips is credited to Sprint 012 throughout.
 - **QA build for Lou:** not built. Lou will ask for it (2026-11-03). The QA pass conditions are in Sprint Completion above and stay unchecked.
+- **Deviations:**
+  - **Completion order:** the spec fold was committed after the deep gate, not before it. The gate ran at `da42e3d` with the fold uncommitted in the checkout; the fold is docs only, the quick and standard gates passed on its commit, and the deep gate runs again on the merge to `main`.
 - **Deviations, recorded in the story PRs:**
   - **Story 1:**
     - The direct-save cases are in `tool-activity.test.ts`'s update-script block, not `artifact-writes.test.ts`.
@@ -476,7 +478,7 @@ Sprint-specific completion items:
     - The Assets tab is described under design.md's "Item rows".
 - **Unresolved issues, accepted (P2s left in the story PRs):**
   - Story 2: the in-lock recheck accepts any `panel_image` use (revisited in Sprint 011 Story 4); commit 1's subject is 54 characters; `assistant-scripts.ts` and `uses.ts` keep their own 100-use count (pre-existing).
-  - Story 3: replacing a base view with an existing image is refused as `in_other_sheet` when that base view's image is also in another person's sheet.
+  - Story 3: replacing a base view with an existing image is refused as `in_other_sheet` when that base view's image is also in another person's sheet. The twelfth P2 of the first review was not taken: one shared make-and-save step for generate-image and generate-sheet. The tools differ (one view per request with an identity input, against up to 10 images with `revises`), and they share the failure mapping, the part that must stay in step.
   - Story 4: with many full sheets, later subjects can lose their sheet in the listing (they stay items named by the subject); escape-heavy names could push the bare subject list past its bound.
   - Story 5: `workspaceSubjects` in `workspace-entries.ts` still parses the script itself rather than calling `currentSubjects` (pre-existing).
   - Story 6: a supplied presentation without `views` would show no views (nothing supplies one today); Assets decides emptiness from the rows it renders, while `subjectGroups.empty` counts every asset.
