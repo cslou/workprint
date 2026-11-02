@@ -8,3 +8,4 @@ export { createArtifactWriters, type ArtifactSaveWriter } from './writers.js';
 export { createVersionUses } from './uses.js';
 export { createStoryboardEdits } from './storyboard.js';
 export { createAssistantScripts, type AssistantScriptInput, type AssistantScriptSave, type AssistantScripts } from './assistant-scripts.js';
+export { createGeneratedImages, type GeneratedImageInput, type GeneratedImageSave, type GeneratedImages, type StoredImage } from './generated-images.js';

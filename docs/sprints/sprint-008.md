@@ -249,7 +249,7 @@ These tests use Docker, a browser build or paid calls. Each is listed once for t
     - publishes the bytes to private storage;
     - in one transaction, creates a new image artifact at version 1 with `createdBy: 'assistant'`, provenance `assistant`, media facts and the input version ids as dependencies;
     - in the same transaction, creates the video's `reference` use with state `draft`;
-    - returns `{ versionId, label, width, height }`, where the label is read-workspace's image name, for example "Image 2 · Version 1".
+    - returns `{ versionId, width, height }`. The tool (Story 3) takes the label, for example "Image 2 · Version 1", from read-workspace's naming of the saved image, since `application` can't import the agent's naming.
   - [ ] **Refusals.** A check failure (`invalid_input` or `unsupported`) saves nothing and leaves no stored object, cleaning up anything published. A missing or foreign video is not-found. The decode sandbox's `capacity` answer is waited out with bounded retries (up to 30 s) instead of failing.
   - [ ] **Input read.** `readImageInputs(account, video, versionIds)` in `apps/api/src/application/` returns each image as `{ versionId, dataUrl }`.
     - Only image versions this video uses (any use state) and this account owns, or built-ins, are returned.
@@ -263,8 +263,8 @@ These tests use Docker, a browser build or paid calls. Each is listed once for t
     - the same bytes as an upload are refused;
     - two `iTXt` chunks, a non-XMP keyword, a compressed chunk, or one over 4 KB are refused;
     - an `iTXt` after `IDAT` is refused.
-  - [ ] Unit tests for the save and input read with fakes for storage and the checker (no stack):
-    - **checker busy:** a decode that answers `capacity` once and then succeeds saves once; one that stays busy past 30 s fails with a readable error and saves nothing;
+  - [ ] Cases for the save and input read with a wrapped checker and storage, in the same integration run (the save needs the database):
+    - **checker busy:** a decode that answers `capacity` once and then succeeds saves once; one that stays busy past the wait bound fails with a readable error and saves nothing;
     - **tampered bytes:** stored bytes whose sha256 differs from the record give an error, not a data URL.
   - [ ] Integration cases in a new `describe` in `apps/api/test/integration/image-upload.test.ts`, with real storage and the real decode:
     - **save:** one artifact at version 1, `created_by = 'assistant'`, provenance `assistant`, a `draft` reference use, one stored object whose sha256 matches, the workspace lists it, and the `media` operation returns a signed URL for it. A `media_objects` row with both sources, or neither, is refused by the database;

@@ -56,3 +56,4 @@ export { withSavedWork, type SavedWorkApplication, type SavedWorkReads } from '.
 export { withStoryboardEdits, type StoryboardEditApplication } from './storyboard-edits.js';
 export { createWorkspaceReader, type OwnedWorkspace, type OwnedWorkspaceRead, type ReadOwnedWorkspace } from './workspace-reads.js';
 export { createAssistantScriptSaver, type AssistantScriptOutcome, type SaveAssistantScript } from './assistant-scripts.js';
+export { createGeneratedImageSaver, createImageInputReader, type GeneratedImageOutcome, type ImageInputsOutcome, type ReadImageInputs, type SaveGeneratedImage } from './generated-images.js';
