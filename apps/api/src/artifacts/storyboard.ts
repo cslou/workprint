@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
-import { idSchema, operations, savedStoryboardContentSchema, type OperationRequest, type OperationResponse, type Version } from '@workprint/contracts';
+import { idSchema, operations, savedReferenceContentSchema, savedStoryboardContentSchema, type OperationRequest, type OperationResponse, type Version } from '@workprint/contracts';
 import { transaction } from '../db/index.js';
 import { assertContentDependencies, parseContent } from './content.js';
 import { ArtifactError } from './errors.js';
@@ -8,6 +8,7 @@ import { canonicalJson } from './manual-content.js';
 import { publishVersion } from './publication.js';
 import { affectedVersions, advanceSelectionRevision, changedShots, selectionRevision, shotOrderChanged } from './selection.js';
 import { createArtifactStore } from './store.js';
+import { panelReferences, shotSubjects, storyboardDependencies } from './storyboard-dependencies.js';
 
 type Command = OperationRequest<'editStoryboard'>['body'];
 type Result = OperationResponse<'editStoryboard'>;
@@ -21,8 +22,11 @@ function editedPlan(base: Plan, shots: Command['shots']): Plan {
   const next = shots.map(shot => {
     const old = previous.get(shot.shotId);
     if (!old || shot.panels.length !== old.panels.length || new Set(shot.panels.map(panel => panel.panelId)).size !== shot.panels.length) throw new ArtifactError('invalid_input');
-    const panels = new Map(old.panels.map(panel => [panel.panelId, panel]));
-    return { shotId: shot.shotId, order: shot.order, intent: shot.intent ?? old.intent, panels: shot.panels.map(panel => {
+    // A person edits intent and panel text only; the assistant's Shot fields (framing, action, dialogue, camera note and
+    // subject references) are kept from the base unchanged.
+    const { panels: oldPanels, ...fields } = old;
+    const panels = new Map(oldPanels.map(panel => [panel.panelId, panel]));
+    return { ...fields, shotId: shot.shotId, order: shot.order, intent: shot.intent ?? old.intent, panels: shot.panels.map(panel => {
       const current = panels.get(panel.panelId);
       if (!current) throw new ArtifactError('invalid_input');
       return { panelId: panel.panelId, order: panel.order, description: panel.description ?? current.description, references: [...panel.references] };
@@ -69,10 +73,23 @@ export function createStoryboardEdits(pool: Pool, checkOwnedConversation: Parame
         throw new ArtifactError('stale_revision');
       }
       const before = savedStoryboardContentSchema.parse(current.content);
-      const content = editedPlan(savedStoryboardContentSchema.parse(base.content), body.shots);
+      const basePlan = savedStoryboardContentSchema.parse(base.content);
+      const content = editedPlan(basePlan, body.shots);
       if (canonicalJson(content) === canonicalJson(before)) throw new ArtifactError('invalid_input');
-      const references = [...new Set(content.shots.flatMap(shot => shot.panels.flatMap(panel => panel.references)))];
-      const dependencies = [content.sourceScriptVersionId, ...references];
+      // The base's Shot-subject sheets carry over unchanged. A base dependency that wasn't a panel reference is one of
+      // them; a panel reference this edit drops stays only when it is a sheet of a subject the Shots still name.
+      const references = panelReferences(content), baseLinks = new Set(panelReferences(basePlan)), subjects = new Set(shotSubjects(content));
+      const sheets: string[] = [];
+      for (const id of base.dependencies) {
+        if (id === content.sourceScriptVersionId || references.includes(id)) continue;
+        if (!baseLinks.has(id)) sheets.push(id);
+        else if (subjects.size) {
+          const dropped = await reads.version(account, id);
+          const sheet = 'content' in dropped ? savedReferenceContentSchema.safeParse(dropped.content).data : undefined;
+          if (sheet && subjects.has(sheet.subject.id)) sheets.push(id);
+        }
+      }
+      const dependencies = storyboardDependencies(content, sheets);
       if (dependencies.length > 100) throw new ArtifactError('invalid_input');
       const resolved = new Map<string, Version>();
       for (const id of dependencies) resolved.set(id, await reads.version(account, id));

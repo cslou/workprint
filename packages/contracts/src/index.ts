@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { contentSchema, exportSchema, generationRequestSchema, generationStatusSchema, idSchema, intendedUseSchema, kindSchema, proposalSchema, questionSchema, revisionSchema, storyboardEditSchema, useBindingSchema, useSchema, versionSchema, workspaceSchema } from './models.js';
 export * from './models.js';
 export * from './saved-content.js';
+export * from './shot-fields.js';
 export * from './response-limits.js';
 export * from './upload-limits.js';
 export * from './asset-labels.js';

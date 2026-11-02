@@ -9,6 +9,7 @@ export { createVersionUses } from './uses.js';
 export { createStoryboardEdits } from './storyboard.js';
 export { createAssistantScripts, type AssistantScriptInput, type AssistantScriptSave, type AssistantScripts } from './assistant-scripts.js';
 export { ScriptSubjectsError, type SubjectInput } from './script-subjects.js';
+export { createAssistantStoryboards, maxShotPanels, StoryboardSaveError, type AssistantPanelInput, type AssistantShotInput, type AssistantStoryboardInput, type AssistantStoryboardSave, type AssistantStoryboards } from './assistant-storyboards.js';
 export { createAssistantReferences, maxSheetViewName, maxSheetViews, SheetSaveError, type AssistantReferences, type AssistantSheetInput, type AssistantSheetSave, type SheetViewInput } from './assistant-references.js';
 export { createGeneratedImages, type GeneratedImageInput, type GeneratedImageSave, type GeneratedImages, type StoredImage } from './generated-images.js';
 export { createGeneratedVideos, type GeneratedVideoInput, type GeneratedVideoSave, type GeneratedVideos, type WithinSave } from './generated-videos.js';
