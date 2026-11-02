@@ -24,7 +24,7 @@ function harness(meta: () => Promise<ImageResult>, outcomes: (GeneratedImageOutc
       const kind = outcomes[calls.saves++] ?? 'saved';
       if (kind !== 'saved') return { kind };
       const versionId = randomUUID(); saved.push(versionId);
-      return { kind, versionId, width: 64, height: 48 };
+      return { kind, versionId, width: 64, height: 48, subjectLeft: false };
     },
     images: { generate: async () => { calls.meta++; return meta(); }, edit: async () => { calls.meta++; return meta(); } },
   };

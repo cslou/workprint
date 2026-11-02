@@ -3,9 +3,12 @@ import { MetaImageError } from '../generation/index.js';
 import { logFailure } from './failure-log.js';
 import type { SavedWorkReads } from './saved-reads.js';
 
-/** What saving an assistant-made image did. `refused` means the bytes didn't pass the media checks. */
+/**
+ * What saving an assistant-made image did. `refused` means the bytes didn't pass the media checks. `subjectLeft`
+ * means the subject asked for left the script while the image was made, so it was saved unfiled.
+ */
 export type GeneratedImageOutcome =
-  | { kind: 'saved'; versionId: string; width: number; height: number }
+  | { kind: 'saved'; versionId: string; width: number; height: number; subjectLeft: boolean }
   | { kind: 'refused' } | { kind: 'not_found' } | { kind: 'unavailable' };
 /** Account and video come from trusted server context (an admitted native run), never from model arguments. */
 export type SaveGeneratedImage = (accountId: string, videoId: string, input: GeneratedImageInput, signal?: AbortSignal) => Promise<GeneratedImageOutcome>;
@@ -33,8 +36,8 @@ export const saveFailure = (outcome: Exclude<GeneratedImageOutcome, { kind: 'sav
 export function createGeneratedImageSaver(save: (account: string, conversation: string, input: GeneratedImageInput, signal?: AbortSignal) => Promise<GeneratedImageSave>): SaveGeneratedImage {
   return async (accountId, videoId, input, signal) => {
     try {
-      const { version } = await save(accountId, videoId, input, signal);
-      return { kind: 'saved', versionId: version.id, width: version.media.width, height: version.media.height };
+      const { version, subjectLeft } = await save(accountId, videoId, input, signal);
+      return { kind: 'saved', versionId: version.id, width: version.media.width, height: version.media.height, subjectLeft };
     } catch (error) {
       if (error instanceof UploadError && (error.code === 'invalid_input' || error.code === 'unsupported')) return { kind: 'refused' };
       if (error instanceof UploadError && error.code === 'not_found') return { kind: 'not_found' };

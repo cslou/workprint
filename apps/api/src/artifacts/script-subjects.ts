@@ -1,4 +1,5 @@
-import { characterSubjectsMatch, newSubjectId, scriptSubjects, subjectNameKey, type ScriptSubject, type SubjectKind, type scriptBodySchema, type savedScriptContentSchema } from '@workprint/contracts';
+import { characterSubjectsMatch, newSubjectId, savedScriptContentSchema, scriptSubjects, subjectNameKey, type ScriptSubject, type SubjectKind, type scriptBodySchema } from '@workprint/contracts';
+import type { PoolClient } from 'pg';
 import type { z } from 'zod';
 
 /** A subject as the assistant sends it: an empty or whitespace id means a new subject. */
@@ -53,4 +54,11 @@ export function withSubjects(body: ScriptBody, base: SavedScript | null, subject
   const named = new Set(body.scenes.flatMap(scene => scene.characters.map(subjectNameKey)));
   if (readable.some(subject => subject.kind === 'character' && !kept.has(subject.id) && named.has(subjectNameKey(subject.name)))) throw new ScriptSubjectsError('differ');
   return { ...body, subjects: resolved, scenes: body.scenes.map(scene => ({ ...scene, characters })) };
+}
+
+/** The subjects of the script the video uses now, read inside the caller's transaction; null when it has no script. */
+export async function scriptSubjectsNow(client: Pick<PoolClient, 'query'>, account: string, conversation: string): Promise<ScriptSubject[] | null> {
+  const script = (await client.query<{ content: unknown }>(`SELECT v.content FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.version_owner_id AND v.version_id=u.version_id
+    WHERE u.owner_id=$1 AND u.conversation_id=$2 AND u.purpose='script'`, [account, conversation])).rows[0];
+  return script ? scriptSubjects(savedScriptContentSchema.parse(script.content)) : null;
 }

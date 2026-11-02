@@ -39,6 +39,19 @@ describe('application migrations and database roles', { timeout: 180000 }, () =>
     assert.deepEqual((await query(db.setupUrl, nativeCatalog)).rows, nativeBefore);
   });
 
+  test('a use can be filed under a subject id of 1 to 200 characters, which the serving role may change', async () => {
+    const column = (await query(db.setupUrl, "SELECT data_type,is_nullable FROM information_schema.columns WHERE table_schema='artifacts' AND table_name='conversation_uses' AND column_name='subject_id'")).rows;
+    assert.deepEqual(column, [{ data_type: 'text', is_nullable: 'YES' }]);
+    assert.equal((await query(db.servingUrl, "SELECT has_column_privilege('artifacts.conversation_uses','subject_id','UPDATE') AS allowed")).rows[0]?.allowed, true);
+    // Only the column's own check is exercised: replica mode skips the version-link trigger and foreign keys, and nothing is kept.
+    const insert = (subject: string) => `BEGIN; SET LOCAL session_replication_role = replica;
+      INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,version_owner_id,binding,purpose,state,subject_id)
+      VALUES('owner','video','use','version','owner','{"purpose":"reference"}','reference','draft','${subject}'); ROLLBACK;`;
+    for (const subject of ['', 'x'.repeat(201)]) await assert.rejects(query(db.adminUrl, insert(subject)), { code: '23514', constraint: 'conversation_uses_subject_id_check' }, `${subject.length} characters`);
+    await query(db.adminUrl, insert('mara'));
+    await query(db.adminUrl, insert('x'.repeat(200)));
+  });
+
   test('the serving role cannot change schema, rewrite immutable rows or escalate', async () => {
     assert.equal((await query(db.servingUrl, 'SELECT count(*)::int AS count FROM artifacts.versions')).rows[0]?.count, 0);
     for (const sql of [

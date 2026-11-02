@@ -37,7 +37,7 @@ function harness(options: Options = {}) {
       const kind = failing.shift();
       if (kind) return { kind };
       const versionId = randomUUID(); images.push(versionId); calls.inputs.push([...image.inputs]);
-      return { kind: 'saved', versionId, width: 64, height: 48 };
+      return { kind: 'saved', versionId, width: 64, height: 48, subjectLeft: false };
     },
     sheets: {
       save: async (_account, _video, input) => { calls.saves.push(input); return options.save ?? { kind: 'saved', versionId: randomUUID(), revision: 1, subjectName: 'Mara' }; },

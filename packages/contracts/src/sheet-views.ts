@@ -1,5 +1,5 @@
 import { savedReferenceContentSchema, savedScriptContentSchema } from './saved-content.js';
-import { scriptSubjects } from './script-subjects.js';
+import { scriptSubjects, type ScriptSubject } from './script-subjects.js';
 
 type VersionLike = Readonly<{ id: string; artifactId: string; kind: string; content?: unknown }>;
 type WorkspaceLike = Readonly<{ script: Readonly<{ version: VersionLike }> | null; assets: readonly Readonly<{ version: VersionLike }>[] }>;
@@ -9,10 +9,15 @@ export type CurrentSheet = Readonly<{ versionId: string; artifactId: string; sub
 /** The sheet an image version is in, and its view there. */
 export type SheetViewName = Readonly<{ sheetArtifactId: string; sheetVersionId: string; subjectId: string; subjectName: string; view: string }>;
 
+/** The current script's subjects in Assets order; none when the video has no script or it doesn't parse. */
+export function currentSubjects(workspace: Pick<WorkspaceLike, 'script'>): ScriptSubject[] {
+  const script = workspace.script && 'content' in workspace.script.version ? savedScriptContentSchema.safeParse(workspace.script.version.content) : null;
+  return script?.success ? scriptSubjects(script.data) : [];
+}
+
 /** The video's current sheets in workspace order. A sheet whose content doesn't parse is not a sheet. */
 export function currentSheets(workspace: WorkspaceLike): CurrentSheet[] {
-  const script = workspace.script && 'content' in workspace.script.version ? savedScriptContentSchema.safeParse(workspace.script.version.content) : null;
-  const names = new Map((script?.success ? scriptSubjects(script.data) : []).map(subject => [subject.id, subject.name]));
+  const names = new Map(currentSubjects(workspace).map(subject => [subject.id, subject.name]));
   return workspace.assets.flatMap(({ version }) => {
     if (version.kind !== 'reference' || !('content' in version)) return [];
     const sheet = savedReferenceContentSchema.safeParse(version.content);

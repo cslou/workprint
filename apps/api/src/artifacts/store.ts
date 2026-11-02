@@ -98,7 +98,7 @@ export function createArtifactStore(pool: Pool, checkOwnedConversation: Ownershi
     // One snapshot: the projected uses and selection revision always describe the same committed state.
     const { rows, revision } = await transaction(pool, async client => {
       await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY');
-      const rows = (await client.query<Row & { use_id: string; binding: unknown; state: string }>(`SELECT ${columns},u.use_id,u.binding,u.state
+      const rows = (await client.query<Row & { use_id: string; binding: unknown; state: string; subject_id: string | null }>(`SELECT ${columns},u.use_id,u.binding,u.state,u.subject_id
         FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.version_owner_id AND v.version_id=u.version_id
         WHERE u.owner_id=$1 AND u.conversation_id=$2 ORDER BY u.created_at,u.use_id LIMIT 101`, [account, conversation])).rows;
       return { rows, revision: await selectionRevision(client, account, conversation) };
@@ -115,7 +115,8 @@ export function createArtifactStore(pool: Pool, checkOwnedConversation: Ownershi
     const work = rows.filter(row => !isClip(row)).map(row => {
       const use = useSchema.safeParse({ id: row.use_id, versionId: row.version_id, binding: row.binding, state: row.state });
       if (!use.success) throw new ArtifactError('integration_failure');
-      return { version: project(row), use: use.data, state: use.data.state === 'approved' ? 'Ready' as const : 'Draft' as const };
+      // The script subject an image is filed under, kept on its use.
+      return { version: project(row), use: use.data, state: use.data.state === 'approved' ? 'Ready' as const : 'Draft' as const, ...(row.subject_id ? { subjectId: row.subject_id } : {}) };
     });
     const script = work.find(item => item.use.binding.purpose === 'script') ?? null;
     const board = work.find(item => item.use.binding.purpose === 'storyboard') ?? null;

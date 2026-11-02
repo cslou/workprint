@@ -44,7 +44,8 @@ const requestFields = { ...jobFields, batchId: idSchema, proposalId: idSchema };
 const videoRequest = z.strictObject({ purpose: z.literal('video'), ...jobFields, revision: revisionSchema });
 export const generationRequestSchema = z.discriminatedUnion('purpose', [targetVariants[0].extend(requestFields), targetVariants[1].extend(requestFields), targetVariants[2].extend(requestFields), videoRequest]);
 export const exportSchema = z.strictObject({ id: idSchema, status: z.enum(['queued', 'processing', 'succeeded', 'failed', 'cancelled']), capturedSelectionRevision: revisionSchema, current: z.boolean(), sources: z.array(z.strictObject({ shotId: idSchema, versionId: idSchema, order })), compatibility: z.strictObject({ compatible: z.boolean(), issues: z.array(z.strictObject({ versionId: idSchema, message: z.string().min(1) })) }), failureReason: z.string().min(1).optional(), outputVersionId: idSchema.optional() });
-const work = z.strictObject({ version: versionSchema, use: useSchema.nullable(), state: z.enum(['Draft', 'Ready']) });
+// `subjectId` is the script subject an image is filed under, kept on its use.
+const work = z.strictObject({ version: versionSchema, use: useSchema.nullable(), state: z.enum(['Draft', 'Ready']), subjectId: idSchema.optional() });
 const panel = z.strictObject({ panelId: idSchema, order, description: z.string(), references: z.array(idSchema), candidateImageVersions: z.array(versionSchema), approvedImageVersionId: idSchema.nullable() });
 // Additive: exact owned videos bound to this Shot (uploads or earlier choices). Absence means none were projected.
 const shot = z.strictObject({ shotId: idSchema, order, intent: z.string().optional(), panels: z.array(panel), chosenVideoVersionId: idSchema.nullable(), candidateVideoVersions: z.array(versionSchema).optional() });

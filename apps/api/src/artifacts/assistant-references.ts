@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import type { z } from 'zod';
-import { idSchema, savedReferenceContentSchema, savedScriptContentSchema, scriptSubjects, sheetViews, useSchema, type Version } from '@workprint/contracts';
+import { idSchema, savedReferenceContentSchema, sheetViews, useSchema, type Version } from '@workprint/contracts';
 import { transaction } from '../db/index.js';
 import { parseContent } from './content.js';
 import { ArtifactError } from './errors.js';
 import { lockPublicationOwner, publishVersion } from './publication.js';
 import { verifiedMedia } from './references.js';
+import { scriptSubjectsNow } from './script-subjects.js';
 import { createArtifactStore } from './store.js';
 import { useRoom as roomLeft } from './use-room.js';
 import { usedImageVersions } from './workspace-images.js';
@@ -107,10 +108,8 @@ export function createAssistantReferences(pool: Pool, checkOwnedConversation: Ow
 
       return transaction(pool, async client => {
         await lockPublicationOwner(client, account);
-        const script = (await client.query<{ content: unknown }>(`SELECT v.content FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.version_owner_id AND v.version_id=u.version_id
-          WHERE u.owner_id=$1 AND u.conversation_id=$2 AND u.purpose='script'`, [account, conversation])).rows[0];
-        if (!script) throw new SheetSaveError('no_script');
-        const subjects = scriptSubjects(savedScriptContentSchema.parse(script.content));
+        const subjects = await scriptSubjectsNow(client, account, conversation);
+        if (!subjects) throw new SheetSaveError('no_script');
         const subject = subjects.find(candidate => candidate.id === input.subjectId);
         if (!subject) throw new SheetSaveError('not_in_script');
         const sheets = await currentSheets(client, account, conversation);
