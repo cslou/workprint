@@ -268,9 +268,9 @@ Deprioritized: everything here waits until the Next items are done (Lou, 2026-11
 - References: Former Sprint 006 plan, Story 3; Sprint 006 Story 2.
 
 ### B-036 — Journal assistant saves for downstream revalidation
-- Problem: Sprint 007's update-script tool saves a script version and moves the use, but writes no `artifacts.commands` or `manual_changes` row, which human saves write. Nothing reads the journal yet, so nothing breaks today. A later tool that revalidates downstream work after a change (storyboard from script, B-017 onward) would miss assistant changes.
+- Problem: Sprint 007's update-script tool saves a script version and moves the use, but writes no `artifacts.commands` or `manual_changes` row, which human saves write. Sprint 008's generate-image edit with `revises` (PR #93) moves an image's reference use the same way, without the `use_changes` row a human "Use this version" writes. Nothing reads the journal yet, so nothing breaks today. A later tool that revalidates downstream work after a change (storyboard from script, B-017 onward) would miss assistant changes.
 - Outcome: Assistant saves record what they replaced, in the same shape later revalidation reads for human saves. Pass: a downstream check sees an assistant script change the same way it sees a human one.
-- References: Sprint 007 Story 2 (PR #80) recorded deviations; `apps/api/src/artifacts/assistant-scripts.ts`; `apps/api/src/artifacts/writers.ts`.
+- References: Sprint 007 Story 2 (PR #80) recorded deviations; `apps/api/src/artifacts/assistant-scripts.ts`; `apps/api/src/artifacts/generated-images.ts` (the `revises` save); `apps/api/src/artifacts/uses.ts` (`upstreamAffected`); `apps/api/src/artifacts/writers.ts`.
 
 ### B-035 — Clean history for retried and stopped replies
 - Problem: In Sprint 006, Retry may resend the user's message if Mastra 1.79 cannot regenerate a reply, so history can show the message twice. A stopped reply is marked interrupted only live; after a reload it shows as plain partial text. Lou accepted both for the MVP (2026-11-01).
