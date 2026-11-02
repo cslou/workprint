@@ -33,6 +33,8 @@ export interface AgentTool {
   readonly phraseFor?: (input: unknown) => string | undefined;
   /** Short summary for the done line, derived from the tool's own result. */
   readonly doneSummary?: (output: unknown) => string | undefined;
+  /** Saved image version ids to show under the done line, derived from the tool's own result. */
+  readonly shownImages?: (output: unknown) => readonly string[] | undefined;
   readonly execute: (input: unknown, context: ToolContext) => Promise<unknown>;
 }
 
@@ -44,13 +46,15 @@ export function defineTool<Schema extends z.ZodType, Output>(tool: {
   phrase?: string;
   phraseFor?: (input: z.infer<Schema>) => string;
   doneSummary?: (output: Output) => string | undefined;
+  shownImages?: (output: Output) => readonly string[] | undefined;
   execute: (input: z.infer<Schema>, context: ToolContext) => Promise<Output>;
 }): AgentTool {
-  const { doneSummary, execute, phraseFor, ...rest } = tool;
+  const { doneSummary, execute, phraseFor, shownImages, ...rest } = tool;
   return {
     ...rest,
     ...(phraseFor ? { phraseFor: (input: unknown) => { const parsed = tool.inputSchema.safeParse(input); return parsed.success ? phraseFor(parsed.data) : undefined; } } : {}),
     ...(doneSummary ? { doneSummary: (output: unknown) => doneSummary(output as Output) } : {}),
+    ...(shownImages ? { shownImages: (output: unknown) => shownImages(output as Output) } : {}),
     execute: (input, context) => execute(tool.inputSchema.parse(input), context),
   };
 }
