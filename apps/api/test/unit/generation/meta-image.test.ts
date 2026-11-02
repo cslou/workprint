@@ -103,6 +103,20 @@ test('Stop aborts as aborted, and a request that never answers times out as unav
   await refusal(client().generate({ prompt: 'x' }, AbortSignal.abort()), 'aborted');
 });
 
+test('a redirect or an answer larger than the images asked for fails without being read', async () => {
+  const answering = (response: () => Response) => createMetaImageClient({ apiKey: key, baseUrl: 'https://meta.invalid/v1', retryDelayMs: 1, fetch: async (_url, init) => {
+    assert.equal(init?.redirect, 'error', 'redirects are refused, so the key is never sent elsewhere');
+    return response();
+  } });
+  await refusal(answering(() => { throw new TypeError('redirect refused'); }).generate({ prompt: 'x' }), 'failed');
+  // One image's worth of base64 is about 14 MiB; this declares far more.
+  await refusal(answering(() => new Response('{}', { status: 200, headers: { 'content-length': String(64 * 1024 * 1024) } })).generate({ prompt: 'x' }), 'failed');
+  let pulled = 0;
+  const endless = new ReadableStream<Uint8Array>({ pull: controller => { pulled++; controller.enqueue(new Uint8Array(1024 * 1024)); } });
+  await refusal(answering(() => new Response(endless, { status: 200 })).generate({ prompt: 'x' }), 'failed');
+  assert.ok(pulled < 20, 'an undeclared body stops at the limit');
+});
+
 test('no error carries the key, the prompt or image bytes', async () => {
   const prompt = 'harmless-prompt-sentinel', bytes = testPng({ seed: 99 }).toString('base64');
   const failures = [
