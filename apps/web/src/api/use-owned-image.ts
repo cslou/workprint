@@ -1,9 +1,12 @@
-import { useEffect,useState } from 'react';
+import { useEffect,useMemo,useState } from 'react';
 import { readPrivateImage } from '@workprint/api-client';
 import type { Version } from '@workprint/contracts';
 import type { BrowserClient } from './client.js';
 
-export function useOwnedImage(connection:BrowserClient|undefined,version:Version|null){
+export function useOwnedImage(connection:BrowserClient|undefined,current:Version|null){
+  // A version never changes, so the first object seen for an id is kept: each workspace refresh hands over a new
+  // object for the same version, which would otherwise read the image again and blank it meanwhile.
+  const version=useMemo(()=>current,[current?.id]);
   const client=connection?.kind==='configured'?connection.client:null,media=version&&(version.kind==='image'||version.kind==='video')?version.media:null;
   const [revision,setRevision]=useState(0);const [snapshot,setSnapshot]=useState<{id:string;revision:number;client:typeof client;phase:'loading'|'ready'|'error'|'expired';url?:string}>();
   useEffect(()=>{

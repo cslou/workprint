@@ -70,7 +70,7 @@ function withText(parts: readonly LivePart[], text: string): LivePart[] {
 }
 /** Adds a tool's line, or moves its existing line on (running → done or failed). */
 function withActivity(parts: readonly LivePart[], chunk: NativeToolActivityChunk, now: number): LivePart[] {
-  const activity: NativeToolActivity = { toolCallId: chunk.toolCallId, tool: chunk.tool, phrase: chunk.phrase, state: chunk.state, ...(chunk.summary !== undefined ? { summary: chunk.summary } : {}) };
+  const activity: NativeToolActivity = { toolCallId: chunk.toolCallId, tool: chunk.tool, phrase: chunk.phrase, state: chunk.state, ...(chunk.summary !== undefined ? { summary: chunk.summary } : {}), ...(chunk.images !== undefined ? { images: [...chunk.images] } : {}) };
   const index = parts.findIndex(part => part.kind === 'activity' && part.activity.toolCallId === activity.toolCallId);
   if (index < 0) return [...parts, { kind: 'activity', activity, startedAt: now }];
   return parts.map((part, at) => at === index && part.kind === 'activity' ? { ...part, activity } : part);

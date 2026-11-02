@@ -6,10 +6,19 @@ export const genericToolPhrase = 'Working…';
 /** running: the tool is executing. done: it returned. failed: it threw. incomplete: it never finished (for example, Stop). */
 export type ToolActivityState = 'running' | 'done' | 'failed' | 'incomplete';
 /** The only tool facts that leave the server: never arguments, results or errors. */
-export type ToolActivity = { toolCallId: string; tool: string; phrase: string; state: ToolActivityState; summary?: string };
+export type ToolActivity = { toolCallId: string; tool: string; phrase: string; state: ToolActivityState; summary?: string; images?: string[] };
 
 const callId = /^[A-Za-z0-9_.:-]{1,128}$/;
 const summaryCharacters = 60;
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Only distinct saved version ids (UUIDs), at most 10, ever reach the browser as shown images. */
+const maxShownImages = 10;
+
+function shown(tool: AgentTool, output: unknown): string[] {
+  let ids: unknown;
+  try { ids = tool.shownImages?.(output); } catch { ids = undefined; }
+  return Array.isArray(ids) ? [...new Set(ids.filter((id): id is string => typeof id === 'string' && uuid.test(id)))].slice(0, maxShownImages) : [];
+}
 
 /**
  * Projects one native tool call to its safe activity line, looking up the phrase and done summary in
@@ -23,7 +32,10 @@ export function projectToolActivity(registry: readonly AgentTool[], call: { tool
   // A phrase from arguments is bounded like a summary, so no tool can echo argument text at length.
   if (typeof phrase !== 'string' || !phrase.trim() || graphemes(phrase).length > summaryCharacters) phrase = undefined;
   const activity: ToolActivity = { toolCallId: call.toolCallId, tool: tool.id, phrase: phrase ?? tool.phrase ?? genericToolPhrase, state: call.state };
-  if (call.state !== 'done' || !tool.doneSummary) return activity;
+  if (call.state !== 'done') return activity;
+  const images = shown(tool, call.output);
+  if (images.length) activity.images = images;
+  if (!tool.doneSummary) return activity;
   let summary: string | undefined;
   try { summary = tool.doneSummary(call.output); } catch { summary = undefined; }
   const flat = typeof summary === 'string' ? summary.replace(/\s+/g, ' ').trim() : '';

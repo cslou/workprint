@@ -392,6 +392,12 @@ Each component has the same anchor here and on the [Components page](brand-book/
   - A done line with no summary shows "Done".
   - A tool that failed, or never finished, shows its phrase without the ellipsis, then "· didn’t finish". It claims no result.
   - Saved history keeps done and didn't-finish lines, with no elapsed time.
+- **Shown images (Sprint 008 Story 4):** when the user asked for an image directly, the done "Saved …" line shows each saved image under it. Preview: [`chat-states/generated-image.html`](chat-states/generated-image.html) at 1440 and 390, approved under Lou's delegation on 2026-11-02; Lou ratifies it at QA.
+  - Each image is at most 240px tall, keeps its aspect ratio (never cropped beyond its own shape) and has `--radius-lg` with a 1px default border on `--color-bg-sunken`. Several images wrap with 8px gaps.
+  - Its box takes the image's shape before it loads, so a late image never moves the thread.
+  - The alt text is the image's name, as the assistant names it ("Image 2 · Version 1"). Clicking opens the media viewer.
+  - A failed read shows "This image couldn’t be shown" in 13px `--color-text-subtle`, and the line stays.
+  - A line the user didn't ask to see, or a refusal, shows no image.
 
 ### Chat box
 
