@@ -120,6 +120,20 @@ export function createGenerationJobs(pool: Pool) {
       const jobs = rows.slice(0, options.limit).map(job);
       return { jobs, nextCursor: rows.length > options.limit ? jobs.at(-1)!.id : null };
     },
+    /**
+     * The one-time pass at server start, before turns are served: no process is waiting on any job now, so a
+     * `running` job becomes `interrupted` (its task id kept) and a `submitting` one failed `outcome_unknown`.
+     * Nothing is polled or resubmitted. Without prepared application storage there are no jobs to mark.
+     */
+    async interruptWaiting(): Promise<{ interrupted: number; failed: number }> {
+      const prepared = await pool.query<{ ready: boolean }>("SELECT to_regclass('generation.requests') IS NOT NULL AS ready");
+      if (!prepared.rows[0]?.ready) return { interrupted: 0, failed: 0 };
+      const result = await pool.query<{ interrupted: number; failed: number }>(
+        `WITH waiting AS (UPDATE generation.requests SET status='interrupted',revision=revision+1,updated_at=clock_timestamp() WHERE status='running' RETURNING 1),
+              unsent AS (UPDATE generation.requests SET status='failed',failure_reason='outcome_unknown',revision=revision+1,updated_at=clock_timestamp() WHERE status='submitting' RETURNING 1)
+         SELECT (SELECT count(*) FROM waiting)::int AS interrupted,(SELECT count(*) FROM unsent)::int AS failed`);
+      return result.rows[0] ?? { interrupted: 0, failed: 0 };
+    },
   });
 }
 export type GenerationJobs = ReturnType<typeof createGenerationJobs>;

@@ -48,6 +48,13 @@ export async function createBackend(routes: ApiRoute[] = [], turns?: TurnComposi
     throw new Error('Serving storage unavailable or privileged; prepare storage separately and use restricted DATABASE_URL');
   }
   const jobs = createGenerationJobs(pool);
+  try {
+    // One pass before any turn is served: nothing waits on a job from an earlier process.
+    await jobs.interruptWaiting();
+  } catch {
+    objects?.close(); await media?.close(); await pool.end();
+    throw new Error('Saved generation jobs unavailable at startup');
+  }
   const tools = turns ? turns.tools ?? productionTools : [];
   const storage = new PostgresStore({ id: 'workprint-native', schemaName: 'mastra', disableInit: true, pool });
   const application = createApplication({ checkOwnedConversation: createOwnedConversationCheck(storage) });

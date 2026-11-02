@@ -116,3 +116,15 @@ test('saved video jobs move only along their closed transitions', { timeout: 120
     assert.equal((await pool.query("SELECT count(*)::int AS n FROM artifacts.versions WHERE owner_id=$1 AND kind='video'", [owner])).rows[0].n, 1, 'a resume never saves a second clip');
   });
 });
+
+test('the start pass interrupts running jobs and fails submitting ones, leaving finished jobs', { timeout: 120000 }, async t => {
+  const { pool, jobs } = await jobStore(t);
+  const version = await transaction(pool, client => clip(client));
+  const running = await seeded(pool, 'running'), submitting = await seeded(pool, 'submitting'), succeeded = await seeded(pool, 'succeeded', 0, version.id);
+  assert.deepEqual(await jobs.interruptWaiting(), { interrupted: 1, failed: 1 });
+  const state = async (id: string) => { const job = await jobs.get(owner, id); return [job.status, job.failureReason, job.taskId !== undefined]; };
+  assert.deepEqual(await state(running), ['interrupted', undefined, true]);
+  assert.deepEqual(await state(submitting), ['failed', 'outcome_unknown', false]);
+  assert.deepEqual(await state(succeeded), ['succeeded', undefined, true]);
+  assert.deepEqual(await jobs.interruptWaiting(), { interrupted: 0, failed: 0 }, 'one pass; nothing is polled or resubmitted');
+});
