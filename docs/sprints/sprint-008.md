@@ -524,7 +524,7 @@ For descriptive-only work, use editorial review and applicable existing checks. 
 - **QA follow-up (Lou's QA at `9d611b3`, 2026-11-02):** generating, Assets and editing worked. Four issues were fixed in two PRs into `sprint-008`, each reviewed at 4/5 or better with no open P0/P1:
   - **"Image service unavailable" on three images**, and **a third image not shown, none after a refresh:** server storage and browser reads both refused past two at once, and every image, including those in the hidden Assets panel, loaded together. Fixed in #92: bounded queues on both sides, lazy loading near view and one shared copy per version per session. The upload confirm now waits out a busy checker, which closes the accepted issue above.
   - **Draft badge in Assets:** images and videos show no status pill until they can be approved or chosen (#92, `design.md`).
-  - **Everything "Version 1":** an edit of one image is now its next version, with history in the Assets viewer. Variations stay separate images until the looks picker (Sprint 012). Fixed in `feat/008-image-versions`.
+  - **Everything "Version 1":** an edit of one image is now its next version, with history in the Assets viewer. Variations stay separate images until the looks picker (Sprint 012). Fixed in #93.
   - **Also in #92:** chat and Assets use one name per image, a server that can't save images makes no paid call, a repeated input is read once, the Meta fetch refuses redirects and oversized bodies, and the flaky pending-dot journey that failed #91's deep pre-merge waits for the hold.
   - **Backlog, after video generation (Lou):** small previews (B-038) and caching across reloads (B-039).
 - **New Dependencies:** None.
