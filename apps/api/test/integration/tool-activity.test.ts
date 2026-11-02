@@ -358,3 +358,22 @@ test('generate-image makes images with Meta and saves each as a draft image of t
     assert.equal((await made(video)).length, 3);
   });
 });
+
+// Composition without storage or the media checker supplies no image client: a paid image would be lost, so none is asked for.
+test('generate-image on a server that can\'t save images refuses before any call to Meta', { timeout: 300000 }, async t => {
+  const provider = await scriptedProvider(); t.after(provider.close);
+  const meta = await metaImageFake(); t.after(meta.close);
+  const fixture = await accountBrowserFixture({ artifacts: true, composition: chatComposition(provider, {}, { url: meta.url }) });
+  t.after(fixture.close);
+  const user = await fixture.auth.createAccount();
+  const client = nativeTurnClient(fixture.apiOrigin, await fixture.accessToken(user), user.id);
+  const video = await client.newVideo();
+  provider.script({ toolCalls: [{ name: 'generate-image', args: { prompt: 'A quiet gallery bench' } }] }, { text: ['Done'] });
+  const turn = await client.turn(video, 'Make an image');
+  assert.ok(completed(turn), JSON.stringify(turn.terminal));
+  const content = (provider.requests[1]!.body as { messages: { role: string; content: unknown }[] }).messages.findLast(message => message.role === 'tool')?.content;
+  const result = (typeof content === 'string' ? JSON.parse(content) : content) as ImageResult;
+  assert.ok(!result.made && result.reason === 'unsaveable', JSON.stringify(result));
+  assert.equal(meta.requests.length, 0);
+  assert.deepEqual(turn.chunks.filter(chunk => chunk.type === 'tool-activity').at(-1)?.payload?.summary, 'Not made: images can’t be saved on this server');
+});
