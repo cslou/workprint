@@ -3,6 +3,7 @@ import { contentSchema, exportSchema, generationRequestSchema, generationStatusS
 export * from './models.js';
 export * from './saved-content.js';
 export * from './shot-fields.js';
+export * from './panel-image.js';
 export * from './response-limits.js';
 export * from './upload-limits.js';
 export * from './asset-labels.js';
