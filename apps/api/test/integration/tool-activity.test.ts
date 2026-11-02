@@ -258,6 +258,16 @@ test('update-script saves the video\'s current script as a draft, and never over
     assert.equal(uses.rowCount, 1);
   });
 
+  await t.test('a base lookup that fails is ignored on a first save, but makes a save on a scripted video unavailable', async () => {
+    // Ownership of the base's original video is unavailable; the target video is still owned.
+    const flaky = createAssistantScriptSaver(createAssistantScripts(pool, async (account, conversation) => conversation === video ? { kind: 'unavailable', reason: 'native_storage' } : check(account, conversation)).save);
+    const fresh = await client(owner).newVideo();
+    const saved = await flaky(owner.id, fresh, { baseVersionId: second, content: script('Mara wades in.') });
+    assert.ok(saved.kind === 'saved' && saved.revision === 1, JSON.stringify(saved));
+    assert.deepEqual(await flaky(owner.id, fresh, { baseVersionId: second, content: script('Mara wades back.') }), { kind: 'unavailable' });
+    assert.equal(await versions(owner.id, fresh), 1); assert.deepEqual(await current(fresh), [saved.versionId, saved.versionId, 'draft']);
+  });
+
   await t.test('the base is the version in use: after Use this version on v1, v2 is stale and v1 saves version 3', async () => {
     await createVersionUses(pool, check).useVersion(owner.id, video, { operationId: randomUUID(), versionId: first, purpose: 'script' });
     assert.deepEqual(await saveScript(owner.id, video, { baseVersionId: second, content: script('Mara turns back.') }), { kind: 'stale' });

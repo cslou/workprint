@@ -116,7 +116,8 @@ try {
       assert.ok(lines.length, 'the model declined the update-script tool twice');
       assert.ok(completed(turn), `turn did not complete: ${turn.terminal?.type ?? 'no terminal chunk'}`);
       // A refused or invalid attempt before the save is a non-pass (Sprint 007 Sprint Completion).
-      assert.deepEqual(lines.map(line => line.payload?.summary), ['Saved version 1'], 'update-script saved only after a refused attempt');
+      const summaries = lines.map(line => line.payload?.summary);
+      assert.deepEqual(summaries, ['Saved version 1'], `expected one first save, got: ${summaries.join(', ')}`);
       const response = await client.get(`/v1/conversations/${video}/workspace`);
       assert.equal(response.status, 200, `workspace read answered ${response.status}`);
       const { script } = await response.json();
