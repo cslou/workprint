@@ -12,7 +12,7 @@ export interface ToolScope {
 export type AgentCollaborators = Readonly<{
   readWorkspace: ReadOwnedWorkspace; saveScript: SaveAssistantScript;
   readImageInputs: ReadImageInputs; saveGeneratedImage: SaveGeneratedImage;
-  /** Absent only in a test composition without a Meta fake; the image tool then reports Meta unavailable. */
+  /** Absent when images can't be saved (no storage or media checker) or a test composes no Meta fake; the tool then refuses before any call. */
   images?: Pick<MetaImageClient, 'generate' | 'edit'>;
 }>;
 
