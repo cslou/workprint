@@ -459,7 +459,7 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
     provider.script({ toolCalls: [{ name: 'read-workspace', args: {} }] }, { text: ['Found it'] });
     const turn = await client(user).turn(video, 'Can you resume the video?', 60000);
     assert.ok(completed(turn), JSON.stringify(turn.terminal));
-    return toolResult() as unknown as { stoppedVideos?: { jobId: string; frames: number }[] };
+    return toolResult() as unknown as { stoppedVideos?: { jobId: string; frames: string[] }[] };
   };
   /** Starts a turn that calls generate-video, and resolves its run id once accepted. */
   const running = (user: { id: string }, video: string, args: Record<string, unknown>, timeoutMs = 60000) => {
@@ -664,7 +664,7 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
     assert.equal(minimax.creates, 1);
     // No result in the history carries the id: the model finds it in read-workspace, as it would after a real restart.
     const listing = await readStopped(owner, video);
-    assert.deepEqual(listing.stoppedVideos?.map(stopped => [stopped.jobId, stopped.frames]), [[job!.request_id, 0]]);
+    assert.deepEqual(listing.stoppedVideos?.map(stopped => [stopped.jobId, stopped.frames]), [[job!.request_id, []]]);
     minimax.script.query({ task: 'succeeded' });
     const { result } = await generate(owner, video, { resume: listing.stoppedVideos![0]!.jobId });
     assert.ok(result.made, JSON.stringify(result));

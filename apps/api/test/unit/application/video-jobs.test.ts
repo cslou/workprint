@@ -177,22 +177,26 @@ test('saved work that fails says whether the create was sent', async () => {
   assert.equal(after.calls.submits, 1);
 });
 
-test('stopped lists only this account\'s and video\'s interrupted jobs, newest first and at most five; a failed read is unavailable', async () => {
+// Scoping and order are the SQL's, proven in generation-jobs.test.ts and the restart case in tool-activity.test.ts.
+test('stopped asks for this video\'s interrupted jobs, at most five, and gives each id with its frames; a failed read is unavailable', async () => {
   const { runner, jobs } = harness();
   const stop = async (owner: string, conversation: string, inputs: string[] = []) => {
     const job = await jobs.begin(owner, conversation, { prompt: 'p', inputs });
     await jobs.started(owner, job.id, `task-${job.id}`); await jobs.interrupted(owner, job.id);
     return job.id;
   };
-  const ids: string[] = [];
+  const ids: string[] = [], frame = randomUUID();
   for (let index = 0; index < 5; index++) ids.push(await stop(account, video));
-  ids.push(await stop(account, video, [randomUUID()]));
+  ids.push(await stop(account, video, [frame]));
+  const list = jobs.list, asked: unknown[] = [];
+  jobs.list = async (owner, conversation, options) => { asked.push([owner, conversation, options]); return list(owner, conversation, options); };
   await stop(randomUUID(), video); await stop(account, randomUUID());
   const running = await jobs.begin(account, video, { prompt: 'p', inputs: [] }); await jobs.started(account, running.id, 'task-running');
   const listed = await runner.stopped(account, video);
   assert.ok(listed.kind === 'read');
   assert.deepEqual(listed.jobs.map(job => job.jobId), ids.slice(1).reverse());
-  assert.deepEqual(listed.jobs.map(job => job.frames), [1, 0, 0, 0, 0]);
+  assert.deepEqual(listed.jobs.map(job => job.frames), [[frame], [], [], [], []]);
+  assert.deepEqual(asked, [[account, video, { limit: 5, status: 'interrupted' }]]);
   jobs.list = async () => { throw new Error('storage down'); };
   assert.deepEqual(await runner.stopped(account, video), { kind: 'unavailable' });
 });

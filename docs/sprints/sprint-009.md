@@ -450,7 +450,7 @@ For descriptive-only work, use editorial review and applicable existing checks. 
 - **Sprint PR review (#103 at `252cd1c`):** 3/5. Security and conventions found nothing.
   - **P1 (semantic):** after a server restart, the model had no way to learn a stopped job's id. The shutdown path ends the call with no result, read-workspace listed no jobs, and every restart test read the id from SQL.
   - **Fixed in `fix/009-resume-after-restart`:**
-    - read-workspace now lists the video's stopped jobs (`stoppedVideos`, newest first, at most 5) with the id a resume takes;
+    - read-workspace now lists the video's stopped jobs (`stoppedVideos`, newest first, at most 5) with the id a resume takes and the image versions each started from;
     - the restart test resumes with the id from that listing;
     - the agent's workspace names use the shared `mediaVersionName`;
     - the query-error test asserts its one create;

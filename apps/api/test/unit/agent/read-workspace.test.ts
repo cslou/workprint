@@ -71,8 +71,8 @@ test('the listing gives the video\'s stopped jobs with their resume ids, only wh
     const signal = new AbortController().signal;
     return tool.execute({}, { scope, collaborators, signal, abortReason: () => undefined }) as Promise<Record<string, unknown>>;
   };
-  const listed = await run({ kind: 'read', jobs: [{ jobId: 'job-2', frames: 1, submittedAt: new Date('2026-11-03T16:34:37Z') }, { jobId: 'job-1', frames: 0, submittedAt: new Date('2026-11-03T16:30:11Z') }] });
-  assert.deepEqual(listed.stoppedVideos, [{ jobId: 'job-2', frames: 1, submittedAt: '2026-11-03T16:34:37.000Z' }, { jobId: 'job-1', frames: 0, submittedAt: '2026-11-03T16:30:11.000Z' }]);
+  const listed = await run({ kind: 'read', jobs: [{ jobId: 'job-2', frames: ['i1'], submittedAt: new Date('2026-11-03T16:34:37Z') }, { jobId: 'job-1', frames: [], submittedAt: new Date('2026-11-03T16:30:11Z') }] });
+  assert.deepEqual(listed.stoppedVideos, [{ jobId: 'job-2', frames: ['i1'], submittedAt: '2026-11-03T16:34:37.000Z' }, { jobId: 'job-1', frames: [], submittedAt: '2026-11-03T16:30:11.000Z' }]);
   assert.deepEqual(asked, [['account', 'video']]);
   assert.equal(listed.total, 1);
   for (const quiet of [await run(), await run({ kind: 'read', jobs: [] }), await run({ kind: 'unavailable' })]) {

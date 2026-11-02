@@ -31,8 +31,8 @@ export type VideoJobTiming = Readonly<{ pollIntervalMs: number; pollDeadlineMs: 
 export const videoJobTiming: VideoJobTiming = Object.freeze({ pollIntervalMs: 10_000, pollDeadlineMs: 30 * 60_000 });
 
 type Jobs = Pick<GenerationJobs, 'begin' | 'started' | 'failed' | 'interrupted' | 'resumed' | 'get' | 'list'>;
-/** One job of this video that stopped waiting: its id is what a resume names. `frames` counts its input images. */
-export type StoppedVideo = Readonly<{ jobId: string; frames: number; submittedAt: Date }>;
+/** One job of this video that stopped waiting: its id is what a resume names. `frames` are its exact input image versions, in order. */
+export type StoppedVideo = Readonly<{ jobId: string; frames: readonly string[]; submittedAt: Date }>;
 export type StoppedVideosOutcome = { kind: 'read'; jobs: readonly StoppedVideo[] } | { kind: 'unavailable' };
 /** At most this many stopped jobs are listed, newest first. */
 export const stoppedVideosLimit = 5;
@@ -196,7 +196,7 @@ export function createVideoJobs(collaborators: VideoJobCollaborators) {
     async stopped(account: string, video: string): Promise<StoppedVideosOutcome> {
       try {
         const page = await jobs.list(account, video, { limit: stoppedVideosLimit, status: 'interrupted' });
-        return { kind: 'read', jobs: page.jobs.map(job => ({ jobId: job.id, frames: job.inputs.length, submittedAt: job.submittedAt })) };
+        return { kind: 'read', jobs: page.jobs.map(job => ({ jobId: job.id, frames: job.inputs, submittedAt: job.submittedAt })) };
       } catch (error) {
         logFailure('Stopped video jobs read failed', error);
         return { kind: 'unavailable' };
