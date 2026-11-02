@@ -10,7 +10,7 @@ import { createMetaImageClient } from '../generation/index.js';
 import { createBackend } from './backend.js';
 import { loadServerConfig } from './config.js';
 import { createIngress } from './ingress.js';
-import { isNativeTurnRoute } from './native-turns.js';
+import { isTurnStreamRoute } from './native-turns.js';
 import { installServerShutdown } from './shutdown.js';
 
 /** A turn stream route may run this long past the turn deadline before the route timeout ends it. */
@@ -45,12 +45,13 @@ const timerMs = (name: string, value: number) => {
 
 /**
  * The route timeout. Hono's timeout races only until a handler returns its Response, so a stream already
- * returned is never cut. A turn route (send, subscribe, observe, Stop) is still bounded by the turn
- * deadline plus a margin instead of the general limit, so no turn route is cut while its turn may run.
+ * returned is never cut. A turn stream route (send, subscribe, observe) is still bounded by the turn
+ * deadline plus a margin instead of the general limit, so none is cut while its turn may run. Stop and
+ * every other route keep the general limit.
  */
-function routeTimeouts(routeMs: number, turnRouteMs: number): MiddlewareHandler {
+export function routeTimeouts(routeMs: number, turnRouteMs: number): MiddlewareHandler {
   const general = timeout(routeMs), turns = timeout(turnRouteMs);
-  return (context, next) => (isNativeTurnRoute(context) ? turns : general)(context, next);
+  return (context, next) => (isTurnStreamRoute(context) ? turns : general)(context, next);
 }
 
 function nodeTimeouts(node: NodeServerTimeouts = {}): ServerOptions {

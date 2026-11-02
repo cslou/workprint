@@ -6,6 +6,9 @@ import { markConversationStarted } from './started-conversations.js';
 
 export const nativeTurnRoutes = [...['send-message', 'threads/subscribe'].map(tail => ({ method: 'POST' as const, path: `/api/agents/${nativeAssistantId}/${tail}` })), ...nativeControlRoutes];
 export const isNativeTurnRoute = (context: Context) => nativeTurnRoutes.some(route => route.path === context.req.path && route.method === context.req.method);
+const streamTails = ['send-message', 'threads/subscribe', 'observe'].map(tail => `/api/agents/${nativeAssistantId}/${tail}`);
+/** The routes that carry a turn's stream (send, subscribe, observe); Stop is not one. */
+export const isTurnStreamRoute = (context: Context) => context.req.method === 'POST' && streamTails.includes(context.req.path);
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 const uuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const isSend = (context: Context) => context.req.path === `/api/agents/${nativeAssistantId}/send-message`;
