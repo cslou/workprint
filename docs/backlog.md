@@ -10,7 +10,7 @@ Convention: `docs/conventions/backlog-management.md` (selected harness root; AGE
   - The history is only in the viewer opened from an Assets row, as a closed "Version history" disclosure under the image. The viewer opened from a chat image has no history.
   - After "Use this version", nothing refreshes: `Assets` gets no `onUsed` from `apps/web/src/shell/workspace-tabs.tsx`, so the row, title and viewer keep the replaced version until the next workspace read. Script and reference rows share this gap.
   - "Use this version" is a human use, so it approves that image version (`apps/api/src/artifacts/uses.ts`). Nothing shows the approval, since media shows no status pill, and later assistant edits of an approved image become new images (SC2). The design guide and comments still say images can't be approved.
-- Outcome: The person can find an image's earlier versions from where they see the image, and choosing one visibly takes effect at once. Lou decides whether choosing a version approves it (and then shows a status) or only switches the current version, and whether image history is view-only until the looks picker (Sprint 012). Pass: after an edit, the person opens the earlier version, chooses it, and Assets and chat show it without a reload.
+- Outcome: The person can find an image's earlier versions from where they see the image, and choosing one visibly takes effect at once. Lou decides whether choosing a version approves it (and then shows a status) or only switches the current version, and whether image history is view-only until the looks picker (Sprint 013). Pass: after an edit, the person opens the earlier version, chooses it, and Assets and chat show it without a reload.
 - References: PR #93 (`apps/web/src/materials/assets.tsx` wraps the image viewer in history; `apps/api/src/artifacts/generated-images.ts` makes an approved image's edit a new image); PR #91 body, Pending (the approval and refresh P2s from its re-review); `apps/web/src/versions/review.tsx` (the closed Version history disclosure); `apps/web/src/conversation/shown-images.tsx` (the chat viewer, with no history); `apps/web/src/shell/workspace-tabs.tsx` (no `onUsed` for Assets); spec §8.3 Images and SC2 (why an approval is never replaced); B-036 (edits are not journaled).
 
 ## Next
@@ -108,30 +108,6 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 - References: `apps/web/src/shell/workspace.ts`; B-011 (the related first-read recovery); spec P3-S9 and P4-S14.
 - Work: [Sprint 007](sprints/sprint-007.md) Story 3 (PR #81) for the Script tab. The other tabs re-read the same way; their own saving tools come with B-015 to B-020. Remaining: re-reads wait while any editor is open, in any tab. Scope that wait to the tab being edited when other tabs gain saving tools.
 
-### B-015 — Agent tool: generate images with Meta Muse Image
-- Problem: The product cannot create images; users can only upload them (Sprint 005).
-- Outcome: A generate-image tool calls Meta's image API from a text prompt, optionally with images already in the user's storage as inputs. It stores the result in private storage as the user's image. The image always appears in the Assets tab. When the user asks for an image directly ("generate me an image"), it also appears in the chat (Lou, 2026-11-01). Pass: the user asks for an image, the agent calls Meta, the image is stored and shown in the chat and in Assets, and a follow-up request can use a stored image as input.
-- Constraint:
-  - Every id taken from model arguments or the browser (image, video, question or option) must resolve to an exact version owned by the trusted account and video, checked by an account- and video-scoped domain query that the tool reaches through an application function; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
-  - The Meta docs, read 2026-11-01, say:
-    - model `muse-image-1.0`
-    - `POST /v1/images/generations` for text to image, and `POST /v1/images/edits` with 1–10 input images (`image_url` or `file_id`)
-    - base64 output by default
-    - blocking calls
-    - $0.01 per image
-  - Confirm the real response shape with one live call before writing the parser.
-  - The key stays server-only.
-  - Request `output_format: png` or `jpeg`. Meta defaults to WebP, but private storage accepts only `image/png` and `image/jpeg` (`supabase/migrations/20261031000000_private_uploads.sql`).
-  - Our storage is private, so input images go to Meta as base64 data URLs, never as public links.
-  - The chat history stores only the saved image's id; the chat renders it through the owned image read (`apps/web/src/api/use-owned-image.ts`). Never put base64 in messages.
-  - Generated images pass the same verification as uploads before they are saved.
-- Constraint: No user authorization before paid calls in the MVP (Lou, 2026-11-01); added later in B-030.
-- References:
-  - [Meta image generation](https://dev.meta.ai/docs/image-generation).
-  - `~/projects/animation-studio/.pi/skills/generate-image/references/prompt-preparation.md`: prompt guidance.
-  - `apps/api/src/storage/`: storage from Sprint 005.
-- Work: [Sprint 008](sprints/sprint-008.md) Stories 1–5. Planning live calls (2026-11-02) confirmed the response shape and found an XMP AI-generated label in Meta's PNGs, which the sprint keeps.
-
 ### B-017 — Agent creates reference sheets
 - Context: Lou will supply the reference-sheet details and templates later (2026-11-01). Keep this as a placeholder until then; it does not block B-012 to B-016.
 - Problem: The Assets tab can show reference sheets (`apps/web/src/materials/sheet.tsx`), but only manual saves create them. The agent cannot create a character, place or prop reference.
@@ -149,45 +125,6 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
   - Panels are generated one image call at a time, each shown as it finishes (B-021).
 - References: `~/projects/animation-studio/.pi/skills/create-storyboard/SKILL.md` with `references/panel-generation-strategy.md` and `storyboard-schema.md`; B-013, B-015, B-017.
 
-### B-025 — Long video generation waits in the tool, with a saved task and resume
-- Problem: MiniMax video takes about 1–5 minutes. The tool must wait for it without losing a paid task on Stop, disconnect or restart.
-- Outcome: Following the Pi `generate-video` pattern (Lou, 2026-11-01), the tool:
-  1. submits to MiniMax
-  2. saves the task id in a generation record before polling
-  3. polls about every 10 seconds, with a 30-minute deadline
-  4. downloads, verifies and stores the video
-  5. marks the record done or failed, then returns the video to the agent
-
-  The turn stays open throughout, and the chat shows "Generating video… N min" (B-021). One call may submit several shots and poll them in parallel. Pass:
-  - A video started in chat arrives, and the agent continues with it.
-  - Closing the browser does not stop it; Sprint 004 made disconnect end only the viewing.
-  - After a server restart mid-poll, the same saved task resumes and nothing is resubmitted.
-- Constraint:
-  - No background workflow in the MVP. The user cannot chat during generation, which is accepted (Lou, 2026-11-01); queueing is B-026.
-  - Never resubmit a paid task to recover. An uncertain submission with no task id is marked failed with an unknown outcome.
-  - When Stop, the 35-minute turn deadline (B-012) or the poll's own 30-minute deadline ends a poll, the record moves to a distinct `interrupted` state: the task id is kept and nothing is resubmitted. The Videos tab shows it as stopped waiting, not running. Only an explicit resume (the user asks, and the agent names that record or its shot) polls the saved task again; a new prompt always submits a new task. The resumed record id must be owned by the trusted account and video, checked by an account- and video-scoped domain query that the tool reaches through an application function, with a foreign or missing id returning not-found (test it). After MiniMax's 7-day query window, counted from the saved submission time, an `interrupted` record becomes `failed` with an unknown outcome. The expiry is applied lazily when the record is read and before any resume; resuming an expired record makes no MiniMax call. Test both paths. A server restart resumes only records still `running`, never `interrupted` ones.
-  - MiniMax result URLs are time-limited and may carry credentials, so never persist or log them; query the task again for a fresh URL. Tasks are queryable only for 7 days.
-  - The Videos tab shows the record's saved status (queued, running, interrupted, done, failed) after a reload, with no invented progress.
-- References:
-  - `~/projects/animation-studio/.pi/skills/generate-video/SKILL.md` (submit → save manifest → poll → download → validate, plus `--resume-manifest`).
-  - `references/minimax-video-v2.md`.
-  - Former Sprint 007 plan, Story 3 (generation records); `packages/contracts` `generationRequestSchema`.
-
-### B-019 — Agent tool: generate a video with MiniMax
-- Problem: The Videos tab and player exist, but nothing produces a generated video.
-- Outcome: A generate-video tool takes a prompt and up to two images (first and last frame, from uploads or storyboard panels) and starts a MiniMax Video V2 task. It waits for the result as in B-025, stores the video, and shows it in the Videos tab. Pass: the generated video is stored, appears in Videos and plays.
-- Constraint:
-  - Every id taken from model arguments or the browser (image, video, question or option) must resolve to an exact version owned by the trusted account and video, checked by an account- and video-scoped domain query that the tool reaches through an application function; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
-  - Lou chose MiniMax for now (2026-11-01); Meta's API has no video generation, only video understanding.
-  - The key is `MINIMAX_API_KEY` in the root `.env`, added by Lou on 2026-11-01. It is server-only; never print it.
-  - Waiting, resume and failure handling follow B-025.
-  - Frames go to MiniMax as data URLs, because storage is private.
-  - Use one fixed resolution and frame rate for every shot, so B-020 can join clips without re-encoding.
-  - The result must pass the Sprint 005 media verification (`video/mp4`) before it is saved and playable.
-  - Confirm the real response shape with one live call before writing the parser. The key stays server-only.
-- Constraint: No user authorization before paid calls in the MVP (Lou, 2026-11-01); added later in B-030.
-- References: `~/projects/animation-studio/.pi/skills/generate-video/SKILL.md` and `references/minimax-video-v2.md` (MiniMax Video Generation V2, up to two endpoint frames); `apps/web/src/videos/`; `packages/player`.
-
 ### B-020 — Agent tool: join videos together
 - Problem: There is no way to combine generated clips into one video.
 - Outcome: A join-videos tool combines an ordered set of the user's stored videos into a new video. The new video is stored and shown in the Videos tab, and the originals are kept. Pass: the joined video plays in Videos in the requested order.
@@ -197,6 +134,7 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
   - Stream-copy joining needs matching codec, resolution and frame rate, so incompatible clips fail with a clear message rather than being re-encoded in the MVP.
   - Run ffmpeg inside the existing bounded media sandbox, and verify the output like any other video.
 - References: `~/projects/animation-studio/.pi/skills/assemble-video/SKILL.md` (stream-copy joining with compatibility checks) and `.pi/lib/ffmpeg.mjs`; `apps/api/src/storage/media/sandbox.ts` (the existing ffmpeg sandbox); B-019.
+- Constraint: Its own sprint (010), after video (Lou, 2026-11-02). It joins the generated videos from Sprint 009.
 
 Moved after video (Lou, 2026-11-02): AskUserQuestion (B-014) and image options (B-016) wait until video generation (B-025, B-019, B-020) is done. Until then the agent asks in plain chat text.
 
@@ -239,6 +177,51 @@ After video generation (Lou, 2026-11-02, from Sprint 008 QA): B-038 and B-039 wa
 - References: `packages/api-client/src/private-image.ts` (`no-store`, credential-free reads); `apps/web/src/main.tsx` (clears the session copy on account change); B-038.
 
 ## In progress
+
+### B-025 — Long video generation waits in the tool, with a saved task and resume
+- Problem: MiniMax video takes about 1–5 minutes. The tool must wait for it without losing a paid task on Stop, disconnect or restart.
+- Outcome: Following the Pi `generate-video` pattern (Lou, 2026-11-01), the tool:
+  1. submits to MiniMax
+  2. saves the task id in a generation record before polling
+  3. polls about every 10 seconds, with a 30-minute deadline
+  4. downloads, verifies and stores the video
+  5. marks the record done or failed, then returns the video to the agent
+
+  The turn stays open throughout, and the chat shows "Making a video… · N min" (B-021). One call makes one video (Lou, 2026-11-02); the agent may call again. Pass:
+  - A video started in chat arrives, and the agent continues with it.
+  - Closing the browser does not stop it; Sprint 004 made disconnect end only the viewing.
+  - After a server restart mid-poll, the job shows as interrupted, and the same saved task resumes when the user asks. Nothing is resubmitted.
+- Constraint:
+  - No background workflow in the MVP. The user cannot chat during generation, which is accepted (Lou, 2026-11-01); queueing is B-026.
+  - Never resubmit a paid task to recover. An uncertain submission with no task id is marked failed with an unknown outcome.
+  - When Stop, the 35-minute turn deadline (B-012) or the poll's own 30-minute deadline ends a poll, the record moves to a distinct `interrupted` state: the task id is kept and nothing is resubmitted. The Videos tab shows it as stopped waiting, not running. Only an explicit resume (the user asks, and the agent names that record or its shot) polls the saved task again; a new prompt always submits a new task. The resumed record id must be owned by the trusted account and video, checked by an account- and video-scoped domain query that the tool reaches through an application function, with a foreign or missing id returning not-found (test it). After MiniMax's 7-day query window, counted from the saved submission time, an `interrupted` record becomes `failed` with an unknown outcome. The expiry is applied lazily when the record is read and before any resume; resuming an expired record makes no MiniMax call. Test both paths. A server restart marks `running` records `interrupted` and resumes nothing by itself (Lou, 2026-11-02): the user asks, as after Stop.
+  - MiniMax result URLs are time-limited and may carry credentials, so never persist or log them; query the task again for a fresh URL. Tasks are queryable only for 7 days.
+  - The Videos tab shows the record's saved status (queued, running, interrupted, done, failed) after a reload, with no invented progress.
+- References:
+  - `~/projects/animation-studio/.pi/skills/generate-video/SKILL.md` (submit → save manifest → poll → download → validate, plus `--resume-manifest`).
+  - `references/minimax-video-v2.md`.
+  - Former Sprint 007 plan, Story 3 (generation records); `packages/contracts` `generationRequestSchema`.
+- Work: [Sprint 009](sprints/sprint-009.md) Stories 2, 3 and 5.
+
+### B-019 — Agent tool: generate a video with MiniMax
+- Problem: The Videos tab and player exist, but nothing produces a generated video.
+- Outcome: A generate-video tool takes a prompt and up to two images (first and last frame, from uploads or storyboard panels) and starts a MiniMax Video V2 task. It waits for the result as in B-025, stores the video, and shows it in the Videos tab. Pass: the generated video is stored, appears in Videos and plays.
+- Constraint:
+  - Every id taken from model arguments or the browser (image, video, question or option) must resolve to an exact version owned by the trusted account and video, checked by an account- and video-scoped domain query that the tool reaches through an application function; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
+  - Lou chose MiniMax for now (2026-11-01); Meta's API has no video generation, only video understanding.
+  - The key is `MINIMAX_API_KEY` in the root `.env`, added by Lou on 2026-11-01. It is server-only; never print it.
+  - Waiting, resume and failure handling follow B-025.
+  - Frames go to MiniMax as data URLs, because storage is private.
+  - Use one fixed resolution and frame rate for every shot, so B-020 can join clips without re-encoding.
+  - The result must pass the Sprint 005 media verification (`video/mp4`) before it is saved and playable.
+  - Confirm the real response shape with one live call before writing the parser. The key stays server-only.
+- Constraint: No user authorization before paid calls in the MVP (Lou, 2026-11-01); added later in B-030.
+- References: `~/projects/animation-studio/.pi/skills/generate-video/SKILL.md` and `references/minimax-video-v2.md` (MiniMax Video Generation V2, up to two endpoint frames); `apps/web/src/videos/`; `packages/player`.
+- Decisions (Lou, 2026-11-02):
+  - Assistant-made videos may use MiniMax's format (H.264 High profile, no aspect-ratio tag), still fully decoded and measured; uploads stay strict.
+  - Generated videos show in a "Generated videos" list in the Videos tab ("Video N · Version 1") and, when asked for directly, in the chat. Linking a clip to a Shot comes with the storyboard (B-018).
+  - Fixed output: MiniMax-H3 at 768P, 24 fps, for B-020.
+- Work: [Sprint 009](sprints/sprint-009.md) Stories 1 and 4–7.
 
 ## Later
 
