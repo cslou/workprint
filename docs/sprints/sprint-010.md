@@ -441,7 +441,7 @@ Sprint-specific completion items:
   - Story 6, #111 (Assets by subject): 4/5, then 4/5. All eleven P2s were fixed.
 - **Lou's core tests, in the scripted build:**
   1. One tool call makes several images and saves them as one sheet: the generate-sheet block in `tool-activity.test.ts` asserts each Meta request, its identity input and the saved sheet (Stories 2–4).
-  2. A sheet shows as a sheet: the `chat.spec.ts` journey opens Mara's sheet and finds her three views captioned in a grid, live and after a reload (Story 6).
+  2. A sheet shows as a sheet: the `chat.spec.ts` journey opens Mara's sheet and finds her three views as separate images, captioned in order, live and after a reload (Story 6). The grid layout itself is CSS, checked at Lou's QA.
   3. Assets by subject: the same journey shows Mara, The Gallery and The key from the script, Empty until made, then Mara with her sheet and a one-off image, and "Other" last (Stories 1, 5 and 6).
 - **Combined-branch verification:** the deep gate (`.checks/regression.sh --tier=deep`, 363 s) passed at `da42e3d`, the `sprint-010` head after Story 6. These records change only docs.
   - Results: unit 227/227, tooling 6/6, integration 163/163, browser 33/33.
@@ -456,7 +456,7 @@ Sprint-specific completion items:
 - **Deviations, recorded in the story PRs:**
   - **Story 1:**
     - The direct-save cases are in `tool-activity.test.ts`'s update-script block, not `artifact-writes.test.ts`.
-    - A new id never reuses a base id, so work filed under a removed subject never moves to a new subject.
+    - A new id never reuses an id from the save's base. A subject removed in one save and added back by name in a later one gets its old id, and with it the sheet and images still filed under it, whatever its kind (found in the sprint PR review).
     - A derived name is cut to 80 characters and derivation stops at 50 subjects. An older script whose character name is over 80 characters is refused on its next empty-list save until the model passes the full list.
   - **Story 2:**
     - A bad description or note is `invalid` with `field: 'text'`.
@@ -482,5 +482,19 @@ Sprint-specific completion items:
   - Story 4: with many full sheets, later subjects can lose their sheet in the listing (they stay items named by the subject); escape-heavy names could push the bare subject list past its bound.
   - Story 5: `workspaceSubjects` in `workspace-entries.ts` still parses the script itself rather than calling `currentSubjects` (pre-existing).
   - Story 6: a supplied presentation without `views` would show no views (nothing supplies one today); Assets decides emptiness from the rows it renders, while `subjectGroups.empty` counts every asset.
+- **Sprint PR review (#113 at `adaae8a`):** security and conventions had no findings, and every finding was a P2.
+  - **Fixed in `fix/010-sprint-review`:**
+    - update-script: an empty subjects list on a script saved before subjects existed now keeps the subjects derived from that base, so renaming a character needs the full list rather than giving it a new id and sending its work to "Other" (logic);
+    - update-script: a subjects list with no subject for a character the script names is refused as "differ" (pass the full list), on a first save too, instead of dropping the character from the scene (logic);
+    - generate-sheet: when the subject's own sheet already shares an image with another sheet, the model is told to ask the person to remove it from one sheet in Assets, not to make a new view (logic);
+    - a unit case for how a place's and a prop's sheet read ("Place", "Prop"), which no test covered (verifications);
+    - the core-test 2 claim above no longer says the journey checks the grid (verifications);
+    - the spec's `create-storyboard` row now reads 010–011 (semantic).
+  - **Accepted:**
+    - A subject removed in one save and added back by name later gets its old id and work, whatever its kind (logic, semantic). For the same kind this is the subject coming back; a different kind with the same name (a prop "Mara" after the character) is a rare edge. A question for Lou.
+    - read-workspace builds its own subject listing (first sheet per subject, within its byte share) rather than `subjectGroups`, so a second current sheet for a subject is an item for the agent while Assets shows it under the subject (semantic). Only people's sheets can make a second current sheet; recorded in Story 4's deviations.
+    - The make-and-save step is still written in both generate-image and `makeSheet`, and `workspaceSubjects` and `resolve` still parse the script themselves (modularity): the Story 3 and Story 5 P2s above.
+    - Commit `6d3421e` (Story 2) has a 53-character subject; it was not amended after its PR opened (pr-hygiene).
+    - The Sprint 011 plan and its backlog and packaging edits ride in this PR: they were committed first on `sprint-010`, as the handoff says (pr-hygiene).
 - **New Dependencies:** None.
 - **Pending:** Lou's QA build (on his word), then the sprint PR's review and the merge to `main` on Lou's command.
