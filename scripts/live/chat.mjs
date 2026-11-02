@@ -1,5 +1,6 @@
 // Chat check against the built API. Scripted by default (fake provider, placeholder key, network
-// guarded); `--live` makes a handful of real Muse Spark calls and saves the sanitized shapes.
+// guarded); `--live` makes a handful of real Muse Spark calls and one Meta image call, and saves the
+// sanitized shapes.
 // Run through `pnpm live:chat [--live]`, which compiles the tests and starts the shared test stack.
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -15,6 +16,8 @@ const { chatComposition, liveChatComposition } = await load('chat-composition.js
 const { environment, liveEnvironment, placeholderMetaKey } = await load('environment.js');
 const { completed, nativeTurnClient } = await load('native-turn-client.js');
 const { scriptedProvider } = await load('scripted-provider.js');
+const { metaImageFake } = await load('meta-image-fake.js');
+const { testStack } = await load('test-stack.js');
 
 /** The key comes only from the root .env, parsed here and passed to the child; never printed or put in process.env. */
 function metaKey() {
@@ -37,10 +40,13 @@ async function childEnvironment() {
 }
 
 const provider = await scriptedProvider();
+// Scripted runs reach Meta images only through the loopback fake; live runs make one real image call.
+const meta = live ? undefined : await metaImageFake();
+const { storage, media } = testStack();
 const fixture = await accountBrowserFixture({
-  // Saved-work tables, so read-workspace reads a real (empty) workspace.
-  artifacts: true,
-  composition: live ? liveChatComposition(provider.gateUrl) : chatComposition(provider),
+  // Saved-work tables, so read-workspace reads a real (empty) workspace; storage and the decode keep made images.
+  artifacts: true, storage, media: media.toolchain,
+  composition: live ? liveChatComposition(provider.gateUrl) : chatComposition(provider, {}, { url: meta.url }),
   environment: childEnvironment,
 });
 const results = [];
@@ -128,6 +134,31 @@ try {
     throw new Error('unreachable');
   });
 
+  // The agent makes one image; it is checked and saved as the video's draft image.
+  await step('generate-image', async () => {
+    const args = { prompt: 'A quiet gallery bench in soft daylight, a framed landscape painting on the wall behind it. Natural colour, no people.', size: '1536x1024', showInChat: true };
+    const prompts = ['Make me an image of a quiet gallery bench in soft daylight, with a framed landscape painting on the wall behind it.', 'Call the generate-image tool now to make one image of a quiet gallery bench in soft daylight. Do not answer before calling it.'];
+    for (const [attempt, prompt] of prompts.entries()) {
+      if (!live) provider.script({ toolCalls: [{ name: 'generate-image', args }] }, { text: ['Here is the image.'] });
+      const video = await client.newVideo();
+      const turn = await client.turn(video, prompt, timeoutMs);
+      const lines = turn.chunks.filter(chunk => chunk.type === 'tool-activity' && chunk.payload?.tool === 'generate-image' && chunk.payload?.state === 'done');
+      if (!lines.length && attempt === 0) continue;
+      assert.ok(lines.length, 'the model declined the generate-image tool twice');
+      assert.ok(completed(turn), `turn did not complete: ${turn.terminal?.type ?? 'no terminal chunk'}`);
+      const summaries = lines.map(line => line.payload?.summary);
+      assert.deepEqual(summaries, ['Saved Image 1 · Version 1'], `expected one saved image, got: ${summaries.join(', ')}`);
+      const response = await client.get(`/v1/conversations/${video}/workspace`);
+      assert.equal(response.status, 200, `workspace read answered ${response.status}`);
+      const { assets } = await response.json();
+      assert.deepEqual(assets.map(asset => [asset.version.kind, asset.version.createdBy, asset.use.state]), [['image', 'assistant', 'draft']]);
+      if (meta) assert.equal(meta.requests.length, 1, 'one request to the fake Meta');
+      shapes['generate-image'] = sanitize(turn.chunks);
+      return { rephrased: attempt > 0, firstChunkMs: turn.firstChunkMs, ...assets[0].version.media };
+    }
+    throw new Error('unreachable');
+  });
+
   await step('stop', async () => {
     if (!live) provider.script({ text: ['Partial', ' never sent'], hold: 'mid' });
     const video = await client.newVideo();
@@ -171,6 +202,7 @@ try {
   await fixture.close().catch(() => undefined);
 } finally {
   await provider.close();
+  await meta?.close();
 }
 console.info(JSON.stringify({ mode: live ? 'live' : 'scripted', results }, null, 2));
 if (failed) process.exitCode = 1;

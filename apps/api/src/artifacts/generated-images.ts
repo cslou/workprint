@@ -16,7 +16,8 @@ export type GeneratedImageSave = Readonly<{ version: Extract<Version, { kind: 'i
 /** One saved image's exact bytes, checked against its record. */
 export type StoredImage = Readonly<{ versionId: string; contentType: string; bytes: Buffer }>;
 export type GeneratedImageCollaborators = Readonly<{
-  storage: PrivateObjectStorage; verifyMedia: MediaVerifier;
+  /** Like uploads, only backend composition supplies these; without them saves and reads are unavailable. */
+  storage?: PrivateObjectStorage | undefined; verifyMedia?: MediaVerifier | undefined;
   /** How long a busy media checker is waited out, and how long between tries. */
   capacityWaitMs?: number; capacityRetryMs?: number;
 }>;
@@ -31,12 +32,15 @@ const busy = (error: unknown) => error instanceof MediaProcessError && error.cod
  * and saves them as the video's draft images. Saved images, uploaded or made, can be read back as exact bytes.
  */
 export function createGeneratedImages(pool: Pool, checkOwnedConversation: OwnedCheck, collaborators: GeneratedImageCollaborators) {
-  const { storage, verifyMedia } = collaborators;
+  const required = () => {
+    if (!collaborators.storage || !collaborators.verifyMedia) throw new UploadError('not_implemented', 'Private storage or media checks are not available');
+    return { storage: collaborators.storage, verifyMedia: collaborators.verifyMedia };
+  };
   const capacityWaitMs = collaborators.capacityWaitMs ?? 30_000, capacityRetryMs = collaborators.capacityRetryMs ?? 250;
   const reads = createArtifactStore(pool, checkOwnedConversation);
 
   /** The checker runs one job at a time; another job's turn is waited out, within a bound. */
-  const verify = async (input: GeneratedImageInput, signal: AbortSignal | undefined) => {
+  const verify = async (verifyMedia: MediaVerifier, input: GeneratedImageInput, signal: AbortSignal | undefined) => {
     const deadline = Date.now() + capacityWaitMs;
     for (;;) {
       try {
@@ -56,12 +60,13 @@ export function createGeneratedImages(pool: Pool, checkOwnedConversation: OwnedC
         // Inputs that aren't distinct ids can't name saved images.
         if (!inputsSchema.safeParse(input.inputs).success) throw new UploadError('not_found');
         if (!(input.bytes instanceof Uint8Array) || !input.bytes.byteLength || input.bytes.byteLength > MAX_UPLOAD_IMAGE_BYTES) throw new UploadError('unsupported');
+        const { storage, verifyMedia } = required();
         const owned = await checkOwnedConversation(account, conversation);
         if (owned.kind !== 'owned') throw new UploadError(owned.kind === 'not_found' ? 'not_found' : 'integration_failure');
         // Each input must be an image this account can read, before anything is stored.
         for (const id of input.inputs) if ((await reads.version(account, id)).kind !== 'image') throw new UploadError('not_found');
         const bytes = Buffer.from(input.bytes);
-        const media = measuredMedia({ kind: 'image', contentType: input.contentType, byteSize: bytes.length }, await verify({ ...input, bytes }, signal));
+        const media = measuredMedia({ kind: 'image', contentType: input.contentType, byteSize: bytes.length }, await verify(verifyMedia, { ...input, bytes }, signal));
         const id = randomUUID(), key = `published/${id}/${id}`, sha256 = digest(bytes);
         // A stopped run stores nothing after its check.
         signal?.throwIfAborted();
@@ -96,6 +101,7 @@ export function createGeneratedImages(pool: Pool, checkOwnedConversation: OwnedC
     /** The exact stored bytes of an image version this account can read; the caller decides which uses allow it. */
     async read(account: string, versionId: string): Promise<StoredImage> {
       try {
+        const { storage } = required();
         const version = await reads.version(account, versionId);
         if (version.kind !== 'image') throw new UploadError('not_found');
         const [object] = await protectedMediaObjects(pool, [versionId], version.builtIn ? BUILT_IN_OWNER : account);

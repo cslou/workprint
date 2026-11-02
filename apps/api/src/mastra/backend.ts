@@ -3,8 +3,8 @@ import { registerApiRoute, type ApiRoute } from '@mastra/core/server';
 import { PostgresStore } from '@mastra/pg';
 import { Pool } from 'pg';
 import { createOwnedConversationCheck, bindNativeTurns, productionTools, turnLimits, type AgentCollaborators, type AgentTool, type NativeTurnModel, type TurnLimits } from '../agent/index.js';
-import { createApplication, createAssistantScriptSaver, createWorkspaceReader, withSavedWork, withManualSaves, withVersionUses, withStoryboardEdits, withUploads } from '../application/index.js';
-import { createArtifactStore, createArtifactWriters, createAssistantScripts, createVersionUses, createStoryboardEdits, createMediaVerifier, createUploadCoordinator } from '../artifacts/index.js';
+import { createApplication, createAssistantScriptSaver, createGeneratedImageSaver, createImageInputReader, createWorkspaceReader, withSavedWork, withManualSaves, withVersionUses, withStoryboardEdits, withUploads } from '../application/index.js';
+import { createArtifactStore, createArtifactWriters, createAssistantScripts, createGeneratedImages, createVersionUses, createStoryboardEdits, createMediaVerifier, createUploadCoordinator } from '../artifacts/index.js';
 import { configuredMediaSandbox, configuredObjectStorage } from '../storage/index.js';
 import { assertRestrictedRole } from '../db/index.js';
 import type { MetaImageClient } from '../generation/index.js';
@@ -55,7 +55,9 @@ export async function createBackend(routes: ApiRoute[] = [], turns?: TurnComposi
   const manualApplication = withManualSaves(savedApplication, createArtifactWriters(pool, application.checkOwnedConversation).human.save);
   const reuseApplication = withVersionUses(manualApplication, createVersionUses(pool, application.checkOwnedConversation).useVersion);
   const planningApplication = withStoryboardEdits(reuseApplication, createStoryboardEdits(pool, application.checkOwnedConversation).editStoryboard);
-  const uploadApplication = withUploads(planningApplication, createUploadCoordinator(pool, application.checkOwnedConversation, { ...(objects ? { storage: objects } : {}), ...(media ? { verifyMedia: createMediaVerifier(media) } : {}) }));
+  // One media checker: uploads and assistant-made images share the one-job decode sandbox.
+  const verifyMedia = media ? createMediaVerifier(media) : undefined;
+  const uploadApplication = withUploads(planningApplication, createUploadCoordinator(pool, application.checkOwnedConversation, { ...(objects ? { storage: objects } : {}), ...(verifyMedia ? { verifyMedia } : {}) }));
   const protectedRoutes = [...applicationRoutes(uploadApplication), ...nativeNavigationRoutes(storage, application.checkOwnedConversation, tools), ...routes];
   const policy = createAdmissionPolicy([...protectedRoutes, ...nativeTurnRoutes], config.browserOrigin);
   const mastra = new ResourceMastra({
@@ -109,7 +111,12 @@ export async function createBackend(routes: ApiRoute[] = [], turns?: TurnComposi
   }, { before: async () => { try { await media?.close(); } finally { objects?.close(); } }, after: async () => { if (!pool.ended) await pool.end(); } });
   if (turns) {
     // Application functions that tools may call, each over the same owned reads as the HTTP boundary.
-    const collaborators: AgentCollaborators = { readWorkspace: createWorkspaceReader(savedWork), saveScript: createAssistantScriptSaver(createAssistantScripts(pool, application.checkOwnedConversation).save) };
+    const generated = createGeneratedImages(pool, application.checkOwnedConversation, { storage: objects, verifyMedia });
+    const collaborators: AgentCollaborators = {
+      readWorkspace: createWorkspaceReader(savedWork), saveScript: createAssistantScriptSaver(createAssistantScripts(pool, application.checkOwnedConversation).save),
+      readImageInputs: createImageInputReader(savedWork, generated.read), saveGeneratedImage: createGeneratedImageSaver(generated.save),
+      ...(turns.images ? { images: turns.images } : {}),
+    };
     bindNativeTurns(mastra, { model: turns.model, tools, limits: turns.limits ?? turnLimits, collaborators });
   }
   return mastra;

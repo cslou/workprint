@@ -43,7 +43,7 @@ function assistantPart(part: StoredPart, tools: readonly AgentTool[]) {
   if (part.type === 'step-start' || part.type === 'reasoning' || part.type === 'error') return null;
   if (part.type !== 'tool-invocation') throw unsupported();
   const { toolInvocation } = part;
-  const activity = projectToolActivity(tools, { toolCallId: toolInvocation.toolCallId, toolName: toolInvocation.toolName, state: storedToolStates[toolInvocation.state] ?? 'incomplete', ...('result' in toolInvocation ? { output: toolInvocation.result } : {}) });
+  const activity = projectToolActivity(tools, { toolCallId: toolInvocation.toolCallId, toolName: toolInvocation.toolName, state: storedToolStates[toolInvocation.state] ?? 'incomplete', input: toolInvocation.args, ...('result' in toolInvocation ? { output: toolInvocation.result } : {}) });
   return activity ? { type: 'tool-activity' as const, ...activity } : null;
 }
 
