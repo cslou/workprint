@@ -9,6 +9,8 @@ import { ReferenceSheet } from './sheet.js';
 import { MediaReceipt } from '../ui/media-receipt.js';
 import type { ScriptProps } from './script.js';
 import { savedMaterialPresentation } from './content.js';
+import { useOwnedImage } from '../api/use-owned-image.js';
+import type { Version } from '@workprint/contracts';
 import './assets.css';
 
 export function Assets({ connection, scope, workspace, prerequisites, onSaved }: ScriptProps) {
@@ -24,5 +26,11 @@ export function Assets({ connection, scope, workspace, prerequisites, onSaved }:
       const exact = prerequisites?.presentations.find((item) => item.versionId === version.id && item.revision === version.revision) ?? savedMaterialPresentation(version);
       return exact?.sheet ? <ReferenceSheet sheet={exact.sheet} state={selection.currentUse?.versionId === version.id && selection.currentUse.state === 'approved' ? 'Ready' : 'Draft'} {...(savedTextTarget({ kind: 'reference-description' }).read(version) !== null ? { description: <ManualVersionEditor connection={connection} scope={scope} version={version} target={{ kind: 'reference-description' }} label="Description" currentUse={selection.currentUse} readOnly={!editable} onSaved={selection.onSaved} /> } : {})} /> : <WorkspaceEmpty tab="assets" />;
     }}</VersionReview>
-  </ViewerDialog>)}{media.map(work => { const name = `${work.version.kind === 'video' ? 'Video' : 'Image'} · Version ${work.version.revision}`; return <ViewerDialog key={work.use?.id ?? work.version.id} title={name} trigger={<AriaButton className="wp-asset-row" data-media-version-id={work.version.id}><span className="wp-asset-no-image" aria-hidden="true">{work.version.kind === 'video' ? 'Video' : 'Image'}</span><span><b>{name}</b><small>{work.version.media.width} × {work.version.media.height}</small></span><StatusPill state={work.state === 'Ready' ? 'ready' : 'draft'} /></AriaButton>}>{close => <MediaReceipt connection={connection} version={work.version} state={work.state} close={close}/>}</ViewerDialog>; })}</div>;
+  </ViewerDialog>)}{media.map(work => { const name = `${work.version.kind === 'video' ? 'Video' : 'Image'} · Version ${work.version.revision}`; return <ViewerDialog key={work.use?.id ?? work.version.id} title={name} trigger={<AriaButton className="wp-asset-row" data-media-version-id={work.version.id}>{work.version.kind === 'image' ? <AssetKeyImage connection={connection} version={work.version} /> : <span className="wp-asset-no-image" aria-hidden="true">Video</span>}<span><b>{name}</b><small>{work.version.media.width} × {work.version.media.height}</small></span><StatusPill state={work.state === 'Ready' ? 'ready' : 'draft'} /></AriaButton>}>{close => <MediaReceipt connection={connection} version={work.version} state={work.state} close={close}/>}</ViewerDialog>; })}</div>;
+}
+
+/** An image row's key image, read through the owned-image read. Decorative: the row is named by its text. */
+function AssetKeyImage({ connection, version }: { connection: ScriptProps['connection']; version: Version }) {
+  const image = useOwnedImage(connection, version);
+  return image.phase === 'ready' && image.url ? <img src={image.url} alt="" onError={image.fail} /> : <span className="wp-asset-no-image" aria-hidden="true">Image</span>;
 }
