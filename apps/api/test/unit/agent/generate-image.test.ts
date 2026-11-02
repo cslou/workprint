@@ -134,6 +134,9 @@ test('subject: empty or "null" files nothing; one not in the script is refused b
   const refused = await run(scripted, { subject: 'ben' }) as { made: false; message: string };
   assert.equal(line({}, refused)?.summary, 'Not made: that subject isn’t in the script'); assert.match(refused.message, /add it to the script first/);
   assert.equal(calls.meta, before, 'nothing is sent for a subject the script lacks');
+  // Without a readable workspace the subject can't be checked, so nothing is sent.
+  const unread = await run({ ...scripted, readWorkspace: async () => ({ kind: 'unavailable' }) }, { subject: 'mara' }) as { made: false; reason: string };
+  assert.equal(unread.reason, 'unavailable'); assert.equal(calls.meta, before);
   // The subject was removed from the script while Meta worked: the save files it under Other and the result says so.
   left = true;
   const saved = await run(scripted, { subject: 'mara' }) as { made: true; note?: string };

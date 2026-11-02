@@ -1,4 +1,4 @@
-import { currentSheets, mediaVersionName, savedScriptContentSchema, scriptSubjects, sheetViews, workspaceMediaLabels, type ScriptSubject, type Version as SavedVersion } from '@workprint/contracts';
+import { currentSheets, currentSubjects, mediaVersionName, savedScriptContentSchema, scriptSubjects, sheetViews, workspaceMediaLabels, type ScriptSubject, type Version as SavedVersion } from '@workprint/contracts';
 import type { OwnedWorkspace } from '../application/index.js';
 
 type Version = OwnedWorkspace['assets'][number]['version'];
@@ -83,6 +83,8 @@ export function workspaceEntries(workspace: OwnedWorkspace): Entry[] {
   const clips = workspace.generatedVideos ?? [];
   const entries: Entry[] = [], seen = new Set<string>(), labels = workspaceMediaLabels(workspace), views = sheetViews(workspace);
   const sheetNames = new Map(currentSheets(workspace).map(sheet => [sheet.versionId, sheet.subjectName]));
+  // An image is filed under a subject only while the script lists it, as in Assets; otherwise it is under Other.
+  const listed = new Set(currentSubjects(workspace).map(subject => subject.id));
   const add = (entry: Entry) => { if (!seen.has(entry.version.id)) { seen.add(entry.version.id); entries.push(entry); } };
   const revision = (version: Version) => `Version ${version.revision}`;
   if (workspace.script) add({ name: `Script · ${revision(workspace.script.version)}`, use: 'script', state: workspace.script.state, version: workspace.script.version });
@@ -91,7 +93,7 @@ export function workspaceEntries(workspace: OwnedWorkspace): Entry[] {
     // Uploaded and made media keep no filename, so they are named by kind and order, or by subject and view in a sheet
     // (the shared rule). A sheet is named by its subject's current script name.
     const subject = 'content' in version && version.kind === 'reference' ? sheetNames.get(version.id) ?? strings(record(record(version.content).subject).name) : '';
-    add({ name: subject ? `${clip(subject, 80)} · ${revision(version)}` : mediaVersionName(labels, version, views), use: 'reference', state: asset.state, version, subjectId: asset.subjectId });
+    add({ name: subject ? `${clip(subject, 80)} · ${revision(version)}` : mediaVersionName(labels, version, views), use: 'reference', state: asset.state, version, subjectId: asset.subjectId && listed.has(asset.subjectId) ? asset.subjectId : undefined });
   }
   for (const made of clips) add({ name: mediaVersionName(labels, made.version), use: 'generated video', state: made.state, version: made.version });
   if (workspace.storyboard.work) add({ name: `Storyboard · ${revision(workspace.storyboard.work.version)}`, use: 'storyboard', state: workspace.storyboard.work.state, version: workspace.storyboard.work.version });

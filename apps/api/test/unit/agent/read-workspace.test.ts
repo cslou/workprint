@@ -157,3 +157,13 @@ test('50 subjects with full sheets stay within 16 KiB, and every sheet image is 
     if (!long) assert.deepEqual(listed.subjects.at(-1)?.sheet, undefined, 'a sheet past the share is left to the items');
   }
 });
+
+test('an image is listed with its subjectId only while the script lists that subject, as Assets files it', () => {
+  const script = (subjects: { id: string; kind: 'character' | 'place'; name: string }[]): OwnedWorkspace['script'] => work({ ...base('s'), kind: 'script', content: { schemaVersion: 1, subjects,
+    scenes: [{ heading: { setting: 'INT.', location: 'Gallery', time: 'Night' }, characters: subjects.filter(subject => subject.kind === 'character').map(subject => subject.name), script: [{ action: 'Mara waits.' }] }] } }, 'script');
+  const assets = [{ ...work(image('i1'), 'reference'), subjectId: 'mara' }, { ...work(image('i2'), 'reference'), subjectId: 'gallery' }, work(image('i3'), 'reference')];
+  const filed = (subjects: Parameters<typeof script>[0]) => listWorkspace({ ...workspace([]), assets, script: script(subjects) }).items.filter(item => item.kind === 'image').map(item => [item.versionId, item.subjectId]);
+  assert.deepEqual(filed([{ id: 'mara', kind: 'character', name: 'Mara' }, { id: 'gallery', kind: 'place', name: 'Gallery' }]), [['i1', 'mara'], ['i2', 'gallery'], ['i3', undefined]]);
+  // The Gallery left the script: its image is listed unfiled, under Other.
+  assert.deepEqual(filed([{ id: 'mara', kind: 'character', name: 'Mara' }]), [['i1', 'mara'], ['i2', undefined], ['i3', undefined]]);
+});
