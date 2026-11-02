@@ -571,6 +571,8 @@ test('an image the agent makes is shown under its line, opens the viewer, and st
   await expect(second.getByText('Saved Image 2 · Version 1', { exact: true })).toBeVisible();
   await expect(second.locator('.wp-shown-image')).toHaveCount(0);
   await expect(live(page).getByRole('listitem', { name: 'Assistant message' }).first().locator('img[alt="Image 1 · Version 1"]')).toBeVisible();
+  // Assets reads image 2 in the same refresh that would read image 1 again, so this waits for that refresh.
+  await expect.poll(() => reads.slice(before).some(id => id !== first)).toBe(true);
   expect(first).toBeTruthy(); expect(reads.slice(before)).not.toContain(first);
 
   await page.reload();
