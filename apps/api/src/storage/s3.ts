@@ -8,6 +8,8 @@ import { StorageError, storageError } from './errors.js';
 export const MAX_OBJECT_BYTES = MAX_UPLOAD_VIDEO_BYTES;
 export const MAX_STORAGE_CONCURRENCY = 2;
 export const MAX_STORAGE_MS = 10000;
+/** Operations past the concurrency cap wait in order, at most this many at once. */
+export const MAX_STORAGE_WAITING = 64;
 export const MAX_UPLOAD_URL_SECONDS = 300;
 export type PrivateStorageConfiguration = Readonly<{ endpoint: string; region: string; bucket: string; credentials: Readonly<{ accessKeyId: string; secretAccessKey: string }> }>;
 export type StoredSnapshot = Readonly<{ bytes: Buffer; byteSize: number; contentType: string; etag: string; sha256: string }>;
@@ -33,13 +35,24 @@ export function createPrivateObjectStorage(configuration: PrivateStorageConfigur
   if ((endpoint.protocol !== 'https:' && !(endpoint.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(endpoint.hostname))) || endpoint.username || endpoint.password || endpoint.search || endpoint.hash || endpoint.pathname !== '/' || !/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(configuration.bucket) || !/^[a-z0-9-]{1,32}$/.test(configuration.region) || !configuration.credentials.accessKeyId || !configuration.credentials.secretAccessKey || !boundedSize(maxBytes, MAX_OBJECT_BYTES) || !boundedSize(timeoutMs, MAX_STORAGE_MS) || !boundedSize(concurrency, MAX_STORAGE_CONCURRENCY)) throw new StorageError('unavailable', 'configuration');
   const client = new S3Client({ ...configuration, endpoint: endpoint.origin, forcePathStyle: true, maxAttempts: 1, requestChecksumCalculation: 'WHEN_REQUIRED', responseChecksumValidation: 'WHEN_REQUIRED' });
   let active = 0, closed = false;
+  const waiting: { grant(): void; refuse(): void }[] = [];
+  const capacity = () => new StorageError('unavailable', 'capacity');
+  // A slot is taken at once when one is free; otherwise the operation waits its turn, for at most two operation deadlines.
+  const acquire = () => new Promise<void>((resolve, reject) => {
+    if (closed) { reject(capacity()); return; }
+    if (active < concurrency) { active++; resolve(); return; }
+    if (waiting.length >= MAX_STORAGE_WAITING) { reject(capacity()); return; }
+    const entry = { grant: () => { clearTimeout(timer); active++; resolve(); }, refuse: () => { clearTimeout(timer); reject(capacity()); } };
+    const timer = setTimeout(() => { waiting.splice(waiting.indexOf(entry), 1); reject(capacity()); }, 2 * timeoutMs);
+    waiting.push(entry);
+  });
+  const release = () => { active--; waiting.shift()?.grant(); };
   const run = async <T>(operation: (signal: AbortSignal) => Promise<T>): Promise<T> => {
-    if (closed || active >= concurrency) throw new StorageError('unavailable', 'capacity');
-    active++;
+    await acquire();
     const signal = AbortSignal.timeout(timeoutMs);
     try { const result = await operation(signal); signal.throwIfAborted(); return result; }
     catch (error) { throw storageError(error); }
-    finally { active--; }
+    finally { release(); }
   };
   const assertKey = (key: string, prefixes: readonly string[]) => { if (!keyIs(key, prefixes)) throw new StorageError('invalid_object'); };
   return Object.freeze({
@@ -101,6 +114,6 @@ export function createPrivateObjectStorage(configuration: PrivateStorageConfigur
         if (output.$metadata.httpStatusCode !== 204) throw new StorageError('unavailable', 'response');
       });
     },
-    close: () => { closed = true; client.destroy(); },
+    close: () => { closed = true; for (const entry of waiting.splice(0)) entry.refuse(); client.destroy(); },
   });
 }
