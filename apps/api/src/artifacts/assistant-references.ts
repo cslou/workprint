@@ -5,10 +5,10 @@ import { idSchema, savedReferenceContentSchema, savedScriptContentSchema, script
 import { transaction } from '../db/index.js';
 import { parseContent } from './content.js';
 import { ArtifactError } from './errors.js';
-import { useRoom } from './generated-media.js';
 import { lockPublicationOwner, publishVersion } from './publication.js';
 import { verifiedMedia } from './references.js';
 import { createArtifactStore } from './store.js';
+import { useRoom as roomLeft } from './use-room.js';
 import { usedImageVersions } from './workspace-images.js';
 
 type OwnedCheck = Parameters<typeof createArtifactStore>[1];
@@ -50,6 +50,15 @@ async function currentSheets(client: PoolClient, account: string, conversation: 
   return rows.flatMap(row => { const sheet = savedReferenceContentSchema.safeParse(row.content); return sheet.success ? [{ ...row, sheet: sheet.data }] : []; });
 }
 
+/** Which of these image versions the video still uses, read under the lock on the transaction's own connection. */
+async function stillUsed(client: PoolClient, account: string, conversation: string, ids: readonly string[], sheets: readonly Sheet[]): Promise<Set<string>> {
+  const rows = ids.length ? (await client.query<{ version_id: string }>(`SELECT u.version_id FROM artifacts.conversation_uses u
+    JOIN artifacts.versions v ON v.owner_id=u.version_owner_id AND v.version_id=u.version_id
+    WHERE u.owner_id=$1 AND u.conversation_id=$2 AND u.purpose IN ('reference','panel_image') AND v.kind='image' AND u.version_id=ANY($3::text[])`, [account, conversation, ids])).rows : [];
+  const listed = new Set(sheets.flatMap(sheet => sheet.sheet.references.map(reference => reference.versionId)));
+  return new Set([...rows.map(row => row.version_id), ...ids.filter(id => listed.has(id))]);
+}
+
 /**
  * The assistant's sheet capability. It saves a script subject's sheet as a draft: the subject's first sheet as a new
  * reference, or the next version of its current sheet on the same use. It never overwrites a newer sheet, never
@@ -66,7 +75,7 @@ export function createAssistantReferences(pool: Pool, checkOwnedConversation: Ow
     /** How many more uses the video can hold, so a caller can refuse before any paid work. */
     async useRoom(account: string, conversation: string): Promise<number> {
       await owned(account, conversation);
-      return useRoom(pool, account, conversation);
+      return roomLeft(pool, account, conversation);
     },
 
     async save(account: string, conversation: string, input: AssistantSheetInput): Promise<AssistantSheetSave> {
@@ -85,6 +94,7 @@ export function createAssistantReferences(pool: Pool, checkOwnedConversation: Ow
         if (version?.kind !== 'image') throw new SheetSaveError('not_found');
       }
       if (!await verifiedMedia(pool, ids)) throw invalidImages();
+      const usedBefore = usedImageVersions(await reads.workspace(account, conversation));
 
       return transaction(pool, async client => {
         await lockPublicationOwner(client, account);
@@ -94,13 +104,13 @@ export function createAssistantReferences(pool: Pool, checkOwnedConversation: Ow
         const subjects = scriptSubjects(savedScriptContentSchema.parse(script.content));
         const subject = subjects.find(candidate => candidate.id === input.subjectId);
         if (!subject) throw new SheetSaveError('not_in_script');
-        // What the video uses is read after the owner lock, so no save that moves a use can land in between.
-        const used = usedImageVersions(await reads.workspace(account, conversation));
         const sheets = await currentSheets(client, account, conversation);
         const current = sheets.find(sheet => sheet.sheet.subject.id === subject.id);
         if ((current?.version_id ?? null) !== input.baseVersionId) throw new SheetSaveError('stale');
         if (current && current.sheet.references.length > maxSheetViews) throw invalidImages();
         // A view is an image the video uses, or one the base sheet already holds, even if its own use moved on.
+        // What the video used before the lock must still be used now, so a use moved meanwhile can't slip in.
+        const used = await stillUsed(client, account, conversation, ids.filter(id => usedBefore.has(id)), sheets);
         const allowed = new Set([...used, ...(current?.dependencies ?? [])]);
         if (ids.some(id => !allowed.has(id))) throw new SheetSaveError('not_found');
         for (const other of sheets) {
@@ -117,7 +127,7 @@ export function createAssistantReferences(pool: Pool, checkOwnedConversation: Ow
           });
         } catch { throw new SheetSaveError('invalid', 'text'); }
         // A new sheet adds a use; a next version moves the sheet's own use.
-        if (!current && await useRoom(client, account, conversation) === 0) throw new SheetSaveError('no_room');
+        if (!current && await roomLeft(client, account, conversation) === 0) throw new SheetSaveError('no_room');
         // The next version of the account's own sheet; a built-in sheet in use starts an owned one on the same use.
         const artifactId = current && current.version_owner_id === account ? current.artifact_id : undefined;
         const version = await publishVersion(client, { accountId: account, conversationId: conversation, artifactId, kind: 'reference', content, dependencies: ids, createdBy: 'assistant' });
