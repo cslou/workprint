@@ -68,6 +68,8 @@ test('a pending dot holds the reply\'s place, and the thread follows the newest 
   await message(page).press('Enter');
   await expect(live(page).locator('.wp-reply-pending')).toBeVisible();
   await expect(working(page)).toBeVisible();
+  // The page shows the dot before the request reaches the model, so wait for the hold before releasing it.
+  await provider.held();
   provider.release();
   await expect(working(page)).toHaveCount(0);
   await expect(live(page).locator('.wp-pending-dot')).toHaveCount(0);
