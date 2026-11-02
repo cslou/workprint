@@ -30,6 +30,10 @@ function memoryJobs() {
     interrupted: async (_: string, id: string) => move(id, ['running'], { status: 'interrupted' }),
     resumed: async (_: string, id: string) => move(id, ['interrupted'], { status: 'running' }),
     get: async (_: string, id: string) => { const row = rows.get(id); if (!row) throw new GenerationJobError('not_found'); return row; },
+    list: async (owner: string, conversation: string, options: { limit: number; status?: JobStatus }) => {
+      const matching = [...rows.values()].filter(job => job.accountId === owner && job.conversationId === conversation && (!options.status || job.status === options.status)).reverse();
+      return { jobs: matching.slice(0, options.limit), nextCursor: null };
+    },
   };
 }
 
@@ -171,4 +175,24 @@ test('saved work that fails says whether the create was sent', async () => {
   after.jobs.started = async () => { throw new Error('storage down'); };
   assert.deepEqual(await after.runner.start(account, video, input, control()), { kind: 'unavailable', created: true });
   assert.equal(after.calls.submits, 1);
+});
+
+test('stopped lists only this account\'s and video\'s interrupted jobs, newest first and at most five; a failed read is unavailable', async () => {
+  const { runner, jobs } = harness();
+  const stop = async (owner: string, conversation: string, inputs: string[] = []) => {
+    const job = await jobs.begin(owner, conversation, { prompt: 'p', inputs });
+    await jobs.started(owner, job.id, `task-${job.id}`); await jobs.interrupted(owner, job.id);
+    return job.id;
+  };
+  const ids: string[] = [];
+  for (let index = 0; index < 5; index++) ids.push(await stop(account, video));
+  ids.push(await stop(account, video, [randomUUID()]));
+  await stop(randomUUID(), video); await stop(account, randomUUID());
+  const running = await jobs.begin(account, video, { prompt: 'p', inputs: [] }); await jobs.started(account, running.id, 'task-running');
+  const listed = await runner.stopped(account, video);
+  assert.ok(listed.kind === 'read');
+  assert.deepEqual(listed.jobs.map(job => job.jobId), ids.slice(1).reverse());
+  assert.deepEqual(listed.jobs.map(job => job.frames), [1, 0, 0, 0, 0]);
+  jobs.list = async () => { throw new Error('storage down'); };
+  assert.deepEqual(await runner.stopped(account, video), { kind: 'unavailable' });
 });

@@ -453,6 +453,14 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
     assert.ok(completed(turn), JSON.stringify(turn.terminal));
     return { turn, result: toolResult(), lines: lines(turn) };
   };
+  /** One completed turn in which the model calls read-workspace; returns the stopped videos it was given. */
+  const readStopped = async (user: { id: string }, video: string) => {
+    provider.reset();
+    provider.script({ toolCalls: [{ name: 'read-workspace', args: {} }] }, { text: ['Found it'] });
+    const turn = await client(user).turn(video, 'Can you resume the video?', 60000);
+    assert.ok(completed(turn), JSON.stringify(turn.terminal));
+    return toolResult() as unknown as { stoppedVideos?: { jobId: string; frames: number }[] };
+  };
   /** Starts a turn that calls generate-video, and resolves its run id once accepted. */
   const running = (user: { id: string }, video: string, args: Record<string, unknown>, timeoutMs = 60000) => {
     provider.reset();
@@ -542,6 +550,7 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
     assert.deepEqual(line.at(-1), ['Making a video…', 'done', 'Stopped waiting for the video']);
     const [job] = await jobs(video);
     assert.equal(job!.status, 'interrupted'); assert.ok(queried() > 4, String(queried()));
+    assert.equal(minimax.creates, 1);
     minimax.reset();
     // The fake forgot the task on reset; its next answers are scripted, as MiniMax still has it.
     minimax.script.query({ task: 'succeeded' });
@@ -653,10 +662,15 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
     origin = await fixture.restartServer();
     const [job] = await settled(video, 'interrupted');
     assert.equal(minimax.creates, 1);
+    // No result in the history carries the id: the model finds it in read-workspace, as it would after a real restart.
+    const listing = await readStopped(owner, video);
+    assert.deepEqual(listing.stoppedVideos?.map(stopped => [stopped.jobId, stopped.frames]), [[job!.request_id, 0]]);
     minimax.script.query({ task: 'succeeded' });
-    const { result } = await generate(owner, video, { resume: job!.request_id });
+    const { result } = await generate(owner, video, { resume: listing.stoppedVideos![0]!.jobId });
     assert.ok(result.made, JSON.stringify(result));
     assert.equal(minimax.creates, 1);
+    // Saved, it is no longer listed as stopped.
+    assert.equal((await readStopped(owner, video)).stoppedVideos, undefined);
   });
 });
 

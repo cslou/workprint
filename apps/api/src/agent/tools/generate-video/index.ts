@@ -111,7 +111,7 @@ export const generateVideoTool = defineTool({
     'Write the prompt about motion: the subject, the one action it performs, how the camera moves (for example a slow push-in or a pan left), the setting and the mood. Keep it to one continuous shot.',
     'firstFrame and lastFrame are optional image versionIds from read-workspace: the clip starts on firstFrame and, when given, ends on lastFrame. A lastFrame needs a firstFrame. With frames, the ratio comes from them.',
     'Each call makes a new paid video. Make one call per video the user asked for.',
-    'If an earlier call stopped waiting, its result gave a jobId. When the user asks to continue or resume that video, call again with resume set to that jobId; the other fields are then ignored and nothing new is paid for.',
+    'If an earlier call stopped waiting, its result gave a jobId; read-workspace also lists stoppedVideos with theirs, for example after a restart. When the user asks to continue or resume that video, call again with resume set to that jobId; the other fields are then ignored and nothing new is paid for.',
     'Set showInChat to true when the user asked for a video directly, so it is shown in the chat.',
   ].join(' '),
   inputSchema: z.strictObject({
