@@ -33,8 +33,10 @@ export function useFollowBottom(scroller: RefObject<HTMLElement | null>, follow:
     const pin = () => { if (following.current) { element.scrollTop = element.scrollHeight; lastTop.current = element.scrollTop; } };
     const onScroll = () => { following.current = followsAfterScroll(element, lastTop.current, following.current); lastTop.current = element.scrollTop; };
     // Input arrives before its scroll event, so newly streamed text can't pull the reader back first.
-    const onWheel = (event: WheelEvent) => { if (event.deltaY < 0) following.current = false; };
-    const onKey = (event: KeyboardEvent) => { if (upKeys.has(event.key)) following.current = false; };
+    // A thread already at its top can't move, so no scroll event would ever resume following.
+    const leave = () => { if (element.scrollTop > 0) following.current = false; };
+    const onWheel = (event: WheelEvent) => { if (event.deltaY < 0) leave(); };
+    const onKey = (event: KeyboardEvent) => { if (upKeys.has(event.key)) leave(); };
     // Mutations run right after each DOM change, before the next frame's scroll event; resizes catch a shorter thread.
     const mutations = new MutationObserver(pin), resizes = new ResizeObserver(pin);
     element.addEventListener('scroll', onScroll, { passive: true });
