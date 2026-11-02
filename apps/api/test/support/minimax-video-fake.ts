@@ -1,5 +1,10 @@
+import { readFile } from 'node:fs/promises';
 import { createServer, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
+
+/** The MiniMax-shaped test clip and its expected facts, for every test that saves one (see fixtures/README.md). */
+export const GENERATED_CLIP = Object.freeze({ path: 'apps/api/test/support/fixtures/minimax-clip.mp4', width: 1344, height: 768, durationMs: 4042, frames: 97, hasAudio: true });
+export const generatedClip = () => readFile(GENERATED_CLIP.path);
 
 /** A scripted create answer. Without one, the fake starts a task and answers its id. */
 export type FakeCreateStep =

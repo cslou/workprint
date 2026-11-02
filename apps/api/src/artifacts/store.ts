@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod';
-import { workspaceResponseBytes, idSchema, operations, savedStoryboardContentSchema, useBindingSchema, useSchema, versionSchema, type OperationRequest, type OperationResponse, type Version } from '@workprint/contracts';
+import { workspaceResponseBytes, idSchema, operations, savedStoryboardContentSchema, clipUseSchema, useBindingSchema, useSchema, versionSchema, type OperationRequest, type OperationResponse, type Version } from '@workprint/contracts';
 import { transaction } from '../db/index.js';
 import { parseContent, assertContentDependencies } from './content.js';
 import { createCursors } from './cursor.js';
@@ -105,7 +105,14 @@ export function createArtifactStore(pool: Pool, checkOwnedConversation: Ownershi
     });
     if (rows.length > 100) throw new ArtifactError('integration_failure');
     await authorize(account, rows);
-    const work = rows.map(row => {
+    // The assistant's clips are their own uses; every other row is a use a person can make.
+    const isClip = (row: { binding: unknown }) => (row.binding as { purpose?: unknown } | null)?.purpose === 'video';
+    const generatedVideos = rows.filter(isClip).map(row => {
+      const use = clipUseSchema.safeParse({ id: row.use_id, versionId: row.version_id, binding: row.binding, state: row.state });
+      if (!use.success) throw new ArtifactError('integration_failure');
+      return { version: project(row), use: use.data, state: 'Draft' as const };
+    });
+    const work = rows.filter(row => !isClip(row)).map(row => {
       const use = useSchema.safeParse({ id: row.use_id, versionId: row.version_id, binding: row.binding, state: row.state });
       if (!use.success) throw new ArtifactError('integration_failure');
       return { version: project(row), use: use.data, state: use.data.state === 'approved' ? 'Ready' as const : 'Draft' as const };
@@ -116,7 +123,7 @@ export function createArtifactStore(pool: Pool, checkOwnedConversation: Ownershi
     // Every exact image bound to a Panel is a candidate; only an explicit human use approves one.
     const images = (shotId: string, panelId: string) => work.filter(item => item.use.binding.purpose === 'panel_image' && item.use.binding.shotId === shotId && item.use.binding.panelId === panelId);
     const videos = (shotId: string) => work.filter(item => item.use.binding.purpose === 'shot_video' && item.use.binding.shotId === shotId);
-    const response: OperationResponse<'workspace'> = { script, assets: work.filter(item => item.use.binding.purpose === 'reference'),
+    const response: OperationResponse<'workspace'> = { script, assets: work.filter(item => item.use.binding.purpose === 'reference'), generatedVideos,
       storyboard: { work: board, shots: planning?.shots.map(shot => ({ ...shot, panels: shot.panels.map(panel => ({ ...panel,
         candidateImageVersions: images(shot.shotId, panel.panelId).map(item => item.version),
         approvedImageVersionId: images(shot.shotId, panel.panelId).find(item => item.use.state === 'approved')?.version.id ?? null })),

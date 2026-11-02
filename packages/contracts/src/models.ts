@@ -15,6 +15,11 @@ export const useBindingSchema = z.discriminatedUnion('purpose', [
 ]);
 export const intendedUseSchema = useBindingSchema;
 export const useSchema = z.strictObject({ id: idSchema, versionId: idSchema, binding: useBindingSchema, state: z.enum(['draft', 'approved']) });
+/**
+ * A clip the assistant made for the video. Its `video` binding is written only by the assistant's save, so it is
+ * not a binding a person can use or intend (`useBindingSchema`), and it is always a draft.
+ */
+export const clipUseSchema = z.strictObject({ id: idSchema, versionId: idSchema, binding: z.strictObject({ purpose: z.literal('video') }), state: z.literal('draft') });
 const versionBase = { id: idSchema, artifactId: idSchema, builtIn: z.boolean().optional(), revision: revisionSchema, createdBy: z.enum(['human', 'assistant']), createdAt: z.iso.datetime(), dependencies: z.array(idSchema) };
 const media = z.strictObject({ contentType: z.string().min(1), byteSize: z.number().int().positive(), width: z.number().int().positive(), height: z.number().int().positive(), durationMs: z.number().nonnegative().optional(), hasAudio: z.boolean().optional() });
 export const versionSchema = z.discriminatedUnion('kind', [
@@ -43,7 +48,9 @@ const work = z.strictObject({ version: versionSchema, use: useSchema.nullable(),
 const panel = z.strictObject({ panelId: idSchema, order, description: z.string(), references: z.array(idSchema), candidateImageVersions: z.array(versionSchema), approvedImageVersionId: idSchema.nullable() });
 // Additive: exact owned videos bound to this Shot (uploads or earlier choices). Absence means none were projected.
 const shot = z.strictObject({ shotId: idSchema, order, intent: z.string().optional(), panels: z.array(panel), chosenVideoVersionId: idSchema.nullable(), candidateVideoVersions: z.array(versionSchema).optional() });
-export const workspaceSchema = z.strictObject({ script: work.nullable(), assets: z.array(work), storyboard: z.strictObject({ work: work.nullable(), shots: z.array(shot) }), videos: z.array(generationRequestSchema), pendingQuestion: questionSchema.nullable(), activeWork: z.array(z.strictObject({ type: z.enum(['generation', 'export']), id: idSchema, status: z.string().min(1) })), selectionRevision: revisionSchema });
+// Additive: the clips the assistant made for this video, as its `video` uses. Absence means none were projected.
+const clip = z.strictObject({ version: versionSchema, use: clipUseSchema, state: z.literal('Draft') });
+export const workspaceSchema = z.strictObject({ script: work.nullable(), assets: z.array(work), generatedVideos: z.array(clip).optional(), storyboard: z.strictObject({ work: work.nullable(), shots: z.array(shot) }), videos: z.array(generationRequestSchema), pendingQuestion: questionSchema.nullable(), activeWork: z.array(z.strictObject({ type: z.enum(['generation', 'export']), id: idSchema, status: z.string().min(1) })), selectionRevision: revisionSchema });
 export const storyboardEditSchema = z.array(z.strictObject({ shotId: idSchema, order, intent: z.string().optional(), panels: z.array(z.strictObject({ panelId: idSchema, order, description: z.string().optional(), references: z.array(idSchema) })) }));
 export type Version = z.infer<typeof versionSchema>;
 export type Question = z.infer<typeof questionSchema>;
