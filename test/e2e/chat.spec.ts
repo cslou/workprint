@@ -591,3 +591,32 @@ test('images the agent makes are shown under their line, each read once, and sta
   for (const number of [1, 2, 3]) await expect(replies.first().locator(`img[alt="Image ${number} · Version 1"]`)).toBeVisible();
   await expect(replies.last().locator('.wp-shown-image')).toHaveCount(0);
 });
+
+test('an edit of one image is its next version: Assets keeps one row, with the earlier version in its history', async ({ page, backend }) => {
+  const [account] = await backend.accounts(1);
+  const { provider, meta } = backend;
+  meta.reset();
+  provider.script({ toolCalls: [{ name: 'generate-image', args: { prompt: 'A quiet gallery bench' } }] }, { text: ['Saved it.'] });
+  await signIn(page, account!);
+  await message(page).fill('Save an image of a gallery bench');
+  await message(page).press('Enter');
+  await expect(live(page).getByText('Saved Image 1 · Version 1', { exact: true })).toBeVisible({ timeout: 45_000 });
+  const row = page.locator('.wp-asset-row');
+  await expect(row).toHaveCount(1);
+  const first = await row.getAttribute('data-media-version-id');
+  provider.script({ toolCalls: [{ name: 'generate-image', args: { prompt: 'The same bench at dusk', inputImages: [first], revises: first } }] }, { text: ['Changed it.'] });
+  await message(page).fill('Make it dusk');
+  await message(page).press('Enter');
+  await expect(live(page).getByText('Saved Image 1 · Version 2', { exact: true })).toBeVisible({ timeout: 45_000 });
+  await page.getByRole('tab', { name: 'Assets', exact: true }).click();
+  await expect(row).toHaveCount(1);
+  await expect(row).toHaveAccessibleName(/^Image 1 · Version 2/);
+  await row.click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('img', { name: 'Saved image', exact: true })).toBeVisible();
+  await dialog.locator('.wp-version-history summary').click();
+  await expect(dialog.locator('.wp-version-history summary')).toHaveText('Version history · 1 earlier');
+  await dialog.getByRole('button', { name: 'View version 1', exact: true }).click();
+  await expect(dialog.getByText('Viewing version 1', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('Image saved · Version 1', { exact: true })).toBeVisible();
+});

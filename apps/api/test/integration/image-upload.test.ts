@@ -207,6 +207,29 @@ describe('assistant-made images are checked, saved privately as the video\'s dra
         const tampered = createGeneratedImages(pool, check, { storage: { ...storage, read: async (...args: Parameters<typeof storage.read>) => { const stored = await storage.read(...args); const bytes = Buffer.from(stored.bytes); bytes.writeUInt8(bytes.readUInt8(bytes.length - 20) ^ 1, bytes.length - 20); return { ...stored, bytes }; } }, verifyMedia: verify });
         assert.deepEqual(await createImageInputReader(store, tampered.read)(account, video, [saved.versionId]), { kind: 'unavailable' });
       });
+
+      await t.test('revises makes the next version only of a draft image this video uses as its own; anything else is a new image', async () => {
+        const image = async (target: string, inputs: string[], revises?: string) => {
+          const outcome = await save(account, target, { bytes: testPng({ seed: 7 }), contentType: 'image/png', inputs, ...(revises ? { revises } : {}) });
+          assert.equal(outcome.kind, 'saved');
+          return store.version(account, (outcome as { versionId: string }).versionId);
+        };
+        const use = async (target: string, artifact: string) => (await pool.query<{ use_id: string; version_id: string; state: string }>('SELECT u.use_id,u.version_id,u.state FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.version_owner_id AND v.version_id=u.version_id WHERE u.owner_id=$1 AND u.conversation_id=$2 AND v.artifact_id=$3', [account, target, artifact])).rows;
+        const first = await image(video, []), [before] = await use(video, first.artifactId);
+        const next = await image(video, [first.id], first.id);
+        assert.deepEqual([next.artifactId, next.revision], [first.artifactId, 2]);
+        assert.deepEqual(await use(video, first.artifactId), [{ use_id: before!.use_id, version_id: next.id, state: 'draft' }], 'the same use moves to the next version');
+        // Another video that doesn't use the image, and a built-in image, give a new image.
+        assert.equal((await image(otherVideo, [next.id], next.id)).revision, 1);
+        const builtIn = (await pool.query<{ version_id: string; artifact_id: string }>('SELECT version_id,artifact_id FROM artifacts.versions WHERE owner_id=$1', [builtin])).rows[0]!;
+        const fromBuiltIn = await image(video, [builtIn.version_id], builtIn.version_id);
+        assert.notEqual(fromBuiltIn.artifactId, builtIn.artifact_id); assert.equal(fromBuiltIn.revision, 1);
+        // A person's approval is never replaced by an assistant draft: the edit is a new image, and the approval stays.
+        await pool.query("UPDATE artifacts.conversation_uses SET state='approved' WHERE owner_id=$1 AND use_id=$2", [account, before!.use_id]);
+        const kept = await image(video, [next.id], next.id);
+        assert.notEqual(kept.artifactId, first.artifactId);
+        assert.deepEqual(await use(video, first.artifactId), [{ use_id: before!.use_id, version_id: next.id, state: 'approved' }]);
+      });
     } finally { storage.close(); await native.close(); await pool.end(); await setup.end(); }
   });
 });
