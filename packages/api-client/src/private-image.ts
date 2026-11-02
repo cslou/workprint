@@ -23,6 +23,8 @@ async function readPrivateObject(value:string,signal:AbortSignal,policy:Policy):
   if(signal.aborted || url.username || url.password || url.hash || !url.searchParams.has('X-Amz-Signature') || (url.protocol!=='https:' && !(url.protocol==='http:' && ['127.0.0.1','localhost','[::1]'].includes(url.hostname))))return fail();
   // The deadline starts once the read has its turn.
   if(!await acquire(policy.slots,signal))return fail();
+  // A stop that lands as the turn comes would never reach the abort listener below.
+  if(signal.aborted){release(policy.slots);return fail();}
   let completed=false;const controller=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;let onAbort=()=>{};
   const interrupted=new Promise<ClientResult<never>>(resolve=>{onAbort=()=>{controller.abort();resolve(fail());};signal.addEventListener('abort',onAbort,{once:true});timer=setTimeout(onAbort,policy.timeoutMs);});
   const work=async():Promise<ClientResult<Blob>>=>{

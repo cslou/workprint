@@ -8,6 +8,7 @@ import { useEntryLocation, replaceEntry } from './auth/browser-entry.js';
 import type { PublicAuthConfig } from './auth/public-config.js';
 import { OwnedShell } from './shell/owned-shell.js';
 import { createConfiguredBrowserClient } from './api/runtime.js';
+import { forgetOwnedImages } from './api/owned-image-cache.js';
 import './ui/tokens.css';
 import './ui/foundations.css';
 
@@ -26,6 +27,8 @@ function Application() {
   useLayoutEffect(() => {
     const id = state.account?.accountId ?? null;
     if (previousAccount.current !== undefined && previousAccount.current !== id) {
+      // Before the next account's images are read: none of this account's stay in memory.
+      if (connection.kind === 'configured') forgetOwnedImages(connection.client);
       const url = new URL(location.href); url.searchParams.delete('conversation'); url.searchParams.delete('returnTo'); replaceEntry(url.pathname + url.search);
     }
     if (id !== null || previousAccount.current !== undefined) previousAccount.current = id;

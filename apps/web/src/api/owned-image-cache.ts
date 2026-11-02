@@ -49,3 +49,9 @@ export function readOwnedImage(client: Client, version: MediaVersion): Promise<O
   });
   return entry.read;
 }
+
+/** Forgets one version's copy, so the next read fetches it again: for an image that failed to show. */
+export function forgetOwnedImage(client: Client, versionId: string): void { kept.get(client)?.delete(versionId); }
+
+/** Forgets every copy read through this client: an account change must not keep the last account's images. */
+export function forgetOwnedImages(client: Client): void { kept.delete(client); }

@@ -1,7 +1,7 @@
 import { useEffect,useMemo,useState } from 'react';
 import type { Version } from '@workprint/contracts';
 import type { BrowserClient } from './client.js';
-import { readOwnedImage } from './owned-image-cache.js';
+import { forgetOwnedImage, readOwnedImage } from './owned-image-cache.js';
 
 export function useOwnedImage(connection:BrowserClient|undefined,current:Version|null){
   // A version never changes, so the first object seen for an id is kept: each workspace refresh hands over a new
@@ -21,5 +21,7 @@ export function useOwnedImage(connection:BrowserClient|undefined,current:Version
     return()=>{alive=false;if(object)URL.revokeObjectURL(object);};
   },[client,media,revision]);
   const state=snapshot?.id===version?.id&&snapshot?.revision===revision&&snapshot?.client===client?snapshot:{phase:'loading' as const};
-  return{...state,retry:()=>setRevision(n=>n+1),fail:()=>{if(version)setSnapshot({id:version.id,revision,client,phase:'error'});}};
+  return{...state,retry:()=>setRevision(n=>n+1),fail:()=>{if(!version)return;
+    // The copy itself may be what failed to show, so trying again reads it afresh.
+    if(client)forgetOwnedImage(client,version.id);setSnapshot({id:version.id,revision,client,phase:'error'});}};
 }
