@@ -15,10 +15,12 @@ const summaryCharacters = 60;
  * Projects one native tool call to its safe activity line, looking up the phrase and done summary in
  * the registry. An unregistered tool name (anything the model invented) or a malformed call id yields null.
  */
-export function projectToolActivity(registry: readonly AgentTool[], call: { toolCallId: unknown; toolName: unknown; state: ToolActivityState; output?: unknown }): ToolActivity | null {
+export function projectToolActivity(registry: readonly AgentTool[], call: { toolCallId: unknown; toolName: unknown; state: ToolActivityState; input?: unknown; output?: unknown }): ToolActivity | null {
   const tool = registry.find(candidate => candidate.id === call.toolName);
   if (!tool || typeof call.toolCallId !== 'string' || !callId.test(call.toolCallId)) return null;
-  const activity: ToolActivity = { toolCallId: call.toolCallId, tool: tool.id, phrase: tool.phrase ?? genericToolPhrase, state: call.state };
+  let phrase: string | undefined;
+  try { phrase = tool.phraseFor?.(call.input); } catch { phrase = undefined; }
+  const activity: ToolActivity = { toolCallId: call.toolCallId, tool: tool.id, phrase: phrase ?? tool.phrase ?? genericToolPhrase, state: call.state };
   if (call.state !== 'done' || !tool.doneSummary) return activity;
   let summary: string | undefined;
   try { summary = tool.doneSummary(call.output); } catch { summary = undefined; }

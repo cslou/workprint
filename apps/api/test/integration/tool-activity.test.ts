@@ -7,8 +7,10 @@ import { createAssistantScriptSaver } from '../../src/application/index.js';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
 import { accountBrowserFixture } from '../support/account-browser-fixture.js';
 import { chatComposition } from '../support/chat-composition.js';
+import { metaImageFake, testPng } from '../support/meta-image-fake.js';
 import { completed, nativeTurnClient } from '../support/native-turn-client.js';
 import { scriptedProvider } from '../support/scripted-provider.js';
+import { testStack } from '../support/test-stack.js';
 
 type Listing = { found: true; mode: 'listing'; items: { name: string; kind: string; versionId: string; use: string; state: string; text: string }[]; total: number; truncated: boolean };
 type Item = { found: true; mode: 'item'; item: { name: string; versionId: string; content?: { subject?: { name?: string } } } };
@@ -274,5 +276,78 @@ test('update-script saves the video\'s current script as a draft, and never over
     const third = await saveScript(owner.id, video, { baseVersionId: first, content: script('Mara floats.') });
     assert.ok(third.kind === 'saved' && third.revision === 3, JSON.stringify(third));
     assert.equal(await versions(owner.id, video), 3); assert.deepEqual(await current(video), [third.versionId, third.versionId, 'draft']);
+  });
+});
+
+type ImageResult = { made: true; images: { versionId: string; label: string; width: number; height: number }[]; failed: number; showInChat: boolean } | { made: false; reason: string; message: string };
+
+// generate-image through real turns: the fake Meta answers, and storage and the real decode check and keep the images.
+test('generate-image makes images with Meta and saves each as a draft image of the run\'s own video', { timeout: 300000 }, async t => {
+  const provider = await scriptedProvider(); t.after(provider.close);
+  const meta = await metaImageFake(); t.after(meta.close);
+  const { storage, media } = testStack();
+  const fixture = await accountBrowserFixture({ artifacts: true, storage, media: media.toolchain, composition: chatComposition(provider, {}, { url: meta.url }) });
+  const pool = new Pool({ connectionString: fixture.servingUrl, max: 2 });
+  t.after(async () => { await pool.end(); await fixture.close(); });
+  const store = createArtifactStore(pool, createOwnedConversationCheck(fixture.native));
+  const [owner, other] = [await fixture.auth.createAccount(), await fixture.auth.createAccount()];
+  const clients = new Map(await Promise.all([owner, other].map(async user => [user.id, nativeTurnClient(fixture.apiOrigin, await fixture.accessToken(user), user.id)] as const)));
+  const client = (user: { id: string }) => clients.get(user.id)!;
+  t.beforeEach(() => { provider.reset(); meta.reset(); });
+
+  /** One turn in which the model calls generate-image with `args`; returns what the tool gave the model and the activity lines. */
+  const generate = async (user: { id: string }, video: string, args: Record<string, unknown>) => {
+    provider.script({ toolCalls: [{ name: 'generate-image', args }] }, { text: ['Done'] });
+    const turn = await client(user).turn(video, 'Make an image');
+    assert.ok(completed(turn), JSON.stringify(turn.terminal));
+    const messages = (provider.requests[1]!.body as { messages: { role: string; content: unknown }[] }).messages;
+    const content = messages.findLast(message => message.role === 'tool')?.content;
+    assert.ok(content !== undefined, 'tool result sent to the model');
+    assert.ok(!JSON.stringify(provider.requests).includes('iVBORw0KGgo'), 'no image bytes reach the model');
+    const lines = turn.chunks.filter(chunk => chunk.type === 'tool-activity').map(chunk => [chunk.payload?.phrase, chunk.payload?.state, chunk.payload?.summary]);
+    return { lines, result: (typeof content === 'string' ? JSON.parse(content) : content) as ImageResult };
+  };
+  const made = async (video: string) => (await pool.query<{ version_id: string; created_by: string; provenance: string }>("SELECT version_id,created_by,provenance FROM artifacts.versions WHERE origin_conversation_id=$1 AND kind='image' ORDER BY publication_revision", [video])).rows;
+  const video = await client(owner).newVideo(), foreignVideo = await client(other).newVideo();
+  const tools = { enable_image_search: false, enable_web_search: false, enable_shell: false };
+
+  await t.test('generate with options: Meta gets the request, both images are saved as drafts, and only ids reach the model', async () => {
+    const { lines, result } = await generate(owner, video, { prompt: 'A quiet gallery bench', count: 2, size: '1536x1024', reasoning: 'low', imageSearch: false, webSearch: false, shell: false });
+    assert.equal(meta.requests.length, 1); assert.equal(meta.requests[0]!.path, '/v1/images/generations');
+    assert.deepEqual(meta.requests[0]!.body, { model: 'muse-image-1.0', prompt: 'A quiet gallery bench', response_format: 'b64_json', n: 2, size: '1536x1024', output_format: 'png', reasoning_strength: 'low', tool_enablement: tools });
+    const rows = await made(video);
+    assert.deepEqual(rows.map(row => [row.created_by, row.provenance]), [['assistant', 'assistant'], ['assistant', 'assistant']]);
+    assert.deepEqual(result, { made: true, failed: 0, showInChat: false, images: rows.map((row, index) => ({ versionId: row.version_id, label: `Image ${index + 1} · Version 1`, width: 64, height: 48 })) });
+    assert.deepEqual(lines, [['Making 2 images…', 'running', undefined], ['Making 2 images…', 'done', 'Saved 2 images']]);
+    assert.deepEqual((await store.workspace(owner.id, video)).assets.map(asset => asset.state), ['Draft', 'Draft']);
+  });
+
+  await t.test('edit: an image the video uses goes to Meta as its exact bytes, with Meta\'s defaults, and becomes a dependency', async () => {
+    const [input] = await made(video);
+    const { lines, result } = await generate(owner, video, { prompt: 'The same bench at dusk', inputImages: [input!.version_id], showInChat: true });
+    assert.equal(meta.requests[0]!.path, '/v1/images/edits');
+    assert.deepEqual(meta.requests[0]!.body, { model: 'muse-image-1.0', prompt: 'The same bench at dusk', response_format: 'b64_json', n: 1, size: 'auto', output_format: 'png', reasoning_strength: 'high',
+      tool_enablement: { enable_image_search: true, enable_web_search: true, enable_shell: true }, images: [{ image_url: `data:image/png;base64,${testPng({ seed: 1 }).toString('base64')}` }] });
+    assert.ok(result.made && result.showInChat);
+    assert.deepEqual((await store.version(owner.id, result.images[0]!.versionId)).dependencies, [input!.version_id]);
+    assert.deepEqual(lines.at(-1), ['Making an image…', 'done', 'Saved Image 3 · Version 1']);
+  });
+
+  await t.test('another account\'s image is not found, and nothing is sent to Meta', async () => {
+    const [input] = await made(video);
+    const { lines, result } = await generate(other, foreignVideo, { prompt: 'Borrow it', inputImages: [input!.version_id] });
+    assert.ok(!result.made && result.reason === 'input_not_found', JSON.stringify(result));
+    assert.deepEqual(lines.at(-1), ['Making an image…', 'done', 'Not made: an input image wasn’t found']);
+    assert.equal(meta.requests.length, 0); assert.deepEqual(await made(foreignVideo), []);
+  });
+
+  await t.test('a content-policy refusal says so and saves nothing', async () => {
+    meta.script({ status: 400, error: { type: 'invalid_request_error', code: 'content_policy_violation', message: 'refused' } });
+    const fresh = await client(owner).newVideo();
+    const { lines, result } = await generate(owner, fresh, { prompt: 'Something refused' });
+    assert.deepEqual(await made(fresh), []);
+    assert.ok(!result.made && result.reason === 'content_policy');
+    assert.deepEqual(lines.at(-1), ['Making an image…', 'done', 'Not made: the request was refused']);
+    assert.equal((await made(video)).length, 3);
   });
 });
