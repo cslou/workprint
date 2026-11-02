@@ -10,7 +10,7 @@ import { MediaReceipt } from '../ui/media-receipt.js';
 import type { ScriptProps } from './script.js';
 import { savedMaterialPresentation } from './content.js';
 import { useOwnedImage } from '../api/use-owned-image.js';
-import { assetLabels, type Version } from '@workprint/contracts';
+import { assetLabels, mediaVersionName, type Version } from '@workprint/contracts';
 import { useNearViewport } from '../ui/use-near-viewport.js';
 import './assets.css';
 
@@ -29,7 +29,7 @@ export function Assets({ connection, scope, workspace, prerequisites, onSaved }:
       const exact = prerequisites?.presentations.find((item) => item.versionId === version.id && item.revision === version.revision) ?? savedMaterialPresentation(version);
       return exact?.sheet ? <ReferenceSheet sheet={exact.sheet} state={selection.currentUse?.versionId === version.id && selection.currentUse.state === 'approved' ? 'Ready' : 'Draft'} {...(savedTextTarget({ kind: 'reference-description' }).read(version) !== null ? { description: <ManualVersionEditor connection={connection} scope={scope} version={version} target={{ kind: 'reference-description' }} label="Description" currentUse={selection.currentUse} readOnly={!editable} onSaved={selection.onSaved} /> } : {})} /> : <WorkspaceEmpty tab="assets" />;
     }}</VersionReview>
-  </ViewerDialog>)}{media.map(work => { const name = `${labels.get(work.version.artifactId) ?? (work.version.kind === 'video' ? 'Video' : 'Image')} · Version ${work.version.revision}`; return <ViewerDialog key={work.use?.id ?? work.version.id} title={name} trigger={<AriaButton className="wp-asset-row" data-media-version-id={work.version.id}>{work.version.kind === 'image' ? <AssetKeyImage connection={connection} version={work.version} /> : <span className="wp-asset-no-image" aria-hidden="true">Video</span>}<span><b>{name}</b><small>{work.version.media.width} × {work.version.media.height}</small></span></AriaButton>}>{close => work.version.kind === 'image' ? <VersionReview connection={connection} scope={scope} version={work.version} binding={{ purpose: 'reference' }} currentUse={work.use} selectionRevision={workspace.selectionRevision} {...(prerequisites?.history ? { historyPrerequisite: prerequisites.history } : {})}>{version => version.kind === 'image' ? <MediaReceipt connection={connection} version={version} close={close}/> : null}</VersionReview> : <MediaReceipt connection={connection} version={work.version} close={close}/>}</ViewerDialog>; })}</div>;
+  </ViewerDialog>)}{media.map(work => { const name = mediaVersionName(labels, work.version); return <ViewerDialog key={work.use?.id ?? work.version.id} title={name} trigger={<AriaButton className="wp-asset-row" data-media-version-id={work.version.id}>{work.version.kind === 'image' ? <AssetKeyImage connection={connection} version={work.version} /> : <span className="wp-asset-no-image" aria-hidden="true">Video</span>}<span><b>{name}</b><small>{work.version.media.width} × {work.version.media.height}</small></span></AriaButton>}>{close => work.version.kind === 'image' ? <VersionReview connection={connection} scope={scope} version={work.version} binding={{ purpose: 'reference' }} currentUse={work.use} selectionRevision={workspace.selectionRevision} {...(prerequisites?.history ? { historyPrerequisite: prerequisites.history } : {})}>{version => version.kind === 'image' ? <MediaReceipt connection={connection} version={version} close={close}/> : null}</VersionReview> : <MediaReceipt connection={connection} version={work.version} close={close}/>}</ViewerDialog>; })}</div>;
 }
 
 /**

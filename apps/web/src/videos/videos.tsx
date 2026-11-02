@@ -11,6 +11,7 @@ import { VersionReview } from '../versions/review.js';
 import { VersionUse } from '../versions/use.js';
 import { useExactVersion } from '../versions/reads.js';
 import { orderedStoryboard } from '../workspace/projection.js';
+import { GeneratedVideos } from './generated-videos.js';
 import { GenerationRequests } from './requests.js';
 import './videos.css';
 
@@ -43,7 +44,7 @@ function ScopedVideos(props: Props) {
     return [{ id, shotId: shot.shotId, number, title: shot.intent ?? `Shot ${number}`, selected: shot.chosenVideoVersionId }];
   })) ?? [];
   const selectionRevision = Math.max(props.workspace.selectionRevision, ...[...choices.values()].map(value => value.selectionRevision));
-  return <div className="wp-videos">{props.renderActions?.({ selectionRevision, workspace: props.workspace, versions: [...loaded.values()] })}{candidates.length ? candidates.map(row => <VideoCandidate key={JSON.stringify([row.shotId, row.id])} {...props} row={row} choice={choices.get(row.shotId) ?? null} onLoaded={observe} onUsed={(value, version) => { choose(row.shotId, value); props.onUsed?.(value, version); }} />) : <WorkspaceEmpty tab="videos" />}<GenerationRequests connection={props.connection} scope={props.scope} workspace={props.workspace} /></div>;
+  return <div className="wp-videos">{props.renderActions?.({ selectionRevision, workspace: props.workspace, versions: [...loaded.values()] })}<GeneratedVideos connection={props.connection} scope={props.scope} workspace={props.workspace} />{candidates.length ? candidates.map(row => <VideoCandidate key={JSON.stringify([row.shotId, row.id])} {...props} row={row} choice={choices.get(row.shotId) ?? null} onLoaded={observe} onUsed={(value, version) => { choose(row.shotId, value); props.onUsed?.(value, version); }} />) : props.workspace.generatedVideos?.length ? null : <WorkspaceEmpty tab="videos" />}<GenerationRequests connection={props.connection} scope={props.scope} workspace={props.workspace} /></div>;
 }
 function VideoCandidate({ connection, scope, workspace, prerequisites, row, choice, onUsed, onLoaded }: Props & { row: { id: string; shotId: string; number: number; title: string; selected: string | null }; choice: OperationResponse<'useVersion'> | null; onUsed(value: OperationResponse<'useVersion'>, version: Version): void; onLoaded(version: Version): void }) {
   const read = useExactVersion(connection.kind === 'configured' ? connection.client : null, scope, row.id);

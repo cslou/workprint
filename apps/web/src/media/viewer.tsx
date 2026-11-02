@@ -39,7 +39,8 @@ const copy = {
 } as const;
 const failureCopy = (code: string) => code === 'unauthenticated' ? copy.unauthenticated : code === 'not_implemented' ? copy.not_implemented : copy.failed;
 const idleSnapshot: PlayerSnapshot = { status: 'idle', sourceId: null, positionMs: 0, durationMs: null, failure: null };
-const format = (ms: number) => { const total = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`; };
+/** A clip time as the player shows it, for example `0:04`. */
+export const formatClipTime = (ms: number) => { const total = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`; };
 
 /** One shared exact-version viewer. It never fetches access or selects by viewing. */
 export function SingleClipViewer(props: Props) {
@@ -128,7 +129,7 @@ function ClipPlayer({ source }: { source: PlayerSource }) {
       </button>
       <span className="wp-clip-bar" aria-hidden="true"><i style={{ width: `${progress}%` }} /></span>
       <input type="range" className="wp-clip-seek" aria-label="Seek" min={0} max={Math.max(duration, 1)} step={50} value={position} disabled={duration <= 0} onChange={(event) => player.current?.seek(Number(event.currentTarget.value))} style={{ '--wp-clip-progress': `${progress}%` } as CSSProperties} />
-      <span className="wp-clip-time">{format(position)} / {format(duration)}</span>
+      <span className="wp-clip-time">{formatClipTime(position)} / {formatClipTime(duration)}</span>
     </> : <p className="wp-clip-note" role="status">{snapshot.status === 'failed' ? copy.failed : copy.loading}</p>}
   </div>;
 }
