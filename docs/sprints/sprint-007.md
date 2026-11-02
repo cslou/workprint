@@ -2,7 +2,7 @@
 
 **Date:** Start 2026-11-02, after Sprint 006 (PR #78) merged into `main` – End after completion gates and Lou's QA
 **Goal:** In a local build, a signed-in user asks the agent to write or change the video's script. The agent saves a new script version, which becomes the video's current script, and the Script tab shows it without a reload. An unsaved manual edit is not lost.
-**Status:** 🟢 Complete (Lou's QA and the merge to `main` pending)
+**Status:** 🟢 Complete
 
 ---
 
@@ -304,6 +304,7 @@ For descriptive-only work, use editorial review and applicable existing checks. 
   - **Run 3 at `824d57b`: every step passed.** update-script saved v1 on the first attempt, with no rephrase and no refused attempts. That first save now ignores the base. Other timings: send first chunk 1.9 s, with the 32,768 cap accepted; title 29 characters; echo tool and read-workspace with no rephrase; Stop acknowledged in 46 ms.
   - The sanitized shapes are committed.
   - After review, `5666333` changed only the not-found message and one description sentence. Neither is reachable from the live step, and the reviewer agreed a fourth run wasn't needed. `824d57b` is the live-verified head.
+- **QA:** Lou ran the QA build and passed it on 2026-11-02: the agent creates the script, then updates it. Lou gave the merge command the same day.
 - **QA build for Lou:** running at `c2f7d3c`.
   - Web is http://127.0.0.1:4179 and the API is :4180, with live Muse Spark.
   - It uses a dedicated synthetic account. Its credentials are in the 0600 file `outputs/qa/sprint-007/c2f7d3cfd2e6/credentials.json`.
