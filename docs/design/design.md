@@ -387,7 +387,7 @@ Each component has the same anchor here and on the [Components page](brand-book/
 - Keep each line to about 60 characters, with one result per line.
 - **Chat (Sprint 006 Story 3):** the server supplies each tool's phrase and done summary; the browser hard-codes none.
   - Lines sit inside the assistant's reply, in the order they happened, between its text.
-  - A running line shows the phrase, then `· 12s` elapsed time in tabular figures. Elapsed time appears only while this page watches the tool run.
+  - A running line shows the phrase, then `· 12s` elapsed time in tabular figures. From one minute it shows whole minutes, rounded down: `· 1 min` from 60 to 119 seconds, `· 2 min` from 120. Elapsed time appears only while this page watches the tool run.
   - A tool with no phrase shows "Working…".
   - A done line with no summary shows "Done".
   - A tool that failed, or never finished, shows its phrase without the ellipsis, then "· didn’t finish". It claims no result.
