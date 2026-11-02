@@ -199,6 +199,7 @@ Three stories is deliberate (Lou, 2026-11-02): the earlier "assistant script sav
   - **Not found means another artifact, not another video.** A base that isn't a version of the script artifact the video uses is not found. A version of that artifact saved from another video is stale. Only the refusal message differs.
   - **A built-in script in use** is adapted into a new owned script at v1, on the same use, as a draft. The built-in gains no version.
   - **The use limit** (100 per video) reports "saving is unavailable".
+  - **A first save ignores the base** (found at Sprint Completion, PR #82). In the first live run, Muse Spark called update-script on a video with no script but passed a base that wasn't null. The refusal didn't help it recover, even once it named the fix. A video with no script has nothing to overwrite, so its first save now ignores the base, and a not-found refusal on a video with a script names the current versionId. The AC's "not-found if the video doesn't own it" therefore applies only once the video has a script.
   - **No command journal.** Assistant saves write no `artifacts.commands` or `manual_changes` row. Nothing reads them yet. Backlog B-036 records this before later tools rely on the journal.
   - **Seam name.** It's `SaveAssistantScript(accountId, videoId, { content, baseVersionId })`, built by `createAssistantScriptSaver`.
 
