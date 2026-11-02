@@ -2,11 +2,10 @@ import { crc32 } from 'node:zlib';
 import { MAX_UPLOAD_IMAGE_BYTES, MAX_UPLOAD_VIDEO_BYTES } from '@workprint/contracts';
 import { UploadError } from './errors.js';
 import { requireStableAvc } from './media-avc.js';
+import { assistantVideoAllowance, type MediaOrigin } from './media-allowance.js';
 
 const invalid = () => new UploadError('invalid_input');
 const unsupported = () => new UploadError('unsupported');
-/** Who made the bytes. Only assistant-made images may carry the provider's AI-generated label. */
-export type MediaOrigin = 'upload' | 'assistant';
 const xmpKeyword = Buffer.from('XML:com.adobe.xmp\0', 'latin1');
 /**
  * The provider's XMP label: an uncompressed `iTXt` (flag and method 0) with the XMP keyword, a language tag
@@ -67,7 +66,7 @@ export function inspectMediaBytes(bytes: Uint8Array, kind: 'image' | 'video', co
       if(type==='ftyp'){if(p!==0 || n<16 || n%4 || b.toString('ascii',p+8,p+12)!=='isom')throw unsupported();for(let q=p+16;q<p+n;q+=4)if(!['isom','iso2','avc1','mp41'].includes(b.toString('ascii',q,q+4)))throw unsupported();}
       boxes.push(type);p+=n;
     }
-    if(['ftyp','moov','mdat'].some(t=>boxes.filter(x=>x===t).length!==1))throw invalid();requireStableAvc(b);return{};
+    if(['ftyp','moov','mdat'].some(t=>boxes.filter(x=>x===t).length!==1))throw invalid();requireStableAvc(b,origin==='assistant'&&assistantVideoAllowance.highProfileAvcC);return{};
   }
   throw unsupported();
 }

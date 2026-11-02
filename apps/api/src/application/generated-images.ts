@@ -1,4 +1,5 @@
-import { ArtifactError, UploadError, type GeneratedImageInput, type GeneratedImageSave, type StoredImage } from '../artifacts/index.js';
+import { ArtifactError, UploadError, usedImageVersions, type GeneratedImageInput, type GeneratedImageSave, type StoredImage } from '../artifacts/index.js';
+import { logFailure } from './failure-log.js';
 import type { SavedWorkReads } from './saved-reads.js';
 
 /** What saving an assistant-made image did. `refused` means the bytes didn't pass the media checks. */
@@ -8,11 +9,10 @@ export type GeneratedImageOutcome =
 /** Account and video come from trusted server context (an admitted native run), never from model arguments. */
 export type SaveGeneratedImage = (accountId: string, videoId: string, input: GeneratedImageInput, signal?: AbortSignal) => Promise<GeneratedImageOutcome>;
 
-/** Saved images as provider inputs. `not_found` covers the whole call when any id isn't an image this video uses. */
-export type ImageInputsOutcome = { kind: 'read'; images: { versionId: string; dataUrl: string }[] } | { kind: 'not_found' } | { kind: 'unavailable' };
+/** Saved images as provider inputs, with their saved size. `not_found` covers the whole call when any id isn't an image this video uses. */
+export type ImageInputsOutcome = { kind: 'read'; images: { versionId: string; dataUrl: string; width: number; height: number }[] } | { kind: 'not_found' } | { kind: 'unavailable' };
 export type ReadImageInputs = (accountId: string, videoId: string, versionIds: readonly string[]) => Promise<ImageInputsOutcome>;
 
-const log = (message: string, error: unknown) => console.error(message, { name: error instanceof Error ? error.name : 'unknown', ...(error instanceof UploadError || error instanceof ArtifactError ? { code: error.code } : {}) });
 
 /** In-process image saves for agent tools, over the assistant-only image capability. */
 export function createGeneratedImageSaver(save: (account: string, conversation: string, input: GeneratedImageInput, signal?: AbortSignal) => Promise<GeneratedImageSave>): SaveGeneratedImage {
@@ -23,34 +23,28 @@ export function createGeneratedImageSaver(save: (account: string, conversation: 
     } catch (error) {
       if (error instanceof UploadError && (error.code === 'invalid_input' || error.code === 'unsupported')) return { kind: 'refused' };
       if (error instanceof UploadError && error.code === 'not_found') return { kind: 'not_found' };
-      log('Generated image save failed', error);
+      logFailure('Generated image save failed', error);
       return { kind: 'unavailable' };
     }
   };
-}
-
-/** Image versions the video uses, in any use state: its images and every Panel's candidate images. */
-function usedImages(workspace: Awaited<ReturnType<SavedWorkReads['workspace']>>): Set<string> {
-  const versions = [...workspace.assets.map(asset => asset.version), ...workspace.storyboard.shots.flatMap(shot => shot.panels.flatMap(panel => panel.candidateImageVersions))];
-  return new Set(versions.filter(version => version.kind === 'image').map(version => version.id));
 }
 
 /** Reads saved images as data URLs, only when the owned video uses each exact image version. */
 export function createImageInputReader(reads: Pick<SavedWorkReads, 'workspace'>, read: (account: string, versionId: string) => Promise<StoredImage>): ReadImageInputs {
   return async (accountId, videoId, versionIds) => {
     try {
-      const used = usedImages(await reads.workspace(accountId, videoId));
+      const used = usedImageVersions(await reads.workspace(accountId, videoId));
       // At most Meta's 10 inputs, each named once.
       if (versionIds.length > 10 || new Set(versionIds).size !== versionIds.length || versionIds.some(id => !used.has(id))) return { kind: 'not_found' };
       const images = [];
       for (const id of versionIds) {
         const image = await read(accountId, id);
-        images.push({ versionId: image.versionId, dataUrl: `data:${image.contentType};base64,${image.bytes.toString('base64')}` });
+        images.push({ versionId: image.versionId, dataUrl: `data:${image.contentType};base64,${image.bytes.toString('base64')}`, width: image.width, height: image.height });
       }
       return { kind: 'read', images };
     } catch (error) {
       if ((error instanceof UploadError || error instanceof ArtifactError) && error.code === 'not_found') return { kind: 'not_found' };
-      log('Image input read failed', error);
+      logFailure('Image input read failed', error);
       return { kind: 'unavailable' };
     }
   };

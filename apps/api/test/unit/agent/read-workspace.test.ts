@@ -26,6 +26,19 @@ test('items are named by what they are and in order; uploads have no filename, s
   assert.deepEqual([listing.total, listing.truncated], [6, false]);
 });
 
+test('a clip the assistant made is listed as the video\'s next numbered video, with its exact version', () => {
+  const made: Version = { ...base('m1'), createdBy: 'assistant', kind: 'video', media: { contentType: 'video/mp4', byteSize: 10, width: 1344, height: 768, durationMs: 4042, hasAudio: true } };
+  const clip = { version: made, use: { id: 'use-m1', versionId: 'm1', binding: { purpose: 'video' as const }, state: 'draft' as const }, state: 'Draft' as const };
+  const listing = listWorkspace(workspace([image('i1')], { generatedVideos: [clip] }));
+  assert.deepEqual(listing.items.map(item => [item.name, item.versionId, item.use, item.state, item.text]), [
+    ['Image 1 · Version 1', 'i1', 'reference', 'Draft', 'image/png, 640×480'], ['Video 1 · Version 1', 'm1', 'generated video', 'Draft', 'video/mp4, 1344×768, 4 s'],
+  ]);
+  assert.equal(workspaceItem(workspace([], { generatedVideos: [clip] }), 'm1')?.name, 'Video 1 · Version 1');
+  // Clips are numbered with the video's other videos, so two never share a name.
+  const uploaded: Version = { ...base('u1'), kind: 'video', media: { contentType: 'video/mp4', byteSize: 10, width: 1280, height: 720, durationMs: 1000, hasAudio: true } };
+  assert.deepEqual(listWorkspace(workspace([uploaded], { generatedVideos: [clip] })).items.map(item => item.name), ['Video 1 · Version 1', 'Video 2 · Version 1']);
+});
+
 test('a listing stops at 50 items, then at 16 KiB, and every text stays within 200 characters', () => {
   const many = listWorkspace(workspace(Array.from({ length: 60 }, (_, index) => image(`i${index}`))));
   assert.deepEqual([many.items.length, many.total, many.truncated], [listingBounds.items, 60, true]);

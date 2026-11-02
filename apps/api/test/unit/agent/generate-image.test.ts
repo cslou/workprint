@@ -90,7 +90,7 @@ test('Stop during the call saves nothing; Stop after one of two saves keeps that
 test('an input named twice is read once, and with no way to save nothing is sent to Meta', async () => {
   const { collaborators, calls } = harness(async () => images(1));
   const id = randomUUID(), read: string[][] = [];
-  const reading: AgentCollaborators = { ...collaborators, readImageInputs: async (_account, _video, ids) => { read.push([...ids]); return { kind: 'read', images: ids.map(versionId => ({ versionId, dataUrl: 'data:image/png;base64,AA==' })) }; } };
+  const reading: AgentCollaborators = { ...collaborators, readImageInputs: async (_account, _video, ids) => { read.push([...ids]); return { kind: 'read', images: ids.map(versionId => ({ versionId, dataUrl: 'data:image/png;base64,AA==', width: 64, height: 48 })) }; } };
   assert.equal((await run(reading, { inputImages: [id, id] }) as { made: boolean }).made, true);
   assert.deepEqual(read, [[id]]);
   const unsaveable: AgentCollaborators = { readWorkspace: reading.readWorkspace, saveScript: reading.saveScript, readImageInputs: reading.readImageInputs, saveGeneratedImage: reading.saveGeneratedImage };
@@ -103,7 +103,7 @@ test('revises reaches the save only for one image made from that very image', as
   const id = randomUUID(), other = randomUUID(), revises: (string | undefined)[] = [];
   const { collaborators } = harness(async () => images(2));
   const recording: AgentCollaborators = { ...collaborators,
-    readImageInputs: async (_account, _video, ids) => ({ kind: 'read', images: ids.map(versionId => ({ versionId, dataUrl: 'data:image/png;base64,AA==' })) }),
+    readImageInputs: async (_account, _video, ids) => ({ kind: 'read', images: ids.map(versionId => ({ versionId, dataUrl: 'data:image/png;base64,AA==', width: 64, height: 48 })) }),
     saveGeneratedImage: async (account, video, input, signal) => { revises.push(input.revises); return collaborators.saveGeneratedImage(account, video, input, signal); } };
   await run(recording, { inputImages: [id], revises: id, count: 1 });
   await run(recording, { inputImages: [id], revises: other, count: 1 });

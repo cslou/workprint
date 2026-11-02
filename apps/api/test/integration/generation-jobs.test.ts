@@ -33,7 +33,7 @@ async function seeded({ pool, setup, jobs }: Store, status: 'running' | 'interru
   if (status === 'submitting') return id;
   await jobs.started(owner, id, `task-${id}`);
   if (status === 'interrupted') await jobs.interrupted(owner, id);
-  if (status === 'succeeded') await transaction(pool, async client => jobs.succeeded(client, owner, id, (await clip(client)).id));
+  if (status === 'succeeded') await transaction(pool, async client => jobs.succeeded(client, owner, conversation, id, (await clip(client)).id, []));
   return id;
 }
 
@@ -122,14 +122,15 @@ test('saved video jobs move only along their closed transitions', { timeout: 120
     let version = '';
     await assert.rejects(transaction(pool, async client => {
       version = (await clip(client)).id;
-      await jobs.succeeded(client, owner, job, version);
+      await jobs.succeeded(client, owner, conversation, job, version, []);
       throw new Error('save failed after the clip was stored');
     }), /save failed/);
     assert.equal((await pool.query('SELECT 1 FROM artifacts.versions WHERE version_id=$1', [version])).rowCount, 0, 'no clip rows remain');
     assert.equal((await jobs.get(owner, job)).status, 'running', 'the job is still waiting');
-    const saved = await transaction(pool, async client => { const made = await clip(client); return jobs.succeeded(client, owner, job, made.id); });
+    await assert.rejects(transaction(pool, async client => jobs.succeeded(client, owner, foreignConversation, job, (await clip(client)).id, [])), refused('not_found'), 'a clip of another video never completes this job');
+    const saved = await transaction(pool, async client => { const made = await clip(client); return jobs.succeeded(client, owner, conversation, job, made.id, []); });
     assert.deepEqual([saved.status, typeof saved.resultVersionId], ['succeeded', 'string']);
-    await assert.rejects(transaction(pool, async client => jobs.succeeded(client, owner, job, (await clip(client)).id)), refused('stale'));
+    await assert.rejects(transaction(pool, async client => jobs.succeeded(client, owner, conversation, job, (await clip(client)).id, [])), refused('stale'));
     assert.equal((await pool.query("SELECT count(*)::int AS n FROM artifacts.versions WHERE owner_id=$1 AND kind='video'", [owner])).rows[0].n, 1, 'a resume never saves a second clip');
   });
 });

@@ -5,13 +5,15 @@ import { describe, test } from 'node:test';
 import { Pool } from 'pg';
 import { PostgresStore } from '@mastra/pg';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
-import { createArtifactStore, createGeneratedImages, createMediaVerifier, createUploadCoordinator } from '../../src/artifacts/index.js';
-import { createGeneratedImageSaver, createImageInputReader } from '../../src/application/index.js';
+import { createArtifactStore, createGeneratedImages, createGeneratedVideos, createMediaVerifier, createUploadCoordinator } from '../../src/artifacts/index.js';
+import { createGeneratedImageSaver, createGeneratedVideoSaver, createImageInputReader } from '../../src/application/index.js';
+import { createGenerationJobs } from '../../src/generation/index.js';
 import { uploadRecords } from '../../src/artifacts/uploads/records.js';
 import { completeUpload } from '../../src/artifacts/uploads/completion.js';
 import { inspectMediaBytes } from '../../src/artifacts/uploads/media-bytes.js';
 import { createMediaSandbox, createPrivateObjectStorage, MediaProcessError } from '../../src/storage/index.js';
 import { pngChunk, testPng } from '../support/meta-image-fake.js';
+import { GENERATED_CLIP, generatedClip } from '../support/minimax-video-fake.js';
 import { testStack } from '../support/test-stack.js';
 import { applyArtifactMigrations } from '../support/artifact-database.js';
 import { createNativeConversation } from '../support/native-conversations.js';
@@ -231,5 +233,95 @@ describe('assistant-made images are checked, saved privately as the video\'s dra
         assert.deepEqual(await use(video, first.artifactId), [{ use_id: before!.use_id, version_id: next.id, state: 'approved' }]);
       });
     } finally { storage.close(); await native.close(); await pool.end(); await setup.end(); }
+  });
+});
+
+describe('assistant-made clips are checked with the MiniMax allowance and saved as the video\'s draft clips', { timeout: 120000 }, () => {
+  test('save with poster and frames, the job in the same transaction, media access and refusals', async t => {
+    const db = await testStack().testDatabase(); t.after(db.close);
+    const { storage: service, media: fixtures } = testStack();
+    const sandbox = await createMediaSandbox(fixtures.toolchain); t.after(() => sandbox.close());
+    const native = new PostgresStore({ id: 'generated-videos', connectionString: db.setupUrl, schemaName: 'mastra' });
+    const pool = new Pool({ connectionString: db.servingUrl, max: 4 });
+    const storage = createPrivateObjectStorage(service);
+    try {
+      await native.init(); await db.grantServing(); await applyArtifactMigrations(db.setupUrl);
+      const account = 'clip-owner', video = (await createNativeConversation(native, account)).id, otherVideo = (await createNativeConversation(native, account)).id;
+      const check = createOwnedConversationCheck(native), store = createArtifactStore(pool, check), verify = createMediaVerifier(sandbox), jobs = createGenerationJobs(pool);
+      const clip = await generatedClip();
+      const effects = { published: [] as string[], removed: [] as string[], checks: 0, verifyMs: [] as number[] };
+      const counted = { ...storage,
+        publish: async (...args: Parameters<typeof storage.publish>) => { effects.published.push(args[0]); return storage.publish(...args); },
+        remove: async (key: string) => { effects.removed.push(key); return storage.remove(key); },
+      };
+      let busyOnce = true;
+      const videos = createGeneratedVideos(pool, check, { storage: counted, capacityRetryMs: 20, verifyMedia: async input => {
+        effects.checks++;
+        if (busyOnce) { busyOnce = false; throw new MediaProcessError('capacity'); }
+        const started = Date.now();
+        try { return await verify(input); } finally { effects.verifyMs.push(Date.now() - started); }
+      } });
+      const saveClip = createGeneratedVideoSaver(videos.save, jobs);
+      const counts = async () => (await pool.query<{ versions: number; generated: number; uses: number }>('SELECT (SELECT count(*)::int FROM artifacts.versions) AS versions,(SELECT count(*)::int FROM artifacts.generated_objects) AS generated,(SELECT count(*)::int FROM artifacts.conversation_uses) AS uses')).rows[0];
+      const waiting = async (inputs: string[] = []) => { const job = await jobs.begin(account, video, { prompt: 'A slow push-in', inputs }); return jobs.started(account, job.id, `task-${job.id}`); };
+      // A frame is an image this video uses.
+      const frame = await createGeneratedImageSaver(createGeneratedImages(pool, check, { storage, verifyMedia: verify }).save)(account, video, { bytes: testPng({ seed: 9 }), contentType: 'image/png', inputs: [] });
+      assert.equal(frame.kind, 'saved'); if (frame.kind !== 'saved') return;
+
+      const job = await waiting([frame.versionId]);
+      const saved = await saveClip(account, video, { bytes: clip, frames: [frame.versionId], jobId: job.id });
+      assert.deepEqual(saved, { kind: 'saved', versionId: (saved as { versionId: string }).versionId, width: GENERATED_CLIP.width, height: GENERATED_CLIP.height, durationMs: GENERATED_CLIP.durationMs });
+      if (saved.kind !== 'saved') return;
+      assert.equal(effects.checks, 2, 'a busy checker is waited out, then the clip is checked once');
+      assert.ok(effects.verifyMs[0]! < 6000, `the clip verified in ${effects.verifyMs[0]} ms`);
+      const version = await store.version(account, saved.versionId);
+      assert.deepEqual([version.kind, version.createdBy, version.dependencies], ['video', 'assistant', [frame.versionId]]);
+      const objects = (await pool.query<{ object_key: string; content_type: string; sha256: string }>('SELECT object_key,content_type,sha256 FROM artifacts.generated_objects WHERE version_id=$1 ORDER BY content_type', [saved.versionId])).rows;
+      assert.deepEqual(objects.map(row => [row.object_key.split('/')[0], row.content_type]), [['posters', 'image/png'], ['published', 'video/mp4']]);
+      assert.equal(objects[1]!.sha256, hash(clip));
+      assert.deepEqual((await pool.query('SELECT purpose,state,binding FROM artifacts.conversation_uses WHERE version_id=$1', [saved.versionId])).rows, [{ purpose: 'video', state: 'draft', binding: { purpose: 'video' } }]);
+      assert.deepEqual([(await jobs.get(account, job.id)).status, (await jobs.get(account, job.id)).resultVersionId], ['succeeded', saved.versionId], 'the job succeeded with the clip');
+      // The clip is the video's draft clip, not one of its assets.
+      const workspace = await store.workspace(account, video);
+      assert.deepEqual(workspace.generatedVideos?.map(made => [made.version.id, made.state]), [[saved.versionId, 'Draft']]);
+      assert.ok(workspace.assets.every(asset => asset.version.id !== saved.versionId));
+      // Its signed URLs serve the exact clip and the saved poster.
+      const access = await createUploadCoordinator(pool, check, { storage, verifyMedia: verify }).media(account, saved.versionId);
+      const signed = await fetch(access.url, { credentials: 'omit', redirect: 'error' });
+      assert.equal(signed.status, 200); assert.equal(hash(new Uint8Array(await signed.arrayBuffer())), hash(clip));
+      assert.ok(access.poster, 'the clip has a poster');
+      const poster = await fetch(access.poster!, { credentials: 'omit', redirect: 'error' });
+      assert.equal(poster.status, 200); assert.equal(hash(new Uint8Array(await poster.arrayBuffer())), objects[0]!.sha256);
+      assert.deepEqual(access.measured, { width: GENERATED_CLIP.width, height: GENERATED_CLIP.height, durationMs: GENERATED_CLIP.durationMs, hasAudio: true });
+
+      await t.test('the same clip as an upload is refused, and refused or failed saves store nothing', async () => {
+        await assert.rejects(verify({ kind: 'video', bytes: clip, contentType: 'video/mp4', signal: AbortSignal.timeout(20000) }), { code: 'unsupported' }, 'uploads keep every rule');
+        const before = await counts(), published = effects.published.length, other = await waiting([frame.versionId]);
+        assert.deepEqual(await saveClip('clip-other', video, { bytes: clip, frames: [frame.versionId], jobId: other.id }), { kind: 'not_found' }, 'another account');
+        assert.deepEqual(await saveClip(account, otherVideo, { bytes: clip, frames: [frame.versionId], jobId: other.id }), { kind: 'not_found' }, 'a frame another video uses');
+        assert.deepEqual(await saveClip(account, video, { bytes: clip, frames: [randomUUID()], jobId: other.id }), { kind: 'not_found' });
+        assert.equal(effects.published.length, published, 'nothing is stored');
+        assert.equal((await jobs.get(account, other.id)).status, 'running', 'the job still waits');
+        // A second success for a finished job, a job of another video, or frames that aren't the job's own roll
+        // the save back and remove both stored objects.
+        const elsewhere = await jobs.started(account, (await jobs.begin(account, otherVideo, { prompt: 'Elsewhere', inputs: [frame.versionId] })).id, 'task-elsewhere');
+        for (const [frames, jobId] of [[[frame.versionId], job.id], [[frame.versionId], elsewhere.id], [[], other.id]] as const) {
+          assert.deepEqual(await saveClip(account, video, { bytes: clip, frames, jobId }), { kind: 'unavailable' }, jobId);
+        }
+        assert.equal(effects.removed.length, 6);
+        assert.deepEqual(effects.removed, effects.published.slice(published), 'each clip and its poster are removed');
+        assert.deepEqual([(await jobs.get(account, other.id)).status, (await jobs.get(account, elsewhere.id)).status], ['running', 'running']);
+        for (const key of effects.removed) await assert.rejects(storage.read(key), { code: 'not_found' });
+        assert.deepEqual(await counts(), before);
+      });
+
+      await t.test('generated objects keep their limits: images and posters 10 MiB, clips 100 MiB, posters only images', async () => {
+        const insert = (key: string, size: number, type: string) => pool.query('INSERT INTO artifacts.generated_objects(owner_id,object_key,version_id,sha256,byte_size,content_type) VALUES($1,$2,$3,$4,$5,$6)', [account, key, saved.versionId, hash(clip), size, type]);
+        const key = (prefix: string) => `${prefix}/${randomUUID()}/${randomUUID()}`;
+        for (const [prefix, size, type] of [['published', 10485761, 'image/png'], ['posters', 10485761, 'image/png'], ['published', 104857601, 'video/mp4'], ['posters', 1024, 'video/mp4'], ['staging', 1024, 'video/mp4']] as const) {
+          await assert.rejects(insert(key(prefix), size, type), { code: '23514' }, `${prefix} ${type} ${size}`);
+        }
+      });
+    } finally { storage.close(); await native.close(); await pool.end(); }
   });
 });
