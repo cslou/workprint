@@ -216,18 +216,12 @@ test('update-script saves the video\'s current script as a draft, and never over
     assert.ok(!JSON.stringify(provider.requests).includes('Private.'));
   });
 
-  await t.test('on a video with no script, a wrong base is refused with "pass null", and the retry in the same turn saves version 1', async () => {
+  await t.test('a video with no script has nothing to overwrite: a first save with any base, even a made-up one, is version 1', async () => {
     const fresh = await client(owner).newVideo();
-    provider.reset();
-    const valid = script('Mara dives in.');
-    provider.script({ toolCalls: [{ name: 'update-script', args: { baseVersionId: 'script-v1', script: valid } }] }, { toolCalls: [{ name: 'update-script', args: { baseVersionId: null, script: valid } }] }, { text: ['Saved'] });
-    const turn = await client(owner).turn(fresh, 'Write the script');
-    assert.ok(completed(turn), JSON.stringify(turn.terminal));
-    const refusal = (provider.requests[1]!.body as { messages: { role: string; content: unknown }[] }).messages.findLast(message => message.role === 'tool')?.content;
-    assert.match(typeof refusal === 'string' ? refusal : JSON.stringify(refusal), /has no script yet\. Call update-script again now with baseVersionId null/);
-    const summaries = turn.chunks.filter(chunk => chunk.type === 'tool-activity' && chunk.payload?.state === 'done').map(chunk => chunk.payload?.summary);
-    assert.deepEqual(summaries, ['Not saved: script not found', 'Saved version 1']);
-    assert.equal(await versions(owner.id, fresh), 1);
+    const { lines, result } = await updateScript(owner, fresh, { baseVersionId: 'script-v1', script: script('Mara dives in.') });
+    assert.ok('saved' in result && result.saved && result.version === 1, JSON.stringify(result));
+    assert.deepEqual(lines.at(-1), ['Updating the script…', 'done', 'Saved version 1']);
+    assert.equal(await versions(owner.id, fresh), 1); assert.deepEqual(await current(fresh), [result.versionId, result.versionId, 'draft']);
   });
 
   await t.test('content the saved-script schema refuses is not saved, and the line says so', async () => {
@@ -237,13 +231,15 @@ test('update-script saves the video\'s current script as a draft, and never over
     assert.equal(await versions(owner.id, video), 2); assert.deepEqual(await current(video), [second, second, 'draft']);
   });
 
-  await t.test('scope comes from the run: a missing video, or a base this video does not use, is not found', async () => {
+  await t.test('scope comes from the run: a missing video or another account\'s video is not found; another video\'s base never moves it', async () => {
     assert.deepEqual(await saveScript(owner.id, randomUUID(), { baseVersionId: null, content: script('Lost.') }), { kind: 'not_found' });
-    const unscripted = await client(owner).newVideo();
-    assert.deepEqual(await saveScript(owner.id, unscripted, { baseVersionId: second, content: script('Moved.') }), { kind: 'not_found' });
     assert.deepEqual(await saveScript(other.id, video, { baseVersionId: second, content: script('Taken.') }), { kind: 'not_found' });
-    assert.equal(await versions(owner.id, unscripted), 0); assert.equal(await versions(owner.id, video), 2);
-    assert.deepEqual(await current(unscripted), [undefined, undefined, undefined]); assert.deepEqual(await current(video), [second, second, 'draft']);
+    // A base from this account's other video starts this video's own script; the other video's script is untouched.
+    const unscripted = await client(owner).newVideo();
+    const own = await saveScript(owner.id, unscripted, { baseVersionId: second, content: script('Moved.') });
+    assert.ok(own.kind === 'saved' && own.revision === 1, JSON.stringify(own));
+    assert.equal(await versions(owner.id, unscripted), 1); assert.equal(await versions(owner.id, video), 2);
+    assert.deepEqual(await current(unscripted), [own.versionId, own.versionId, 'draft']); assert.deepEqual(await current(video), [second, second, 'draft']);
   });
 
   await t.test('two first saves at once make exactly one script; the other is stale', async () => {
