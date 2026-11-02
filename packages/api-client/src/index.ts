@@ -6,7 +6,8 @@ import { createNativeControl, type NativeTurnControls } from './native-control.j
 export type { NativeStopInput, NativeStopReceipt, NativeRunInput, NativeRunObservation } from './native-control.js';
 export type { NativeThread, NativeThreads, NativeMessages, NativeNavigation } from './native.js';
 export { nativeTransportLimits } from './native-turns.js';
-export type { NativeToolActivity, NativeToolActivityChunk, NativeHistoryPart } from './native-activity.js';
+export type { NativeShownMedia, NativeToolActivity, NativeToolActivityChunk, NativeHistoryPart } from './native-activity.js';
+export { shownMedia } from './native-activity.js';
 export type { NativeTurnScope, NativeTextInput, NativeSendReceipt, NativeObservedFinish, NativeObservedTurn, NativeTextDelta, NativeObservation } from './native-turns.js';
 
 import type { ClientError, ClientResult, CallOptions } from './types.js';

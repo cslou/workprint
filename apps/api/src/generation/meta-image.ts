@@ -5,6 +5,7 @@
  */
 
 import { MAX_UPLOAD_IMAGE_BYTES } from '@workprint/contracts';
+import { abortableDelay, readBounded } from './http.js';
 
 export const metaImageModel = 'muse-image-1.0';
 export const metaImageBaseUrl = 'https://api.meta.ai/v1';
@@ -128,23 +129,8 @@ function failure(status: number, text: string): MetaImageError {
 const responseLimit = (count: number) => count * Math.ceil(MAX_UPLOAD_IMAGE_BYTES * 4 / 3) + 64 * 1024;
 
 /** The body as text, read only up to `limit` bytes; a longer body is cancelled and fails. */
-async function boundedText(response: Response, limit: number): Promise<string> {
-  const declared = Number(response.headers.get('content-length'));
-  if (Number.isFinite(declared) && declared > limit) { await response.body?.cancel(); throw new MetaImageError('failed'); }
-  const reader = response.body?.getReader();
-  if (!reader) return '';
-  const chunks: Uint8Array[] = []; let size = 0;
-  try {
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > limit) { await reader.cancel(); throw new MetaImageError('failed'); }
-      chunks.push(value);
-    }
-  } finally { reader.releaseLock(); }
-  return Buffer.concat(chunks, size).toString('utf8');
-}
+const boundedText = async (response: Response, limit: number) => (await readBounded(response.body as AsyncIterable<Uint8Array> | null,
+  Number(response.headers.get('content-length') ?? NaN), limit, () => new MetaImageError('failed'), () => response.body?.cancel())).toString('utf8');
 
 function result(text: string, requested: ImageOutputFormat | undefined, requestId: string | null): ImageResult {
   let parsed: Record<string, unknown> | undefined;
@@ -194,11 +180,7 @@ export function createMetaImageClient(options: MetaImageClientOptions): MetaImag
     const limit = responseLimit(request.n ?? 1);
     let response = await attempt(path, payload, limit, signal);
     if (response.status === 503 || response.status === 429) {
-      await new Promise<void>(resolve => {
-        const stop = () => { clearTimeout(timer); resolve(); };
-        const timer = setTimeout(() => { signal?.removeEventListener('abort', stop); resolve(); }, retryDelayMs);
-        signal?.addEventListener('abort', stop, { once: true });
-      });
+      await abortableDelay(retryDelayMs, signal);
       if (signal?.aborted) throw new MetaImageError('aborted');
       response = await attempt(path, payload, limit, signal);
     }

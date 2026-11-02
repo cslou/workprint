@@ -51,6 +51,9 @@ test('missing or malformed configuration fails without echoing values', () => {
   assert.deepEqual(loadServerConfig(valid).assistant, { model: 'meta/muse-spark-1.3', apiKey: valid.META_API_KEY });
   // The image client uses the same server-only key, against Meta's API.
   assert.deepEqual(loadServerConfig(valid).images, { apiKey: valid.META_API_KEY, baseUrl: 'https://api.meta.ai/v1' });
+  // Video is optional: no key, no video client; a key goes only to MiniMax's API.
+  assert.equal(loadServerConfig(valid).videos, undefined);
+  assert.deepEqual(loadServerConfig({ ...valid, MINIMAX_API_KEY: 'harmless-minimax-key' }).videos, { apiKey: 'harmless-minimax-key', baseUrl: 'https://api.minimax.io' });
   assert.equal(loadServerConfig({ ...valid, SUPABASE_URL: 'https://auth.example.invalid' }).supabase.url, 'https://auth.example.invalid');
 });
 
@@ -63,6 +66,8 @@ test('model and key failures name only the setting, never the key', () => {
     [{ ...valid, DEFAULT_ASSISTANT_MODEL: 'mock/muse-spark-1.3' }, 'DEFAULT_ASSISTANT_MODEL'],
     [{ ...valid, META_API_KEY: undefined }, 'META_API_KEY'],
     [{ ...valid, META_API_KEY: `${key}\n` }, 'META_API_KEY'],
+    [{ ...valid, MINIMAX_API_KEY: `${key} with space` }, 'MINIMAX_API_KEY'],
+    [{ ...valid, MINIMAX_API_KEY: '' }, 'MINIMAX_API_KEY'],
   ] as const) {
     assert.throws(() => loadServerConfig(env), (error: unknown) => {
       assert.ok(error instanceof Error);

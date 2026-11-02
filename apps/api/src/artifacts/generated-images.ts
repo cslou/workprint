@@ -1,9 +1,10 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import { idSchema, MAX_UPLOAD_IMAGE_BYTES, useSchema, type Version } from '@workprint/contracts';
 import { transaction } from '../db/index.js';
 import type { PrivateObjectStorage } from '../storage/index.js';
+import { digest, requireUseRoom, withStoredObjects } from './generated-media.js';
 import { protectedMediaObjects } from './media-objects.js';
 import { lockPublicationOwner, publishVersion } from './publication.js';
 import { BUILT_IN_OWNER, createArtifactStore } from './store.js';
@@ -14,8 +15,8 @@ import type { MediaVerifier, OwnedCheck } from './uploads/types.js';
 /** `revises`, one of `inputs`, names the image this one changes: it is saved as that image's next version. */
 export type GeneratedImageInput = Readonly<{ bytes: Uint8Array; contentType: string; inputs: readonly string[]; revises?: string | undefined }>;
 export type GeneratedImageSave = Readonly<{ version: Extract<Version, { kind: 'image' | 'video' }>; use: z.infer<typeof useSchema> }>;
-/** One saved image's exact bytes, checked against its record. */
-export type StoredImage = Readonly<{ versionId: string; contentType: string; bytes: Buffer }>;
+/** One saved image's exact bytes, checked against its record, with its saved size. */
+export type StoredImage = Readonly<{ versionId: string; contentType: string; bytes: Buffer; width: number; height: number }>;
 export type GeneratedImageCollaborators = Readonly<{
   /** Like uploads, only backend composition supplies these; without them saves and reads are unavailable. */
   storage?: PrivateObjectStorage | undefined; verifyMedia?: MediaVerifier | undefined;
@@ -23,7 +24,6 @@ export type GeneratedImageCollaborators = Readonly<{
   capacityWaitMs?: number; capacityRetryMs?: number;
 }>;
 
-const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 const inputsSchema = z.array(idSchema).max(10).refine(ids => new Set(ids).size === ids.length);
 const binding = { purpose: 'reference' } as const;
 
@@ -59,10 +59,7 @@ export function createGeneratedImages(pool: Pool, checkOwnedConversation: OwnedC
         const id = randomUUID(), key = `published/${id}/${id}`, sha256 = digest(bytes);
         // A stopped run stores nothing after its check.
         signal?.throwIfAborted();
-        const object = await storage.publish(key, bytes, input.contentType);
-        try {
-          if (object.sha256 !== sha256 || object.byteSize !== bytes.length) throw new UploadError('integration_failure');
-          return await transaction(pool, async client => {
+        return await withStoredObjects(storage, [{ key, bytes, contentType: input.contentType }], () => transaction(pool, async client => {
             await lockPublicationOwner(client, account);
             // An edit of one of this video's own images is that image's next version, in the same place in the video.
             // A built-in image, or one the video doesn't use as an image, can't be revised: the edit is a new image.
@@ -72,10 +69,7 @@ export function createGeneratedImages(pool: Pool, checkOwnedConversation: OwnedC
               JOIN artifacts.versions r ON r.owner_id=$1 AND r.version_id=$3 AND r.artifact_id=v.artifact_id
               WHERE u.owner_id=$1 AND u.conversation_id=$2 AND u.purpose='reference' AND u.state='draft' AND u.version_owner_id=$1 AND v.kind='image'
               ORDER BY u.created_at,u.use_id LIMIT 1 FOR UPDATE OF u`, [account, conversation, input.revises])).rows[0] : undefined;
-            if (!revised) {
-              const count = (await client.query<{ count: number }>('SELECT count(*)::int AS count FROM artifacts.conversation_uses WHERE owner_id=$1 AND conversation_id=$2', [account, conversation])).rows[0]!.count;
-              if (count >= 100) throw new UploadError('integration_failure');
-            }
+            if (!revised) await requireUseRoom(client, account, conversation);
             // No base check: edits made at once land as successive versions, and none is lost.
             const version = await publishVersion(client, { accountId: account, conversationId: conversation, artifactId: revised?.artifact_id, kind: 'image', media, dependencies: input.inputs, createdBy: 'assistant' });
             if (version.kind !== 'image') throw new UploadError('integration_failure');
@@ -86,13 +80,7 @@ export function createGeneratedImages(pool: Pool, checkOwnedConversation: OwnedC
             if (revised) await client.query("UPDATE artifacts.conversation_uses SET version_id=$1,state='draft' WHERE owner_id=$2 AND use_id=$3", [version.id, account, use.id]);
             else await client.query("INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state) VALUES($1,$2,$3,$4,$5,'reference','draft')", [account, conversation, use.id, version.id, binding]);
             return { version, use };
-          });
-        } catch (error) {
-          // Nothing saved points at the object, so it never outlives the failed save.
-          try { await storage.remove(key); }
-          catch (removeError) { throw new AggregateError([uploadError(error), uploadError(removeError)], 'Generated image cleanup failed', { cause: removeError }); }
-          throw error;
-        }
+          }), 'Generated image');
       } catch (error) {
         if (error instanceof AggregateError) throw error;
         throw uploadError(error);
@@ -110,7 +98,7 @@ export function createGeneratedImages(pool: Pool, checkOwnedConversation: OwnedC
         const stored = await storage.read(object.objectKey, Math.min(version.media.byteSize, MAX_UPLOAD_IMAGE_BYTES));
         // The bytes must be the ones that were checked and saved, not whatever the object holds now.
         if (stored.byteSize !== version.media.byteSize || digest(stored.bytes) !== object.sha256) throw new UploadError('integration_failure');
-        return { versionId, contentType: version.media.contentType, bytes: stored.bytes };
+        return { versionId, contentType: version.media.contentType, bytes: stored.bytes, width: version.media.width, height: version.media.height };
       } catch (error) { throw uploadError(error); }
     },
   });

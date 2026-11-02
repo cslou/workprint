@@ -49,6 +49,24 @@ test('response contracts retain exact proposal/question targets and decode only 
   assert.equal(errorEnvelopeSchema.safeParse({ error: { code: 'success', message: 'ok' } }).success, false);
   assert.equal(errorEnvelopeSchema.safeParse({ error: { code: 'invalid_input', message: 'bad', stack: 'private' } }).success, false);
   assert.equal(errorEnvelopeSchema.safeParse({ error: { code: 'invalid_input', message: 'bad', details: { token: 'private' } } }).success, false);
+  // The assistant's clips are their own draft `video` uses, which no person can use or intend.
+  const clipVersion = { id: 'clip-v', artifactId: 'clip', revision: 1, createdBy: 'assistant', createdAt: '2026-11-02T12:00:00Z', dependencies: [], kind: 'video', media: { contentType: 'video/mp4', byteSize: 1024, width: 1344, height: 768, durationMs: 4042, hasAudio: true } };
+  const clip = { version: clipVersion, use: { id: 'u', versionId: 'clip-v', binding: { purpose: 'video' }, state: 'draft' }, state: 'Draft' };
+  const emptyWorkspace = { script: null, assets: [], storyboard: { work: null, shots: [] }, videos: [], pendingQuestion: null, activeWork: [], selectionRevision: 0 };
+  assert.equal(operations.workspace.response.safeParse({ ...emptyWorkspace, generatedVideos: [clip] }).success, true);
+  assert.equal(operations.workspace.response.safeParse({ ...emptyWorkspace, generatedVideos: [{ ...clip, use: { ...clip.use, state: 'approved' }, state: 'Ready' }] }).success, false, 'a clip is always a draft');
+  assert.equal(operations.workspace.response.safeParse({ ...emptyWorkspace, assets: [clip] }).success, false, 'a clip use is not an asset use');
+  assert.equal(operations.useVersion.request.safeParse({ params: { id: 'c' }, query: {}, body: { purpose: 'video', operationId: 'o', versionId: 'clip-v' } }).success, false);
+  assert.equal(operations.requestUpload.request.safeParse({ params: { id: 'c' }, query: {}, body: { operationId: 'o', kind: 'video', filename: 'a.mp4', contentType: 'video/mp4', byteSize: 10, intendedUse: { purpose: 'video' } } }).success, false);
+  // Generation jobs: the video variant has no target, batch or proposal; the others keep their shape.
+  const video = { id: 'j', purpose: 'video', status: 'interrupted', revision: 3, remote: { taskId: '459000874041694' } };
+  assert.deepEqual(operations.generationRequest.response.parse(video), video);
+  for (const failureReason of ['expired', 'check_refused', 'outcome_unknown']) assert.equal(operations.generationRequest.response.safeParse({ ...video, status: 'failed', failureReason }).success, true, failureReason);
+  for (const extra of [{ batchId: 'b' }, { proposalId: 'p' }, { target: { shotId: 's' } }]) assert.equal(operations.generationRequest.response.safeParse({ ...video, ...extra }).success, false, JSON.stringify(extra));
+  const shotJob = { id: 'g', batchId: 'b', proposalId: 'p', purpose: 'shot_video', target: { shotId: 's' }, status: 'running', remote: {} };
+  assert.deepEqual(operations.generationRequest.response.parse(shotJob), shotJob);
+  assert.equal(operations.generationRequest.response.safeParse({ ...shotJob, batchId: undefined }).success, false, 'existing variants still need their batch');
+  assert.equal(operations.generationRequest.response.safeParse({ ...shotJob, purpose: 'reference_image', target: { role: 'hero' }, proposalId: undefined }).success, false);
   const exported = { id: 'e', status: 'succeeded', capturedSelectionRevision: 7, current: false, sources: [{ shotId: 's', versionId: 'v', order: 0 }], compatibility: { compatible: true, issues: [] }, outputVersionId: 'output-v' };
   assert.deepEqual(operations.export.response.parse(exported), exported);
   assert.equal(operations.export.response.safeParse({ ...exported, nativeRun: {} }).success, false);

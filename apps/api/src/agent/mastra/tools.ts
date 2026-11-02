@@ -1,5 +1,5 @@
 import { createTool } from '@mastra/core/tools';
-import type { AgentCollaborators, AgentTool, ToolScope } from '../tools/index.js';
+import type { AgentCollaborators, AgentTool, ToolAbortReason, ToolScope } from '../tools/index.js';
 
 const uuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 
@@ -11,8 +11,25 @@ function trustedScope(context: { agent?: { threadId?: string; resourceId?: strin
   return { accountId, videoId };
 }
 
-/** Builds the native tool set once, so the tool list sent to the model stays identical across turns. */
-export function nativeTools(registry: readonly AgentTool[], collaborators: AgentCollaborators) {
+/**
+ * Why a tool's signal fired, from what Mastra 1.79 reports: the turn deadline (`timeout.totalMs`) aborts the
+ * run with a `MastraTimeoutError` whose `timeoutType` is `total`, and Stop (`threads/abort`) aborts it with no
+ * reason, a plain AbortError. A shutdown aborts the binding's own signal with its own reason. The combined
+ * signal keeps the reason of whichever fired first, so a later abort never changes the answer.
+ */
+function abortReason(signal: AbortSignal, shutdown: AbortSignal): ToolAbortReason | undefined {
+  if (!signal.aborted) return undefined;
+  if (shutdown.aborted && signal.reason === shutdown.reason) return 'shutdown';
+  const reason: unknown = signal.reason;
+  const deadline = reason instanceof Error && reason.name === 'MastraTimeoutError' && (reason as { timeoutType?: unknown }).timeoutType === 'total';
+  return deadline ? 'deadline' : 'stop';
+}
+
+/**
+ * Builds the native tool set once, so the tool list sent to the model stays identical across turns.
+ * Each call's signal fires on its run's abort or on `shutdown`.
+ */
+export function nativeTools(registry: readonly AgentTool[], collaborators: AgentCollaborators, shutdown: AbortSignal) {
   const ids = new Set<string>();
   const tools: Record<string, ReturnType<typeof createTool>> = {};
   for (const tool of registry) {
@@ -22,11 +39,10 @@ export function nativeTools(registry: readonly AgentTool[], collaborators: Agent
       id: tool.id,
       description: tool.description,
       inputSchema: tool.inputSchema,
-      execute: async (input, context) => tool.execute(input, {
-        scope: trustedScope(context),
-        collaborators,
-        signal: context.abortSignal ?? new AbortController().signal,
-      }),
+      execute: async (input, context) => {
+        const signal = context.abortSignal ? AbortSignal.any([context.abortSignal, shutdown]) : shutdown;
+        return tool.execute(input, { scope: trustedScope(context), collaborators, signal, abortReason: () => abortReason(signal, shutdown) });
+      },
     });
   }
   return Object.freeze(tools);

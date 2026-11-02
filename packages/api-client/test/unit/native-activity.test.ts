@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { isHistoryPart } from '../../src/native-activity.js';
+import { isHistoryPart, shownMedia } from '../../src/native-activity.js';
 import { nativeOutcome } from '../../src/native-outcome.js';
 
 const runId = '11111111-1111-4111-8111-111111111111', messageId = '22222222-2222-4222-8222-222222222222';
@@ -34,12 +34,22 @@ test('saved history accepts text and exact tool activity parts only', () => {
   for (const bad of [{ ...line, result: {} }, { ...line, state: 'running?' }, { ...line, tool: 'Read Workspace' }, { type: 'tool-invocation', toolInvocation: {} }, { type: 'reasoning', text: 'private' }]) assert.equal(isHistoryPart(bad), false, JSON.stringify(bad));
 });
 
-test('a line\'s shown images are 1 to 10 version ids (UUIDs) and nothing else', () => {
+test('a line\'s shown media are 1 to 10 image or video version ids (UUIDs), and a line in the earlier images shape still shows its images', () => {
   const line = { type: 'tool-activity', toolCallId: 'call_1', tool: 'generate-image', phrase: 'Making an image…', state: 'done', summary: 'Saved Image 1 · Version 1' };
   const ids = Array.from({ length: 11 }, (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`);
-  assert.ok(isHistoryPart({ ...line, images: ids.slice(0, 10) }));
+  const media = ids.slice(0, 10).map((versionId, index) => ({ kind: index ? 'image' : 'video', versionId }));
+  assert.ok(isHistoryPart({ ...line, media }));
+  for (const bad of [[{ kind: 'image', versionId: 'not-a-uuid' }], ids.map(versionId => ({ kind: 'image', versionId })), [], [{ kind: 'audio', versionId: ids[0] }], [{ kind: 'image', versionId: ids[0], src: 'x' }], [ids[0]]]) {
+    assert.equal(isHistoryPart({ ...line, media: bad }), false, JSON.stringify(bad));
+  }
+  // The shape saved before videos: image ids only.
+  const earlier = { ...line, images: ids.slice(0, 2) };
+  assert.ok(isHistoryPart(earlier));
+  assert.deepEqual(shownMedia(earlier as never), ids.slice(0, 2).map(versionId => ({ kind: 'image', versionId })));
+  assert.deepEqual(shownMedia({ ...line, media } as never), media);
   for (const images of [['not-a-uuid'], ids, [], [{ id: ids[0] }], ids[0]]) assert.equal(isHistoryPart({ ...line, images }), false, JSON.stringify(images));
-  assert.equal(isHistoryPart({ ...line, images: [ids[0]], thumbnails: [] }), false, 'an extra key');
+  assert.equal(isHistoryPart({ ...line, images: [ids[0]], media: [media[0]] }), false, 'one shape per line');
+  assert.equal(isHistoryPart({ ...line, media: [media[0]], thumbnails: [] }), false, 'an extra key');
 });
 
 test('a run observation\'s abort event ends the turn as interrupted', () => {

@@ -57,6 +57,7 @@ test('Stop ends exactly the turn it names, including a running tool, and nothing
     assert.ok(interrupted(ended), JSON.stringify(ended.terminal));
     await wait(1000);
     assert.equal(provider.gate().aborted(), true, 'the tool observed the abort');
+    assert.deepEqual(provider.gate().reasons(), ['stop']);
     assert.equal(provider.requests.length + provider.unscripted.length, 1, 'no model step after Stop');
   });
 
@@ -84,5 +85,62 @@ test('Stop ends exactly the turn it names, including a running tool, and nothing
     assert.equal((await stop(stranger, owner.id, video, runId)).status, 400, 'a claimed scope is not ownership');
     provider.release();
     assert.ok(completed(await turn));
+  });
+});
+
+// Long turns (Sprint 009 Story 2) on a server whose route and Node timeouts are shrunk to 1 s and whose
+// turn deadline is 5 s.
+test('a turn outlasts the route and Node timeouts, and tools learn why they were stopped', { timeout: 300000 }, async t => {
+  const provider = await scriptedProvider(); t.after(provider.close);
+  const node = { requestTimeout: 1000, headersTimeout: 1000, keepAliveTimeout: 1000, connectionsCheckingInterval: 100 };
+  const fixture = await accountBrowserFixture({ composition: chatComposition(provider, { turnMs: 5000 }, undefined, { routeTimeoutMs: 1000, node, slowRoute: true }) }); t.after(fixture.close);
+  const owner = await fixture.auth.createAccount(), token = await fixture.accessToken(owner);
+  const client = nativeTurnClient(fixture.apiOrigin, token, owner.id);
+  t.beforeEach(() => provider.reset());
+
+  await t.test('a tool held for 2 s finishes and its reply is saved', async () => {
+    const video = await client.newVideo();
+    provider.script({ toolCalls: [{ name: 'test-gated', args: {} }] }, { text: ['Finished ', 'after the wait'] });
+    const started = Date.now();
+    const turn = client.turn(video, 'Run the gated tool');
+    await provider.gate().reached; await wait(2000); provider.openGate();
+    const ended = await turn;
+    assert.ok(completed(ended), JSON.stringify(ended.terminal)); assert.equal(ended.text, 'Finished after the wait');
+    assert.ok(Date.now() - started >= 2000);
+    const saved = await (await client.get(`/memory/threads/${video}/messages?page=0&perPage=20`)).json() as { messages: { role: string }[] };
+    assert.deepEqual(saved.messages.map(message => message.role).sort(), ['assistant', 'user']);
+  });
+
+  await t.test('a route that is not a turn still times out at 1 s', async () => {
+    const started = Date.now();
+    const response = await client.get('/test/slow');
+    assert.equal(response.status, 504); await response.body?.cancel();
+    assert.ok(Date.now() - started < 1900, `answered after ${Date.now() - started} ms`);
+  });
+
+  await t.test('the turn deadline stops a held tool with reason deadline', async () => {
+    const video = await client.newVideo();
+    provider.script({ toolCalls: [{ name: 'test-gated', args: {} }] }, { text: ['Should never be asked for'] });
+    const ended = await client.turn(video, 'Run the gated tool');
+    assert.ok(!completed(ended), JSON.stringify(ended.terminal));
+    await wait(500);
+    assert.deepEqual(provider.gate().reasons(), ['deadline']);
+    assert.equal(provider.requests.length + provider.unscripted.length, 1, 'no model step after the deadline');
+  });
+
+  // Last: it stops this suite's server.
+  await t.test('a shutdown stops a held tool with reason shutdown, within the 7 s budget', async () => {
+    const video = await client.newVideo();
+    provider.script({ toolCalls: [{ name: 'test-gated', args: {} }] }, { text: ['Should never be asked for'] });
+    const turn = client.turn(video, 'Run the gated tool');
+    await provider.gate().reached;
+    const started = Date.now();
+    await fixture.stopServer();
+    assert.ok(Date.now() - started < 7000, `stopped after ${Date.now() - started} ms`);
+    assert.deepEqual(fixture.serverTermination(), { code: 0, signal: null }, 'a clean exit, with no shutdown step failing');
+    const ended = await turn;
+    assert.ok(interrupted(ended), JSON.stringify(ended.terminal));
+    assert.deepEqual(provider.gate().reasons(), ['shutdown']);
+    assert.equal(provider.requests.length + provider.unscripted.length, 1, 'no model step after the shutdown');
   });
 });

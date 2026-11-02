@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { OwnedWorkspace } from '../../../src/application/index.js';
+import type { OwnedWorkspace, StoppedVideosOutcome } from '../../../src/application/index.js';
+import { productionTools, type AgentCollaborators } from '../../../src/agent/index.js';
 import { listingBounds, listWorkspace, workspaceItem } from '../../../src/agent/workspace-entries.js';
 
 type Version = OwnedWorkspace['assets'][number]['version'];
@@ -26,6 +27,19 @@ test('items are named by what they are and in order; uploads have no filename, s
   assert.deepEqual([listing.total, listing.truncated], [6, false]);
 });
 
+test('a clip the assistant made is listed as the video\'s next numbered video, with its exact version', () => {
+  const made: Version = { ...base('m1'), createdBy: 'assistant', kind: 'video', media: { contentType: 'video/mp4', byteSize: 10, width: 1344, height: 768, durationMs: 4042, hasAudio: true } };
+  const clip = { version: made, use: { id: 'use-m1', versionId: 'm1', binding: { purpose: 'video' as const }, state: 'draft' as const }, state: 'Draft' as const };
+  const listing = listWorkspace(workspace([image('i1')], { generatedVideos: [clip] }));
+  assert.deepEqual(listing.items.map(item => [item.name, item.versionId, item.use, item.state, item.text]), [
+    ['Image 1 · Version 1', 'i1', 'reference', 'Draft', 'image/png, 640×480'], ['Video 1 · Version 1', 'm1', 'generated video', 'Draft', 'video/mp4, 1344×768, 4 s'],
+  ]);
+  assert.equal(workspaceItem(workspace([], { generatedVideos: [clip] }), 'm1')?.name, 'Video 1 · Version 1');
+  // Clips are numbered with the video's other videos, so two never share a name.
+  const uploaded: Version = { ...base('u1'), kind: 'video', media: { contentType: 'video/mp4', byteSize: 10, width: 1280, height: 720, durationMs: 1000, hasAudio: true } };
+  assert.deepEqual(listWorkspace(workspace([uploaded], { generatedVideos: [clip] })).items.map(item => item.name), ['Video 1 · Version 1', 'Video 2 · Version 1']);
+});
+
 test('a listing stops at 50 items, then at 16 KiB, and every text stays within 200 characters', () => {
   const many = listWorkspace(workspace(Array.from({ length: 60 }, (_, index) => image(`i${index}`))));
   assert.deepEqual([many.items.length, many.total, many.truncated], [listingBounds.items, 60, true]);
@@ -43,4 +57,25 @@ test('item mode returns a used version in full and nothing for any other id', ()
   assert.deepEqual(workspaceItem(space, 'i1'), { name: 'Image 1 · Version 1', kind: 'image', versionId: 'i1', revision: 1, use: 'reference', state: 'Draft', media: { contentType: 'image/png', byteSize: 10, width: 640, height: 480 } });
   assert.equal((workspaceItem(space, 'r1') as { content: { subject: { description: string } } }).content.subject.description, 'A tall courier.');
   assert.equal(workspaceItem(space, 'someone-elses'), null);
+});
+
+test('the listing gives the video\'s stopped jobs with their resume ids, only when the server makes videos and they can be read', async () => {
+  const tool = productionTools.find(candidate => candidate.id === 'read-workspace')!;
+  const scope = { accountId: 'account', videoId: 'video' }, asked: string[][] = [];
+  const run = (stopped?: StoppedVideosOutcome) => {
+    const collaborators: AgentCollaborators = {
+      readWorkspace: async () => ({ kind: 'found', workspace: workspace([image('i1')]) }),
+      saveScript: async () => ({ kind: 'unavailable' }), readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }),
+      ...(stopped ? { videos: { start: async () => ({ kind: 'not_found' }), resume: async () => ({ kind: 'not_found' }), stopped: async (account: string, video: string) => { asked.push([account, video]); return stopped; } } } : {}),
+    };
+    const signal = new AbortController().signal;
+    return tool.execute({}, { scope, collaborators, signal, abortReason: () => undefined }) as Promise<Record<string, unknown>>;
+  };
+  const listed = await run({ kind: 'read', jobs: [{ jobId: 'job-2', frames: ['i1'], submittedAt: new Date('2026-11-03T16:34:37Z') }, { jobId: 'job-1', frames: [], submittedAt: new Date('2026-11-03T16:30:11Z') }] });
+  assert.deepEqual(listed.stoppedVideos, [{ jobId: 'job-2', frames: ['i1'], submittedAt: '2026-11-03T16:34:37.000Z' }, { jobId: 'job-1', frames: [], submittedAt: '2026-11-03T16:30:11.000Z' }]);
+  assert.deepEqual(asked, [['account', 'video']]);
+  assert.equal(listed.total, 1);
+  for (const quiet of [await run(), await run({ kind: 'read', jobs: [] }), await run({ kind: 'unavailable' })]) {
+    assert.equal('stoppedVideos' in quiet, false); assert.equal(quiet.total, 1);
+  }
 });

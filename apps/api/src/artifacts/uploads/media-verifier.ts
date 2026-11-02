@@ -34,7 +34,7 @@ export function createMediaVerifier(sandbox:MediaSandbox):MediaVerifier {
   return async input=>{
     const byteSize=input.bytes.byteLength,header=inspectMediaBytes(input.bytes,input.kind,input.contentType,input.origin);
     try{return await sandbox.use(input.bytes,async job=>{
-      const measured=measureMediaProbe(parseMediaProbe(await job.probe()),input.kind,input.contentType,byteSize);
+      const measured=measureMediaProbe(parseMediaProbe(await job.probe()),input.kind,input.contentType,byteSize,input.origin);
       if(header.width!==undefined && (header.width!==measured.width || header.height!==measured.height))throw new UploadError('invalid_input');
       verifyDecodedFrames(await job.decode(),measured.frames,measured.durationMs);
       const media={width:measured.width,height:measured.height,...(input.kind==='video'?{durationMs:measured.durationMs!,hasAudio:!!measured.hasAudio}:{})};

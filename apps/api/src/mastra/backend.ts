@@ -3,11 +3,11 @@ import { registerApiRoute, type ApiRoute } from '@mastra/core/server';
 import { PostgresStore } from '@mastra/pg';
 import { Pool } from 'pg';
 import { createOwnedConversationCheck, bindNativeTurns, productionTools, turnLimits, type AgentCollaborators, type AgentTool, type NativeTurnModel, type TurnLimits } from '../agent/index.js';
-import { createApplication, createAssistantScriptSaver, createGeneratedImageSaver, createImageInputReader, createWorkspaceReader, withSavedWork, withManualSaves, withVersionUses, withStoryboardEdits, withUploads } from '../application/index.js';
-import { createArtifactStore, createArtifactWriters, createAssistantScripts, createGeneratedImages, createVersionUses, createStoryboardEdits, createMediaVerifier, createUploadCoordinator } from '../artifacts/index.js';
+import { createApplication, createAssistantScriptSaver, createGeneratedImageSaver, createGeneratedVideoSaver, createImageInputReader, createVideoJobs, createWorkspaceReader, type VideoJobTiming, withSavedWork, withManualSaves, withVersionUses, withGenerationRequests, withStoryboardEdits, withUploads } from '../application/index.js';
+import { createArtifactStore, createArtifactWriters, createAssistantScripts, createGeneratedImages, createGeneratedVideos, createVersionUses, createStoryboardEdits, createMediaVerifier, createUploadCoordinator } from '../artifacts/index.js';
 import { configuredMediaSandbox, configuredObjectStorage } from '../storage/index.js';
 import { assertRestrictedRole } from '../db/index.js';
-import type { MetaImageClient } from '../generation/index.js';
+import { createGenerationJobs, type MetaImageClient, type MiniMaxVideoClient } from '../generation/index.js';
 import { loadServerConfig } from './config.js';
 import { verifyAccount } from './auth.js';
 import { applicationRoutes } from './application-routes.js';
@@ -16,10 +16,15 @@ import { createAdmissionPolicy, decorateCors } from './admission.js';
 import { nativeNavigationRoutes } from './native-navigation.js';
 import { nativeTurnRoutes, isNativeTurnRoute } from './native-turns.js';
 
-/** Turn composition. Production supplies the model and the Meta image client; a test composition may point them at fakes, add tools and override limits. */
+/**
+ * Turn composition. Production supplies the model, the Meta image client and, with a MiniMax key, the video client;
+ * a test composition may point them at fakes, add tools and override limits and video polling.
+ */
 export interface TurnComposition {
   readonly model: NativeTurnModel;
   readonly images?: MetaImageClient;
+  readonly videos?: MiniMaxVideoClient;
+  readonly videoTiming?: VideoJobTiming;
   readonly tools?: readonly AgentTool[];
   readonly limits?: TurnLimits;
 }
@@ -40,12 +45,20 @@ export async function createBackend(routes: ApiRoute[] = [], turns?: TurnComposi
   });
   try {
     await assertRestrictedRole(pool, {
-      createSchemas: ['artifacts', 'mastra', 'public'], ownershipSchemas: ['artifacts', 'mastra'],
+      createSchemas: ['artifacts', 'generation', 'mastra', 'public'], ownershipSchemas: ['artifacts', 'generation', 'mastra'],
       requiredSchemas: ['mastra', 'public'], errorMessage: 'Privileged serving connection',
     });
   } catch {
     objects?.close(); await media?.close(); await pool.end();
     throw new Error('Serving storage unavailable or privileged; prepare storage separately and use restricted DATABASE_URL');
+  }
+  const jobs = createGenerationJobs(pool);
+  try {
+    // One pass before any turn is served: nothing waits on a job from an earlier process.
+    await jobs.interruptWaiting();
+  } catch {
+    objects?.close(); await media?.close(); await pool.end();
+    throw new Error('Saved generation jobs unavailable at startup');
   }
   const tools = turns ? turns.tools ?? productionTools : [];
   const storage = new PostgresStore({ id: 'workprint-native', schemaName: 'mastra', disableInit: true, pool });
@@ -58,7 +71,8 @@ export async function createBackend(routes: ApiRoute[] = [], turns?: TurnComposi
   // One media checker: uploads and assistant-made images share the one-job decode sandbox.
   const verifyMedia = media ? createMediaVerifier(media) : undefined;
   const uploadApplication = withUploads(planningApplication, createUploadCoordinator(pool, application.checkOwnedConversation, { ...(objects ? { storage: objects } : {}), ...(verifyMedia ? { verifyMedia } : {}) }));
-  const protectedRoutes = [...applicationRoutes(uploadApplication), ...nativeNavigationRoutes(storage, application.checkOwnedConversation, tools), ...routes];
+  const jobApplication = withGenerationRequests(uploadApplication, application.checkOwnedConversation, jobs);
+  const protectedRoutes = [...applicationRoutes(jobApplication), ...nativeNavigationRoutes(storage, application.checkOwnedConversation, tools), ...routes];
   const policy = createAdmissionPolicy([...protectedRoutes, ...nativeTurnRoutes], config.browserOrigin);
   const mastra = new ResourceMastra({
     storage,
@@ -112,11 +126,16 @@ export async function createBackend(routes: ApiRoute[] = [], turns?: TurnComposi
   if (turns) {
     // Application functions that tools may call, each over the same owned reads as the HTTP boundary.
     const generated = createGeneratedImages(pool, application.checkOwnedConversation, { storage: objects, verifyMedia });
+    const readImageInputs = createImageInputReader(savedWork, generated.read);
+    const clips = createGeneratedVideos(pool, application.checkOwnedConversation, { storage: objects, verifyMedia });
     const collaborators: AgentCollaborators = {
       readWorkspace: createWorkspaceReader(savedWork), saveScript: createAssistantScriptSaver(createAssistantScripts(pool, application.checkOwnedConversation).save),
-      readImageInputs: createImageInputReader(savedWork, generated.read), saveGeneratedImage: createGeneratedImageSaver(generated.save),
-      // Images are made only where they can be saved: without storage and the checker, no paid call is made.
+      readImageInputs, saveGeneratedImage: createGeneratedImageSaver(generated.save),
+      // Images and videos are made only where they can be saved: without storage and the checker, no paid call is made.
       ...(turns.images && objects && verifyMedia ? { images: turns.images } : {}),
+      ...(turns.videos && objects && verifyMedia ? { videos: createVideoJobs({
+        jobs, client: turns.videos, readImageInputs, saveVideo: createGeneratedVideoSaver(clips.save, jobs), ...(turns.videoTiming ? { timing: turns.videoTiming } : {}),
+      }) } : {}),
     };
     bindNativeTurns(mastra, { model: turns.model, tools, limits: turns.limits ?? turnLimits, collaborators });
   }

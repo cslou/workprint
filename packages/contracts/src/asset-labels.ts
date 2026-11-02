@@ -13,3 +13,16 @@ export function assetLabels(assets: readonly Readonly<{ version: Readonly<{ arti
   }
   return labels;
 }
+
+/**
+ * The names of a video's assets and its generated videos together: generated videos count with the assets, so a
+ * made clip and any other video never share a number. The assistant and the chat name media by this.
+ */
+export function workspaceMediaLabels(workspace: Readonly<{ assets: Parameters<typeof assetLabels>[0]; generatedVideos?: Parameters<typeof assetLabels>[0] | undefined }>): ReadonlyMap<string, string> {
+  return assetLabels([...workspace.assets, ...(workspace.generatedVideos ?? [])]);
+}
+
+/** One exact media version's name, as the assistant, the chat, Assets and Videos show it ("Video 1 · Version 2"). */
+export function mediaVersionName(labels: ReadonlyMap<string, string>, version: Readonly<{ artifactId: string; kind: string; revision: number }>): string {
+  return `${labels.get(version.artifactId) ?? (version.kind === 'video' ? 'Video' : 'Image')} · Version ${version.revision}`;
+}

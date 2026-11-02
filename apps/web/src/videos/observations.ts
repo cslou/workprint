@@ -1,19 +1,23 @@
-import { sameRequest, type GenerationRequest } from './reads.js';
+import { requestIdentity, sameRequest, type GenerationRequest } from './reads.js';
 
 const statusOrder = (request: GenerationRequest) => {
   switch (request.status) {
     case 'queued': return 0;
     case 'submitting': return 1;
     case 'running': return 2;
-    default: return 3;
+    case 'interrupted': return 3;
+    default: return 4;
   }
 };
-/** Public requests have no revision: accept forward states, never rank terminal outcomes. */
+/**
+ * A saved video job carries its revision, so the later read wins, including a move back from `interrupted`
+ * to `running` on resume. Other requests have none: accept forward states, never rank terminal outcomes. Without a
+ * revision a Stop is shown but a resume isn't; only video jobs resume, and they carry one.
+ */
 export function newerRequest(known: GenerationRequest, observed: GenerationRequest) {
-  return sameRequest(known, observed) && statusOrder(observed) > statusOrder(known) ? observed : known;
-}
-export function requestIdentity(request: GenerationRequest) {
-  return JSON.stringify([request.id, request.batchId, request.proposalId, request.purpose, request.target]);
+  if (!sameRequest(known, observed)) return known;
+  if (known.purpose === 'video' && observed.purpose === 'video') return observed.revision > known.revision ? observed : known;
+  return statusOrder(observed) > statusOrder(known) ? observed : known;
 }
 /** Scope-owned observation union. Missing rows are not deletion authority. */
 export function mergeRequestObservations(known: GenerationRequest[], ...sources: readonly (readonly GenerationRequest[])[]) {

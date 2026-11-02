@@ -5,13 +5,16 @@ export type MediaObject = Readonly<{ ownerId: string; versionId: string; objectK
 
 /**
  * Media rows whose object is protected for that exact version, from either source: an upload object or
- * an assistant-made (generated) object. A poster, when there is one, must be protected too.
+ * an assistant-made (generated) object. A poster, when there is one (an upload's or a generated clip's), must be
+ * protected for the same version too.
  */
-const protectedMedia = `SELECT m.owner_id,m.version_id,COALESCE(o.object_key,g.object_key) AS object_key,m.poster_key,m.sha256 FROM artifacts.media_objects m
+const protectedMedia = `SELECT m.owner_id,m.version_id,COALESCE(o.object_key,g.object_key) AS object_key,COALESCE(m.poster_key,m.generated_poster_key) AS poster_key,m.sha256 FROM artifacts.media_objects m
   LEFT JOIN artifacts.upload_objects o ON o.owner_id=m.owner_id AND o.object_key=m.object_key AND o.protected_version_id=m.version_id
   LEFT JOIN artifacts.generated_objects g ON g.owner_id=m.owner_id AND g.object_key=m.generated_key AND g.version_id=m.version_id
   LEFT JOIN artifacts.upload_objects p ON p.owner_id=m.owner_id AND p.object_key=m.poster_key AND p.protected_version_id=m.version_id
-  WHERE (o.object_key IS NOT NULL OR g.object_key IS NOT NULL) AND (m.poster_key IS NULL OR p.object_key IS NOT NULL)`;
+  LEFT JOIN artifacts.generated_objects gp ON gp.owner_id=m.owner_id AND gp.object_key=m.generated_poster_key AND gp.version_id=m.version_id
+  WHERE (o.object_key IS NOT NULL OR g.object_key IS NOT NULL) AND (m.poster_key IS NULL OR p.object_key IS NOT NULL)
+    AND (m.generated_poster_key IS NULL OR gp.object_key IS NOT NULL)`;
 
 /** Protected media objects for these exact versions; `owner` narrows them to one owner. Missing ones are left out. */
 export async function protectedMediaObjects(pool: Pool, versionIds: readonly string[], owner?: string): Promise<MediaObject[]> {

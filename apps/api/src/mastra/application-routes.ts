@@ -1,9 +1,9 @@
 import { registerApiRoute } from '@mastra/core/server';
 import { applicationError, errorStatus, operations, type OperationName } from '@workprint/contracts';
-import type { Application, SavedWorkApplication, ManualSaveApplication, UploadApplication } from '../application/index.js';
+import type { Application, GenerationRequestApplication, SavedWorkApplication, ManualSaveApplication, UploadApplication } from '../application/index.js';
 import { readBody } from './body.js';
 
-export const applicationRoutes = (application: Application | SavedWorkApplication | ManualSaveApplication | UploadApplication) => (Object.keys(operations) as OperationName[]).map((name) => {
+export const applicationRoutes = (application: Application | SavedWorkApplication | ManualSaveApplication | UploadApplication | GenerationRequestApplication) => (Object.keys(operations) as OperationName[]).map((name) => {
   const operation = operations[name];
   return registerApiRoute(operation.path, { method: operation.method, handler: async (context) => {
     const accountId: unknown = context.get('requestContext').get('accountId');

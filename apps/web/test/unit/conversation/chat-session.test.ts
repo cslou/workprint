@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { ClientResult, NativeMessages, NativeObservation, NativeObservedTurn, NativeThread, NativeToolActivityChunk } from '@workprint/api-client';
 import { createChatSession, replyText, sendsOnEnter, tooLong, type ChatSessionConfig } from '../../../src/conversation/chat-session.js';
+import { elapsedLabel } from '../../../src/conversation/elapsed.js';
 
 const account = '22222222-2222-4222-8222-222222222222';
 const video = '11111111-1111-4111-8111-111111111111';
@@ -287,4 +288,8 @@ test('after dispose, late reply text and results change nothing', async () => {
   session.dispose(); push(' late'); finish(); await sending;
   assert.equal(replyText(session.getSnapshot().turns[0]!), 'Early'); assert.equal(session.getSnapshot().phase, 'working');
   assert.equal(calls.closed, 1);
+});
+
+test('a running line counts seconds under a minute, then whole minutes rounded down', () => {
+  assert.deepEqual([0, 59, 60, 119, 120, 359].map(elapsedLabel), ['0s', '59s', '1 min', '1 min', '2 min', '5 min']);
 });

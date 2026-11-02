@@ -1,4 +1,4 @@
-import { assetLabels } from '@workprint/contracts';
+import { mediaVersionName, workspaceMediaLabels } from '@workprint/contracts';
 import type { OwnedWorkspace } from '../application/index.js';
 
 type Version = OwnedWorkspace['assets'][number]['version'];
@@ -46,7 +46,8 @@ function summary(version: Version): string {
 
 /** Every exact version the video uses, in workspace order, each once, with a name a person would recognise. */
 export function workspaceEntries(workspace: OwnedWorkspace): Entry[] {
-  const entries: Entry[] = [], seen = new Set<string>(), labels = assetLabels(workspace.assets);
+  const clips = workspace.generatedVideos ?? [];
+  const entries: Entry[] = [], seen = new Set<string>(), labels = workspaceMediaLabels(workspace);
   const add = (entry: Entry) => { if (!seen.has(entry.version.id)) { seen.add(entry.version.id); entries.push(entry); } };
   const revision = (version: Version) => `Version ${version.revision}`;
   if (workspace.script) add({ name: `Script · ${revision(workspace.script.version)}`, use: 'script', state: workspace.script.state, version: workspace.script.version });
@@ -54,8 +55,9 @@ export function workspaceEntries(workspace: OwnedWorkspace): Entry[] {
     const { version } = asset;
     // Uploaded and made media keep no filename, so they are named by kind and order (the shared rule).
     const subject = 'content' in version && version.kind === 'reference' ? strings(record(record(version.content).subject).name) : '';
-    add({ name: `${subject ? clip(subject, 80) : labels.get(version.artifactId)} · ${revision(version)}`, use: 'reference', state: asset.state, version });
+    add({ name: subject ? `${clip(subject, 80)} · ${revision(version)}` : mediaVersionName(labels, version), use: 'reference', state: asset.state, version });
   }
+  for (const made of clips) add({ name: mediaVersionName(labels, made.version), use: 'generated video', state: made.state, version: made.version });
   if (workspace.storyboard.work) add({ name: `Storyboard · ${revision(workspace.storyboard.work.version)}`, use: 'storyboard', state: workspace.storyboard.work.state, version: workspace.storyboard.work.version });
   [...workspace.storyboard.shots].sort((a, b) => a.order - b.order).forEach((shot, shotIndex) => {
     const shotNumber = shotIndex + 1;

@@ -9,6 +9,8 @@ export const root = process.cwd();
 export const sentinel = 'workprint-harmless-secret-sentinel';
 /** Stands in for the Meta key in every test process; the network guard keeps it off the network. */
 export const placeholderMetaKey = 'workprint-placeholder-meta-key';
+/** Stands in for the MiniMax key in test compositions that reach the loopback MiniMax fake. */
+export const placeholderMiniMaxKey = 'workprint-placeholder-minimax-key';
 
 export async function environment() {
   const logs = await mkdtemp(join(tmpdir(), 'workprint-foundation-'));
