@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { MetaImageError, type ImageResult } from '../../../generation/index.js';
 import { defineTool, type ToolContext } from '../define.js';
-import { workspaceItem } from '../read-workspace/projection.js';
+import { workspaceItem } from '../../workspace-entries.js';
 
 /** One saved image, named as read-workspace names it; the name is left out when the workspace can't be read. */
 type SavedImage = { versionId: string; label?: string; width: number; height: number };
