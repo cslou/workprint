@@ -29,7 +29,7 @@ function harness(meta: () => Promise<ImageResult>, outcomes: (GeneratedImageOutc
   };
   return { collaborators, saved, calls };
 }
-const run = (collaborators: AgentCollaborators, input: Record<string, unknown>, signal = new AbortController().signal) => tool.execute({ prompt: 'A bench', ...input }, { scope, collaborators, signal } satisfies ToolContext);
+const run = (collaborators: AgentCollaborators, input: Record<string, unknown>, signal = new AbortController().signal) => tool.execute({ prompt: 'A bench', ...input }, { scope, collaborators, signal, abortReason: () => signal.aborted ? 'stop' : undefined } satisfies ToolContext);
 const line = (input: Record<string, unknown>, output: unknown) => projectToolActivity(productionTools, { toolCallId: 'call_1', toolName: 'generate-image', state: 'done', input: { prompt: 'A bench', ...input }, output });
 const images = (count: number): ImageResult => ({ images: Array.from({ length: count }, () => png), requestId: null, usage: null });
 

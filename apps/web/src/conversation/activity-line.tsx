@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { NativeToolActivity } from '@workprint/api-client';
+import { elapsedLabel } from './elapsed.js';
 import { ShownImages } from './shown-images.js';
 import './activity-line.css';
 
@@ -12,7 +13,7 @@ function Elapsed({ since }: { since: number }) {
     const timer = setInterval(() => setValue(seconds(since)), 1000);
     return () => clearInterval(timer);
   }, [since]);
-  return <span className="wp-act-elapsed">{value}s</span>;
+  return <span className="wp-act-elapsed">{elapsedLabel(value)}</span>;
 }
 
 /**

@@ -16,10 +16,15 @@ export type AgentCollaborators = Readonly<{
   images?: Pick<MetaImageClient, 'generate' | 'edit'>;
 }>;
 
+/** Why a tool's signal fired: the exact-turn Stop, the turn deadline or a server shutdown. */
+export type ToolAbortReason = 'stop' | 'deadline' | 'shutdown';
+
 export interface ToolContext {
   readonly scope: ToolScope;
   readonly collaborators: AgentCollaborators;
   readonly signal: AbortSignal;
+  /** Why `signal` fired, fixed by whichever came first; undefined while it has not fired. */
+  readonly abortReason: () => ToolAbortReason | undefined;
 }
 
 /** Framework-neutral tool definition. `agent/mastra` turns these into native tools. */

@@ -31,7 +31,8 @@ const isTitleRequest = (body: Record<string, unknown>) => {
 /**
  * Loopback OpenAI-compatible chat-completions server for tests. It streams scripted text and tool
  * calls, can hold a step until released, and records every request. It also serves `/gate`, which
- * a test tool calls and which stays open until `openGate()`, so tests can hold a running tool.
+ * a test tool calls and which stays open until `openGate()`, so tests can hold a running tool, and
+ * `/gate/reason`, where that tool reports why it was stopped.
  * Title requests have their own script and record, so turn scripts and request counts never include
  * them; an unscripted title request fails, which leaves the video untitled.
  */
@@ -48,7 +49,7 @@ export async function scriptedProvider() {
     let open!: () => void, markReached!: () => void;
     const opened = new Promise<void>(resolve => { open = resolve; });
     const reached = new Promise<void>(resolve => { markReached = resolve; });
-    return { open, opened, reached, markReached, aborted: false };
+    return { open, opened, reached, markReached, aborted: false, reasons: [] as string[] };
   }
   let gate = newGate();
   const chunk = (delta: Record<string, unknown>, finish: string | null = null) =>
@@ -89,6 +90,7 @@ export async function scriptedProvider() {
     request.on('data', (part: string) => { raw += part; });
     request.on('end', () => {
       const path = request.url ?? '';
+      if (path === '/gate/reason') { gate.reasons.push(raw); response.end(); return; }
       if (path === '/gate') {
         const current = gate;
         current.markReached();
@@ -126,7 +128,8 @@ export async function scriptedProvider() {
     /** Resolves when a step reaches its hold point. */
     held: () => held,
     release() { releaseHold?.(); releaseHold = undefined; },
-    gate: () => ({ reached: gate.reached, aborted: () => gate.aborted }),
+    /** The current gate; `reasons` lists each abort reason the gated tool reported. */
+    gate: () => ({ reached: gate.reached, aborted: () => gate.aborted, reasons: () => [...gate.reasons] }),
     openGate() { gate.open(); },
     /** Clears scripts, records and gates between tests. */
     reset() {
