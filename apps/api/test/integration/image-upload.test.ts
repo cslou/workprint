@@ -263,12 +263,12 @@ describe('assistant-made clips are checked with the MiniMax allowance and saved 
       } });
       const saveClip = createGeneratedVideoSaver(videos.save, jobs);
       const counts = async () => (await pool.query<{ versions: number; generated: number; uses: number }>('SELECT (SELECT count(*)::int FROM artifacts.versions) AS versions,(SELECT count(*)::int FROM artifacts.generated_objects) AS generated,(SELECT count(*)::int FROM artifacts.conversation_uses) AS uses')).rows[0];
-      const waiting = async () => { const job = await jobs.begin(account, video, { prompt: 'A slow push-in', inputs: [] }); return jobs.started(account, job.id, `task-${job.id}`); };
+      const waiting = async (inputs: string[] = []) => { const job = await jobs.begin(account, video, { prompt: 'A slow push-in', inputs }); return jobs.started(account, job.id, `task-${job.id}`); };
       // A frame is an image this video uses.
       const frame = await createGeneratedImageSaver(createGeneratedImages(pool, check, { storage, verifyMedia: verify }).save)(account, video, { bytes: testPng({ seed: 9 }), contentType: 'image/png', inputs: [] });
       assert.equal(frame.kind, 'saved'); if (frame.kind !== 'saved') return;
 
-      const job = await waiting();
+      const job = await waiting([frame.versionId]);
       const saved = await saveClip(account, video, { bytes: clip, frames: [frame.versionId], jobId: job.id });
       assert.deepEqual(saved, { kind: 'saved', versionId: (saved as { versionId: string }).versionId, width: GENERATED_CLIP.width, height: GENERATED_CLIP.height, durationMs: GENERATED_CLIP.durationMs });
       if (saved.kind !== 'saved') return;
@@ -296,16 +296,31 @@ describe('assistant-made clips are checked with the MiniMax allowance and saved 
 
       await t.test('the same clip as an upload is refused, and refused or failed saves store nothing', async () => {
         await assert.rejects(verify({ kind: 'video', bytes: clip, contentType: 'video/mp4', signal: AbortSignal.timeout(20000) }), { code: 'unsupported' }, 'uploads keep every rule');
-        const before = await counts(), published = effects.published.length, other = await waiting();
+        const before = await counts(), published = effects.published.length, other = await waiting([frame.versionId]);
+        assert.deepEqual(await saveClip('clip-other', video, { bytes: clip, frames: [frame.versionId], jobId: other.id }), { kind: 'not_found' }, 'another account');
         assert.deepEqual(await saveClip(account, otherVideo, { bytes: clip, frames: [frame.versionId], jobId: other.id }), { kind: 'not_found' }, 'a frame another video uses');
         assert.deepEqual(await saveClip(account, video, { bytes: clip, frames: [randomUUID()], jobId: other.id }), { kind: 'not_found' });
         assert.equal(effects.published.length, published, 'nothing is stored');
         assert.equal((await jobs.get(account, other.id)).status, 'running', 'the job still waits');
-        // A second success for a finished job rolls the save back and removes both stored objects.
-        assert.deepEqual(await saveClip(account, video, { bytes: clip, frames: [], jobId: job.id }), { kind: 'unavailable' });
-        assert.deepEqual(effects.removed, effects.published.slice(published), 'the clip and its poster are removed');
+        // A second success for a finished job, a job of another video, or frames that aren't the job's own roll
+        // the save back and remove both stored objects.
+        const elsewhere = await jobs.started(account, (await jobs.begin(account, otherVideo, { prompt: 'Elsewhere', inputs: [frame.versionId] })).id, 'task-elsewhere');
+        for (const [frames, jobId] of [[[frame.versionId], job.id], [[frame.versionId], elsewhere.id], [[], other.id]] as const) {
+          assert.deepEqual(await saveClip(account, video, { bytes: clip, frames, jobId }), { kind: 'unavailable' }, jobId);
+        }
+        assert.equal(effects.removed.length, 6);
+        assert.deepEqual(effects.removed, effects.published.slice(published), 'each clip and its poster are removed');
+        assert.deepEqual([(await jobs.get(account, other.id)).status, (await jobs.get(account, elsewhere.id)).status], ['running', 'running']);
         for (const key of effects.removed) await assert.rejects(storage.read(key), { code: 'not_found' });
         assert.deepEqual(await counts(), before);
+      });
+
+      await t.test('generated objects keep their limits: images and posters 10 MiB, clips 100 MiB, posters only images', async () => {
+        const insert = (key: string, size: number, type: string) => pool.query('INSERT INTO artifacts.generated_objects(owner_id,object_key,version_id,sha256,byte_size,content_type) VALUES($1,$2,$3,$4,$5,$6)', [account, key, saved.versionId, hash(clip), size, type]);
+        const key = (prefix: string) => `${prefix}/${randomUUID()}/${randomUUID()}`;
+        for (const [prefix, size, type] of [['published', 10485761, 'image/png'], ['posters', 10485761, 'image/png'], ['published', 104857601, 'video/mp4'], ['posters', 1024, 'video/mp4'], ['staging', 1024, 'video/mp4']] as const) {
+          await assert.rejects(insert(key(prefix), size, type), { code: '23514' }, `${prefix} ${type} ${size}`);
+        }
       });
     } finally { storage.close(); await native.close(); await pool.end(); }
   });

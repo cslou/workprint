@@ -1,6 +1,6 @@
 import { UploadError, type GeneratedVideoInput, type GeneratedVideoSave, type WithinSave } from '../artifacts/index.js';
 import type { GenerationJobs } from '../generation/index.js';
-import { logFailure } from './generated-images.js';
+import { logFailure } from './failure-log.js';
 
 /** What saving an assistant-made clip did. `refused` means the bytes didn't pass the media checks. */
 export type GeneratedVideoOutcome =
@@ -17,7 +17,7 @@ type SaveClip = (account: string, conversation: string, input: GeneratedVideoInp
 export function createGeneratedVideoSaver(save: SaveClip, jobs: Pick<GenerationJobs, 'succeeded'>): SaveGeneratedVideo {
   return async (accountId, videoId, { jobId, ...input }, signal) => {
     try {
-      const { version } = await save(accountId, videoId, input, { signal, within: (client, saved) => jobs.succeeded(client, accountId, jobId, saved.id) });
+      const { version } = await save(accountId, videoId, input, { signal, within: (client, saved) => jobs.succeeded(client, accountId, videoId, jobId, saved.id, input.frames) });
       return { kind: 'saved', versionId: version.id, width: version.media.width, height: version.media.height, durationMs: version.media.durationMs ?? 0 };
     } catch (error) {
       if (error instanceof UploadError && (error.code === 'invalid_input' || error.code === 'unsupported')) return { kind: 'refused' };

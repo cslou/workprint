@@ -55,14 +55,18 @@ export function createGenerationJobs(pool: Pool) {
     `UPDATE generation.requests SET status='failed',failure_reason='expired',revision=revision+1,updated_at=clock_timestamp()
      WHERE owner_id=$1 AND ${where}=$2 AND ${expired}`, [account, value]);
 
-  async function move(account: string, request: string, from: readonly JobStatus[], to: { status: JobStatus; taskId?: string; failureReason?: JobFailure; resultVersionId?: string }, client: Pool | PoolClient = pool): Promise<VideoJob> {
-    if (!id(account) || !id(request)) throw new GenerationJobError('not_found');
+  /**
+   * `conversation`, when given, narrows the job to that video: a job of another video reads not-found. `inputs`,
+   * when given, must be the job's saved inputs, or the move is stale.
+   */
+  async function move(account: string, request: string, from: readonly JobStatus[], to: { status: JobStatus; taskId?: string; failureReason?: JobFailure; resultVersionId?: string }, client: Pool | PoolClient = pool, conversation?: string, inputs?: readonly string[]): Promise<VideoJob> {
+    if (!id(account) || !id(request) || (conversation !== undefined && !id(conversation))) throw new GenerationJobError('not_found');
     const moved = await client.query<Row>(
       `UPDATE generation.requests SET status=$3,task_id=COALESCE($4,task_id),failure_reason=$5,result_version_id=$6,revision=revision+1,updated_at=clock_timestamp()
-       WHERE owner_id=$1 AND request_id=$2 AND status=ANY($7::text[]) RETURNING ${columns}`,
-      [account, request, to.status, to.taskId ?? null, to.failureReason ?? null, to.resultVersionId ?? null, from]);
+       WHERE owner_id=$1 AND request_id=$2 AND status=ANY($7::text[]) AND ($8::text IS NULL OR conversation_id=$8) AND ($9::text[] IS NULL OR inputs=$9::text[]) RETURNING ${columns}`,
+      [account, request, to.status, to.taskId ?? null, to.failureReason ?? null, to.resultVersionId ?? null, from, conversation ?? null, inputs ? [...inputs] : null]);
     if (moved.rows[0]) return job(moved.rows[0]);
-    const exists = await client.query('SELECT 1 FROM generation.requests WHERE owner_id=$1 AND request_id=$2', [account, request]);
+    const exists = await client.query('SELECT 1 FROM generation.requests WHERE owner_id=$1 AND request_id=$2 AND ($3::text IS NULL OR conversation_id=$3)', [account, request, conversation ?? null]);
     throw new GenerationJobError(exists.rowCount ? 'stale' : 'not_found');
   }
 
@@ -90,10 +94,13 @@ export function createGenerationJobs(pool: Pool) {
       if (id(account) && id(request)) await expire(account, 'request_id', request);
       return move(account, request, ['interrupted'], { status: 'running' });
     },
-    /** The clip was saved: called inside the transaction that saves it, so both commit or neither does. */
-    succeeded: (client: PoolClient, account: string, request: string, resultVersionId: string) => {
+    /**
+     * The clip was saved for this video: called inside the transaction that saves it, so both commit or neither
+     * does. Only a job of the same video, made from the same frames, can take the clip as its result.
+     */
+    succeeded: (client: PoolClient, account: string, conversation: string, request: string, resultVersionId: string, inputs: readonly string[]) => {
       if (!id(resultVersionId)) throw new GenerationJobError('invalid_input');
-      return move(account, request, ['running'], { status: 'succeeded', resultVersionId }, client);
+      return move(account, request, ['running'], { status: 'succeeded', resultVersionId }, client, conversation, inputs);
     },
     async get(account: string, request: string): Promise<VideoJob> {
       if (!id(account) || !id(request)) throw new GenerationJobError('not_found');

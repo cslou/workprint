@@ -1,4 +1,5 @@
 import { ArtifactError, UploadError, usedImageVersions, type GeneratedImageInput, type GeneratedImageSave, type StoredImage } from '../artifacts/index.js';
+import { logFailure } from './failure-log.js';
 import type { SavedWorkReads } from './saved-reads.js';
 
 /** What saving an assistant-made image did. `refused` means the bytes didn't pass the media checks. */
@@ -12,7 +13,6 @@ export type SaveGeneratedImage = (accountId: string, videoId: string, input: Gen
 export type ImageInputsOutcome = { kind: 'read'; images: { versionId: string; dataUrl: string; width: number; height: number }[] } | { kind: 'not_found' } | { kind: 'unavailable' };
 export type ReadImageInputs = (accountId: string, videoId: string, versionIds: readonly string[]) => Promise<ImageInputsOutcome>;
 
-export const logFailure = (message: string, error: unknown) => console.error(message, { name: error instanceof Error ? error.name : 'unknown', ...(error instanceof UploadError || error instanceof ArtifactError ? { code: error.code } : {}) });
 
 /** In-process image saves for agent tools, over the assistant-only image capability. */
 export function createGeneratedImageSaver(save: (account: string, conversation: string, input: GeneratedImageInput, signal?: AbortSignal) => Promise<GeneratedImageSave>): SaveGeneratedImage {
