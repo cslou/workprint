@@ -95,3 +95,51 @@ test('the listing gives the script\'s subjects with their ids, and 50 subjects w
   assert.equal(listed.items[0]?.name, 'Script · Version 1', 'the script still fits beside the subjects');
   assert.ok(listed.truncated);
 });
+
+const subjectScript = (subjects: { id: string; kind: 'character' | 'place' | 'prop'; name: string }[]): Version => ({ ...base('s'), kind: 'script', content: { schemaVersion: 1, subjects,
+  scenes: [{ heading: { setting: 'INT.', location: 'The Gallery', time: 'Night' }, characters: subjects.filter(subject => subject.kind === 'character').map(subject => subject.name), script: [{ action: 'She waits.' }] }] } });
+const sheetVersion = (id: string, subject: string, views: [string, string][]): Version => ({ ...base(id), kind: 'reference', content: { schemaVersion: 1,
+  subject: { id: subject, kind: 'character', name: 'Old name', description: 'A courier.', continuityNotes: ['n'] }, references: views.map(([versionId, view]) => ({ versionId, view, notes: [] })) } });
+const readTool = productionTools.find(candidate => candidate.id === 'read-workspace')!;
+const reading = (space: OwnedWorkspace, readView: AgentCollaborators['sheets']['readView']) => {
+  const collaborators: AgentCollaborators = { readWorkspace: async () => ({ kind: 'found', workspace: space }), saveScript: async () => ({ kind: 'unavailable' }), readImageInputs: async () => ({ kind: 'not_found' }),
+    saveGeneratedImage: async () => ({ kind: 'unavailable' }), sheets: { ...unusedSheets, readView } };
+  const signal = new AbortController().signal;
+  return (input: Record<string, unknown>) => readTool.execute(input, { scope: { accountId: 'a', videoId: 'v' }, collaborators, signal, abortReason: () => undefined }) as Promise<Record<string, unknown>>;
+};
+
+test('a sheet\'s images are listed under its subject by name, and item mode reads the sheet, a view and a view whose use moved on', async () => {
+  // Mara's sheet lists v1, v2 and v3; v3's own use has moved on to its next version, v3b.
+  const sheet = sheetVersion('sh', 'mara', [['v1', 'Full-body front'], ['v2', 'Three-quarter'], ['v3', 'Face close-up']]);
+  const v3b: Version = { ...image('v3b'), artifactId: 'artifact-v3', revision: 2 };
+  const space = workspace([image('i1'), image('v1'), image('v2'), v3b, image('i5'), sheet], { script: work(subjectScript([{ id: 'mara', kind: 'character', name: 'Mara' }, { id: 'the-gallery', kind: 'place', name: 'The Gallery' }]), 'script') });
+  const reads: string[] = [];
+  const read = reading(space, async (_account, _video, versionId) => { reads.push(versionId); return { kind: 'found', version: { ...image('v3'), artifactId: 'artifact-v3' } }; });
+  const listed = await read({}) as { subjects: unknown[]; items: { name: string; versionId: string }[]; total: number };
+  assert.deepEqual(listed.subjects, [
+    { id: 'mara', kind: 'character', name: 'Mara', sheet: { versionId: 'sh', views: [{ view: 'Full-body front', versionId: 'v1' }, { view: 'Three-quarter', versionId: 'v2' }, { view: 'Face close-up', versionId: 'v3' }] } },
+    { id: 'the-gallery', kind: 'place', name: 'The Gallery' },
+  ]);
+  // The views aren't items; every other image keeps its number, and the sheet is named by the script's name.
+  assert.deepEqual(listed.items.map(item => item.name), ['Script · Version 1', 'Image 1 · Version 1', 'Image 4 · Version 2', 'Image 5 · Version 1', 'Mara · Version 1']);
+  assert.equal(listed.total, 5);
+  const item = async (versionId: string) => ((await read({ versionId })) as { item?: Record<string, unknown> }).item;
+  assert.deepEqual((await item('sh'))?.content, sheet.kind === 'reference' && 'content' in sheet ? sheet.content : undefined);
+  assert.deepEqual([(await item('v2'))?.name, (await item('v2'))?.use], ['Mara · Three-quarter', 'reference']);
+  assert.deepEqual(reads, [], 'a view the video uses is read from the workspace');
+  assert.deepEqual([(await item('v3'))?.name, (await item('v3'))?.use, (await item('v3'))?.revision], ['Mara · Face close-up', 'sheet view', 1]);
+  assert.deepEqual(await read({ versionId: 'elsewhere' }), { found: false, reason: 'not_found' });
+  assert.ok(reads.every(id => id === 'v3'), 'only a sheet\'s own view is read on its own');
+  // The read of a moved-on view can fail like any other read.
+  assert.deepEqual(await reading(space, async () => ({ kind: 'unavailable' }))({ versionId: 'v3' }), { found: false, reason: 'unavailable' });
+});
+
+test('50 subjects with full sheets stay within 16 KiB: sheets past the subjects\' share give their version id only', async () => {
+  const subjects = Array.from({ length: 50 }, (_, index) => ({ id: `subject-${index}`, kind: 'prop' as const, name: `${'n'.repeat(70)}${index}` }));
+  const sheets = subjects.map((subject, index) => sheetVersion(`sheet-${index}`, subject.id, Array.from({ length: 5 }, (_, view) => [`${'v'.repeat(40)}-${index}-${view}`, `${'w'.repeat(76)} ${view}`] as [string, string])));
+  const listed = await reading(workspace(sheets, { script: work(subjectScript(subjects), 'script') }), async () => ({ kind: 'not_found' }))({}) as { subjects: { sheet?: { versionId: string; views?: unknown[] } }[]; items: unknown[] };
+  assert.ok(Buffer.byteLength(JSON.stringify(listed)) <= listingBounds.bytes);
+  assert.ok(listed.subjects[0]?.sheet?.views, 'the first sheets keep their views');
+  assert.deepEqual(listed.subjects.at(-1)?.sheet, { versionId: 'sheet-49' });
+  assert.ok(listed.items.length > 0, 'items still fit beside the subjects');
+});

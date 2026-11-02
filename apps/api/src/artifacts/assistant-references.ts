@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import type { z } from 'zod';
-import { idSchema, savedReferenceContentSchema, savedScriptContentSchema, scriptSubjects, useSchema, type Version } from '@workprint/contracts';
+import { idSchema, savedReferenceContentSchema, savedScriptContentSchema, scriptSubjects, sheetViews, useSchema, type Version } from '@workprint/contracts';
 import { transaction } from '../db/index.js';
 import { parseContent } from './content.js';
 import { ArtifactError } from './errors.js';
@@ -74,6 +74,13 @@ export function createAssistantReferences(pool: Pool, checkOwnedConversation: Ow
     if (check.kind !== 'owned') throw new ArtifactError(check.kind === 'not_found' ? 'not_found' : 'integration_failure');
   };
   return Object.freeze({
+    /** One image version a current sheet of the video lists, even when that image's own use has moved on; any other is not found. */
+    async view(account: string, conversation: string, versionId: string): Promise<Version> {
+      if (!idSchema.safeParse(versionId).success || !sheetViews(await reads.workspace(account, conversation)).has(versionId)) throw new ArtifactError('not_found');
+      const version = await reads.version(account, versionId);
+      if (version.kind !== 'image') throw new ArtifactError('not_found');
+      return version;
+    },
     /** How many more uses the video can hold, so a caller can refuse before any paid work. */
     async useRoom(account: string, conversation: string): Promise<number> {
       await owned(account, conversation);

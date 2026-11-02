@@ -837,6 +837,13 @@ test('generate-sheet makes a script subject\'s views one at a time with Meta and
     for (const item of rest) assert.deepEqual((await store.version(owner.id, item.versionId)).dependencies, [first!.versionId]);
     assert.deepEqual(lines, [['Making a reference sheet…', 'running', undefined], ['Making a reference sheet…', 'done', 'Saved Mara · Version 1']]);
     assert.deepEqual(shown, result.views.map(item => ({ kind: 'image', versionId: item.versionId })));
+    // The next read-workspace turn lists Mara with her sheet's views, and the views aren't items again.
+    provider.reset();
+    provider.script({ toolCalls: [{ name: 'read-workspace', args: {} }] }, { text: ['Read it'] });
+    assert.ok(completed(await client(owner).turn(maraVideo, 'What does Mara have?')));
+    const listing = toolResult() as unknown as { subjects: { id: string; sheet?: unknown }[]; items: { name: string; versionId: string }[] };
+    assert.deepEqual(listing.subjects.find(subject => subject.id === 'mara')?.sheet, { versionId: result.sheet.versionId, views: result.views });
+    assert.deepEqual(listing.items.map(item => item.name), ['Script · Version 1', 'Mara · Version 1']);
   });
 
   await t.test('a next version redoes a view by its name in place, keeping the base\'s spelling and its first view as the identity', async () => {

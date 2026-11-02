@@ -1,4 +1,4 @@
-import { mediaVersionName, savedScriptContentSchema, scriptSubjects, workspaceMediaLabels, type ScriptSubject } from '@workprint/contracts';
+import { currentSheets, mediaVersionName, savedScriptContentSchema, scriptSubjects, sheetViews, workspaceMediaLabels, type ScriptSubject, type Version as SavedVersion } from '@workprint/contracts';
 import type { OwnedWorkspace } from '../application/index.js';
 
 type Version = OwnedWorkspace['assets'][number]['version'];
@@ -44,24 +44,43 @@ function summary(version: Version): string {
   return clip([`${strings(heading.setting)} ${strings(heading.location)} - ${strings(heading.time)}`, ...lines].join(' '));
 }
 
-/** The video's subjects from its current script, in Assets order; none without a script. */
-export function workspaceSubjects(workspace: OwnedWorkspace): ScriptSubject[] {
+/**
+ * A script subject as the model sees it, with its current sheet's version id and views when it has one. A sheet past
+ * the listing's share for subjects gives its version id only; item mode on it gives its views.
+ */
+export type WorkspaceSubject = ScriptSubject & { sheet?: { versionId: string; views?: { view: string; versionId: string }[] } };
+
+/** The share of the listing's byte bound that subjects' sheet views may take, so items still fit beside them. */
+const subjectViewBytes = listingBounds.bytes / 2;
+
+/** The video's subjects from its current script, in Assets order, each with its first current sheet; none without a script. */
+export function workspaceSubjects(workspace: OwnedWorkspace): WorkspaceSubject[] {
   const content = workspace.script ? savedScriptContentSchema.safeParse('content' in workspace.script.version ? workspace.script.version.content : null) : null;
-  return content?.success ? scriptSubjects(content.data) : [];
+  const sheets = currentSheets(workspace);
+  let bytes = 0;
+  return (content?.success ? scriptSubjects(content.data) : []).map(subject => {
+    const sheet = sheets.find(candidate => candidate.subjectId === subject.id);
+    if (!sheet) return subject;
+    const views = sheet.views.map(({ view, versionId }) => ({ view, versionId }));
+    bytes += Buffer.byteLength(JSON.stringify(views));
+    return { ...subject, sheet: { versionId: sheet.versionId, ...(bytes <= subjectViewBytes ? { views } : {}) } };
+  });
 }
 
 /** Every exact version the video uses, in workspace order, each once, with a name a person would recognise. */
 export function workspaceEntries(workspace: OwnedWorkspace): Entry[] {
   const clips = workspace.generatedVideos ?? [];
-  const entries: Entry[] = [], seen = new Set<string>(), labels = workspaceMediaLabels(workspace);
+  const entries: Entry[] = [], seen = new Set<string>(), labels = workspaceMediaLabels(workspace), views = sheetViews(workspace);
+  const sheetNames = new Map(currentSheets(workspace).map(sheet => [sheet.versionId, sheet.subjectName]));
   const add = (entry: Entry) => { if (!seen.has(entry.version.id)) { seen.add(entry.version.id); entries.push(entry); } };
   const revision = (version: Version) => `Version ${version.revision}`;
   if (workspace.script) add({ name: `Script · ${revision(workspace.script.version)}`, use: 'script', state: workspace.script.state, version: workspace.script.version });
   for (const asset of workspace.assets) {
     const { version } = asset;
-    // Uploaded and made media keep no filename, so they are named by kind and order (the shared rule).
-    const subject = 'content' in version && version.kind === 'reference' ? strings(record(record(version.content).subject).name) : '';
-    add({ name: subject ? `${clip(subject, 80)} · ${revision(version)}` : mediaVersionName(labels, version), use: 'reference', state: asset.state, version });
+    // Uploaded and made media keep no filename, so they are named by kind and order, or by subject and view in a sheet
+    // (the shared rule). A sheet is named by its subject's current script name.
+    const subject = 'content' in version && version.kind === 'reference' ? sheetNames.get(version.id) ?? strings(record(record(version.content).subject).name) : '';
+    add({ name: subject ? `${clip(subject, 80)} · ${revision(version)}` : mediaVersionName(labels, version, views), use: 'reference', state: asset.state, version });
   }
   for (const made of clips) add({ name: mediaVersionName(labels, made.version), use: 'generated video', state: made.state, version: made.version });
   if (workspace.storyboard.work) add({ name: `Storyboard · ${revision(workspace.storyboard.work.version)}`, use: 'storyboard', state: workspace.storyboard.work.state, version: workspace.storyboard.work.version });
@@ -80,7 +99,9 @@ export function workspaceEntries(workspace: OwnedWorkspace): Entry[] {
  * The byte bound covers the whole tool result the model receives, including its envelope.
  */
 export function listWorkspace(workspace: OwnedWorkspace, envelope: Readonly<Record<string, unknown>> = {}): WorkspaceListing {
-  const entries = workspaceEntries(workspace);
+  // A sheet's images are listed under its subject, not again as items; item mode still reads them.
+  const views = sheetViews(workspace);
+  const entries = workspaceEntries(workspace).filter(entry => !(entry.use === 'reference' && entry.version.kind === 'image' && views.has(entry.version.id)));
   const listing: WorkspaceListing = { items: [], total: entries.length, truncated: false };
   for (const entry of entries) {
     const item: WorkspaceItem = { name: clip(entry.name), kind: entry.version.kind, versionId: entry.version.id, use: entry.use, state: entry.state, text: summary(entry.version) };
@@ -89,6 +110,14 @@ export function listWorkspace(workspace: OwnedWorkspace, envelope: Readonly<Reco
     listing.items.push(item);
   }
   return listing;
+}
+
+/** A sheet's image read on its own, named by its subject and view: one whose own use moved on to a later version. */
+export function sheetViewItem(workspace: OwnedWorkspace, version: SavedVersion): WorkspaceItemDetail | null {
+  if (version.kind !== 'image' || !('media' in version)) return null;
+  const views = sheetViews(workspace);
+  if (!views.has(version.id)) return null;
+  return { name: mediaVersionName(workspaceMediaLabels(workspace), version, views), kind: version.kind, versionId: version.id, revision: version.revision, use: 'sheet view', state: 'Draft', media: version.media };
 }
 
 /** One item in full, only when the video uses that exact version. */

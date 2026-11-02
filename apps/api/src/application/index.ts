@@ -57,7 +57,7 @@ export { withSavedWork, type SavedWorkApplication, type SavedWorkReads } from '.
 export { withStoryboardEdits, type StoryboardEditApplication } from './storyboard-edits.js';
 export { createWorkspaceReader, type OwnedWorkspace, type OwnedWorkspaceRead, type ReadOwnedWorkspace } from './workspace-reads.js';
 export { createAssistantScriptSaver, type AssistantScriptOutcome, type SaveAssistantScript } from './assistant-scripts.js';
-export { createAssistantSheets, type AssistantSheetOutcome, type AssistantSheets, type SaveAssistantSheet, type SheetUseRoom } from './assistant-references.js';
+export { createAssistantSheets, type AssistantSheetOutcome, type AssistantSheets, type ReadSheetView, type SaveAssistantSheet, type SheetUseRoom } from './assistant-references.js';
 export { makeSheet, sheetViewCap, sheetViewNameCap, sheetViewPrompt, type SheetMakers, type SheetOutcome, type SheetRequest, type SheetView, type SheetViewRequest } from './sheets.js';
 export { createGeneratedImageSaver, createImageInputReader, metaImageFailure, type GeneratedImageOutcome, type ImageFailure, type ImageInputsOutcome, type ReadImageInputs, type SaveGeneratedImage } from './generated-images.js';
 export { createGeneratedVideoSaver, type GeneratedVideoOutcome, type SaveGeneratedVideo } from './generated-videos.js';
