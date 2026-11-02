@@ -2,7 +2,7 @@
 
 **Date:** Start 2026-11-02, from `main` after PR #91 (`57ecc93`) – End after completion gates and Lou's QA
 **Goal:** In a local build, a signed-in user asks the agent for a video. The agent calls MiniMax Video V2 with a prompt and up to two of the video's saved images as first and last frames. The tool waits in the turn while the chat shows the elapsed minutes. The job is saved before any waiting, so Stop, a deadline or a restart never loses it or submits it twice. The finished clip is checked, saved privately as an assistant-made video, and plays in the chat and in a new "Generated videos" list in the Videos tab, live and after a reload.
-**Status:** 🟡 In progress (plan approved and implementation authorized by Lou, 2026-11-02)
+**Status:** 🟡 Awaiting Lou's QA (all stories merged into `sprint-009`; completion gates passed 2026-11-03)
 
 ---
 
@@ -385,14 +385,14 @@ These tests use Docker, a browser build or a paid call. Each is listed once for 
 
 After all implementation stories are complete, perform this checklist before sprint integration. This is a completion step, not a separate story.
 
-- [ ] Confirm all stories met their acceptance criteria using recorded implementation and verification evidence.
-- [ ] Run the applicable regression suite on the combined sprint branch.
-  - [ ] `.checks/regression.sh --tier=deep` on `sprint-009` with the pinned toolchain; the audit's two known moderate advisories (B-004, B-008) are the approved non-pass.
+- [x] Confirm all stories met their acceptance criteria using recorded implementation and verification evidence.
+- [x] Run the applicable regression suite on the combined sprint branch.
+  - [x] `.checks/regression.sh --tier=deep` on `sprint-009` with the pinned toolchain; the audit's two known moderate advisories (B-004, B-008) are the approved non-pass.
 - [ ] Run any planned cross-story checks not covered by that suite.
-  - [ ] Fold the video flow into spec §8.3 and §8.7 (and the §4 `generation` row) before the deep gate.
-  - [ ] `pnpm live:video`, `pnpm live:image` and `pnpm live:chat` dry modes pass on the combined branch (no gate runs them).
+  - [x] Fold the video flow into spec §8.3 and §8.7 (and the §4 `generation` row) before the deep gate.
+  - [x] `pnpm live:video`, `pnpm live:image` and `pnpm live:chat` dry modes pass on the combined branch (no gate runs them).
   - [ ] A QA build for Lou (web 4179, API 4180, live Muse Spark, live Meta images and live MiniMax video, with storage and the sandbox). Pass conditions: a real turn of at least 6 minutes (past Node's 5-minute defaults; two videos in one turn if one is quicker) completes, showing `· N min` while it waits; a video from a prompt and one from a saved image each play in the chat and in Generated videos; Stop leaves an `Interrupted` card; asking to resume it saves the clip with exactly one MiniMax task for that job.
-- [ ] Record results and unresolved issues in a brief `## Final Review`.
+- [x] Record results and unresolved issues in a brief `## Final Review`.
 
 For descriptive-only work, use editorial review and applicable existing checks. Preserve applicable design checks and approval gates. Failed, ambiguous, or unrun required checks remain non-pass.
 
@@ -413,3 +413,53 @@ For descriptive-only work, use editorial review and applicable existing checks. 
 - Sprint doc includes a brief `## Final Review` with completion evidence, unresolved issues, and a New Dependencies field containing dependencies or `None`.
 - Sprint-integration PR is reviewed, passes the required gates, and is merged only after the explicit user merge command.
 - If the sprint introduces new flows, they are folded into the implementation spec before sprint integration.
+
+## Final Review
+
+- **Outcome:** the goal is met in the scripted build; Lou's live QA is pending. Every story AC and verification item is met. Each story merged into `sprint-009` after an independent review of its final head scored at least 4/5 with no open P0/P1. The verdicts come from the orchestrator's review runs and are recorded in the PR bodies:
+  - Story 1, #95 (MiniMax video client): 4/5. All 17 P2s were fixed.
+  - Story 2, #96 (turns that wait for minutes): 4/5. All 5 P2s were fixed.
+  - Story 3, #97 (saved video jobs): 4/5, with eight P2s disposed in the PR.
+  - Story 4, #98 (save generated videos): 4/5 after fixes.
+  - Story 5, #99 (generate-video tool): 4/5 after four fix cycles. The first review's P1 was a create sent after a Stop during the frame read.
+  - Story 6, #100 (video in the chat): 5/5 after one fix round.
+  - Story 7, #101 (Generated videos): 5/5 after one fix round. The first review's P1 was empty-state evidence that never opened the Videos tab.
+- **Combined-branch verification:** the deep gate (`.checks/regression.sh --tier=deep`, 322 s) passed at `5087b4d`, which is `sprint-009` plus these records.
+  - Results: unit 199/199, tooling 6/6, integration 141/141, browser 32/32.
+  - The first deep run, at `688f29e`, failed 2 integration tests. Both were expectations Sprint 009 made stale. The built admission check still expected the generation-request reads to be unimplemented (Story 3), and the empty workspace lacked `generatedVideos` (Story 4). Neither file was in the stories' targeted runs. Both expectations are fixed in `Test: Expect the video reads in older suites`; the diagnosis is in `.checks/.logs/run-lp4ufvxd/diagnosis.md`.
+  - Audit is NON-PASS, as approved: the same 2 moderate advisories, `@hono/node-server` GHSA-rmxm-3fg6-px4f (B-004) and `minimatch` GHSA-g3hv-75wg-m249 (B-008). There are no high or critical advisories.
+  - Logs: `outputs/verification/sprint-009/deep-5087b4d/` and `deep-688f29e/`.
+- **Live checks:** `pnpm live:video` and `pnpm live:image` pass in dry mode, and `pnpm live:chat` passes in scripted mode, its default. The one approved paid MiniMax call was Story 1's (`outputs/verification/sprint-009/minimax-video-live-2026-11-02.json`).
+- **QA build for Lou:** at `5087b4d`.
+  - Address: http://127.0.0.1:4179, API :4180.
+  - Live services: Muse Spark 1.3, Meta `muse-image-1.0` and MiniMax-H3 768P video. All are paid calls.
+  - Storage: private loopback object storage and the pinned decode sandbox.
+  - Account: a dedicated synthetic account, in a 0600 file under `outputs/qa/sprint-009/5087b4de9cc8/`.
+  - Pass conditions, from the checklist and still to be run by Lou:
+    - a real turn of at least 6 minutes completes, showing `· N min`;
+    - a video from a prompt and one from a saved image each play in the chat and in Generated videos;
+    - Stop leaves an `Interrupted` card;
+    - a resume saves the clip with one MiniMax task for that job.
+- **Deviations, recorded in the story PRs:**
+  - **Story 4:**
+    - The test clip is 97 frames (4.04 s), not 4 s, because of the cut points in MiniMax's B-frame groups.
+    - The High-profile `avcC` tail is allowed for assistant clips (Lou, 2026-11-02).
+    - A clip's use is its own `clipUseSchema`, not a new `useBindingSchema` option.
+  - **Story 5:**
+    - Two commits instead of three.
+    - A download error after MiniMax succeeds leaves the job resumable. Only a clip too large fails it.
+    - One image used as both frames is refused.
+    - The commit subject `Fix(application): Name an unused frame only with one` is 52 characters. It was not amended.
+  - **Story 6:**
+    - The play mark is the player's own play control, shared at 40px, since the Videos thumbnail has no overlay.
+    - `SingleClipViewer` takes its use props together or not at all.
+  - **Story 7:**
+    - Rows are named through the shared `workspaceMediaLabels` and `mediaVersionName`.
+    - The poster itself is the play button.
+    - The Videos panel mounts only while open until the video has a script, assets or Shots.
+- **Unresolved issues, accepted:**
+  - Stop cannot cancel a MiniMax task or its charge (B-029). Background execution is B-032.
+  - The tooling test `tasks.test.js:138` failed once with `kill EPERM` on a push gate and passed when rerun. `test/support/process.ts` `stop()` treats only ESRCH as gone, and on macOS a process group whose members have all exited can answer EPERM. Diagnosis: `.checks/.logs/run-v4p4efgx/diagnosis.md`. Not fixed this sprint.
+  - Story 3 left one P2 unchanged: the shared admission/parse/validate envelope is repeated across application boundary files.
+- **New Dependencies:** None. `pnpm live:video` is a new script.
+- **Pending:** Lou's QA, then the merge to `main` on Lou's command.
