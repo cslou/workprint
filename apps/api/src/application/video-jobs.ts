@@ -19,11 +19,11 @@ export type VideoJobOutcome =
   /** The server is shutting down: the job stays `running` for the next start to mark interrupted. */
   | { kind: 'shutdown'; jobId: string }
   | { kind: 'failed'; jobId: string; reason: JobFailure; provider?: VideoProviderFailure }
-  /** Nothing was saved or sent. */
-  | { kind: 'input_not_found' } | { kind: 'invalid'; detail?: string }
+  /** Nothing was saved or sent. `not_started`: the caller's signal fired before the create, so none is paid for. */
+  | { kind: 'input_not_found' } | { kind: 'invalid'; detail?: string } | { kind: 'not_started' }
   /** Resume refusals: an unknown job, one still being made, one already saved, one that failed. */
   | { kind: 'not_found' } | { kind: 'busy'; jobId: string } | { kind: 'already_saved'; jobId: string; versionId: string } | { kind: 'not_resumable'; jobId: string; reason: JobFailure }
-  /** The saved jobs or an input read couldn't be reached. */
+  /** The saved jobs or an input read couldn't be reached. After a create, the job may still be waiting at MiniMax. */
   | { kind: 'unavailable' };
 
 export type VideoJobTiming = Readonly<{ pollIntervalMs: number; pollDeadlineMs: number }>;
@@ -60,6 +60,11 @@ export function createVideoJobs(collaborators: VideoJobCollaborators) {
     return { kind: 'interrupted', jobId };
   }
 
+  async function refused(account: string, jobId: string): Promise<VideoJobOutcome> {
+    await jobs.failed(account, jobId, 'check_refused');
+    return { kind: 'failed', jobId, reason: 'check_refused' };
+  }
+
   /** Polls a running job's task, then downloads, checks and saves its clip. `frames` are the job's saved inputs. */
   async function wait(account: string, video: string, jobId: string, taskId: string, frames: readonly string[], control: VideoRunControl): Promise<VideoJobOutcome> {
     const { signal } = control;
@@ -87,7 +92,9 @@ export function createVideoJobs(collaborators: VideoJobCollaborators) {
     try { bytes = await client.download(url, signal); } catch (error) {
       if (!(error instanceof MiniMaxVideoError)) throw error;
       if (signal.aborted) return stopped(account, jobId, control);
-      // MiniMax keeps the task for 7 days, and a fresh query gives a fresh URL: the job stays resumable.
+      // A clip too large to accept stays too large: the job fails. Any other download error stays resumable, since
+      // MiniMax keeps the task for 7 days and a fresh query gives a fresh URL (an expired one is refused).
+      if (error.detail === 'download.size') return refused(account, jobId);
       await jobs.interrupted(account, jobId);
       return { kind: 'interrupted', jobId };
     }
@@ -96,7 +103,8 @@ export function createVideoJobs(collaborators: VideoJobCollaborators) {
     const saved = await saveVideo(account, video, { bytes, frames, jobId }, signal);
     if (saved.kind === 'saved') return { kind: 'saved', jobId, versionId: saved.versionId, width: saved.width, height: saved.height, durationMs: saved.durationMs };
     if (signal.aborted) return stopped(account, jobId, control);
-    if (saved.kind === 'refused') { await jobs.failed(account, jobId, 'check_refused'); return { kind: 'failed', jobId, reason: 'check_refused' }; }
+    // A clip the check refuses, or one whose frames this video no longer uses, would be refused on every resume.
+    if (saved.kind === 'refused' || saved.kind === 'not_found') return refused(account, jobId);
     await jobs.interrupted(account, jobId);
     return { kind: 'interrupted', jobId };
   }
@@ -130,6 +138,8 @@ export function createVideoJobs(collaborators: VideoJobCollaborators) {
         if (error instanceof MiniMaxVideoError) return { kind: 'invalid', ...(error.detail ? { detail: error.detail } : {}) };
         throw error;
       }
+      // Once the caller's signal fired, nothing new is paid for.
+      if (control.signal.aborted) return { kind: 'not_started' };
       const job = await jobs.begin(account, video, { prompt: request.prompt, inputs: ids });
       let taskId: string;
       // The create is never cut off by Stop: it ends with a task id or an unknown outcome within its own timeout.
@@ -161,7 +171,9 @@ export function createVideoJobs(collaborators: VideoJobCollaborators) {
         if (!(error instanceof GenerationJobError)) throw error;
         // Another turn resumed it first, or it expired just now.
         const now = await jobs.get(account, jobId);
-        return now.status === 'failed' ? { kind: 'not_resumable', jobId, reason: now.failureReason ?? 'provider_error' } : { kind: 'busy', jobId };
+        if (now.status === 'failed') return { kind: 'not_resumable', jobId, reason: now.failureReason ?? 'provider_error' };
+        if (now.status === 'succeeded' && now.resultVersionId) return { kind: 'already_saved', jobId, versionId: now.resultVersionId };
+        return { kind: 'busy', jobId };
       }
       return wait(account, video, jobId, job.taskId, resumed.inputs, control);
     }),

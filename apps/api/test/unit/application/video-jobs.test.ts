@@ -33,14 +33,14 @@ function memoryJobs() {
   };
 }
 
-function harness(options: { frames?: ImageInputsOutcome; submit?: () => Promise<{ taskId: string }>; tasks?: (() => Promise<VideoTask>)[]; save?: GeneratedVideoOutcome['kind'] } = {}) {
+function harness(options: { frames?: ImageInputsOutcome; submit?: () => Promise<{ taskId: string }>; tasks?: (() => Promise<VideoTask>)[]; download?: () => Promise<Uint8Array>; save?: GeneratedVideoOutcome['kind'] } = {}) {
   const jobs = memoryJobs(), calls = { submits: 0, queries: 0, downloads: 0, saves: 0 };
   const runner = createVideoJobs({
     jobs,
     client: {
       submit: async () => { calls.submits++; return options.submit ? options.submit() : { taskId: 'task-1' }; },
       query: async () => { const next = options.tasks?.[calls.queries++]; return next ? next() : { status: 'succeeded', result: { url: 'https://example.invalid/clip.mp4' } }; },
-      download: async () => { calls.downloads++; return new Uint8Array([1]); },
+      download: async () => { calls.downloads++; return options.download ? options.download() : new Uint8Array([1]); },
     },
     readImageInputs: async () => options.frames ?? { kind: 'not_found' },
     saveVideo: async () => {
@@ -118,4 +118,42 @@ test('a resume refuses every state but interrupted, and another video\'s job is 
   await jobs.failed(account, job.id, 'outcome_unknown');
   assert.deepEqual(await runner.resume(account, video, job.id, control()), { kind: 'not_resumable', jobId: job.id, reason: 'outcome_unknown' });
   assert.equal(calls.submits + calls.queries, 0);
+});
+
+test('the turn deadline interrupts a polling job; a signal fired before the create sends nothing', async () => {
+  const controller = new AbortController();
+  const { runner, jobs } = harness({ tasks: [async () => { controller.abort(); return { status: 'running' }; }] });
+  assert.equal((await runner.start(account, video, input, control(controller, 'deadline'))).kind, 'interrupted');
+  assert.deepEqual([...jobs.rows.values()].map(job => [job.status, job.taskId]), [['interrupted', 'task-1']]);
+  const early = new AbortController();
+  early.abort();
+  const before = harness({ frames: { kind: 'read', images: [frame()] } });
+  assert.deepEqual(await before.runner.start(account, video, { ...input, firstFrame: randomUUID() }, control(early)), { kind: 'not_started' });
+  assert.equal(before.jobs.rows.size, 0); assert.equal(before.calls.submits, 0);
+});
+
+test('a download that finishes after Stop saves nothing; a clip too large or no longer framed fails the job', async () => {
+  const controller = new AbortController();
+  const late = harness({ download: async () => { controller.abort(); return new Uint8Array([1]); } });
+  assert.equal((await late.runner.start(account, video, input, control(controller))).kind, 'interrupted');
+  assert.equal(late.calls.saves, 0);
+  assert.deepEqual([...late.jobs.rows.values()].map(job => job.status), ['interrupted']);
+  const large = harness({ download: async () => { throw new MiniMaxVideoError('failed', { detail: 'download.size' }); } });
+  const refusedDownload = harness({ download: async () => { throw new MiniMaxVideoError('failed', { detail: 'download' }); } });
+  const unframed = harness({ save: 'not_found' });
+  for (const [run, status] of [[large, 'failed'], [refusedDownload, 'interrupted'], [unframed, 'failed']] as const) {
+    await run.runner.start(account, video, input, control());
+    assert.deepEqual([...run.jobs.rows.values()].map(job => [job.status, job.failureReason]), [[status, status === 'failed' ? 'check_refused' : undefined]]);
+  }
+});
+
+test('a resume that lost the race to a finished resume reads the saved clip', async () => {
+  const { runner, jobs } = harness();
+  const job = await jobs.begin(account, video, { prompt: 'p', inputs: [] });
+  await jobs.started(account, job.id, 'task-1'); await jobs.interrupted(account, job.id);
+  const resumed = jobs.resumed;
+  const versionId = randomUUID();
+  // Another turn resumes and saves it between this resume's read and its move.
+  jobs.resumed = async (owner, id) => { await resumed(owner, id); jobs.rows.set(id, { ...jobs.rows.get(id)!, status: 'succeeded', resultVersionId: versionId }); throw new GenerationJobError('stale'); };
+  assert.deepEqual(await runner.resume(account, video, job.id, control()), { kind: 'already_saved', jobId: job.id, versionId });
 });

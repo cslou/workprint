@@ -21,10 +21,8 @@ function harness(outcome: VideoJobOutcome, withVideos = true) {
   };
   return { collaborators, calls };
 }
-const run = (collaborators: AgentCollaborators, input: Record<string, unknown>) => {
-  const signal = new AbortController().signal;
-  return tool.execute(input, { scope, collaborators, signal, abortReason: () => undefined } satisfies ToolContext) as Promise<{ made: boolean; reason?: string; message?: string }>;
-};
+const run = (collaborators: AgentCollaborators, input: Record<string, unknown>, signal = new AbortController().signal) =>
+  tool.execute(input, { scope, collaborators, signal, abortReason: () => signal.aborted ? 'shutdown' : undefined } satisfies ToolContext) as Promise<{ made: boolean; reason?: string; message?: string }>;
 const summary = (output: unknown) => projectToolActivity(productionTools, { toolCallId: 'call_1', toolName: 'generate-video', state: 'done', input: {}, output })?.summary;
 
 test('without video jobs the tool refuses before any call', async () => {
@@ -67,10 +65,19 @@ test('each outcome has its own line and a message the model can follow', async (
     [{ kind: 'busy', jobId }, 'That video is still being made', /do not start it again/],
     [{ kind: 'already_saved', jobId, versionId: randomUUID() }, 'That video is already saved', /already saved\. Do not resume/],
     [{ kind: 'not_resumable', jobId, reason: 'expired' }, 'That video failed and can’t be resumed', /cannot be resumed/],
+    [{ kind: 'unavailable' }, 'Not made: saved video jobs are unavailable', /MiniMax may have started it/],
   ];
   for (const [outcome, line, message] of cases) {
     const result = await run(harness(outcome).collaborators, { prompt: 'A bench' });
     assert.equal(summary(result), line, outcome.kind); assert.match(result.message!, message, line);
   }
   assert.equal(summary({ error: true }), 'Not made: the request wasn’t valid');
+});
+
+test('a shutdown, or a signal that fired before the create, ends the call incomplete instead of returning a line', async () => {
+  const controller = new AbortController();
+  controller.abort(new Error('Server shutting down'));
+  for (const outcome of [{ kind: 'shutdown', jobId }, { kind: 'not_started' }] as const) {
+    await assert.rejects(run(harness(outcome).collaborators, { prompt: 'A bench' }, controller.signal), /Server shutting down/);
+  }
 });

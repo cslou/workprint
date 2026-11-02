@@ -205,7 +205,8 @@ export function createMiniMaxVideoClient(options: MiniMaxVideoClientOptions): Mi
       if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) invalid('maxBytes');
       try { return await download(url, signal, Math.min(maxBytes, maxVideoDownloadBytes)); } catch (error) {
         if (signal?.aborted) throw new MiniMaxVideoError('aborted');
-        throw new MiniMaxVideoError(error instanceof DownloadError ? downloadCodes[error.reason] : 'unavailable', { detail: 'download' });
+        // `download.size` says the clip itself is too large, so fetching it again can't help.
+        throw new MiniMaxVideoError(error instanceof DownloadError ? downloadCodes[error.reason] : 'unavailable', { detail: error instanceof DownloadError && error.reason === 'too_large' ? 'download.size' : 'download' });
       }
     },
   };
