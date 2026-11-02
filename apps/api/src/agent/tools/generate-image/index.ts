@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import { MetaImageError, type ImageResult } from '../../../generation/index.js';
 import { defineTool, type ToolContext } from '../define.js';
-import { workspaceItem } from '../read-workspace/projection.js';
+import { workspaceItem } from '../../workspace-entries.js';
 
 /** One saved image, named as read-workspace names it; the name is left out when the workspace can't be read. */
 type SavedImage = { versionId: string; label?: string; width: number; height: number };
-type Reason = 'content_policy' | 'input_not_found' | 'unavailable' | 'checks' | 'not_saved' | 'invalid';
+type Reason = 'content_policy' | 'input_not_found' | 'unavailable' | 'unsaveable' | 'checks' | 'not_saved' | 'invalid';
 export type GenerateImageResult =
   | { made: true; images: SavedImage[]; failed: number; showInChat: boolean }
   | { made: false; reason: Reason; message: string };
@@ -22,6 +22,7 @@ const summaries: Readonly<Record<Reason, string>> = {
   content_policy: 'Not made: the request was refused',
   input_not_found: 'Not made: an input image wasn’t found',
   unavailable: 'Not made: Meta is unavailable',
+  unsaveable: 'Not made: images can’t be saved on this server',
   checks: 'Not saved: the image didn’t pass checks',
   not_saved: 'Not saved: the image couldn’t be stored',
   invalid: 'Not made: the request wasn’t valid',
@@ -30,6 +31,7 @@ const messages: Readonly<Record<Exclude<Reason, 'invalid'>, string>> = {
   content_policy: 'Not made: Meta refused this request under its content policy. Rephrase the prompt without the refused content, or ask the user how to change it.',
   input_not_found: 'Not made: an input image is not one this video uses. Call read-workspace and pass only image versionIds it lists.',
   unavailable: 'Not made: Meta image generation is unavailable right now. Tell the user; do not retry more than once in this turn.',
+  unsaveable: 'Not made: this server cannot save images, so nothing was sent to Meta. Tell the user; do not retry.',
   checks: 'Not saved: the image Meta returned did not pass the media checks. Tell the user; you may try once more with a different size.',
   not_saved: 'Not saved: Meta made the image but saving is unavailable right now. Tell the user and do not retry in this turn.',
 };
@@ -56,6 +58,7 @@ export const generateImageTool = defineTool({
     'Write a compact prompt from the blocks that apply, and leave out the rest: intent and constraints; what each input image is for; composition and visible state; what to preserve and what to change, when editing; one quality focus; relevant appearance; what to avoid.',
     'Then critique and simplify it: remove details the user did not ask for, repetition and contradictions, but keep every requirement. Do not invent story facts or force a style such as photorealism. Ask the user first only if a missing choice would change the image materially.',
     'size sets the shape, not exact pixels: "auto", or WxH such as 1536x1024. Keep the long side at 2048 or less.',
+    'For variations of one prompt, make one call with count; make separate calls only for different prompts.',
     'Set showInChat to true when the user asked for an image directly, so it is shown in the chat.',
   ].join(' '),
   inputSchema: z.strictObject({
@@ -84,22 +87,26 @@ export const generateImageTool = defineTool({
   shownImages: (result: GenerateImageResult | { error: true }) => 'made' in result && result.made && result.showInChat ? result.images.map(image => image.versionId) : [],
   execute: async (input, context): Promise<GenerateImageResult> => {
     const { scope, collaborators, signal } = context;
+    // Without a way to save, a paid image would be lost: nothing is sent. Composition supplies the client only with saving.
+    const images = collaborators.images;
+    if (!images) return refusal('unsaveable');
     let inputs: { versionId: string; dataUrl: string }[] = [];
-    if (input.inputImages.length) {
-      const read = await collaborators.readImageInputs(scope.accountId, scope.videoId, input.inputImages);
+    // An input named twice is the same input.
+    const inputImages = [...new Set(input.inputImages)];
+    if (inputImages.length) {
+      const read = await collaborators.readImageInputs(scope.accountId, scope.videoId, inputImages);
       if (read.kind === 'not_found') return refusal('input_not_found');
       if (read.kind === 'unavailable') return refusal('unavailable');
       inputs = read.images;
     }
-    if (!collaborators.images) return refusal('unavailable');
     const request = {
       prompt: input.prompt, n: input.count, size: input.size, outputFormat: 'png' as const, reasoningStrength: input.reasoning,
       tools: { imageSearch: input.imageSearch, webSearch: input.webSearch, shell: input.shell },
     };
     let result: ImageResult;
     try {
-      result = inputs.length ? await collaborators.images.edit({ ...request, images: inputs.map(image => ({ dataUrl: image.dataUrl })) }, signal)
-        : await collaborators.images.generate(request, signal);
+      result = inputs.length ? await images.edit({ ...request, images: inputs.map(image => ({ dataUrl: image.dataUrl })) }, signal)
+        : await images.generate(request, signal);
     } catch (error) {
       if (!(error instanceof MetaImageError)) throw error;
       // Stop: the run's own handling ends the line as incomplete.

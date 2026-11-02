@@ -38,7 +38,12 @@ test('image-only upload admission refuses new and previously issued video upload
       read: async (...args: Parameters<typeof storage.read>) => { effects.reads++; return storage.read(...args); },
       publish: async (...args: Parameters<typeof storage.publish>) => { effects.publication++; return storage.publish(...args); },
     };
-    const uploads = createUploadCoordinator(pool, createOwnedConversationCheck(native), { storage: guarded, verifyMedia: async input => { effects.inspection++; return verify(input); } });
+    // The first image's check finds the one-job checker busy (an assistant image check), as during an image save.
+    let busyOnce = true;
+    const uploads = createUploadCoordinator(pool, createOwnedConversationCheck(native), { storage: guarded, verifyMedia: async input => {
+      if (input.kind === 'image' && busyOnce) { busyOnce = false; throw new MediaProcessError('capacity'); }
+      effects.inspection++; return verify(input);
+    } });
     const video = { operationId: randomUUID(), kind: 'video' as const, filename: 'ordinary.mp4', contentType: 'video/mp4', byteSize: fixtures.video.length, intendedUse: { purpose: 'reference' as const } };
     // Persistence-only setup represents a grant issued before the restriction; no
     // test-only enable switch or successful verification/publication is supplied.
@@ -83,6 +88,7 @@ test('image-only upload admission refuses new and previously issued video upload
       await setup.query("UPDATE artifacts.uploads SET kind='video',content_type='video/mp4' WHERE upload_id=$1", [grant.uploadId]);
       await assert.rejects(uploads.confirm(account, grant.uploadId, confirmation), refusal, 'A video-kind row cannot return even a parseable historical cached result');
     }
+    assert.equal(busyOnce, false, 'the first confirm met a busy checker and waited it out');
     assert.equal(effects.inspection, 2); assert.equal(effects.publication, 2);
     assert.deepEqual((await pool.query('SELECT (SELECT count(*)::int FROM artifacts.versions) AS versions,(SELECT count(*)::int FROM artifacts.media_objects) AS pointers,(SELECT count(*)::int FROM artifacts.conversation_uses) AS uses,(SELECT count(*)::int FROM artifacts.manual_changes) AS approvals')).rows, [{ versions: 2, pointers: 2, uses: 2, approvals: 0 }]);
   } finally { storage.close(); await native.close(); await pool.end(); await setup.end(); }

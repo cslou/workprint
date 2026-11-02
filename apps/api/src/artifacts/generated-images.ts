@@ -3,12 +3,12 @@ import type { Pool } from 'pg';
 import { z } from 'zod';
 import { idSchema, MAX_UPLOAD_IMAGE_BYTES, useSchema, type Version } from '@workprint/contracts';
 import { transaction } from '../db/index.js';
-import { MediaProcessError, type PrivateObjectStorage } from '../storage/index.js';
+import type { PrivateObjectStorage } from '../storage/index.js';
 import { protectedMediaObjects } from './media-objects.js';
 import { lockPublicationOwner, publishVersion } from './publication.js';
 import { BUILT_IN_OWNER, createArtifactStore } from './store.js';
 import { UploadError, uploadError } from './uploads/errors.js';
-import { measuredMedia } from './uploads/media-verifier.js';
+import { measuredMedia, verifyWhenFree } from './uploads/media-verifier.js';
 import type { MediaVerifier, OwnedCheck } from './uploads/types.js';
 
 export type GeneratedImageInput = Readonly<{ bytes: Uint8Array; contentType: string; inputs: readonly string[] }>;
@@ -25,7 +25,6 @@ export type GeneratedImageCollaborators = Readonly<{
 const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 const inputsSchema = z.array(idSchema).max(10).refine(ids => new Set(ids).size === ids.length);
 const binding = { purpose: 'reference' } as const;
-const busy = (error: unknown) => error instanceof MediaProcessError && error.code === 'capacity';
 
 /**
  * The assistant's image capability: it checks assistant-made bytes as strictly as uploads, stores them privately
@@ -39,19 +38,8 @@ export function createGeneratedImages(pool: Pool, checkOwnedConversation: OwnedC
   const capacityWaitMs = collaborators.capacityWaitMs ?? 30_000, capacityRetryMs = collaborators.capacityRetryMs ?? 250;
   const reads = createArtifactStore(pool, checkOwnedConversation);
 
-  /** The checker runs one job at a time; another job's turn is waited out, within a bound. */
-  const verify = async (verifyMedia: MediaVerifier, input: GeneratedImageInput, signal: AbortSignal | undefined) => {
-    const deadline = Date.now() + capacityWaitMs;
-    for (;;) {
-      try {
-        const attempt = AbortSignal.timeout(20_000);
-        return await verifyMedia({ kind: 'image', bytes: input.bytes, contentType: input.contentType, origin: 'assistant', signal: signal ? AbortSignal.any([signal, attempt]) : attempt });
-      } catch (error) {
-        if (!busy(error) || Date.now() + capacityRetryMs > deadline || signal?.aborted) throw error;
-        await new Promise(resolve => setTimeout(resolve, capacityRetryMs));
-      }
-    }
-  };
+  const verify = (verifyMedia: MediaVerifier, input: GeneratedImageInput, signal: AbortSignal | undefined) =>
+    verifyWhenFree(verifyMedia, { kind: 'image', bytes: input.bytes, contentType: input.contentType, origin: 'assistant' }, { waitMs: capacityWaitMs, retryMs: capacityRetryMs, signal });
 
   return Object.freeze({
     async save(account: string, conversation: string, input: GeneratedImageInput, signal?: AbortSignal): Promise<GeneratedImageSave> {

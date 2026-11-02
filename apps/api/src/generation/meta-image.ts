@@ -4,6 +4,8 @@
  * failures to a closed set of codes. Errors never carry the key, the prompt or image bytes.
  */
 
+import { MAX_UPLOAD_IMAGE_BYTES } from '@workprint/contracts';
+
 export const metaImageModel = 'muse-image-1.0';
 export const metaImageBaseUrl = 'https://api.meta.ai/v1';
 const maxImages = 10;
@@ -122,6 +124,28 @@ function failure(status: number, text: string): MetaImageError {
   return new MetaImageError('failed');
 }
 
+/** The largest answer worth reading: each image at most an upload's size, base64-encoded, plus the envelope. */
+const responseLimit = (count: number) => count * Math.ceil(MAX_UPLOAD_IMAGE_BYTES * 4 / 3) + 64 * 1024;
+
+/** The body as text, read only up to `limit` bytes; a longer body is cancelled and fails. */
+async function boundedText(response: Response, limit: number): Promise<string> {
+  const declared = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > limit) { await response.body?.cancel(); throw new MetaImageError('failed'); }
+  const reader = response.body?.getReader();
+  if (!reader) return '';
+  const chunks: Uint8Array[] = []; let size = 0;
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) { await reader.cancel(); throw new MetaImageError('failed'); }
+      chunks.push(value);
+    }
+  } finally { reader.releaseLock(); }
+  return Buffer.concat(chunks, size).toString('utf8');
+}
+
 function result(text: string, requested: ImageOutputFormat | undefined, requestId: string | null): ImageResult {
   let parsed: Record<string, unknown> | undefined;
   try { parsed = record(JSON.parse(text)); } catch { parsed = undefined; }
@@ -147,18 +171,19 @@ export function createMetaImageClient(options: MetaImageClientOptions): MetaImag
   const timeoutMs = options.timeoutMs ?? 120_000, retryDelayMs = options.retryDelayMs ?? 1000;
   const base = options.baseUrl.replace(/\/+$/, '');
 
-  async function attempt(path: string, payload: string, signal: AbortSignal | undefined): Promise<{ status: number; text: string; requestId: string | null }> {
+  async function attempt(path: string, payload: string, limit: number, signal: AbortSignal | undefined): Promise<{ status: number; text: string; requestId: string | null }> {
     const timeout = AbortSignal.timeout(timeoutMs);
     try {
       const response = await send(`${base}${path}`, {
-        method: 'POST', body: payload,
+        method: 'POST', body: payload, redirect: 'error',
         headers: { authorization: `Bearer ${options.apiKey}`, 'content-type': 'application/json' },
         signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       });
       const requestId = response.headers.get('x-request-id');
-      return { status: response.status, text: await response.text(), requestId: requestId && /^[\w-]{1,128}$/.test(requestId) ? requestId : null };
-    } catch {
+      return { status: response.status, text: await boundedText(response, limit), requestId: requestId && /^[\w-]{1,128}$/.test(requestId) ? requestId : null };
+    } catch (error) {
       if (signal?.aborted) throw new MetaImageError('aborted');
+      if (error instanceof MetaImageError) throw error;
       throw new MetaImageError(timeout.aborted ? 'unavailable' : 'failed');
     }
   }
@@ -166,7 +191,8 @@ export function createMetaImageClient(options: MetaImageClientOptions): MetaImag
   async function call(path: string, request: ImageRequest, images: readonly ImageInput[] | undefined, signal: AbortSignal | undefined): Promise<ImageResult> {
     const payload = JSON.stringify(body(request, images));
     if (signal?.aborted) throw new MetaImageError('aborted');
-    let response = await attempt(path, payload, signal);
+    const limit = responseLimit(request.n ?? 1);
+    let response = await attempt(path, payload, limit, signal);
     if (response.status === 503 || response.status === 429) {
       await new Promise<void>(resolve => {
         const stop = () => { clearTimeout(timer); resolve(); };
@@ -174,7 +200,7 @@ export function createMetaImageClient(options: MetaImageClientOptions): MetaImag
         signal?.addEventListener('abort', stop, { once: true });
       });
       if (signal?.aborted) throw new MetaImageError('aborted');
-      response = await attempt(path, payload, signal);
+      response = await attempt(path, payload, limit, signal);
     }
     if (response.status !== 200) throw failure(response.status, response.text);
     return result(response.text, request.outputFormat, response.requestId);

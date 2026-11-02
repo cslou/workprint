@@ -18,9 +18,15 @@ test('a completed private image response is not aborted after fully reading EOF'
 test('private image rejects unqualified content and oversized declarations before exposing bytes',async()=>{
   for(const headers of [{'Content-Type':'image/svg+xml','Content-Length':3},{'Content-Type':'image/png','Content-Length':10*1024**2+1}]){const fixture=await peer((_request,response)=>{response.writeHead(200,headers);response.end('abc');});try{assert.ok(!(await readPrivateImage(fixture.url,new AbortController().signal)).ok);}finally{await fixture.close();}}
 });
-test('two stalled real image responses retain bounded capacity, reject a third and settle on the fixed deadline',{timeout:15000},async()=>{
-  let requests=0,reached!:()=>void;const ready=new Promise<void>(r=>{reached=r;});const fixture=await peer((_request,response)=>{if(++requests===2)reached();response.writeHead(200,{'Content-Type':'image/png','Content-Length':3});response.flushHeaders();response.write('a');});
-  try{const first=readPrivateImage(fixture.url,new AbortController().signal),second=readPrivateImage(fixture.url,new AbortController().signal);await ready;assert.ok(!(await readPrivateImage(fixture.url,new AbortController().signal)).ok);assert.equal(requests,2);const results=await Promise.all([first,second]);assert.ok(results.every(r=>!r.ok));assert.equal(requests,2);}finally{await fixture.close();}
+test('past two stalled image reads a third waits its turn, and leaving the queue sends nothing',{timeout:15000},async()=>{
+  let requests=0,reached!:()=>void;const ready=new Promise<void>(r=>{reached=r;});const fixture=await peer((request,response)=>{if(++requests===2)reached();response.writeHead(200,{'Content-Type':'image/png','Content-Length':3});if(request.url?.includes('quick'))response.end('abc');else{response.flushHeaders();response.write('a');}});
+  try{
+    const stalled=new AbortController(),first=readPrivateImage(fixture.url,stalled.signal),second=readPrivateImage(fixture.url,new AbortController().signal);await ready;
+    const leaving=new AbortController(),left=readPrivateImage(fixture.url+'&quick=true',leaving.signal),third=readPrivateImage(fixture.url+'&quick=true',new AbortController().signal);
+    leaving.abort();assert.ok(!(await left).ok);assert.equal(requests,2,'a queued read that leaves is never sent');
+    stalled.abort();const done=await third;assert.ok(done.ok,'the waiting read runs once a slot frees');assert.equal(await done.value.text(),'abc');assert.equal(requests,3);
+    assert.ok(!(await first).ok);assert.ok(!(await second).ok,'a stalled read still settles on its fixed deadline');
+  }finally{await fixture.close();}
 });
 test('private video download requires the exact version type and byte size, holds one slot and scales its deadline',async()=>{
   for(const [headers,body] of [[{'Content-Type':'video/webm','Content-Length':3},'abc'],[{'Content-Type':'video/mp4','Content-Length':4},'abcd'],[{'Content-Type':'video/mp4','Content-Length':3},'ab']] as const){
@@ -32,8 +38,9 @@ test('private video download requires the exact version type and byte size, hold
   try{
     const ok=await readPrivateVideo(fixture.url,new AbortController().signal,{contentType:'video/mp4',byteSize:3});assert.ok(ok.ok);assert.equal(await ok.value.text(),'abc');
     const controller=new AbortController(),stalled=readPrivateVideo(fixture.url+'&stall=true',controller.signal,{contentType:'video/mp4',byteSize:3});await ready;
-    assert.ok(!(await readPrivateVideo(fixture.url,new AbortController().signal,{contentType:'video/mp4',byteSize:3})).ok,'One download at a time');
+    const waiting=readPrivateVideo(fixture.url,new AbortController().signal,{contentType:'video/mp4',byteSize:3});
     controller.abort();assert.ok(!(await stalled).ok);
+    assert.ok((await waiting).ok,'One download at a time: the next waits for the slot');
   }finally{await fixture.close();}
   assert.equal(privateVideoDeadlineMs(1),61000);assert.equal(privateVideoDeadlineMs(100*1024**2),860000);
 });

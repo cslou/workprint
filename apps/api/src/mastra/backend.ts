@@ -115,7 +115,8 @@ export async function createBackend(routes: ApiRoute[] = [], turns?: TurnComposi
     const collaborators: AgentCollaborators = {
       readWorkspace: createWorkspaceReader(savedWork), saveScript: createAssistantScriptSaver(createAssistantScripts(pool, application.checkOwnedConversation).save),
       readImageInputs: createImageInputReader(savedWork, generated.read), saveGeneratedImage: createGeneratedImageSaver(generated.save),
-      ...(turns.images ? { images: turns.images } : {}),
+      // Images are made only where they can be saved: without storage and the checker, no paid call is made.
+      ...(turns.images && objects && verifyMedia ? { images: turns.images } : {}),
     };
     bindNativeTurns(mastra, { model: turns.model, tools, limits: turns.limits ?? turnLimits, collaborators });
   }

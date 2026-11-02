@@ -86,3 +86,15 @@ test('Stop during the call saves nothing; Stop after one of two saves keeps that
   await assert.rejects(run(partway.collaborators, { count: 2 }, after.signal), { name: 'AbortError' });
   assert.equal(partway.calls.saves, 1); assert.equal(partway.saved.length, 1);
 });
+
+test('an input named twice is read once, and with no way to save nothing is sent to Meta', async () => {
+  const { collaborators, calls } = harness(async () => images(1));
+  const id = randomUUID(), read: string[][] = [];
+  const reading: AgentCollaborators = { ...collaborators, readImageInputs: async (_account, _video, ids) => { read.push([...ids]); return { kind: 'read', images: ids.map(versionId => ({ versionId, dataUrl: 'data:image/png;base64,AA==' })) }; } };
+  assert.equal((await run(reading, { inputImages: [id, id] }) as { made: boolean }).made, true);
+  assert.deepEqual(read, [[id]]);
+  const unsaveable: AgentCollaborators = { readWorkspace: reading.readWorkspace, saveScript: reading.saveScript, readImageInputs: reading.readImageInputs, saveGeneratedImage: reading.saveGeneratedImage };
+  const result = await run(unsaveable, { inputImages: [id] }) as { made: false; message: string };
+  assert.equal(line({}, result)?.summary, 'Not made: images can’t be saved on this server'); assert.match(result.message, /nothing was sent to Meta/);
+  assert.equal(calls.meta, 1, 'only the first call reached Meta'); assert.equal(read.length, 1, 'no input is read without a way to save');
+});

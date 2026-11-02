@@ -1,4 +1,5 @@
-import type { OwnedWorkspace } from '../../../application/index.js';
+import { assetLabels } from '@workprint/contracts';
+import type { OwnedWorkspace } from '../application/index.js';
 
 type Version = OwnedWorkspace['assets'][number]['version'];
 type State = 'Draft' | 'Ready';
@@ -45,17 +46,15 @@ function summary(version: Version): string {
 
 /** Every exact version the video uses, in workspace order, each once, with a name a person would recognise. */
 export function workspaceEntries(workspace: OwnedWorkspace): Entry[] {
-  const entries: Entry[] = [], seen = new Set<string>(), counts = new Map<string, number>();
+  const entries: Entry[] = [], seen = new Set<string>(), labels = assetLabels(workspace.assets);
   const add = (entry: Entry) => { if (!seen.has(entry.version.id)) { seen.add(entry.version.id); entries.push(entry); } };
   const revision = (version: Version) => `Version ${version.revision}`;
   if (workspace.script) add({ name: `Script · ${revision(workspace.script.version)}`, use: 'script', state: workspace.script.state, version: workspace.script.version });
   for (const asset of workspace.assets) {
     const { version } = asset;
-    // Uploaded media keeps no filename, so it is named by kind and order.
+    // Uploaded and made media keep no filename, so they are named by kind and order (the shared rule).
     const subject = 'content' in version && version.kind === 'reference' ? strings(record(record(version.content).subject).name) : '';
-    const label = version.kind === 'image' ? 'Image' : version.kind === 'video' ? 'Video' : 'Reference';
-    const ordinal = (counts.get(label) ?? 0) + 1; counts.set(label, ordinal);
-    add({ name: `${subject ? clip(subject, 80) : `${label} ${ordinal}`} · ${revision(version)}`, use: 'reference', state: asset.state, version });
+    add({ name: `${subject ? clip(subject, 80) : labels.get(version.artifactId)} · ${revision(version)}`, use: 'reference', state: asset.state, version });
   }
   if (workspace.storyboard.work) add({ name: `Storyboard · ${revision(workspace.storyboard.work.version)}`, use: 'storyboard', state: workspace.storyboard.work.state, version: workspace.storyboard.work.version });
   [...workspace.storyboard.shots].sort((a, b) => a.order - b.order).forEach((shot, shotIndex) => {

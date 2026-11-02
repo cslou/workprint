@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { defineTool } from '../define.js';
-import { listWorkspace, workspaceItem, type WorkspaceItemDetail, type WorkspaceListing } from './projection.js';
+import { listWorkspace, workspaceItem, type WorkspaceItemDetail, type WorkspaceListing } from '../../workspace-entries.js';
 
 type ReadWorkspaceResult =
   | ({ found: true; mode: 'listing' } & WorkspaceListing)

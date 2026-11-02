@@ -395,7 +395,8 @@ Each component has the same anchor here and on the [Components page](brand-book/
 - **Shown images (Sprint 008 Story 4):** when the user asked for an image directly, the done "Saved …" line shows each saved image under it. Preview: [`chat-states/generated-image.html`](chat-states/generated-image.html) at 1440 and 390, approved under Lou's delegation on 2026-11-02; Lou ratifies it at QA.
   - Each image is at most 240px tall, keeps its aspect ratio (never cropped beyond its own shape) and has `--radius-lg` with a 1px default border on `--color-bg-sunken`. Several images wrap with 8px gaps.
   - Its box takes the image's shape before it loads, so a late image never moves the thread.
-  - The alt text is the image's name, as the assistant names it ("Image 2 · Version 1"). Clicking opens the media viewer.
+  - The alt text is the image's name, as the assistant and Assets name it ("Image 2 · Version 1"): N counts images in the video's Assets order. Clicking opens the media viewer.
+  - An image is read only when it comes within about one screen of view, and chat, Assets and the viewer share one copy of each version for the session, within a memory limit. Nothing is kept across reloads. Assets images load when the tab opens.
   - A failed read shows "This image couldn’t be shown" in 13px `--color-text-subtle`, and the line stays.
   - A line the user didn't ask to see, or a refusal, shows no image.
 
@@ -527,6 +528,8 @@ The temporary aggregation reference uses native checkbox/label sections so its r
 | Chosen (Videos) | `--color-status-ready-bg` / `--color-status-ready-text` | The version used in the scene |
 
 "Making…" (`.fresh.making`) is progress, not a state. It is a small pill on a dimmed placeholder. There are no live badges.
+
+**Images and videos show no status pill** (Lou, Sprint 008 QA, 2026-11-02): in Assets rows, the upload receipt and the media viewer. Every saved image is a draft and nothing approves one yet, so the pill told the person nothing. Media gets a status again when images can be approved or chosen.
 
 ### Chips and pills
 
