@@ -39,12 +39,19 @@ export async function prepareShotChoiceWork({ accountIds, native, servingUrl }: 
 }
 
 /** A video job that waited on its MiniMax task until a Stop: saved through the job store, as the tool will. */
-export async function saveInterruptedVideoJob({ servingUrl }: Pick<SavedWorkSetup, 'servingUrl'>, accountId: string, conversationId: string) {
+/** Video jobs saved along their real transitions: one interrupted, and one failed with each reason a create or wait can end in. */
+export async function saveVideoJobs({ servingUrl }: Pick<SavedWorkSetup, 'servingUrl'>, accountId: string, conversationId: string) {
   const pool = new Pool({ connectionString: servingUrl, max: 1, connectionTimeoutMillis: 1000, statement_timeout: 2000 });
   try {
     const jobs = createGenerationJobs(pool);
-    const job = await jobs.begin(accountId, conversationId, { prompt: 'A slow push-in on the platform', inputs: [] });
-    await jobs.started(accountId, job.id, '459000874041694');
-    return await jobs.interrupted(accountId, job.id);
+    const waiting = async (prompt: string) => {
+      const job = await jobs.begin(accountId, conversationId, { prompt, inputs: [] });
+      return jobs.started(accountId, job.id, `task-${job.id}`);
+    };
+    const interrupted = await jobs.interrupted(accountId, (await waiting('A slow push-in on the platform')).id);
+    const unknown = await jobs.failed(accountId, (await jobs.begin(accountId, conversationId, { prompt: 'Unanswered create', inputs: [] })).id, 'outcome_unknown');
+    const refused = await jobs.failed(accountId, (await waiting('A clip that fails checks')).id, 'check_refused');
+    const provider = await jobs.failed(accountId, (await waiting('A clip MiniMax failed')).id, 'provider_error');
+    return { interrupted, failed: { outcome_unknown: unknown, check_refused: refused, provider_error: provider } };
   } finally { await pool.end(); }
 }
