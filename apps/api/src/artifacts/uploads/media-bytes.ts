@@ -8,8 +8,16 @@ const unsupported = () => new UploadError('unsupported');
 /** Who made the bytes. Only assistant-made images may carry the provider's AI-generated label. */
 export type MediaOrigin = 'upload' | 'assistant';
 const xmpKeyword = Buffer.from('XML:com.adobe.xmp\0', 'latin1');
-/** The provider's XMP label: an uncompressed `iTXt` with the XMP keyword and at most 4 KB of data. */
-const isXmpLabel = (data: Buffer) => data.length <= 4096 && data.length > xmpKeyword.length + 1 && data.subarray(0, xmpKeyword.length).equals(xmpKeyword) && data[xmpKeyword.length] === 0;
+/**
+ * The provider's XMP label: an uncompressed `iTXt` (flag and method 0) with the XMP keyword, a language tag
+ * and a translated keyword, and at most 4 KB of data.
+ */
+const isXmpLabel = (data: Buffer) => {
+  const at = xmpKeyword.length;
+  if (data.length > 4096 || !data.subarray(0, at).equals(xmpKeyword) || data[at] !== 0 || data[at + 1] !== 0) return false;
+  const language = data.indexOf(0, at + 2);
+  return language !== -1 && data.indexOf(0, language + 1) !== -1;
+};
 /** Closed positively-qualified container/image variants, not MIME or filename inference. */
 export function inspectMediaBytes(bytes: Uint8Array, kind: 'image' | 'video', contentType: string, origin: MediaOrigin = 'upload'): { width?: number; height?: number } {
   const b=Buffer.from(bytes.buffer,bytes.byteOffset,bytes.byteLength);

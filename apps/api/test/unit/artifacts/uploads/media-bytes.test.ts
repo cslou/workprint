@@ -17,5 +17,6 @@ test('only an assistant-made PNG may carry one uncompressed XMP label before its
   refused(testPng({ xmp: false, before: [itxt('XML:com.adobe.xmp', metaXmp, 1)] }), 'assistant', 'a compressed label');
   refused(testPng({ xmp: false, before: [itxt('XML:com.adobe.xmp', 'x'.repeat(4096))] }), 'assistant', 'a label over 4 KB');
   refused(testPng({ xmp: false, after: [itxt('XML:com.adobe.xmp', metaXmp)] }), 'assistant', 'a label after the image data');
+  refused(testPng({ xmp: false, before: [pngChunk('iTXt', Buffer.from('XML:com.adobe.xmp\0\0\0no separators', 'latin1'))] }), 'assistant', 'a label without its language tag');
   refused(testPng({ before: [pngChunk('tEXt', Buffer.from('Comment\0hello', 'latin1'))] }), 'assistant', 'other text chunks');
 });

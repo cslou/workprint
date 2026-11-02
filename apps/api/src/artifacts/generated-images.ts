@@ -52,13 +52,19 @@ export function createGeneratedImages(pool: Pool, checkOwnedConversation: OwnedC
   return Object.freeze({
     async save(account: string, conversation: string, input: GeneratedImageInput, signal?: AbortSignal): Promise<GeneratedImageSave> {
       try {
-        if (!idSchema.safeParse(account).success || !idSchema.safeParse(conversation).success || !inputsSchema.safeParse(input.inputs).success) throw new UploadError('invalid_input');
+        if (!idSchema.safeParse(account).success || !idSchema.safeParse(conversation).success) throw new UploadError('invalid_input');
+        // Inputs that aren't distinct ids can't name saved images.
+        if (!inputsSchema.safeParse(input.inputs).success) throw new UploadError('not_found');
         if (!(input.bytes instanceof Uint8Array) || !input.bytes.byteLength || input.bytes.byteLength > MAX_UPLOAD_IMAGE_BYTES) throw new UploadError('unsupported');
         const owned = await checkOwnedConversation(account, conversation);
         if (owned.kind !== 'owned') throw new UploadError(owned.kind === 'not_found' ? 'not_found' : 'integration_failure');
+        // Each input must be an image this account can read, before anything is stored.
+        for (const id of input.inputs) if ((await reads.version(account, id)).kind !== 'image') throw new UploadError('not_found');
         const bytes = Buffer.from(input.bytes);
         const media = measuredMedia({ kind: 'image', contentType: input.contentType, byteSize: bytes.length }, await verify({ ...input, bytes }, signal));
         const id = randomUUID(), key = `published/${id}/${id}`, sha256 = digest(bytes);
+        // A stopped run stores nothing after its check.
+        signal?.throwIfAborted();
         const object = await storage.publish(key, bytes, input.contentType);
         try {
           if (object.sha256 !== sha256 || object.byteSize !== bytes.length) throw new UploadError('integration_failure');

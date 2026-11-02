@@ -40,7 +40,8 @@ export function createImageInputReader(reads: Pick<SavedWorkReads, 'workspace'>,
   return async (accountId, videoId, versionIds) => {
     try {
       const used = usedImages(await reads.workspace(accountId, videoId));
-      if (new Set(versionIds).size !== versionIds.length || versionIds.some(id => !used.has(id))) return { kind: 'not_found' };
+      // At most Meta's 10 inputs, each named once.
+      if (versionIds.length > 10 || new Set(versionIds).size !== versionIds.length || versionIds.some(id => !used.has(id))) return { kind: 'not_found' };
       const images = [];
       for (const id of versionIds) {
         const image = await read(accountId, id);

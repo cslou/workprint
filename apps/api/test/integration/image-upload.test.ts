@@ -157,12 +157,23 @@ describe('assistant-made images are checked, saved privately as the video\'s dra
         const labelled = testPng({ before: [pngChunk('tEXt', Buffer.from('Comment\0hello', 'latin1'))] });
         assert.deepEqual(await save(account, video, { bytes: labelled, contentType: 'image/png', inputs: [] }), { kind: 'refused' });
         assert.deepEqual(await save(foreign, video, { bytes: made, contentType: 'image/png', inputs: [] }), { kind: 'not_found' });
+        assert.deepEqual(await save(account, video, { bytes: made, contentType: 'image/png', inputs: [randomUUID()] }), { kind: 'not_found' }, 'an input that is not a readable image');
         const busy = createGeneratedImages(pool, check, { storage: counted, capacityWaitMs: 200, capacityRetryMs: 20, verifyMedia: async () => { throw new MediaProcessError('capacity'); } });
         const started = Date.now();
         assert.deepEqual(await createGeneratedImageSaver(busy.save)(account, video, { bytes: made, contentType: 'image/png', inputs: [] }), { kind: 'unavailable' });
         assert.ok(Date.now() - started < 2000, 'the wait is bounded');
         assert.deepEqual(await counts(), before);
         assert.equal(effects.published.length, published, 'nothing is stored');
+
+        // A save that fails after storing removes the object: here the video is at its limit of 100 uses.
+        const full = (await createNativeConversation(native, account)).id;
+        for (let index = 0; index < 100; index++) await pool.query("INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state) VALUES($1,$2,$3,$4,$5,'reference','draft')", [account, full, randomUUID(), saved.versionId, { purpose: 'reference', role: randomUUID() }]);
+        const seeded = await counts();
+        assert.deepEqual(await save(account, full, { bytes: made, contentType: 'image/png', inputs: [] }), { kind: 'unavailable' });
+        const stored = effects.published.at(-1)!;
+        assert.equal(effects.published.length, published + 1); assert.deepEqual(effects.removed, [stored]);
+        await assert.rejects(storage.read(stored), { code: 'not_found' });
+        assert.deepEqual(await counts(), seeded);
       });
 
       await t.test('the input read returns the exact bytes of uploaded, made and built-in images this video uses', async () => {
