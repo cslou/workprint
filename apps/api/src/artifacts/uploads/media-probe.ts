@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { UploadError } from './errors.js';
-import { assistantVideoAllowance, type MediaOrigin } from './media-bytes.js';
+import { assistantVideoAllowance, type MediaOrigin } from './media-allowance.js';
 
 const stream=z.object({codec_name:z.string().max(64),codec_type:z.enum(['video','audio']),profile:z.string().max(64).optional(),width:z.number().int().positive().optional(),height:z.number().int().positive().optional(),pix_fmt:z.string().max(32).optional(),codec_tag_string:z.string().max(16).optional(),r_frame_rate:z.string().max(32).optional(),avg_frame_rate:z.string().max(32).optional(),sample_aspect_ratio:z.string().max(32).optional(),field_order:z.string().max(32).optional(),duration:z.string().max(32).optional(),nb_frames:z.string().max(32).optional(),sample_rate:z.string().max(16).optional(),channels:z.number().int().optional(),side_data_list:z.array(z.unknown()).max(0).optional(),disposition:z.object({attached_pic:z.literal(0)}),color_primaries:z.literal('unknown').optional(),color_transfer:z.literal('unknown').optional(),color_space:z.string().max(32).optional()});
 const schema=z.object({streams:z.array(stream).min(1).max(2),format:z.object({format_name:z.string().max(100),size:z.string().regex(/^\d+$/),duration:z.string().max(32).optional()})});

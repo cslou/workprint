@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { requireStableAvc } from '../../../../src/artifacts/uploads/media-avc.js';
+import { generatedClip } from '../../../support/minimax-video-fake.js';
 
 // Structural-only fixture isolates range accounting; actual codec/publication proof
 // is in test/integration/image-upload.test.ts. These bytes are not a decode verdict.
@@ -29,8 +30,7 @@ test('AVC sample ranges cannot alias or run backward and amplify byte inspection
 });
 
 test('a High-profile avcC tail passes only for assistant clips, and only as 4:2:0 8-bit with no SPS extension',async()=>{
-  const { readFile } = await import('node:fs/promises');
-  const clip=await readFile('apps/api/test/support/fixtures/minimax-clip.mp4');
+  const clip=await generatedClip();
   requireStableAvc(clip,true);
   assert.throws(()=>requireStableAvc(clip),{code:'unsupported'},'uploads keep the Baseline record');
   const tail=clip.indexOf(Buffer.from([0xfd,0xf8,0xf8,0x00]),clip.indexOf(Buffer.from('avcC')));

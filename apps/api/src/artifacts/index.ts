@@ -10,4 +10,4 @@ export { createStoryboardEdits } from './storyboard.js';
 export { createAssistantScripts, type AssistantScriptInput, type AssistantScriptSave, type AssistantScripts } from './assistant-scripts.js';
 export { createGeneratedImages, type GeneratedImageInput, type GeneratedImageSave, type GeneratedImages, type StoredImage } from './generated-images.js';
 export { createGeneratedVideos, type GeneratedVideoInput, type GeneratedVideoSave, type GeneratedVideos, type WithinSave } from './generated-videos.js';
-export { usedImageVersions } from './generated-media.js';
+export { usedImageVersions } from './workspace-images.js';

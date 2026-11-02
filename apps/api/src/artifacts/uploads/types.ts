@@ -1,7 +1,7 @@
 import type { OperationRequest, OperationResponse, Version } from '@workprint/contracts';
 import type { PrivateObjectStorage } from '../../storage/index.js';
 import type { createArtifactStore } from '../store.js';
-import type { MediaOrigin } from './media-bytes.js';
+import type { MediaOrigin } from './media-allowance.js';
 
 export type UploadRequest = OperationRequest<'requestUpload'>['body'];
 export type UploadResult = OperationResponse<'confirmUpload'>;

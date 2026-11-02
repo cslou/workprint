@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
-import type { OperationResponse } from '@workprint/contracts';
 import type { PrivateObjectStorage } from '../storage/index.js';
 import { UploadError, uploadError } from './uploads/errors.js';
 
@@ -36,10 +35,4 @@ export async function withStoredObjects<T>(storage: PrivateObjectStorage, object
 export async function requireUseRoom(client: PoolClient, account: string, conversation: string) {
   const count = (await client.query<{ count: number }>('SELECT count(*)::int AS count FROM artifacts.conversation_uses WHERE owner_id=$1 AND conversation_id=$2', [account, conversation])).rows[0]!.count;
   if (count >= 100) throw new UploadError('integration_failure');
-}
-
-/** Image versions the video uses, in any use state: its images and every Panel's candidate images. */
-export function usedImageVersions(workspace: OperationResponse<'workspace'>): Set<string> {
-  const versions = [...workspace.assets.map(asset => asset.version), ...workspace.storyboard.shots.flatMap(shot => shot.panels.flatMap(panel => panel.candidateImageVersions))];
-  return new Set(versions.filter(version => version.kind === 'image').map(version => version.id));
 }

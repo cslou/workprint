@@ -34,6 +34,9 @@ test('a clip the assistant made is listed as the video\'s next numbered video, w
     ['Image 1 · Version 1', 'i1', 'reference', 'Draft', 'image/png, 640×480'], ['Video 1 · Version 1', 'm1', 'generated video', 'Draft', 'video/mp4, 1344×768, 4 s'],
   ]);
   assert.equal(workspaceItem(workspace([], { generatedVideos: [clip] }), 'm1')?.name, 'Video 1 · Version 1');
+  // Clips are numbered with the video's other videos, so two never share a name.
+  const uploaded: Version = { ...base('u1'), kind: 'video', media: { contentType: 'video/mp4', byteSize: 10, width: 1280, height: 720, durationMs: 1000, hasAudio: true } };
+  assert.deepEqual(listWorkspace(workspace([uploaded], { generatedVideos: [clip] })).items.map(item => item.name), ['Video 1 · Version 1', 'Video 2 · Version 1']);
 });
 
 test('a listing stops at 50 items, then at 16 KiB, and every text stays within 200 characters', () => {
