@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { makeSheet, sheetViewCap, type ImageFailure, type SheetOutcome } from '../../../application/index.js';
+import { makeSheet, sheetViewCap, sheetViewNameCap, type ImageFailure, type SheetOutcome } from '../../../application/index.js';
 import { defineTool } from '../define.js';
 import { imageFailure, imageSize } from '../image-shared.js';
 
@@ -48,7 +48,7 @@ function refused(outcome: Exclude<SheetOutcome, { kind: 'saved' }>): GenerateShe
     case 'refused': return before(outcome.reason);
     case 'invalid': return refusal('invalid', 'Not made: the sheet wasn’t valid (views)', 'Not made: each view needs a name and either an image or a prompt, and two views can\'t share a name or an image. Fix views and try once more. Nothing was sent.');
     case 'too_long': return refusal('too_long', `Not made: ${outcome.subjectName}’s sheet has over ${sheetViewCap} views; trim it first`, `Not made: ${outcome.subjectName}'s sheet has more than ${sheetViewCap} views, so it can't be changed here. Ask the user to remove views in Assets first. Nothing was sent.`);
-    case 'unrevisable': return refusal('unrevisable', `Not made: ${outcome.subjectName}’s sheet can’t be changed here`, `Not made: a view in ${outcome.subjectName}'s sheet has a name longer than 80 characters, so it can't be changed here. Ask the user to rename that view in Assets first. Nothing was sent.`);
+    case 'unrevisable': return refusal('unrevisable', `Not made: ${outcome.subjectName}’s sheet can’t be changed here`, `Not made: a view in ${outcome.subjectName}'s sheet has a name longer than ${sheetViewNameCap} characters, so it can't be changed here. Ask the user to rename that view in Assets first. Nothing was sent.`);
     case 'in_other_sheet': return refusal('in_other_sheet', `Not made: that image is already in ${outcome.subjectName}’s sheet`, `Not made: a view's image is already in ${outcome.subjectName}'s sheet, and an image is in one sheet only. Make a new view instead. Nothing was sent.`);
     case 'view_failed': { const failure = imageFailure(outcome.failure); return refusal(outcome.failure.reason, failure.summary, `${failure.message} No sheet was saved.`); }
     case 'not_saved': return unsaved(outcome);
@@ -60,7 +60,7 @@ const filled = (max: number) => z.string().min(1).max(max).refine(text => text.t
 const notes = (min: number) => z.array(filled(200)).min(min).max(10);
 
 const view = z.strictObject({
-  view: filled(80).describe('The view\'s name, for example "Face close-up" or "Wide master".'),
+  view: filled(sheetViewNameCap).describe('The view\'s name, for example "Face close-up" or "Wide master".'),
   prompt: z.string().max(8000).default('').describe('One pose or angle to make; empty when image is set.'),
   image: z.string().max(200).default('').describe('An image versionId from read-workspace to use as this view instead of making one; empty to make it.'),
   notes: notes(0).default([]).describe('Short notes about this view.'),

@@ -1,5 +1,5 @@
 import { savedReferenceContentSchema, savedScriptContentSchema, scriptSubjects, subjectNameKey, type ScriptSubject } from '@workprint/contracts';
-import { maxSheetViews, usedImageVersions } from '../artifacts/index.js';
+import { maxSheetViewName, maxSheetViews, usedImageVersions } from '../artifacts/index.js';
 import { MetaImageError, type MetaImageClient } from '../generation/index.js';
 import type { AssistantSheets } from './assistant-references.js';
 import { metaImageFailure, saveFailure, type ImageFailure, type ReadImageInputs, type SaveGeneratedImage } from './generated-images.js';
@@ -33,7 +33,7 @@ export type SheetMakers = Readonly<{
 /** The most views a sheet the assistant makes holds in total: the sheet save's own limit. */
 export const sheetViewCap = maxSheetViews;
 /** The longest view name the sheet save takes. */
-const maxViewName = 80;
+export const sheetViewNameCap = maxSheetViewName;
 
 /** An optional id: empty, whitespace or "null" means none. */
 const none = (value: string) => { const trimmed = value.trim(); return trimmed.toLowerCase() === 'null' ? '' : trimmed; };
@@ -121,15 +121,16 @@ export async function makeSheet(makers: SheetMakers, accountId: string, videoId:
   if (!planned) return { kind: 'invalid', field: 'views' };
   if (current && current.references.length > sheetViewCap) return { kind: 'too_long', subjectName: subject.name };
   if (planned.length > sheetViewCap) return { kind: 'refused', reason: 'too_many_views' };
-  // A person's sheet can hold names the save refuses; checked here, before any paid view.
-  if (planned.some(item => !item.make && item.view.trim().length > maxViewName)) return { kind: 'unrevisable', subjectName: subject.name };
+  // A person's sheet can hold names the save refuses, and a remade view keeps its name; checked before any paid view.
+  if (planned.some(item => item.view.trim().length > sheetViewNameCap)) return { kind: 'unrevisable', subjectName: subject.name };
 
   // Existing images must be ones the video uses, and each is in one sheet only.
   const used = usedImageVersions(workspace), identity = none(request.identity);
   const placed = planned.flatMap(item => item.versionId && !current?.references.some(reference => reference.versionId === item.versionId) ? [item.versionId] : []);
   if ([identity, ...placed].some(id => id && !used.has(id))) return { kind: 'refused', reason: 'image_not_found' };
   // Every view's image, kept ones too, is in this sheet only: people's sheets can share an image.
-  const listed = planned.flatMap(item => item.versionId ? [item.versionId] : []);
+  // A failed remake puts its base image back, so that image counts too.
+  const listed = planned.flatMap(item => [item.versionId, item.replaces].filter((id): id is string => Boolean(id)));
   const holder = all.find(sheet => sheet !== current && sheet.references.some(reference => listed.includes(reference.versionId)));
   if (holder) return { kind: 'in_other_sheet', subjectName: subjects.find(candidate => candidate.id === holder.subjectId)?.name ?? holder.subjectId };
   const toMake = planned.filter(item => item.make).length;

@@ -23,6 +23,8 @@ export type AssistantSheetSave = Readonly<{ version: Version; use: z.infer<typeo
 
 /** At most this many views in a sheet the assistant saves; a person's longer sheet stays valid but can't be revised by it. */
 export const maxSheetViews = 5;
+/** The longest view name an assistant sheet takes. */
+export const maxSheetViewName = 80;
 const binding = { purpose: 'reference' } as const;
 
 /**
@@ -82,7 +84,7 @@ export function createAssistantReferences(pool: Pool, checkOwnedConversation: Ow
       await owned(account, conversation);
       const ids = input.views.map(view => view.versionId);
       if (input.views.length < 1 || input.views.length > maxSheetViews || new Set(ids).size !== ids.length
-        || input.views.some(view => trimmedLength(view.view) < 1 || trimmedLength(view.view) > 80)) throw invalidImages();
+        || input.views.some(view => trimmedLength(view.view) < 1 || trimmedLength(view.view) > maxSheetViewName)) throw invalidImages();
       // The sheet's own text is checked apart from its images, so a refusal names what to fix.
       const text = savedReferenceContentSchema.shape.subject.shape, notes = savedReferenceContentSchema.shape.references.element.shape.notes;
       if (!text.description.safeParse(input.description).success || !text.continuityNotes.safeParse(input.continuityNotes).success
