@@ -15,7 +15,7 @@ export type VideoProviderFailure = Exclude<MiniMaxVideoErrorCode, 'aborted'> | '
 export type VideoJobOutcome =
   | { kind: 'saved'; jobId: string; versionId: string; width: number; height: number; durationMs: number }
   /** Stop, the turn or poll deadline, or a download or save that was unavailable after MiniMax finished: resumable. */
-  | { kind: 'interrupted'; jobId: string }
+  | { kind: 'interrupted'; jobId: string; cause?: 'frame_unused' }
   /** The server is shutting down: the job stays `running` for the next start to mark interrupted. */
   | { kind: 'shutdown'; jobId: string }
   | { kind: 'failed'; jobId: string; reason: JobFailure; provider?: VideoProviderFailure }
@@ -106,7 +106,7 @@ export function createVideoJobs(collaborators: VideoJobCollaborators) {
     if (saved.kind === 'refused') return refused(account, jobId);
     // Unavailable, or a frame this video no longer uses (the user can use it again): the job stays resumable.
     await jobs.interrupted(account, jobId);
-    return { kind: 'interrupted', jobId };
+    return saved.kind === 'not_found' ? { kind: 'interrupted', jobId, cause: 'frame_unused' } : { kind: 'interrupted', jobId };
   }
 
   /**

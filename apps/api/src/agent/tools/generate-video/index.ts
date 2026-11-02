@@ -7,7 +7,7 @@ import { workspaceItem } from '../../workspace-entries.js';
 type Reason =
   | 'unsaveable' | 'input_not_found' | 'invalid' | 'stopped' | 'outcome_unknown' | 'refused' | 'unauthorized' | 'payment_required'
   | 'rate_limited' | 'unavailable' | 'task_failed' | 'task_cancelled' | 'checks' | 'not_found' | 'busy' | 'already_saved' | 'not_resumable'
-  | 'jobs_unavailable' | 'work_unavailable';
+  | 'jobs_unavailable' | 'work_unavailable' | 'frame_unused';
 /** One saved clip, named as read-workspace names it; the name is left out when the workspace can't be read. */
 type SavedClip = { versionId: string; label?: string; width: number; height: number; durationS: number };
 export type GenerateVideoResult =
@@ -33,8 +33,9 @@ const summaries: Readonly<Record<Exclude<Reason, 'already_saved'>, string>> = {
   not_resumable: 'That video failed and can’t be resumed',
   jobs_unavailable: 'Not saved: saved video jobs are unavailable',
   work_unavailable: 'Not made: saved work is unavailable',
+  frame_unused: 'Not saved: a frame is no longer used here',
 };
-const messages: Readonly<Record<Exclude<Reason, 'invalid' | 'stopped' | 'already_saved'>, string>> = {
+const messages: Readonly<Record<Exclude<Reason, 'invalid' | 'stopped' | 'already_saved' | 'frame_unused'>, string>> = {
   unsaveable: 'Not made: this server cannot save videos, so nothing was sent to MiniMax. Tell the user; do not retry.',
   input_not_found: 'Not made: a frame is not an image this video uses. Call read-workspace and pass only image versionIds it lists. Nothing was sent.',
   outcome_unknown: 'Not made: MiniMax may have started this video, but its answer was lost, so it cannot be resumed and was not sent again. Tell the user; do not retry unless they ask.',
@@ -52,18 +53,21 @@ const messages: Readonly<Record<Exclude<Reason, 'invalid' | 'stopped' | 'already
   jobs_unavailable: 'Saved video jobs are unavailable right now, so this video job could not be tracked; MiniMax may have started it. Tell the user; do not retry in this turn.',
   work_unavailable: 'Not made: saved work could not be reached, so nothing was sent to MiniMax. Tell the user; do not retry in this turn.',
 };
-const providerReasons: Readonly<Record<VideoProviderFailure, Exclude<Reason, 'invalid' | 'stopped' | 'already_saved'>>> = {
+const providerReasons: Readonly<Record<VideoProviderFailure, Exclude<Reason, 'invalid' | 'stopped' | 'already_saved' | 'frame_unused'>>> = {
   invalid_request: 'refused', unauthorized: 'unauthorized', payment_required: 'payment_required', rate_limited: 'rate_limited',
   unavailable: 'unavailable', failed: 'unavailable', task_failed: 'task_failed', task_cancelled: 'task_cancelled',
 };
 
-const refusal = (reason: Exclude<Reason, 'invalid' | 'stopped' | 'already_saved'>, jobId?: string): GenerateVideoResult => ({ made: false, reason, message: messages[reason], ...(jobId ? { jobId } : {}) });
+const refusal = (reason: Exclude<Reason, 'invalid' | 'stopped' | 'already_saved' | 'frame_unused'>, jobId?: string): GenerateVideoResult => ({ made: false, reason, message: messages[reason], ...(jobId ? { jobId } : {}) });
 
 /** Names a saved clip as read-workspace does, so the model and the user see the same name. */
 async function labelOf(context: ToolContext, versionId: string) {
   const read = await context.collaborators.readWorkspace(context.scope.accountId, context.scope.videoId);
   return read.kind === 'found' ? workspaceItem(read.workspace, versionId)?.name : undefined;
 }
+
+const stoppedResult = (jobId: string): GenerateVideoResult => ({ made: false, reason: 'stopped', jobId,
+  message: `Stopped waiting before the video was saved; MiniMax keeps it for 7 days. Tell the user it can be resumed: call generate-video with resume set to "${jobId}" when they ask.` });
 
 async function result(context: ToolContext, outcome: VideoJobOutcome, showInChat: boolean): Promise<GenerateVideoResult> {
   switch (outcome.kind) {
@@ -72,9 +76,12 @@ async function result(context: ToolContext, outcome: VideoJobOutcome, showInChat
       return { made: true, jobId: outcome.jobId, showInChat,
         video: { versionId: outcome.versionId, ...(label ? { label } : {}), width: outcome.width, height: outcome.height, durationS: Math.round(outcome.durationMs / 100) / 10 } };
     }
+    case 'interrupted':
+      if (outcome.cause === 'frame_unused') return { made: false, reason: 'frame_unused', jobId: outcome.jobId,
+        message: `Not saved: MiniMax made the video, but one of its frames is no longer an image this video uses. Ask the user to use that image again in the video, then call generate-video with resume set to "${outcome.jobId}".` };
+      return stoppedResult(outcome.jobId);
     // A shutdown ends the call before this; were it to reach here, it reads as a stop.
-    case 'interrupted': case 'shutdown': return { made: false, reason: 'stopped', jobId: outcome.jobId,
-      message: `Stopped waiting before the video was saved; MiniMax keeps it for 7 days. Tell the user it can be resumed: call generate-video with resume set to "${outcome.jobId}" when they ask.` };
+    case 'shutdown': return stoppedResult(outcome.jobId);
     case 'failed':
       if (outcome.reason === 'outcome_unknown') return refusal('outcome_unknown', outcome.jobId);
       if (outcome.reason === 'check_refused') return refusal('checks', outcome.jobId);

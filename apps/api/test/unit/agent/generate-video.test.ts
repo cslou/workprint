@@ -51,6 +51,7 @@ test('optional values are harmless: an empty resume is a new job, empty frames a
 test('each outcome has its own line and a message the model can follow', async () => {
   const cases: [VideoJobOutcome, string, RegExp][] = [
     [{ kind: 'interrupted', jobId }, 'Stopped waiting for the video', new RegExp(`resume set to "${jobId}"`)],
+    [{ kind: 'interrupted', jobId, cause: 'frame_unused' }, 'Not saved: a frame is no longer used here', new RegExp(`use that image again.*resume set to "${jobId}"`)],
     [{ kind: 'failed', jobId, reason: 'outcome_unknown', provider: 'unavailable' }, 'Not made: MiniMax’s answer was lost', /cannot be resumed and was not sent again/],
     [{ kind: 'failed', jobId, reason: 'invalid_input', provider: 'invalid_request' }, 'Not made: MiniMax refused the request', /Rephrase the prompt/],
     [{ kind: 'failed', jobId, reason: 'provider_error', provider: 'unauthorized' }, 'Not made: MiniMax refused the server key', /do not retry/],
