@@ -60,6 +60,13 @@ test('empty ids are new, base ids are kept through a rename, and an unknown or r
   assert.throws(() => withSubjects(body(['Mara', 'Ben']), null, [{ id: '', kind: 'character', name: 'Mara' }]), differs);
   assert.throws(() => withSubjects(body(['Mara', 'Ben']), stored, [{ id: 'mara', kind: 'character', name: 'Mara' }]), differs);
   assert.deepEqual(withSubjects(body(['Mara']), stored, [{ id: 'mara', kind: 'character', name: 'Mara Vale' }]).scenes[0]!.characters, ['Mara Vale']);
+  // A base character the list drops can't hide behind another's rename, and an old name can't stand beside its new one.
+  const pair = { ...body(['Mara', 'Ben']), subjects: [{ id: 'mara', kind: 'character' as const, name: 'Mara' }, { id: 'ben', kind: 'character' as const, name: 'Ben' }] };
+  assert.throws(() => withSubjects(body(['Mara', 'Ben']), pair, [{ id: 'mara', kind: 'character', name: 'Ben' }]), differs);
+  assert.throws(() => withSubjects(body(['Mara', 'Mara Vale']), stored, [{ id: 'mara', kind: 'character', name: 'Mara Vale' }]), differs);
+  // A renamed character's lines take the new name, so the scene still names its speaker.
+  const speaks = { ...body(['Mara']), scenes: [{ ...body(['Mara']).scenes[0]!, script: [{ dialogue: { character: 'Mara', text: 'Who is there?' } }, { dialogue: { character: 'Narrator', text: 'Night.', delivery: 'voice_over' as const } }] }] };
+  assert.deepEqual(withSubjects(speaks, stored, [{ id: 'mara', kind: 'character', name: 'Mara Vale' }]).scenes[0]!.script, [{ dialogue: { character: 'Mara Vale', text: 'Who is there?' } }, { dialogue: { character: 'Narrator', text: 'Night.', delivery: 'voice_over' } }]);
   // A new subject named like a base subject the list leaves out is that subject: a forgotten id is kept.
   assert.deepEqual(withSubjects(body(['Mara']), stored, [{ id: '', kind: 'character', name: 'MARA' }, { id: '', kind: 'place', name: 'The Gallery' }]).subjects, [{ id: 'mara', kind: 'character', name: 'MARA' }, { id: 'the-gallery', kind: 'place', name: 'The Gallery' }]);
   // A subject named "Null" never gets the id a model sends to mean none.
