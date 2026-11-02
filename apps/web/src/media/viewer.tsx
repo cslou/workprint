@@ -13,18 +13,22 @@ import { useVersionMedia } from './reads.js';
 import './media.css';
 
 type Use = OperationResponse<'useVersion'>['use'];
-type Props = {
-  connection: BrowserClient;
-  scope: ReadScope | null;
-  version: Version;
-  caption: string;
-  trigger: ReactElement;
+/** Using the version for a Shot, offered under the clip. */
+type UseProps = {
   binding: { purpose: 'shot_video'; shotId: string };
   currentUse: Use | null;
   selectedVersionId: string | null;
   selectionRevision: number;
   onUsed(value: OperationResponse<'useVersion'>): void;
 };
+/** Without the use props, the viewer only plays the clip: a generated video has no Shot to use it for yet. */
+type Props = {
+  connection: BrowserClient;
+  scope: ReadScope | null;
+  version: Version;
+  caption: string;
+  trigger: ReactElement;
+} & (UseProps | { [Key in keyof UseProps]?: undefined });
 const copy = {
   loading: 'Loading this video…',
   unauthenticated: 'Sign-in required to load this video.',
@@ -43,11 +47,12 @@ export function SingleClipViewer(props: Props) {
     <ClipViewer {...props} />
   </ViewerDialog>;
 }
-function ClipViewer({ connection, scope, version, caption, binding, currentUse, selectedVersionId, selectionRevision, onUsed }: Props) {
+function ClipViewer(props: Props) {
+  const { connection, scope, version, caption } = props;
   return <div className="wp-clip-version" data-displayed-version-id={version.id}>
     <PrivateClip connection={connection} scope={scope} version={version} />
     <p>{caption}</p>
-    <VersionUse connection={connection} scope={scope} version={version} binding={binding} currentUse={currentUse} selectedVersionId={selectedVersionId} selectionRevision={selectionRevision} presentation="viewer" onUsed={onUsed} />
+    {props.binding ? <VersionUse connection={connection} scope={scope} version={version} binding={props.binding} currentUse={props.currentUse} selectedVersionId={props.selectedVersionId} selectionRevision={props.selectionRevision} presentation="viewer" onUsed={props.onUsed} /> : null}
   </div>;
 }
 /**
@@ -119,7 +124,7 @@ function ClipPlayer({ source }: { source: PlayerSource }) {
     <video ref={media} className="wp-clip-media" playsInline preload="metadata" aria-label="Video" />
     {ready ? <>
       <button type="button" className="wp-clip-toggle" aria-label={playing ? 'Pause' : 'Play'} onClick={() => { if (!player.current) return; if (playing) player.current.pause(); else player.current.play(); }}>
-        {playing ? <svg className="wp-clip-pause-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg> : <svg className="wp-clip-play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7Z" /></svg>}
+        {playing ? <svg className="wp-clip-pause-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg> : <PlayIcon />}
       </button>
       <span className="wp-clip-bar" aria-hidden="true"><i style={{ width: `${progress}%` }} /></span>
       <input type="range" className="wp-clip-seek" aria-label="Seek" min={0} max={Math.max(duration, 1)} step={50} value={position} disabled={duration <= 0} onChange={(event) => player.current?.seek(Number(event.currentTarget.value))} style={{ '--wp-clip-progress': `${progress}%` } as CSSProperties} />
@@ -127,3 +132,7 @@ function ClipPlayer({ source }: { source: PlayerSource }) {
     </> : <p className="wp-clip-note" role="status">{snapshot.status === 'failed' ? copy.failed : copy.loading}</p>}
   </div>;
 }
+
+const PlayIcon = () => <svg className="wp-clip-play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7Z" /></svg>;
+/** The player's play control as a mark, smaller, over a poster that opens the player. */
+export const PlayMark = () => <span className="wp-clip-toggle wp-clip-mark" aria-hidden="true"><PlayIcon /></span>;

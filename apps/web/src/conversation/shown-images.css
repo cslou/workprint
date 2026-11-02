@@ -2,4 +2,5 @@
 .wp-shown-image { display: block; max-width: 100%; padding: 0; border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-lg); background: var(--color-bg-sunken); overflow: hidden; cursor: pointer; }
 .wp-shown-image img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .wp-shown-image[data-focus-visible] { outline: var(--border-width-focus) solid var(--color-border-focus); outline-offset: var(--border-width-focus-offset); }
+.wp-shown-image[data-kind="video"] { position: relative; }
 .wp-shown-image-failed { margin: var(--space-6) 0 var(--space-10); font-size: var(--font-size-13); color: var(--color-text-subtle); }

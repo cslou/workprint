@@ -1,4 +1,4 @@
-import { nativeTransportLimits, type ApiClient, type ClientError, type NativeMessages, type NativeObservation, type NativeThread, type NativeToolActivity, type NativeToolActivityChunk } from '@workprint/api-client';
+import { nativeTransportLimits, shownMedia, type ApiClient, type ClientError, type NativeMessages, type NativeObservation, type NativeThread, type NativeToolActivity, type NativeToolActivityChunk } from '@workprint/api-client';
 
 type Native = Pick<ApiClient['native'], 'createConversation' | 'subscribe' | 'sendText' | 'loadMessages' | 'stop'>;
 
@@ -70,7 +70,8 @@ function withText(parts: readonly LivePart[], text: string): LivePart[] {
 }
 /** Adds a tool's line, or moves its existing line on (running → done or failed). */
 function withActivity(parts: readonly LivePart[], chunk: NativeToolActivityChunk, now: number): LivePart[] {
-  const activity: NativeToolActivity = { toolCallId: chunk.toolCallId, tool: chunk.tool, phrase: chunk.phrase, state: chunk.state, ...(chunk.summary !== undefined ? { summary: chunk.summary } : {}), ...(chunk.images !== undefined ? { images: [...chunk.images] } : {}) };
+  const media = shownMedia(chunk);
+  const activity: NativeToolActivity = { toolCallId: chunk.toolCallId, tool: chunk.tool, phrase: chunk.phrase, state: chunk.state, ...(chunk.summary !== undefined ? { summary: chunk.summary } : {}), ...(media.length ? { media } : {}) };
   const index = parts.findIndex(part => part.kind === 'activity' && part.activity.toolCallId === activity.toolCallId);
   if (index < 0) return [...parts, { kind: 'activity', activity, startedAt: now }];
   return parts.map((part, at) => at === index && part.kind === 'activity' ? { ...part, activity } : part);

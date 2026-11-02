@@ -10,6 +10,7 @@ import type * as Processes from '../../apps/api/test/support/process.js';
 import type * as Provider from '../../apps/api/test/support/scripted-provider.js';
 import type * as Chat from '../../apps/api/test/support/chat-composition.js';
 import type * as MetaImages from '../../apps/api/test/support/meta-image-fake.js';
+import type * as MiniMaxVideos from '../../apps/api/test/support/minimax-video-fake.js';
 import type { SavedWorkSetup } from '../../apps/api/test/support/auth-built-fixture.js';
 
 // Fixtures are compiled by `node scripts/test.mjs compile`; Playwright loads the emitted modules.
@@ -22,7 +23,8 @@ export type Account = { id: string; email: string; password: string; nextPasswor
 
 /**
  * One backend for the worker on the shared test stack (Postgres, Auth, object storage, media): API and the built web app.
- * Muse Spark is routed to one scripted provider, which chat journeys script per test; Meta images go to a loopback fake.
+ * Muse Spark is routed to one scripted provider, which chat journeys script per test; Meta images and MiniMax videos go
+ * to loopback fakes. MiniMax serves the MiniMax-shaped test clip and is polled every 50 ms.
  */
 async function startBackend() {
   const { accountBrowserFixture } = await loadSupport<typeof AppFixture>('account-browser-fixture');
@@ -31,6 +33,7 @@ async function startBackend() {
   const { scriptedProvider } = await loadSupport<typeof Provider>('scripted-provider');
   const { chatComposition } = await loadSupport<typeof Chat>('chat-composition');
   const { metaImageFake } = await loadSupport<typeof MetaImages>('meta-image-fake');
+  const { generatedClip, miniMaxVideoFake } = await loadSupport<typeof MiniMaxVideos>('minimax-video-fake');
   const cleanups: (() => unknown)[] = [];
   const close = async () => {
     const errors: unknown[] = [];
@@ -40,8 +43,9 @@ async function startBackend() {
   try {
     const provider = await scriptedProvider(); cleanups.push(provider.close);
     const meta = await metaImageFake(); cleanups.push(meta.close);
+    const minimax = await miniMaxVideoFake({ clip: await generatedClip() }); cleanups.push(minimax.close);
     const media = await createLibraryMediaFixture(); cleanups.push(media.close);
-    const app = await accountBrowserFixture({ artifacts: true, storage: media.configuration, media: media.media, serverLifetimeMs: suiteLifetimeMs, composition: chatComposition(provider, {}, { url: meta.url }) }, previewOrigin);
+    const app = await accountBrowserFixture({ artifacts: true, storage: media.configuration, media: media.media, serverLifetimeMs: suiteLifetimeMs, composition: chatComposition(provider, {}, { url: meta.url }, {}, { url: minimax.url, timing: { pollIntervalMs: 50, pollDeadlineMs: 60_000 } }) }, previewOrigin);
     cleanups.push(app.close);
     const logs = await mkdtemp(join(tmpdir(), 'workprint-e2e-')); cleanups.push(() => rm(logs, { recursive: true, force: true }));
     const env = { PATH: process.env.PATH, HOME: process.env.HOME, WORKPRINT_PUBLIC_SUPABASE_URL: app.auth.url, WORKPRINT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: app.auth.anonKey, WORKPRINT_PUBLIC_API_ORIGIN: app.apiOrigin };
@@ -51,7 +55,7 @@ async function startBackend() {
     cleanups.push(web.stop);
     await web.response(previewOrigin);
     return {
-      app, media, provider, meta, close,
+      app, media, provider, meta, minimax, close,
       accounts: (count: number) => Promise.all(Array.from({ length: count }, () => app.auth.createAccount())) as Promise<Account[]>,
       setup: (accounts: readonly Account[]): SavedWorkSetup => ({ accountIds: accounts.map(account => account.id), native: app.native, servingUrl: app.servingUrl, setupUrl: app.setupUrl }),
       /** Read an owned API operation as the account, for asserting persisted state. */
@@ -92,4 +96,23 @@ export async function signIn(page: Page, account: Account, target = '/app') {
   await page.getByLabel('Password', { exact: true }).fill(account.password);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page).toHaveURL(previewOrigin + target);
+}
+
+/**
+ * One scripted turn in which the agent makes a video with the MiniMax fake, sent from the open video's chat box.
+ * Resolves with the turn's reply once its line reads `Saved Video N · Version 1`.
+ */
+export async function makeVideo(page: Page, backend: { provider: { script(...steps: unknown[]): void }; minimax: { reset(): void } }, options: { showInChat?: boolean; text?: string } = {}) {
+  backend.minimax.reset();
+  const text = options.text ?? 'Here it is.';
+  backend.provider.script({ toolCalls: [{ name: 'generate-video', args: { prompt: 'A slow push-in on a quiet gallery bench', showInChat: options.showInChat ?? true } }] }, { text: [text] });
+  const box = page.getByRole('textbox', { name: 'Message' });
+  // This turn's reply is the one after those already shown, never an earlier reply's line.
+  const replies = page.getByRole('list', { name: 'New messages' }).getByRole('listitem', { name: 'Assistant message' });
+  const reply = replies.nth(await replies.count());
+  await box.fill('Make a short video of the gallery bench');
+  await box.press('Enter');
+  await expect(reply.getByText(/^Saved Video \d+ · Version 1$/)).toBeVisible({ timeout: 60_000 });
+  await expect(reply.getByText(text, { exact: true })).toBeVisible();
+  return reply;
 }

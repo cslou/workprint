@@ -29,6 +29,9 @@ export interface ToolContext {
   readonly abortReason: () => ToolAbortReason | undefined;
 }
 
+/** A saved image or video version to show under a done line. */
+export type ShownMedia = Readonly<{ kind: 'image' | 'video'; versionId: string }>;
+
 /** Framework-neutral tool definition. `agent/mastra` turns these into native tools. */
 export interface AgentTool {
   readonly id: string;
@@ -40,8 +43,8 @@ export interface AgentTool {
   readonly phraseFor?: (input: unknown) => string | undefined;
   /** Short summary for the done line, derived from the tool's own result. */
   readonly doneSummary?: (output: unknown) => string | undefined;
-  /** Saved image version ids to show under the done line, derived from the tool's own result. */
-  readonly shownImages?: (output: unknown) => readonly string[] | undefined;
+  /** Saved images and videos to show under the done line, derived from the tool's own result. */
+  readonly shownMedia?: (output: unknown) => readonly ShownMedia[] | undefined;
   readonly execute: (input: unknown, context: ToolContext) => Promise<unknown>;
 }
 
@@ -53,15 +56,15 @@ export function defineTool<Schema extends z.ZodType, Output>(tool: {
   phrase?: string;
   phraseFor?: (input: z.infer<Schema>) => string;
   doneSummary?: (output: Output) => string | undefined;
-  shownImages?: (output: Output) => readonly string[] | undefined;
+  shownMedia?: (output: Output) => readonly ShownMedia[] | undefined;
   execute: (input: z.infer<Schema>, context: ToolContext) => Promise<Output>;
 }): AgentTool {
-  const { doneSummary, execute, phraseFor, shownImages, ...rest } = tool;
+  const { doneSummary, execute, phraseFor, shownMedia, ...rest } = tool;
   return {
     ...rest,
     ...(phraseFor ? { phraseFor: (input: unknown) => { const parsed = tool.inputSchema.safeParse(input); return parsed.success ? phraseFor(parsed.data) : undefined; } } : {}),
     ...(doneSummary ? { doneSummary: (output: unknown) => doneSummary(output as Output) } : {}),
-    ...(shownImages ? { shownImages: (output: unknown) => shownImages(output as Output) } : {}),
+    ...(shownMedia ? { shownMedia: (output: unknown) => shownMedia(output as Output) } : {}),
     execute: (input, context) => execute(tool.inputSchema.parse(input), context),
   };
 }
