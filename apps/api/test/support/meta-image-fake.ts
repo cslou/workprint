@@ -35,7 +35,9 @@ export type FakeImageStep =
   | { readonly status: number; readonly error?: Record<string, unknown> }
   | { readonly raw: string }
   /** Never answers, until the request is aborted or the fake closes. */
-  | { readonly hang: true };
+  | { readonly hang: true }
+  /** Answers with `n` test PNGs once `hold` resolves, so a test can change saved work while the request is held. */
+  | { readonly hold: Promise<unknown> };
 export type FakeImageRequest = { readonly path: string; readonly authorization: string | undefined; readonly body: Record<string, unknown> };
 
 /**
@@ -56,16 +58,21 @@ export async function metaImageFake() {
       let body: Record<string, unknown> = {};
       try { body = JSON.parse(raw) as Record<string, unknown>; } catch { /* recorded as empty */ }
       requests.push({ path, authorization: request.headers.authorization, body });
-      const step = steps.shift() ?? { images: Array.from({ length: typeof body.n === 'number' ? body.n : 1 }, () => testPng({ seed: ++seed })) };
+      const made = () => ({ images: Array.from({ length: typeof body.n === 'number' ? body.n : 1 }, () => testPng({ seed: ++seed })) });
+      const answer = (step: Exclude<FakeImageStep, { hang: true } | { hold: Promise<unknown> }>) => {
+        if ('raw' in step) { response.writeHead(200, { 'content-type': 'application/json' }).end(step.raw); return; }
+        if ('status' in step) { response.writeHead(step.status, { 'content-type': 'application/json' }).end(JSON.stringify({ error: step.error ?? { type: 'server_error', message: 'scripted failure' } })); return; }
+        response.writeHead(200, { 'content-type': 'application/json', 'x-request-id': `fake-${requests.length}` }).end(JSON.stringify({
+          created: 1793588678, data: step.images.map(image => ({ b64_json: image.toString('base64') })),
+          // Like Meta, the label follows the request and defaults to webp, so a missing format fails the signature check.
+          output_format: step.outputFormat ?? (typeof body.output_format === 'string' ? body.output_format : 'webp'), background: 'opaque',
+          usage: { input_tokens: 10, output_tokens: 20, total_tokens: 30 },
+        }));
+      };
+      const step = steps.shift() ?? made();
       if ('hang' in step) return;
-      if ('raw' in step) { response.writeHead(200, { 'content-type': 'application/json' }).end(step.raw); return; }
-      if ('status' in step) { response.writeHead(step.status, { 'content-type': 'application/json' }).end(JSON.stringify({ error: step.error ?? { type: 'server_error', message: 'scripted failure' } })); return; }
-      response.writeHead(200, { 'content-type': 'application/json', 'x-request-id': `fake-${requests.length}` }).end(JSON.stringify({
-        created: 1793588678, data: step.images.map(image => ({ b64_json: image.toString('base64') })),
-        // Like Meta, the label follows the request and defaults to webp, so a missing format fails the signature check.
-        output_format: step.outputFormat ?? (typeof body.output_format === 'string' ? body.output_format : 'webp'), background: 'opaque',
-        usage: { input_tokens: 10, output_tokens: 20, total_tokens: 30 },
-      }));
+      if ('hold' in step) { void step.hold.then(() => { if (!response.destroyed) answer(made()); }); return; }
+      answer(step);
     });
   });
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
