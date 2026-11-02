@@ -2,7 +2,7 @@
 
 **Date:** Start 2026-11-02, after Sprint 006 (PR #78) merged into `main` – End after completion gates and Lou's QA
 **Goal:** In a local build, a signed-in user asks the agent to write or change the video's script. The agent saves a new script version, which becomes the video's current script, and the Script tab shows it without a reload. An unsaved manual edit is not lost.
-**Status:** 🔵 In progress
+**Status:** 🟢 Complete (Lou's QA and the merge to `main` pending)
 
 ---
 
@@ -258,13 +258,13 @@ After all implementation stories are complete, perform this checklist before spr
 
 - [x] Confirm all stories met their acceptance criteria using recorded implementation and verification evidence.
 - [x] Fold the agent script-writing flow into spec §8.3 (cross-referenced from §8.1) before the deep gate, together with the §10 sprint-rule fixes and the SC2 exception (Affected Flows).
-- [ ] Run the applicable regression suite on the combined sprint branch: the deep gate (Tests requiring extra consideration, item 5).
+- [x] Run the applicable regression suite on the combined sprint branch: the deep gate (Tests requiring extra consideration, item 5).
   - Audit moderates stay the existing B-004/B-008 non-pass.
   - While a QA host holds 4180, use `WORKPRINT_PREVIEW_PORT=4185`. 4190, the earlier choice, is on the Fetch "bad port" list and fails every journey (Sprint 006 Final Review).
-- [ ] Run any planned cross-story checks not covered by that suite:
-  - [ ] `pnpm live:chat --live` once on the combined head. Sprint 006's steps pass as before. The update-script step passes when Muse Spark calls `update-script` with schema-valid content and the workspace read returns the new version. One rephrase is allowed. A second refusal or invalid content is a non-pass, fixed before integration.
-  - [ ] Then a QA build for Lou (web 4179, API 4180, live Muse Spark).
-- [ ] Record results and unresolved issues in a brief `## Final Review`.
+- [x] Run any planned cross-story checks not covered by that suite:
+  - [x] `pnpm live:chat --live` once on the combined head. Sprint 006's steps pass as before. The update-script step passes when Muse Spark calls `update-script` with schema-valid content and the workspace read returns the new version. One rephrase is allowed. A second refusal or invalid content is a non-pass, fixed before integration.
+  - [x] Then a QA build for Lou (web 4179, API 4180, live Muse Spark).
+- [x] Record results and unresolved issues in a brief `## Final Review`.
 
 For descriptive-only work, use editorial review and applicable existing checks. Preserve applicable design checks and approval gates. Failed, ambiguous, or unrun required checks remain non-pass.
 
@@ -285,3 +285,49 @@ For descriptive-only work, use editorial review and applicable existing checks. 
 - Sprint doc includes a brief `## Final Review` with completion evidence, unresolved issues, and a New Dependencies field containing dependencies or `None`.
 - Sprint-integration PR is reviewed, passes the required gates, and is merged only after the explicit user merge command.
 - If the sprint introduces new flows, they are folded into the implementation spec before sprint integration.
+
+## Final Review
+
+- **Stories:** each story merged into `sprint-007` after one independent reviewer, run as a reasoning-model sub-agent, reached at least 4/5 with no open P0/P1:
+  - Story 1, #79 (B-006 tab assembly).
+  - Story 2, #80 (B-013 update-script): 4/5. Eight P2s, fixed or recorded as deviations.
+  - Story 3, #81 (B-024 Script tab refresh): 5/5 after two fix rounds.
+  - Completion fix, #82 (first save ignores the base): 5/5 after one fix round.
+- **Deep gate** at `399854e` (`.checks/regression.sh --tier=deep`, `WORKPRINT_PREVIEW_PORT=4185`, 214 s): PASS.
+  - Unit 152/152, tooling 6/6, integration 100/100, browser 26/26.
+  - Audit is NON-PASS, as approved: 2 moderate advisories, `@hono/node-server` GHSA-rmxm-3fg6-px4f (B-004) and `minimatch` GHSA-g3hv-75wg-m249 (B-008). There are no high or critical advisories.
+  - Logs: `outputs/verification/sprint-007/deep-399854e/`.
+  - PR #82 changed code after this run. The `main` pre-merge gate runs deep again on the final head, and its result is recorded on the sprint PR.
+- **`pnpm live:chat --live` (real Muse Spark 1.3), 3 runs against the 1 planned:**
+  - **Run 1 at `399854e`: non-pass.** The update-script step failed: Muse Spark called the tool on a video with no script but sent a base that wasn't `null`, and didn't recover from the "not found" refusal. Every other step passed. Diagnosis: `outputs/verification/sprint-007/live-chat-399854e.md`.
+  - **Run 2 at `81dc550`: still a non-pass.** The refusal now said to pass null; the model retried, again with a non-null base.
+  - **Run 3 at `824d57b`: every step passed.** update-script saved v1 on the first attempt, with no rephrase and no refused attempts. That first save now ignores the base. Other timings: send first chunk 1.9 s, with the 32,768 cap accepted; title 29 characters; echo tool and read-workspace with no rephrase; Stop acknowledged in 46 ms.
+  - The sanitized shapes are committed.
+  - After review, `5666333` changed only the not-found message and one description sentence. Neither is reachable from the live step, and the reviewer agreed a fourth run wasn't needed. `824d57b` is the live-verified head.
+- **QA build for Lou:** running at `c2f7d3c`.
+  - Web is http://127.0.0.1:4179 and the API is :4180, with live Muse Spark.
+  - It uses a dedicated synthetic account. Its credentials are in the 0600 file `outputs/qa/sprint-007/c2f7d3cfd2e6/credentials.json`.
+  - Stop it with `node outputs/qa/sprint-007/c2f7d3cfd2e6/stop.mjs`. It expires after 8 hours.
+  - Uploads are unavailable on this host, as in Sprint 006.
+- **Spec:** the agent script flow is folded into §8.3, with the §8.1 tools cross-reference. The §9 SC2 MVP exception is recorded. §10's sprint rules now branch from and integrate into `main`.
+- **Deviations, recorded:**
+  - **Story 2:**
+    - The base is the version in use.
+    - "Not found" means another artifact.
+    - A built-in script in use is adapted into a new owned script.
+    - The 100-use limit reports "unavailable".
+    - There is no save journal (B-036).
+    - The seam has a different name.
+    - The first save ignores the base (#82).
+    - No selection-revision bump: the plan's assumption was wrong.
+  - **Story 3:**
+    - Own effects are ordered by a refresh count, not `selectionRevision`.
+    - A re-read waits while an editor is open, so Version history lists v2 during the edit and v1 after it closes.
+    - One re-read follows each confirmed use.
+    - A failed background re-read keeps the shown value, except when the session has ended.
+- **For Lou to confirm in QA:**
+  - Waiting while the editor is open changes the approved Story 3 journey wording: Version history shows v2 during an open edit.
+  - An agent rewrite replaces an approved script as a draft (the SC2 exception). Reverting is Version history → "Use this version".
+- **Accepted P2s:** Story 3 tests the hook wiring only through pure helpers and the browser journey. There is no React renderer test.
+- **Unresolved:** none blocking. Audit advisories B-004 and B-008 remain non-pass and gate shared or public deployment only.
+- **New Dependencies:** None.
