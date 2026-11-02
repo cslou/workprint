@@ -27,5 +27,5 @@ export async function transaction<T>(pool: Pool, work: (client: PoolClient) => P
 
 /** Application checks do not require native bootstrap schemas. */
 export function assertRestrictedApplicationRole(pool: Pool): Promise<void> {
-  return assertRestrictedRole(pool, { createSchemas: ['artifacts'], ownershipSchemas: ['artifacts'], errorMessage: 'Privileged application serving connection' });
+  return assertRestrictedRole(pool, { createSchemas: ['artifacts', 'generation'], ownershipSchemas: ['artifacts', 'generation'], errorMessage: 'Privileged application serving connection' });
 }

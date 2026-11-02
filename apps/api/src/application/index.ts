@@ -52,6 +52,7 @@ export type Application = ReturnType<typeof createApplication>;
 export { withUploads, type UploadApplication } from './uploads.js';
 export { withManualSaves, type ManualSaveApplication } from './manual-saves.js';
 export { withVersionUses, type VersionUseApplication } from './version-uses.js';
+export { publicJob, withGenerationRequests, type GenerationJobReads, type GenerationRequestApplication } from './generation-requests.js';
 export { withSavedWork, type SavedWorkApplication, type SavedWorkReads } from './saved-reads.js';
 export { withStoryboardEdits, type StoryboardEditApplication } from './storyboard-edits.js';
 export { createWorkspaceReader, type OwnedWorkspace, type OwnedWorkspaceRead, type ReadOwnedWorkspace } from './workspace-reads.js';

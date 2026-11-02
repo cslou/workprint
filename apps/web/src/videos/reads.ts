@@ -5,7 +5,9 @@ import { useScopedRead, type ReadScope } from '../api/use-scoped-read.js';
 import { collectPages } from '../api/paged-read.js';
 export type GenerationRequest = OperationResponse<'generationRequest'>;
 export const unfinished = (request: GenerationRequest) => request.status === 'queued' || request.status === 'submitting' || request.status === 'running';
-export const sameRequest = (a: GenerationRequest, b: GenerationRequest) => a.id === b.id && a.batchId === b.batchId && a.proposalId === b.proposalId && a.purpose === b.purpose && JSON.stringify(a.target) === JSON.stringify(b.target);
+/** A request's identity: its id, purpose and, for the variants that have them, batch, proposal and target. */
+export const requestIdentity = (request: GenerationRequest) => JSON.stringify(request.purpose === 'video' ? [request.id, request.purpose] : [request.id, request.batchId, request.proposalId, request.purpose, request.target]);
+export const sameRequest = (a: GenerationRequest, b: GenerationRequest) => requestIdentity(a) === requestIdentity(b);
 export function useGenerationRequests(client: ApiClient | null, scope: ReadScope | null) {
   const id = scope?.conversationId;
   const read = useMemo(() => client && id ? (signal: AbortSignal) => collectPages(

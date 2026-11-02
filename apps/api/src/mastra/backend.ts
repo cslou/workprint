@@ -3,11 +3,11 @@ import { registerApiRoute, type ApiRoute } from '@mastra/core/server';
 import { PostgresStore } from '@mastra/pg';
 import { Pool } from 'pg';
 import { createOwnedConversationCheck, bindNativeTurns, productionTools, turnLimits, type AgentCollaborators, type AgentTool, type NativeTurnModel, type TurnLimits } from '../agent/index.js';
-import { createApplication, createAssistantScriptSaver, createGeneratedImageSaver, createImageInputReader, createWorkspaceReader, withSavedWork, withManualSaves, withVersionUses, withStoryboardEdits, withUploads } from '../application/index.js';
+import { createApplication, createAssistantScriptSaver, createGeneratedImageSaver, createImageInputReader, createWorkspaceReader, withSavedWork, withManualSaves, withVersionUses, withGenerationRequests, withStoryboardEdits, withUploads } from '../application/index.js';
 import { createArtifactStore, createArtifactWriters, createAssistantScripts, createGeneratedImages, createVersionUses, createStoryboardEdits, createMediaVerifier, createUploadCoordinator } from '../artifacts/index.js';
 import { configuredMediaSandbox, configuredObjectStorage } from '../storage/index.js';
 import { assertRestrictedRole } from '../db/index.js';
-import type { MetaImageClient } from '../generation/index.js';
+import { createGenerationJobs, type MetaImageClient } from '../generation/index.js';
 import { loadServerConfig } from './config.js';
 import { verifyAccount } from './auth.js';
 import { applicationRoutes } from './application-routes.js';
@@ -40,13 +40,14 @@ export async function createBackend(routes: ApiRoute[] = [], turns?: TurnComposi
   });
   try {
     await assertRestrictedRole(pool, {
-      createSchemas: ['artifacts', 'mastra', 'public'], ownershipSchemas: ['artifacts', 'mastra'],
+      createSchemas: ['artifacts', 'generation', 'mastra', 'public'], ownershipSchemas: ['artifacts', 'generation', 'mastra'],
       requiredSchemas: ['mastra', 'public'], errorMessage: 'Privileged serving connection',
     });
   } catch {
     objects?.close(); await media?.close(); await pool.end();
     throw new Error('Serving storage unavailable or privileged; prepare storage separately and use restricted DATABASE_URL');
   }
+  const jobs = createGenerationJobs(pool);
   const tools = turns ? turns.tools ?? productionTools : [];
   const storage = new PostgresStore({ id: 'workprint-native', schemaName: 'mastra', disableInit: true, pool });
   const application = createApplication({ checkOwnedConversation: createOwnedConversationCheck(storage) });
@@ -58,7 +59,8 @@ export async function createBackend(routes: ApiRoute[] = [], turns?: TurnComposi
   // One media checker: uploads and assistant-made images share the one-job decode sandbox.
   const verifyMedia = media ? createMediaVerifier(media) : undefined;
   const uploadApplication = withUploads(planningApplication, createUploadCoordinator(pool, application.checkOwnedConversation, { ...(objects ? { storage: objects } : {}), ...(verifyMedia ? { verifyMedia } : {}) }));
-  const protectedRoutes = [...applicationRoutes(uploadApplication), ...nativeNavigationRoutes(storage, application.checkOwnedConversation, tools), ...routes];
+  const jobApplication = withGenerationRequests(uploadApplication, application.checkOwnedConversation, jobs);
+  const protectedRoutes = [...applicationRoutes(jobApplication), ...nativeNavigationRoutes(storage, application.checkOwnedConversation, tools), ...routes];
   const policy = createAdmissionPolicy([...protectedRoutes, ...nativeTurnRoutes], config.browserOrigin);
   const mastra = new ResourceMastra({
     storage,

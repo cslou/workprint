@@ -49,6 +49,15 @@ test('response contracts retain exact proposal/question targets and decode only 
   assert.equal(errorEnvelopeSchema.safeParse({ error: { code: 'success', message: 'ok' } }).success, false);
   assert.equal(errorEnvelopeSchema.safeParse({ error: { code: 'invalid_input', message: 'bad', stack: 'private' } }).success, false);
   assert.equal(errorEnvelopeSchema.safeParse({ error: { code: 'invalid_input', message: 'bad', details: { token: 'private' } } }).success, false);
+  // Generation jobs: the video variant has no target, batch or proposal; the others keep their shape.
+  const video = { id: 'j', purpose: 'video', status: 'interrupted', remote: { taskId: '459000874041694' } };
+  assert.deepEqual(operations.generationRequest.response.parse(video), video);
+  for (const failureReason of ['expired', 'check_refused', 'outcome_unknown']) assert.equal(operations.generationRequest.response.safeParse({ ...video, status: 'failed', failureReason }).success, true, failureReason);
+  for (const extra of [{ batchId: 'b' }, { proposalId: 'p' }, { target: { shotId: 's' } }]) assert.equal(operations.generationRequest.response.safeParse({ ...video, ...extra }).success, false, JSON.stringify(extra));
+  const shotJob = { id: 'g', batchId: 'b', proposalId: 'p', purpose: 'shot_video', target: { shotId: 's' }, status: 'running', remote: {} };
+  assert.deepEqual(operations.generationRequest.response.parse(shotJob), shotJob);
+  assert.equal(operations.generationRequest.response.safeParse({ ...shotJob, batchId: undefined }).success, false, 'existing variants still need their batch');
+  assert.equal(operations.generationRequest.response.safeParse({ ...shotJob, purpose: 'reference_image', target: { role: 'hero' }, proposalId: undefined }).success, false);
   const exported = { id: 'e', status: 'succeeded', capturedSelectionRevision: 7, current: false, sources: [{ shotId: 's', versionId: 'v', order: 0 }], compatibility: { compatible: true, issues: [] }, outputVersionId: 'output-v' };
   assert.deepEqual(operations.export.response.parse(exported), exported);
   assert.equal(operations.export.response.safeParse({ ...exported, nativeRun: {} }).success, false);
