@@ -2,7 +2,7 @@
 
 **Date:** Start 2026-11-02, from `main` after PR #91 (`57ecc93`) – End after completion gates and Lou's QA
 **Goal:** In a local build, a signed-in user asks the agent for a video. The agent calls MiniMax Video V2 with a prompt and up to two of the video's saved images as first and last frames. The tool waits in the turn while the chat shows the elapsed minutes. The job is saved before any waiting, so Stop, a deadline or a restart never loses it or submits it twice. The finished clip is checked, saved privately as an assistant-made video, and plays in the chat and in a new "Generated videos" list in the Videos tab, live and after a reload.
-**Status:** 🟢 Complete (Lou's QA passed 2026-11-03; the merge to main follows)
+**Status:** 🟢 Complete on Lou's acceptance (QA 2026-11-03; some QA conditions not separately confirmed, see Final Review; the merge to main follows)
 
 ---
 
@@ -391,7 +391,7 @@ After all implementation stories are complete, perform this checklist before spr
 - [x] Run any planned cross-story checks not covered by that suite.
   - [x] Fold the video flow into spec §8.3 and §8.7 (and the §4 `generation` row) before the deep gate.
   - [x] `pnpm live:video`, `pnpm live:image` and `pnpm live:chat` dry modes pass on the combined branch (no gate runs them).
-  - [x] A QA build for Lou (web 4179, API 4180, live Muse Spark, live Meta images and live MiniMax video, with storage and the sandbox). Pass conditions: a real turn of at least 6 minutes (past Node's 5-minute defaults; two videos in one turn if one is quicker) completes, showing `· N min` while it waits; a video from a prompt and one from a saved image each play in the chat and in Generated videos; Stop leaves an `Interrupted` card; asking to resume it saves the clip with exactly one MiniMax task for that job.
+  - [x] *(Accepted by Lou on 2026-11-03; only some pass conditions confirmed, see Final Review.)* A QA build for Lou (web 4179, API 4180, live Muse Spark, live Meta images and live MiniMax video, with storage and the sandbox). Pass conditions: a real turn of at least 6 minutes (past Node's 5-minute defaults; two videos in one turn if one is quicker) completes, showing `· N min` while it waits; a video from a prompt and one from a saved image each play in the chat and in Generated videos; Stop leaves an `Interrupted` card; asking to resume it saves the clip with exactly one MiniMax task for that job.
 - [x] Record results and unresolved issues in a brief `## Final Review`.
 
 For descriptive-only work, use editorial review and applicable existing checks. Preserve applicable design checks and approval gates. Failed, ambiguous, or unrun required checks remain non-pass.
@@ -416,7 +416,7 @@ For descriptive-only work, use editorial review and applicable existing checks. 
 
 ## Final Review
 
-- **Outcome:** the goal is met in the scripted build and in Lou's live QA. Every story AC and verification item is met, with the deviations recorded below. Each story merged into `sprint-009` after an independent review of its final head scored at least 4/5 with no open P0/P1. The verdicts come from the orchestrator's review runs and are recorded in the PR bodies:
+- **Outcome:** the goal is met in the scripted build. Lou accepted it after a partial live QA, recorded below. Every story AC and verification item is met, with the deviations recorded below. Each story merged into `sprint-009` after an independent review of its final head scored at least 4/5 with no open P0/P1. The verdicts come from the orchestrator's review runs and are recorded in the PR bodies:
   - Story 1, #95 (MiniMax video client): 4/5. All 17 P2s were fixed.
   - Story 2, #96 (turns that wait for minutes): 4/5. All 5 P2s were fixed.
   - Story 3, #97 (saved video jobs): 4/5, with eight P2s disposed in the PR.
@@ -435,7 +435,18 @@ For descriptive-only work, use editorial review and applicable existing checks. 
   - Live services: Muse Spark 1.3, Meta `muse-image-1.0` and MiniMax-H3 768P video. All are paid calls.
   - Storage: private loopback object storage and the pinned decode sandbox.
   - Account: a dedicated synthetic account, in a 0600 file under `outputs/qa/sprint-009/5087b4de9cc8/`.
-  - Lou's QA on 2026-11-03 passed: "the creation of the video works and it used the image", and "stopping and restarting also works". This covers a video made from a saved image, and Stop followed by a resume of the same job. Lou reported no separate result for the 6-minute turn or for playback in each place.
+  - **Lou's QA on 2026-11-03.** Lou wrote: "the creation of the video works and it used the image", and "stopping and restarting also works". Lou then asked to merge.
+  - **Confirmed by Lou:**
+    - a video made from a saved image;
+    - stopping and restarting.
+  - **Not separately confirmed, accepted by Lou:**
+    - a turn of at least 6 minutes showing `· N min`;
+    - a video from a prompt alone;
+    - playback in the chat and in Generated videos;
+    - the `Interrupted` card;
+    - a resume using exactly one MiniMax task for that job. This condition is not visible in the UI and was not checked server-side.
+
+    The scripted suites cover each of these: the 35-minute route bound and the minute display (Story 2), the job states and the one create on resume (Stories 3 and 5), and the chat and Videos playback journeys (Stories 6 and 7). The 6-minute turn has not been proven with live MiniMax.
 - **Deviations, recorded in the story PRs:**
   - **Story 4:**
     - The test clip is 97 frames (4.04 s), not 4 s, because of the cut points in MiniMax's B-frame groups.
