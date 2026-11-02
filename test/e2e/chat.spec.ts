@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { test, expect, signIn } from './fixtures.js';
+import { test, expect, makeVideo, signIn } from './fixtures.js';
 
 const sendPath = '/api/agents/assistant/send-message';
 const notSent = 'Your message wasn’t sent. It’s still here, so you can try again.';
@@ -590,6 +590,57 @@ test('images the agent makes are shown under their line, each read once, and sta
   await expect(replies).toHaveCount(2);
   for (const number of [1, 2, 3]) await expect(replies.first().locator(`img[alt="Image ${number} · Version 1"]`)).toBeVisible();
   await expect(replies.last().locator('.wp-shown-image')).toHaveCount(0);
+});
+
+test('a video the agent makes shows its poster under the line and plays in the viewer, after reload too', async ({ page, backend }) => {
+  test.slow();
+  const [account] = await backend.accounts(1);
+  await signIn(page, account!);
+  const reply = await makeVideo(page, backend);
+  await expect(reply.getByText('Saved Video 1 · Version 1', { exact: true })).toBeVisible();
+  const poster = (root: typeof reply) => root.locator('img[alt="Video 1 · Version 1"]');
+  await expect(poster(reply)).toBeVisible();
+  await expect.poll(() => poster(reply).evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  // The poster carries the clip's own size, so its box is held before it loads, and it is at most 240 px tall.
+  await expect(poster(reply)).toHaveAttribute('width', '1344');
+  expect((await reply.locator('.wp-shown-image[data-kind="video"]').boundingBox())!.height).toBeLessThanOrEqual(240);
+  await expect(reply.locator('.wp-shown-play')).toBeVisible();
+
+  /** Opens the clip from its poster, plays it, and closes the viewer. */
+  const plays = async (root: typeof reply) => {
+    await root.getByRole('button', { name: 'Play Video 1 · Version 1', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.locator('.wp-clip-surface[data-ready="true"]')).toHaveCount(1);
+    await dialog.getByRole('button', { name: 'Play', exact: true }).click();
+    await expect.poll(() => dialog.locator('.wp-clip-media').evaluate(node => {
+      const video = node as HTMLVideoElement;
+      return video.getVideoPlaybackQuality().totalVideoFrames > 0 || video.currentTime > 0;
+    }), { timeout: 10_000 }).toBe(true);
+    // A clip seen in the chat is only viewed: the viewer offers no use or choice.
+    await expect(dialog.getByRole('button', { name: /^Use / })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+  };
+  await plays(reply);
+
+  // Not asked for directly: the line, and no video.
+  const quiet = await makeVideo(page, backend, { showInChat: false, text: 'Saved it for later.' });
+  await expect(quiet.getByText('Saved Video 2 · Version 1', { exact: true })).toBeVisible();
+  await expect(quiet.locator('.wp-shown-image')).toHaveCount(0);
+
+  // A refused poster read leaves the line and says the video couldn't be shown.
+  await page.route('**/v1/versions/*/media', route => route.fulfill({ status: 503, body: '' }), { times: 1 });
+  const refused = await makeVideo(page, backend, { text: 'One more.' });
+  await expect(refused.getByText('Saved Video 3 · Version 1', { exact: true })).toBeVisible();
+  await expect(refused.getByText('This video couldn’t be shown', { exact: true })).toBeVisible();
+
+  await page.reload();
+  const replies = saved(page).getByRole('listitem', { name: 'Assistant message' });
+  await expect(replies).toHaveCount(3);
+  await expect.poll(() => poster(replies.first()).evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  await plays(replies.first());
+  await expect(replies.nth(1).locator('.wp-shown-image')).toHaveCount(0);
+  await expect(replies.last().locator('img[alt="Video 3 · Version 1"]')).toBeVisible();
 });
 
 test('an edit of one image is its next version: Assets keeps one row, with the earlier version in its history', async ({ page, backend }) => {

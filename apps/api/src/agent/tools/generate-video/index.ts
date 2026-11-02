@@ -131,6 +131,8 @@ export const generateVideoTool = defineTool({
     if (result.reason === 'already_saved') return result.label ? `That video is already saved as ${result.label}` : 'That video is already saved';
     return summaries[result.reason];
   },
+  // Shown only when the user asked for a video directly; a refusal shows none.
+  shownMedia: (result: GenerateVideoResult | { error: true }) => 'made' in result && result.made && result.showInChat ? [{ kind: 'video', versionId: result.video.versionId }] : [],
   execute: async (input, context): Promise<GenerateVideoResult> => {
     const { scope, collaborators, signal, abortReason } = context;
     // Without a way to save, a paid video would be lost: nothing is sent. Composition supplies the jobs only with saving.

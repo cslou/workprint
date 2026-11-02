@@ -86,7 +86,7 @@ export const generateImageTool = defineTool({
     return result.images.length > 1 ? `Saved ${result.images.length} images` : only?.label ? `Saved ${only.label}` : 'Saved 1 image';
   },
   // Shown only when the user asked for an image directly; a refusal shows none.
-  shownImages: (result: GenerateImageResult | { error: true }) => 'made' in result && result.made && result.showInChat ? result.images.map(image => image.versionId) : [],
+  shownMedia: (result: GenerateImageResult | { error: true }) => 'made' in result && result.made && result.showInChat ? result.images.map(image => ({ kind: 'image', versionId: image.versionId })) : [],
   execute: async (input, context): Promise<GenerateImageResult> => {
     const { scope, collaborators, signal } = context;
     // Without a way to save, a paid image would be lost: nothing is sent. Composition supplies the client only with saving.

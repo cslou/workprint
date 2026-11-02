@@ -13,18 +13,22 @@ import { useVersionMedia } from './reads.js';
 import './media.css';
 
 type Use = OperationResponse<'useVersion'>['use'];
-type Props = {
-  connection: BrowserClient;
-  scope: ReadScope | null;
-  version: Version;
-  caption: string;
-  trigger: ReactElement;
+/** Using the version for a Shot, offered under the clip. */
+type UseProps = {
   binding: { purpose: 'shot_video'; shotId: string };
   currentUse: Use | null;
   selectedVersionId: string | null;
   selectionRevision: number;
   onUsed(value: OperationResponse<'useVersion'>): void;
 };
+/** Without the use props, the viewer only plays the clip: a generated video has no Shot to use it for yet. */
+type Props = {
+  connection: BrowserClient;
+  scope: ReadScope | null;
+  version: Version;
+  caption: string;
+  trigger: ReactElement;
+} & (UseProps | { [Key in keyof UseProps]?: undefined });
 const copy = {
   loading: 'Loading this video…',
   unauthenticated: 'Sign-in required to load this video.',
@@ -43,11 +47,12 @@ export function SingleClipViewer(props: Props) {
     <ClipViewer {...props} />
   </ViewerDialog>;
 }
-function ClipViewer({ connection, scope, version, caption, binding, currentUse, selectedVersionId, selectionRevision, onUsed }: Props) {
+function ClipViewer(props: Props) {
+  const { connection, scope, version, caption } = props;
   return <div className="wp-clip-version" data-displayed-version-id={version.id}>
     <PrivateClip connection={connection} scope={scope} version={version} />
     <p>{caption}</p>
-    <VersionUse connection={connection} scope={scope} version={version} binding={binding} currentUse={currentUse} selectedVersionId={selectedVersionId} selectionRevision={selectionRevision} presentation="viewer" onUsed={onUsed} />
+    {props.binding ? <VersionUse connection={connection} scope={scope} version={version} binding={props.binding} currentUse={props.currentUse} selectedVersionId={props.selectedVersionId} selectionRevision={props.selectionRevision} presentation="viewer" onUsed={props.onUsed} /> : null}
   </div>;
 }
 /**
