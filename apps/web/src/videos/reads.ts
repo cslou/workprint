@@ -4,7 +4,6 @@ import type { OperationResponse } from '@workprint/contracts';
 import { useScopedRead, type ReadScope } from '../api/use-scoped-read.js';
 import { collectPages } from '../api/paged-read.js';
 export type GenerationRequest = OperationResponse<'generationRequest'>;
-export const unfinished = (request: GenerationRequest) => request.status === 'queued' || request.status === 'submitting' || request.status === 'running';
 /** A request's identity: its id, purpose and, for the variants that have them, batch, proposal and target. */
 export const requestIdentity = (request: GenerationRequest) => JSON.stringify(request.purpose === 'video' ? [request.id, request.purpose] : [request.id, request.batchId, request.proposalId, request.purpose, request.target]);
 export const sameRequest = (a: GenerationRequest, b: GenerationRequest) => requestIdentity(a) === requestIdentity(b);

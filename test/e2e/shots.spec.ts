@@ -38,3 +38,38 @@ test('a Shot video choice survives reload and can be changed to another exact ve
   await expect(chosen).toContainText('Version 1');
   expect(await persisted()).toEqual([['platform-shot', first.id], ['arrival-shot', null]]);
 });
+
+test('saved video jobs show their status after a reload, one unreadable card alone, and no Cancel', async ({ page, backend }) => {
+  const { prepareShotChoiceWork, saveInterruptedVideoJob } = await loadSupport<typeof ShotWork>('shot-choice-work');
+  const accounts = await backend.accounts(2);
+  const saved = await prepareShotChoiceWork(backend.setup(accounts));
+  const job = await saveInterruptedVideoJob(backend.setup(accounts), saved.accountId, saved.conversationId);
+  // Nothing saves Shot jobs yet (no batches or proposals in the MVP), so two join the real list here:
+  // one for a Shot in the storyboard and one for a Shot that isn't.
+  const listPath = `/v1/conversations/${saved.conversationId}/generation-requests`;
+  const shotJob = (id: string, shotId: string) => ({ id, batchId: 'batch-1', proposalId: 'proposal-1', purpose: 'shot_video', target: { shotId }, status: 'running', remote: {} });
+  await page.route(url => url.pathname === listPath, async route => {
+    const response = await route.fetch();
+    const body = await response.json() as { items: unknown[]; nextCursor: string | null };
+    await route.fulfill({ response, json: { ...body, items: [...body.items, shotJob('shot-job', 'platform-shot'), shotJob('lost-job', 'missing-shot')] } });
+  });
+  const cards = page.locator('.wp-request-card');
+  const check = async () => {
+    await page.getByRole('tab', { name: 'Videos', exact: true }).click();
+    await expect(cards).toHaveCount(3);
+    const video = page.locator(`.wp-request-card[data-request-id="${job.id}"]`);
+    await expect(video.locator('b')).toHaveText('Video request');
+    await expect(video.locator('.wp-status')).toHaveText('Interrupted');
+    await expect(video).toContainText('Stopped waiting. Ask the agent to resume it.');
+    const shot = page.locator('.wp-request-card[data-request-id="shot-job"]');
+    await expect(shot.locator('b')).toHaveText('Shot 1 · Video request');
+    await expect(shot.locator('.wp-status')).toHaveText('Running');
+    await expect(page.locator('.wp-request-card[data-request-id="lost-job"]')).toHaveText('This request can’t be shown');
+    await expect(page.getByText('This request can’t be shown')).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'Cancel request' })).toHaveCount(0);
+  };
+  await signIn(page, accounts[0]!, `/app?conversation=${saved.conversationId}`);
+  await check();
+  await page.reload();
+  await check();
+});

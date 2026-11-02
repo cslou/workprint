@@ -5,6 +5,7 @@ import { createOwnedConversationCheck } from '../../src/agent/index.js';
 import { createArtifactStore } from '../../src/artifacts/index.js';
 import { publishVersion } from '../../src/artifacts/publication.js';
 import { transaction } from '../../src/db/index.js';
+import { createGenerationJobs } from '../../src/generation/index.js';
 import { createNativeConversation } from './native-conversations.js';
 import type { SavedWorkSetup } from './auth-built-fixture.js';
 
@@ -34,5 +35,16 @@ export async function prepareShotChoiceWork({ accountIds, native, servingUrl }: 
     // Displayed candidates are draft Shot bindings; only an explicit human use chooses one.
     for (const version of candidates) await pool.query("INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state) VALUES($1,$2,$3,$4,$5,'shot_video','draft')", [accountId, conversation.id, randomUUID(), version.id, { purpose: 'shot_video', shotId: 'platform-shot' }]);
     return { accountId, foreignAccountId, conversationId: conversation.id, script, planning, candidates };
+  } finally { await pool.end(); }
+}
+
+/** A video job that waited on its MiniMax task until a Stop: saved through the job store, as the tool will. */
+export async function saveInterruptedVideoJob({ servingUrl }: Pick<SavedWorkSetup, 'servingUrl'>, accountId: string, conversationId: string) {
+  const pool = new Pool({ connectionString: servingUrl, max: 1, connectionTimeoutMillis: 1000, statement_timeout: 2000 });
+  try {
+    const jobs = createGenerationJobs(pool);
+    const job = await jobs.begin(accountId, conversationId, { prompt: 'A slow push-in on the platform', inputs: [] });
+    await jobs.started(accountId, job.id, '459000874041694');
+    return await jobs.interrupted(accountId, job.id);
   } finally { await pool.end(); }
 }
