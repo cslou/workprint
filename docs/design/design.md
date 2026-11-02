@@ -418,6 +418,7 @@ Inert previews: [`chat-states/`](chat-states/index.html) at 1440 and 390 (Sprint
 
 | State | Where | Copy | Actions |
 | --- | --- | --- | --- |
+| Reply pending (added 2026-11-02 at Lou's request; not in the previews) | Where the reply will appear: after your message until its first text, and again after a finished tool line until more text arrives | None: a 10px `--color-action-primary-bg` dot that grows and shrinks (`--duration-pulse`), static under reduced motion. Hidden from screen readers; the chat box's "Working…" announces the state | — |
 | Reply failed | Under the reply, after any text that streamed | "Something went wrong and this reply didn’t finish." | **Retry**, once: it sends the same message again |
 | Reply interrupted | Under the reply | "This reply was interrupted." | **Retry**, once |
 | Reply stopped | Under the reply, after **Stop**, once the server acknowledged the Stop and the reply ended interrupted | "Stopped." | **Retry**, once |
@@ -429,6 +430,8 @@ Inert previews: [`chat-states/`](chat-states/index.html) at 1440 and 390 (Sprint
 | Too long | Under the chat box; Send is unavailable | "Messages can be up to 32 KB. Shorten this one to send it." | — |
 
 Copy never says a message was delivered, or a reply stopped, when that is unknown, and never claims the provider stopped work or charges. Closing the page or switching video stops watching only; it never sends a Stop. Saved history shows a failed or interrupted reply as its plain text, without the notice.
+
+The conversation follows the newest text while you are at its end, within about one line. Any scroll up, even less than a line, stops following, so text arriving below leaves your place alone. Returning to the end, sending a message or opening a conversation resumes it. **Load earlier messages** keeps your place. On narrow screens (820px and below) the whole page scrolls, and the page does not follow.
 
 ### Question card
 

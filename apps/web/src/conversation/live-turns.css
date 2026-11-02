@@ -2,3 +2,8 @@
 .wp-turn-notice p { margin: 0; }
 .wp-saved-assistant p + .wp-turn-notice { margin-top: var(--space-12); }
 .wp-turn-notice .wp-button-secondary { height: var(--size-control-md); border-color: var(--color-border-strong); background: var(--color-bg-surface); color: var(--color-text-primary); }
+.wp-reply-pending { display: flex; align-items: center; min-height: calc(var(--font-size-14) * var(--font-line-height-1-5)); }
+.wp-pending-dot { display: block; width: var(--space-10); height: var(--space-10); border-radius: var(--radius-pill); background: var(--color-action-primary-bg); animation: wp-pending-grow var(--duration-pulse) ease-in-out infinite; }
+.wp-saved-assistant > .wp-pending-dot { margin-top: var(--space-10); }
+@keyframes wp-pending-grow { 0%, 100% { transform: scale(.6); } 50% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .wp-pending-dot { animation: none; } }

@@ -4,6 +4,7 @@ import type { NativeThread } from '@workprint/api-client';
 import { Button } from '../ui/controls.js';
 import { SkeletonLines, SkeletonRows, usePlaceholder } from '../ui/skeleton.js';
 import { ActivityLine } from '../conversation/activity-line.js';
+import { useFollowBottom } from './follow-bottom.js';
 import { HistoryScroll } from './history-scroll.js';
 import type { HistoryState, NativeNavigationState } from './use-native-navigation.js';
 import { Welcome } from './welcome.js';
@@ -30,9 +31,10 @@ export function Recents({ navigation, embedded = false, onActivate = () => {} }:
     </>}
   </div>;
 }
-/** `live` holds turns sent from this page, shown after the saved messages. */
-export function NativeHistory({ state, navigation, live = null }: { state: HistoryState; navigation: NativeNavigationState; live?: ReactNode }) {
+/** `live` holds turns sent from this page, shown after the saved messages; a change of `follow` (a new send) returns the thread to its newest text. */
+export function NativeHistory({ state, navigation, live = null, follow = 0 }: { state: HistoryState; navigation: NativeNavigationState; live?: ReactNode; follow?: number }) {
   const title = useRef<HTMLHeadingElement>(null), scroller = useRef<HTMLDivElement>(null);
+  const unfollow = useFollowBottom(scroller, `${state.id}:${follow}`);
   // History only delays its placeholder: holding it after resolution would also hold the opening/thread layout.
   const placeholder = usePlaceholder(state.kind === 'loading', 0);
   useEffect(() => {
@@ -40,7 +42,8 @@ export function NativeHistory({ state, navigation, live = null }: { state: Histo
     const frame = requestAnimationFrame(() => { if (!document.querySelector('[role="dialog"]')) title.current?.focus(); });
     return () => cancelAnimationFrame(frame);
   }, [state.id, state.kind]);
-  const earlier = () => { void navigation.earlier(); };
+  // Earlier messages land above the reader, and HistoryScroll keeps their place.
+  const earlier = () => { unfollow(); void navigation.earlier(); };
   return <>
     {/* The title is not shown visually; it remains the focus and announcement target for an opened conversation. */}
     {state.kind !== 'unavailable' && <h1 ref={title} tabIndex={-1} className="wp-sr-only">{state.kind === 'loading' && !state.thread ? 'Loading conversation' : threadTitle(state.thread)}</h1>}
