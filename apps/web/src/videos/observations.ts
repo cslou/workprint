@@ -4,14 +4,15 @@ const statusOrder = (request: GenerationRequest) => {
   switch (request.status) {
     case 'queued': return 0;
     case 'submitting': return 1;
-    case 'running':
-    case 'interrupted': return 2;
-    default: return 3;
+    case 'running': return 2;
+    case 'interrupted': return 3;
+    default: return 4;
   }
 };
 /**
  * A saved video job carries its revision, so the later read wins, including a move back from `interrupted`
- * to `running` on resume. Other requests have none: accept forward states, never rank terminal outcomes.
+ * to `running` on resume. Other requests have none: accept forward states, never rank terminal outcomes. Without a
+ * revision a Stop is shown but a resume isn't; only video jobs resume, and they carry one.
  */
 export function newerRequest(known: GenerationRequest, observed: GenerationRequest) {
   if (!sameRequest(known, observed)) return known;

@@ -58,5 +58,6 @@ test('a saved video job shows its later read, back and forth between waiting and
   assert.deepEqual(shown([job('running', 4)], job('interrupted', 3)), ['running'], 'an older read never replaces a newer one');
   const shot: Request = { id: 'g', batchId: 'b', proposalId: 'p', purpose: 'shot_video', target: { shotId: 's' }, status: 'running', remote: {} };
   assert.deepEqual(shown([{ ...shot, status: 'succeeded' }], shot), ['succeeded'], 'other requests still only move forward');
+  assert.deepEqual(shown([shot], { ...shot, status: 'interrupted' }), ['interrupted'], 'a Stop is shown without a revision');
   assert.deepEqual(shown([{ ...shot, status: 'interrupted' }], { ...shot, status: 'failed', failureReason: 'provider_error' }), ['failed'], 'an interrupted request still reaches its outcome');
 });
