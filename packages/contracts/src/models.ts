@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { shotFields } from './shot-fields.js';
 
 export const idSchema = z.string().min(1).max(200);
 export const revisionSchema = z.number().int().nonnegative();
@@ -48,7 +49,7 @@ export const exportSchema = z.strictObject({ id: idSchema, status: z.enum(['queu
 const work = z.strictObject({ version: versionSchema, use: useSchema.nullable(), state: z.enum(['Draft', 'Ready']), subjectId: idSchema.optional() });
 const panel = z.strictObject({ panelId: idSchema, order, description: z.string(), references: z.array(idSchema), candidateImageVersions: z.array(versionSchema), approvedImageVersionId: idSchema.nullable() });
 // Additive: exact owned videos bound to this Shot (uploads or earlier choices). Absence means none were projected.
-const shot = z.strictObject({ shotId: idSchema, order, intent: z.string().optional(), panels: z.array(panel), chosenVideoVersionId: idSchema.nullable(), candidateVideoVersions: z.array(versionSchema).optional() });
+const shot = z.strictObject({ shotId: idSchema, order, intent: z.string().optional(), ...shotFields, panels: z.array(panel), chosenVideoVersionId: idSchema.nullable(), candidateVideoVersions: z.array(versionSchema).optional() });
 // Additive: the clips the assistant made for this video, as its `video` uses. Absence means none were projected.
 const clip = z.strictObject({ version: versionSchema, use: clipUseSchema, state: z.literal('Draft') });
 export const workspaceSchema = z.strictObject({ script: work.nullable(), assets: z.array(work), generatedVideos: z.array(clip).optional(), storyboard: z.strictObject({ work: work.nullable(), shots: z.array(shot) }), videos: z.array(generationRequestSchema), pendingQuestion: questionSchema.nullable(), activeWork: z.array(z.strictObject({ type: z.enum(['generation', 'export']), id: idSchema, status: z.string().min(1) })), selectionRevision: revisionSchema });

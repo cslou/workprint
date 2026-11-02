@@ -46,3 +46,27 @@ test('stored planning keeps stable Shot and Panel identities with unique orders 
   ]) assert.throws(() => parseContent('storyboard', value));
   assert.throws(() => parseContent('image', {}), /./, 'Media publication belongs to the later verified-upload boundary');
 });
+
+test('an assistant storyboard\'s Shot fields parse, an old storyboard without them still parses, and their bounds hold', () => {
+  const panel = { panelId: 'panel-one', order: 0, description: 'Mara at the door.', references: [] };
+  const reference = (subjectId: string) => ({ subjectId, role: 'composition', purpose: 'Keep the doorway.' });
+  const shot = { shotId: 'shot-one', order: 0, intent: 'Mara arrives', framing: 'wide', action: 'Mara steps in out of the rain.', cameraNote: 'Slow push in.',
+    dialogue: [{ character: 'Mara', text: 'Anyone here?' }, { character: 'Narrator', text: 'It was late.', delivery: 'voice_over' }],
+    references: [{ subjectId: 'mara', role: 'identity', purpose: 'Her face and coat.' }, { subjectId: 'the-gallery', role: 'environment', purpose: 'The room.' }], panels: [panel] };
+  const plan = { schemaVersion: 1, sourceScriptVersionId: 'script-v1', shots: [shot] };
+  assert.deepEqual(parseContent('storyboard', plan), plan);
+  const old = { schemaVersion: 1, sourceScriptVersionId: 'script-v1', shots: [{ shotId: 'shot-one', order: 0, intent: 'Mara arrives', panels: [panel] }] };
+  assert.deepEqual(parseContent('storyboard', old), old);
+  for (const value of [
+    { ...plan, shots: [{ ...shot, framing: 'x'.repeat(81) }] },
+    { ...plan, shots: [{ ...shot, references: Array.from({ length: 11 }, (_, n) => reference(`subject-${n}`)) }] },
+    { ...plan, shots: [{ ...shot, references: [reference('mara'), reference('mara')] }] },
+    { ...plan, shots: [{ ...shot, references: [{ ...reference('mara'), purpose: 'x'.repeat(121) }] }] },
+    { ...plan, shots: [{ ...shot, references: [{ ...reference('mara'), role: 'lighting' }] }] },
+    { ...plan, shots: [{ ...shot, action: 'x'.repeat(2001) }] },
+    { ...plan, shots: [{ ...shot, dialogue: Array.from({ length: 21 }, () => ({ character: 'Mara', text: 'Again.' })) }] },
+  ]) assert.throws(() => parseContent('storyboard', value));
+  const ten = parseContent('storyboard', { ...plan, shots: [{ ...shot, references: Array.from({ length: 10 }, (_, n) => reference(`subject-${n}`)) }] });
+  assert.ok('shots' in ten);
+  assert.equal(ten.shots[0]!.references!.length, 10);
+});
