@@ -177,7 +177,7 @@ Three stories is deliberate (Lou, 2026-11-02): the earlier "assistant script sav
     - **Stale base:** a base id that is an earlier owned version creates no new version, leaves the use unchanged, and the tool result says stale. The line ends done with "Not saved: the script changed".
     - **Foreign base:** a base id owned by another account or another video returns not-found, with no new version and the use unchanged. The line ends done with "Not saved: script not found".
     - **Invalid content:** no write, a tool error the model can read, and the line ends done with "Not saved: the script isn't valid".
-    - **Scope:** the chat route already rejects another account's video, so this case calls `saveAssistantScript` directly with a scope for a missing video, and with a scope for a video of the same account other than the base's. Pass: not-found, with zero new versions and no use change.
+    - **Scope:** the chat route already rejects another account's video, so this case calls `saveAssistantScript` directly with a scope for a missing video, and with a scope for a video of the same account other than the base's. Pass: not-found, with zero new versions and no use change. (Corrected by PR #82: not-found applies once the target video has a script. On a video with no script, a first save ignores the base and saves v1 without touching the base's video. See the Story 2 deviations.)
     - **Concurrent first saves:** two parallel `saveAssistantScript(..., null)` calls give exactly one artifact and one use, and the other call returns stale.
     - Pass: every case asserts the version count and the use's version id and state.
 - **Regression verification:**
@@ -322,12 +322,16 @@ For descriptive-only work, use editorial review and applicable existing checks. 
     - No selection-revision bump: the plan's assumption was wrong.
   - **Story 3:**
     - Own effects are ordered by a refresh count, not `selectionRevision`.
-    - A re-read waits while an editor is open, so Version history lists v2 during the edit and v1 after it closes.
+    - A re-read waits while an editor is open, so Version history lists v2 during the edit and v1 after it closes. The wait uses the shell-wide draft guard, the same one deferred uses already rely on, so an editor open in any tab (Assets or Storyboard too) holds the Script tab's re-read until it closes.
+    - A re-read that fails for any reason except a not-found base is ignored on a first save, which ignores the base anyway (sprint PR review).
     - One re-read follows each confirmed use.
     - A failed background re-read keeps the shown value, except when the session has ended.
 - **For Lou to confirm in QA:**
-  - Waiting while the editor is open changes the approved Story 3 journey wording: Version history shows v2 during an open edit.
+  - Waiting while the editor is open changes the approved Story 3 journey wording: Version history shows v2 during an open edit. An editor open in another tab also holds the Script tab's update until it closes. Scoping the hold to each tab comes with the other tabs' saving tools (B-024 note).
   - An agent rewrite replaces an approved script as a draft (the SC2 exception). Reverting is Version history → "Use this version".
-- **Accepted P2s:** Story 3 tests the hook wiring only through pure helpers and the browser journey. There is no React renderer test.
+- **Accepted P2s:**
+  - Story 3 tests the hook wiring only through pure helpers and the browser journey. There is no React renderer test.
+  - The 100-use limit's "unavailable" mapping is a one-line change with no test (sprint PR review).
+  - The shell-wide hold described above.
 - **Unresolved:** none blocking. Audit advisories B-004 and B-008 remain non-pass and gate shared or public deployment only.
 - **New Dependencies:** None.

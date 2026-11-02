@@ -30,9 +30,11 @@ export function createAssistantScripts(pool: Pool, checkOwnedConversation: Owned
       let content: ReturnType<typeof parseContent>;
       try { content = parseContent('script', input.content); } catch { throw new ArtifactError('invalid_input'); }
       // Native ownership of the base is checked outside SQL. A foreign, missing or malformed id resolves to
-      // nothing, which is not found only when the video has a script to protect.
+      // nothing, which is not found only when the video has a script to protect. Any other lookup failure
+      // matters only then too: a first save ignores the base.
+      let lookupFailure: unknown;
       const base = input.baseVersionId === null || !idSchema.safeParse(input.baseVersionId).success ? null
-        : await reads.version(account, input.baseVersionId).catch((error: unknown) => { if (error instanceof ArtifactError && error.code === 'not_found') return null; throw error; });
+        : await reads.version(account, input.baseVersionId).catch((error: unknown) => { if (!(error instanceof ArtifactError && error.code === 'not_found')) lookupFailure = error; return null; });
 
       return transaction(pool, async client => {
         // The owner lock serializes this account's publishers, so two first saves cannot both create a script.
@@ -42,6 +44,7 @@ export function createAssistantScripts(pool: Pool, checkOwnedConversation: Owned
           WHERE u.owner_id=$1 AND u.conversation_id=$2 AND u.purpose='script' FOR UPDATE OF u`, [account, conversation])).rows[0];
         if (current) {
           if (input.baseVersionId === null) throw new ArtifactError('stale_revision');
+          if (lookupFailure) throw lookupFailure;
           if (!base || base.kind !== 'script' || current.artifact_id !== base.artifactId) throw new ArtifactError('not_found');
           if (current.version_id !== base.id) throw new ArtifactError('stale_revision');
         }

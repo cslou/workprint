@@ -173,9 +173,11 @@ test('update-script saves the video\'s current script as a draft, and never over
   const current = async (video: string) => { const work = (await store.workspace(owner.id, video)).script; return [work?.version.id, work?.use?.versionId, work?.use?.state]; };
 
   await t.test('a video with no script gets version 1, created by the assistant and used as a draft', async () => {
+    const revision = (await store.workspace(owner.id, video)).selectionRevision;
     const { turn, lines, result } = await updateScript(owner, video, { baseVersionId: null, script: script('Mara swims across the lake.') });
     assert.ok('saved' in result && result.saved, JSON.stringify(result));
     assert.equal(result.version, 1); first = result.versionId;
+    assert.equal((await store.workspace(owner.id, video)).selectionRevision, revision, 'a script save is not a selection change');
     assert.deepEqual(lines, [['Updating the script…', 'running', undefined], ['Updating the script…', 'done', 'Saved version 1']]);
     assert.ok(!JSON.stringify(turn.chunks).includes('Mara swims'), 'no script text leaves the server');
     const workspace = await store.workspace(owner.id, video);
@@ -184,8 +186,9 @@ test('update-script saves the video\'s current script as a draft, and never over
   });
 
   await t.test('the next save on the current version becomes version 2 and moves the same use', async () => {
-    const before = (await store.workspace(owner.id, video)).script!.use!.id;
+    const prior = await store.workspace(owner.id, video), before = prior.script!.use!.id;
     const { lines, result } = await updateScript(owner, video, { baseVersionId: first, script: script('Mara swims faster.') });
+    assert.equal((await store.workspace(owner.id, video)).selectionRevision, prior.selectionRevision);
     assert.ok('saved' in result && result.saved, JSON.stringify(result));
     assert.equal(result.version, 2); second = result.versionId;
     assert.deepEqual(lines.at(-1), ['Updating the script…', 'done', 'Saved version 2']);
@@ -230,6 +233,8 @@ test('update-script saves the video\'s current script as a draft, and never over
     const { lines, result } = await updateScript(owner, video, { baseVersionId: second, script: script('Mara waves.', 'Nobody') });
     assert.ok('error' in result, JSON.stringify(result));
     assert.deepEqual(lines.at(-1), ['Updating the script…', 'done', 'Not saved: the script isn’t valid']);
+    // The domain refuses on its own too, for a caller that skips the tool's input schema.
+    assert.deepEqual(await saveScript(owner.id, video, { baseVersionId: second, content: script('Mara waves.', 'Nobody') }), { kind: 'invalid' });
     assert.equal(await versions(owner.id, video), 2); assert.deepEqual(await current(video), [second, second, 'draft']);
   });
 
