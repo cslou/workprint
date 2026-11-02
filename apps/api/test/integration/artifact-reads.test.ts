@@ -31,7 +31,7 @@ describe('owned artifact persistence and reads', { timeout: 120000 }, () => {
   after(async () => { await native?.close(); await serving?.close(); if (pool && !pool.ended) await pool.end(); await db?.close(); });
 
   test('a new conversation has an empty workspace', async () => {
-    assert.deepEqual(await store.workspace('account-a', conversation), { script: null, assets: [], storyboard: { work: null, shots: [] }, videos: [], pendingQuestion: null, activeWork: [], selectionRevision: 0 });
+    assert.deepEqual(await store.workspace('account-a', conversation), { script: null, assets: [], generatedVideos: [], storyboard: { work: null, shots: [] }, videos: [], pendingQuestion: null, activeWork: [], selectionRevision: 0 });
   });
 
   test('versions keep their revision, dependencies and content', async () => {
