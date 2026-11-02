@@ -127,7 +127,7 @@ test('every outcome has its line and a message the model can follow', async () =
     ['not_in_script', { save: { kind: 'not_in_script' } }, input(), 'Not saved: the subject left the script; views kept', /no longer in the script/],
     ['not_in_script', { save: { kind: 'no_script' } }, input(), 'Not saved: the subject left the script; views kept', /no longer in the script/],
     ['unrevisable', { sheets: [{ ...base, views: base.views.slice(0, 2), names: ['x'.repeat(81), 'Side'] }] }, input(), 'Not made: Mara’s sheet can’t be changed here', /rename that view in Assets/],
-    ['in_other_sheet', { sheets: [{ ...base, views: [image] }, { id: randomUUID(), subject: 'the-key', views: [image] }] }, input(), 'Not made: that image is already in The key’s sheet', /in one sheet only/],
+    ['in_other_sheet', { sheets: [{ ...base, views: [image] }, { id: randomUUID(), subject: 'the-key', views: [image] }] }, input(), 'Not made: that image is already in The key’s sheet', /remove it from one sheet in Assets/],
     ['in_other_sheet', { sheets: [{ ...base, views: [image] }, { id: randomUUID(), subject: 'the-key', views: [image] }] }, input({ views: views('View 1') }), 'Not made: that image is already in The key’s sheet', /in one sheet only/],
     ['checks', { saves: ['refused'] }, input(), 'Not saved: the image didn’t pass checks', /did not pass the media checks.*No sheet was saved/],
     ['not_saved', { saves: ['unavailable'] }, input(), 'Not saved: the image couldn’t be stored', /saving is unavailable.*No sheet was saved/],
