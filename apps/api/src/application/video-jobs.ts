@@ -105,8 +105,9 @@ export function createVideoJobs(collaborators: VideoJobCollaborators) {
     if (signal.aborted) return stopped(account, jobId, control);
     if (saved.kind === 'refused') return refused(account, jobId);
     // Unavailable, or a frame this video no longer uses (the user can use it again): the job stays resumable.
+    // A job with no frames has none to restore, so its not-found reads as a plain stop.
     await jobs.interrupted(account, jobId);
-    return saved.kind === 'not_found' ? { kind: 'interrupted', jobId, cause: 'frame_unused' } : { kind: 'interrupted', jobId };
+    return saved.kind === 'not_found' && frames.length ? { kind: 'interrupted', jobId, cause: 'frame_unused' } : { kind: 'interrupted', jobId };
   }
 
   /**

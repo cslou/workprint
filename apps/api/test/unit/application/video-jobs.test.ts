@@ -146,7 +146,11 @@ test('a download that finishes after Stop saves nothing; only a clip too large f
     assert.deepEqual([...run.jobs.rows.values()].map(job => [job.status, job.failureReason]), [[status, status === 'failed' ? 'check_refused' : undefined]]);
   }
   const [job] = unframed.jobs.rows.values();
-  assert.deepEqual(await unframed.runner.resume(account, video, job!.id, control()), { kind: 'interrupted', jobId: job!.id, cause: 'frame_unused' });
+  // Without frames there is nothing to use again: a plain stop.
+  assert.deepEqual(await unframed.runner.resume(account, video, job!.id, control()), { kind: 'interrupted', jobId: job!.id });
+  const framed = harness({ frames: { kind: 'read', images: [frame()] }, save: 'not_found' });
+  const outcome = await framed.runner.start(account, video, { ...input, firstFrame: randomUUID() }, control());
+  assert.deepEqual(outcome, { kind: 'interrupted', jobId: [...framed.jobs.rows.keys()][0], cause: 'frame_unused' });
 });
 
 test('a resume that lost the race to a finished resume reads the saved clip', async () => {
