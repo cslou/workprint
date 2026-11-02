@@ -1,4 +1,4 @@
-import { workspaceMediaLabels } from '@workprint/contracts';
+import { mediaVersionName, workspaceMediaLabels } from '@workprint/contracts';
 import type { OwnedWorkspace } from '../application/index.js';
 
 type Version = OwnedWorkspace['assets'][number]['version'];
@@ -55,9 +55,9 @@ export function workspaceEntries(workspace: OwnedWorkspace): Entry[] {
     const { version } = asset;
     // Uploaded and made media keep no filename, so they are named by kind and order (the shared rule).
     const subject = 'content' in version && version.kind === 'reference' ? strings(record(record(version.content).subject).name) : '';
-    add({ name: `${subject ? clip(subject, 80) : labels.get(version.artifactId)} · ${revision(version)}`, use: 'reference', state: asset.state, version });
+    add({ name: subject ? `${clip(subject, 80)} · ${revision(version)}` : mediaVersionName(labels, version), use: 'reference', state: asset.state, version });
   }
-  for (const made of clips) add({ name: `${labels.get(made.version.artifactId)} · ${revision(made.version)}`, use: 'generated video', state: made.state, version: made.version });
+  for (const made of clips) add({ name: mediaVersionName(labels, made.version), use: 'generated video', state: made.state, version: made.version });
   if (workspace.storyboard.work) add({ name: `Storyboard · ${revision(workspace.storyboard.work.version)}`, use: 'storyboard', state: workspace.storyboard.work.state, version: workspace.storyboard.work.version });
   [...workspace.storyboard.shots].sort((a, b) => a.order - b.order).forEach((shot, shotIndex) => {
     const shotNumber = shotIndex + 1;
