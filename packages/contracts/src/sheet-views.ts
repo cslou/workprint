@@ -1,5 +1,5 @@
-import { savedReferenceContentSchema, savedScriptContentSchema } from './saved-content.js';
-import { scriptSubjects } from './script-subjects.js';
+import { savedReferenceContentSchema } from './saved-content.js';
+import { currentSubjects } from './script-subjects.js';
 
 type VersionLike = Readonly<{ id: string; artifactId: string; kind: string; content?: unknown }>;
 type WorkspaceLike = Readonly<{ script: Readonly<{ version: VersionLike }> | null; assets: readonly Readonly<{ version: VersionLike }>[] }>;
@@ -11,8 +11,7 @@ export type SheetViewName = Readonly<{ sheetArtifactId: string; sheetVersionId: 
 
 /** The video's current sheets in workspace order. A sheet whose content doesn't parse is not a sheet. */
 export function currentSheets(workspace: WorkspaceLike): CurrentSheet[] {
-  const script = workspace.script && 'content' in workspace.script.version ? savedScriptContentSchema.safeParse(workspace.script.version.content) : null;
-  const names = new Map((script?.success ? scriptSubjects(script.data) : []).map(subject => [subject.id, subject.name]));
+  const names = new Map(currentSubjects(workspace).map(subject => [subject.id, subject.name]));
   return workspace.assets.flatMap(({ version }) => {
     if (version.kind !== 'reference' || !('content' in version)) return [];
     const sheet = savedReferenceContentSchema.safeParse(version.content);

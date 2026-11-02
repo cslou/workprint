@@ -24,7 +24,7 @@ function harness(meta: () => Promise<ImageResult>, outcomes: (GeneratedImageOutc
       const kind = outcomes[calls.saves++] ?? 'saved';
       if (kind !== 'saved') return { kind };
       const versionId = randomUUID(); saved.push(versionId);
-      return { kind, versionId, width: 64, height: 48 };
+      return { kind, versionId, width: 64, height: 48, subjectLeft: false };
     },
     images: { generate: async () => { calls.meta++; return meta(); }, edit: async () => { calls.meta++; return meta(); } },
   };
@@ -112,4 +112,33 @@ test('revises reaches the save only for one image made from that very image', as
   await run(recording, { inputImages: [id], revises: 'null', count: 1 });
   await run(recording, { inputImages: [id], revises: id, count: 2 });
   assert.deepEqual(revises, [id, undefined, undefined, undefined, undefined, undefined]);
+});
+
+test('subject: empty or "null" files nothing; one not in the script is refused before Meta; one that left meanwhile is noted', async () => {
+  const subjects: (string | undefined)[] = [];
+  const { collaborators, calls } = harness(async () => images(1));
+  const script = { version: { id: randomUUID(), artifactId: randomUUID(), kind: 'script', revision: 1, content: { schemaVersion: 1, subjects: [{ id: 'mara', kind: 'character', name: 'Mara' }],
+    scenes: [{ heading: { setting: 'interior', location: 'The Gallery', time: 'night' }, characters: ['Mara'], script: [{ action: 'She waits.' }] }] } } };
+  let left = false;
+  const scripted: AgentCollaborators = { ...collaborators,
+    readWorkspace: async () => ({ kind: 'found', workspace: { ...workspace([]), script } as unknown as OwnedWorkspace }),
+    saveGeneratedImage: async (account, video, input, signal) => {
+      subjects.push(input.subject);
+      const outcome = await collaborators.saveGeneratedImage(account, video, input, signal);
+      return outcome.kind === 'saved' ? { ...outcome, subjectLeft: left } : outcome;
+    } };
+  for (const subject of ['', '  ', 'null', ' NULL ']) assert.equal((await run(scripted, { subject }) as { made: boolean }).made, true);
+  assert.equal((await run(scripted, { subject: ' mara ' }) as { note?: string }).note, undefined);
+  assert.deepEqual(subjects, [undefined, undefined, undefined, undefined, 'mara']);
+  const before = calls.meta;
+  const refused = await run(scripted, { subject: 'ben' }) as { made: false; message: string };
+  assert.equal(line({}, refused)?.summary, 'Not made: that subject isn’t in the script'); assert.match(refused.message, /add it to the script first/);
+  assert.equal(calls.meta, before, 'nothing is sent for a subject the script lacks');
+  // Without a readable workspace the subject can't be checked, so nothing is sent.
+  const unread = await run({ ...scripted, readWorkspace: async () => ({ kind: 'unavailable' }) }, { subject: 'mara' }) as { made: false; reason: string };
+  assert.equal(unread.reason, 'unavailable'); assert.equal(calls.meta, before);
+  // The subject was removed from the script while Meta worked: the save files it under Other and the result says so.
+  left = true;
+  const saved = await run(scripted, { subject: 'mara' }) as { made: true; note?: string };
+  assert.equal(saved.made, true); assert.equal(saved.note, 'Saved under Other: that subject is no longer in the script.');
 });

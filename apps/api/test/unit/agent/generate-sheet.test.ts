@@ -26,7 +26,7 @@ const workspace = (images: string[], sheets: (Sheet & { id: string })[], withScr
 type Options = { saves?: ('refused' | 'unavailable')[]; images?: string[]; sheets?: (Sheet & { id: string })[]; script?: boolean; room?: number; save?: AssistantSheetOutcome; meta?: (call: number) => Promise<ImageResult>; noClient?: boolean; unreadable?: boolean };
 /** Fake collaborators over one video: Meta answers each call with `meta`, and the sheet save answers `save`. */
 function harness(options: Options = {}) {
-  const images = [...(options.images ?? [])], calls = { generate: 0, edit: 0, saves: [] as unknown[], edits: [] as string[], inputs: [] as string[][] };
+  const images = [...(options.images ?? [])], calls = { generate: 0, edit: 0, saves: [] as unknown[], edits: [] as string[], inputs: [] as string[][], subjects: [] as (string | undefined)[] };
   const failing = [...(options.saves ?? [])];
   const meta = options.meta ?? (async () => ({ images: [png], requestId: null, usage: null }));
   const collaborators: AgentCollaborators = {
@@ -36,8 +36,8 @@ function harness(options: Options = {}) {
     saveGeneratedImage: async (_account, _video, image) => {
       const kind = failing.shift();
       if (kind) return { kind };
-      const versionId = randomUUID(); images.push(versionId); calls.inputs.push([...image.inputs]);
-      return { kind: 'saved', versionId, width: 64, height: 48 };
+      const versionId = randomUUID(); images.push(versionId); calls.inputs.push([...image.inputs]); calls.subjects.push(image.subject);
+      return { kind: 'saved', versionId, width: 64, height: 48, subjectLeft: false };
     },
     sheets: {
       save: async (_account, _video, input) => { calls.saves.push(input); return options.save ?? { kind: 'saved', versionId: randomUUID(), revision: 1, subjectName: 'Mara' }; },
@@ -64,6 +64,7 @@ test('"null" means no identity and no image: the view is made from its prompt al
   const result = await run(collaborators, input({ identity: 'null', views: [{ view: 'Front', prompt: 'Standing', image: ' null ' }] }));
   assert.equal(result.made, true, JSON.stringify(result));
   assert.deepEqual([calls.generate, calls.edit], [1, 0]);
+  assert.deepEqual(calls.subjects, ['mara'], 'a made view is filed under its subject');
   // The model is offered no nullable field.
   assert.ok(!JSON.stringify(z.toJSONSchema(tool.inputSchema)).includes('"null"'));
 });

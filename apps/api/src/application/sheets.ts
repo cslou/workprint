@@ -3,6 +3,7 @@ import { maxSheetViewName, maxSheetViews, usedImageVersions } from '../artifacts
 import { MetaImageError, type MetaImageClient } from '../generation/index.js';
 import type { AssistantSheets } from './assistant-references.js';
 import { metaImageFailure, saveFailure, type ImageFailure, type ReadImageInputs, type SaveGeneratedImage } from './generated-images.js';
+import { optionalId } from './optional-id.js';
 import type { ReadOwnedWorkspace } from './workspace-reads.js';
 
 /** One view to put in a sheet: an existing image (`image`) or one made from `prompt`. Empty means none. */
@@ -34,9 +35,6 @@ export type SheetMakers = Readonly<{
 export const sheetViewCap = maxSheetViews;
 /** The longest view name the sheet save takes. */
 export const sheetViewNameCap = maxSheetViewName;
-
-/** An optional id: empty, whitespace or "null" means none. */
-const none = (value: string) => { const trimmed = value.trim(); return trimmed.toLowerCase() === 'null' ? '' : trimmed; };
 
 /** What a made view keeps from its identity image, by the subject's kind. */
 const keepLines: Readonly<Record<ScriptSubject['kind'], string>> = {
@@ -84,7 +82,7 @@ async function resolve(makers: SheetMakers, accountId: string, videoId: string, 
  * no name, neither an image nor a prompt, shares a name with another, or repeats an image.
  */
 function plan(base: Sheet | undefined, views: readonly SheetViewRequest[]): Planned[] | undefined {
-  const given = views.map(view => ({ ...view, view: view.view.trim(), image: none(view.image) }));
+  const given = views.map(view => ({ ...view, view: view.view.trim(), image: optionalId(view.image) }));
   if (given.some(view => !view.view || (!view.image && !view.prompt.trim())) || new Set(given.map(view => subjectNameKey(view.view))).size !== given.length) return undefined;
   const planned: Planned[] = (base?.views ?? []).map(reference => ({ view: reference.view, notes: [...reference.notes], versionId: reference.versionId }));
   for (const view of given) {
@@ -117,7 +115,7 @@ export async function makeSheet(makers: SheetMakers, accountId: string, videoId:
   if (planned.some(item => item.view.trim().length > sheetViewNameCap)) return { kind: 'unrevisable', subjectName: subject.name };
 
   // Existing images must be ones the video uses, and each is in one sheet only.
-  const used = usedImageVersions(workspace), identity = none(request.identity);
+  const used = usedImageVersions(workspace), identity = optionalId(request.identity);
   const placed = planned.flatMap(item => item.versionId && !current?.views.some(reference => reference.versionId === item.versionId) ? [item.versionId] : []);
   if ([identity, ...placed].some(id => id && !used.has(id))) return { kind: 'refused', reason: 'image_not_found' };
   // Every view's image, kept ones too, is in this sheet only: people's sheets can share an image.
@@ -154,7 +152,7 @@ export async function makeSheet(makers: SheetMakers, accountId: string, videoId:
       signal.throwIfAborted();
       if (!image) failure = { reason: 'unavailable' };
       else {
-        const saved = await makers.saveGeneratedImage(accountId, videoId, { bytes: image.bytes, contentType: image.contentType, inputs: input ? [input.versionId] : [] }, signal);
+        const saved = await makers.saveGeneratedImage(accountId, videoId, { bytes: image.bytes, contentType: image.contentType, inputs: input ? [input.versionId] : [], subject: subject.id }, signal);
         signal.throwIfAborted();
         if (saved.kind === 'saved') {
           item.versionId = saved.versionId;

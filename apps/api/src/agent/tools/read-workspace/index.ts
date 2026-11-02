@@ -17,7 +17,7 @@ export const readWorkspaceTool = defineTool({
     'Read the saved work in this video: the script, references and uploaded images, the storyboard and shot versions.',
     'Call it with no arguments for a compact list of every exact version, with its name, kind, versionId, use, state and short text.',
     'Pass a versionId from that list to read that one item in full.',
-    'The list also gives subjects: the characters, places and props the script names, each with the id that update-script keeps, and its sheet\'s versionId and views when it has one (pass a sheet\'s versionId to read its views when they are left out). A sheet\'s images are listed under its subject, not again as items; pass a view\'s versionId to read that image.',
+    'The list also gives subjects: the characters, places and props the script names, each with the id that update-script keeps, and its sheet\'s versionId and views when it has one (pass a sheet\'s versionId to read its views when they are left out). A sheet\'s images are listed under its subject, not again as items; pass a view\'s versionId to read that image. An image filed under a subject has its subjectId.',
     'The list also gives stoppedVideos: videos that stopped waiting, newest first, each with the jobId to pass as generate-video resume when the user asks to continue one and the image versionIds it started from (frames).',
   ].join(' '),
   inputSchema: z.strictObject({ versionId: z.string().min(1).max(200).optional().describe('An exact versionId from the listing, to read that item in full.') }),

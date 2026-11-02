@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import { subjectKinds, subjectNameKey, type scriptBodySchema, type scriptSubjectSchema } from './saved-content.js';
+import { savedScriptContentSchema, subjectKinds, subjectNameKey, type scriptBodySchema, type scriptSubjectSchema } from './saved-content.js';
 
 export type ScriptSubject = z.infer<typeof scriptSubjectSchema>;
 export type SubjectKind = ScriptSubject['kind'];
@@ -45,4 +45,10 @@ export function scriptSubjects(script: ScriptLike): ScriptSubject[] {
   for (const scene of script.scenes) for (const name of scene.characters) add(name, 'character');
   for (const scene of script.scenes) add(scene.heading.location, 'place');
   return subjects;
+}
+
+/** The subjects of the script a workspace uses, in Assets order; none when it has no script or it doesn't parse. */
+export function currentSubjects(workspace: Readonly<{ script: Readonly<{ version: Readonly<{ kind: string; content?: unknown }> }> | null }>): ScriptSubject[] {
+  const script = workspace.script && 'content' in workspace.script.version ? savedScriptContentSchema.safeParse(workspace.script.version.content) : null;
+  return script?.success ? scriptSubjects(script.data) : [];
 }

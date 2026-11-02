@@ -329,4 +329,26 @@ test('the assistant saves a script subject\'s sheet as a draft, never over newer
     assert.equal((await sheets.save(account, full, mara([a, b], sheet.versionId))).kind, 'saved');
     assert.deepEqual(await sheets.useRoom(account, randomUUID()), { kind: 'not_found' });
   });
+
+  await t.test('an image is filed under a script subject on its use; a subject not in the script saves it unfiled and says so', async () => {
+    const subjectOf = async (versionId: string) => (await pool.query<{ subject_id: string | null }>('SELECT subject_id FROM artifacts.conversation_uses WHERE owner_id=$1 AND version_id=$2', [account, versionId])).rows.map(row => row.subject_id);
+    const asset = async (conversation: string, versionId: string) => (await store.workspace(account, conversation)).assets.find(item => item.version.id === versionId);
+    const make = (conversation: string, subject: string, extra: { inputs?: string[]; revises?: string } = {}) => saveImage(account, conversation, { bytes: testPng({ seed: ++seed }), contentType: 'image/png', inputs: extra.inputs ?? [], ...(extra.revises ? { revises: extra.revises } : {}), subject });
+    const filed = await make(video, 'mara');
+    assert.ok(filed.kind === 'saved' && !filed.subjectLeft, JSON.stringify(filed));
+    assert.deepEqual(await subjectOf(filed.versionId), ['mara']);
+    assert.equal((await asset(video, filed.versionId))?.subjectId, 'mara');
+    // A subject the script doesn't list (here, never did; in the tool, removed while Meta worked) files nothing.
+    for (const [conversation, subject] of [[video, 'ben'], [unscripted, 'mara']] as const) {
+      const loose = await make(conversation, subject);
+      assert.ok(loose.kind === 'saved' && loose.subjectLeft, JSON.stringify(loose));
+      assert.deepEqual(await subjectOf(loose.versionId), [null]);
+      assert.ok(!('subjectId' in (await asset(conversation, loose.versionId))!), 'an unfiled asset has no subjectId');
+    }
+    // A next version asked for a subject the script lacks is unfiled too, on the same use.
+    const edit = await make(video, 'ben', { inputs: [filed.versionId], revises: filed.versionId });
+    assert.ok(edit.kind === 'saved' && edit.subjectLeft, JSON.stringify(edit));
+    assert.deepEqual(await subjectOf(edit.versionId), [null]);
+    assert.deepEqual(await subjectOf(filed.versionId), [], 'the edit moved the image\'s own use');
+  });
 });

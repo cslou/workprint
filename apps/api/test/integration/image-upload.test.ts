@@ -144,7 +144,7 @@ describe('assistant-made images are checked, saved privately as the video\'s dra
 
       const made = testPng({ seed: 5 });
       const saved = await save(account, video, { bytes: made, contentType: 'image/png', inputs: [] });
-      assert.deepEqual(saved, { kind: 'saved', versionId: (saved as { versionId: string }).versionId, width: 64, height: 48 });
+      assert.deepEqual(saved, { kind: 'saved', versionId: (saved as { versionId: string }).versionId, width: 64, height: 48, subjectLeft: false });
       if (saved.kind !== 'saved') return;
       assert.equal(effects.checks, 2, 'a busy checker is waited out, then the image is checked once');
       const row = (await pool.query('SELECT v.created_by,v.provenance,v.revision,g.sha256,g.byte_size::int AS byte_size,u.state,u.purpose FROM artifacts.versions v JOIN artifacts.generated_objects g ON g.version_id=v.version_id JOIN artifacts.conversation_uses u ON u.version_id=v.version_id WHERE v.version_id=$1', [saved.versionId])).rows;
