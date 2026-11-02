@@ -48,11 +48,18 @@ export async function accountBrowserFixture(options: AppFixtureOptions = {}, bro
     const servingEnv = { WORKPRINT_BROWSER_ORIGIN: browserOrigin,
       ...(storage ? { S3_ENDPOINT: storage.endpoint, S3_REGION: storage.region, S3_BUCKET: storage.bucket, S3_ACCESS_KEY_ID: storage.credentials.accessKeyId, S3_SECRET_ACCESS_KEY: storage.credentials.secretAccessKey } : {}),
       ...(media ? { MEDIA_TOOLCHAIN_DIRECTORY: media.toolchainDirectory, MEDIA_DOCKER_PATH: media.dockerPath } : {}) };
-    const server = await startAuthServer(entry, env.env, { url: auth.url, anonKey: auth.anonKey, servingUrl: db.servingUrl, accounts: [] }, join(env.logs, 'account-api.log'), { env: servingEnv, ...(serverLifetimeMs ? { lifetimeMs: serverLifetimeMs } : {}) });
+    const startServer = (log: string) => startAuthServer(entry, env.env, { url: auth.url, anonKey: auth.anonKey, servingUrl: db.servingUrl, accounts: [] }, join(env.logs, log), { env: servingEnv, ...(serverLifetimeMs ? { lifetimeMs: serverLifetimeMs } : {}) });
+    const server = await startServer('account-api.log');
     cleanups.push(server.server.stop); cleanups.push(env.noNetwork);
     return { auth, apiOrigin: server.origin, close, native: store, servingUrl: db.servingUrl, setupUrl: db.setupUrl,
       /** Stops the API process with SIGTERM, as a shutdown does; later calls and `close` don't repeat it. */
       stopServer: server.server.stop,
+      /** Starts the same composition again on the same database, as a restart does, after `stopServer`; returns its origin. */
+      restartServer: async () => {
+        const restarted = await startServer('account-api-restarted.log');
+        cleanups.push(restarted.server.stop);
+        return restarted.origin;
+      },
       /** How the API process exited, once it has. */
       serverTermination: () => server.server.termination,
       /** The API process log, for leak checks. */

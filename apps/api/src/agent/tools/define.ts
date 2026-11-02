@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { ReadImageInputs, ReadOwnedWorkspace, SaveAssistantScript, SaveGeneratedImage } from '../../application/index.js';
+import type { ReadImageInputs, ReadOwnedWorkspace, SaveAssistantScript, SaveGeneratedImage, VideoJobs } from '../../application/index.js';
 import type { MetaImageClient } from '../../generation/index.js';
 
 /** Trusted scope from the admitted native run, never from model arguments. */
@@ -8,12 +8,14 @@ export interface ToolScope {
   readonly videoId: string;
 }
 
-/** Application functions that tools may call, and the Meta image client. Supplied once by composition. */
+/** Application functions that tools may call, the Meta image client and the video jobs. Supplied once by composition. */
 export type AgentCollaborators = Readonly<{
   readWorkspace: ReadOwnedWorkspace; saveScript: SaveAssistantScript;
   readImageInputs: ReadImageInputs; saveGeneratedImage: SaveGeneratedImage;
   /** Absent when images can't be saved (no storage or media checker) or a test composes no Meta fake; the tool then refuses before any call. */
   images?: Pick<MetaImageClient, 'generate' | 'edit'>;
+  /** Absent without storage, the media checker or a MiniMax key (or a test's MiniMax fake); the tool then refuses before any call. */
+  videos?: Pick<VideoJobs, 'start' | 'resume'>;
 }>;
 
 /** Why a tool's signal fired: the exact-turn Stop, the turn deadline or a server shutdown. */
