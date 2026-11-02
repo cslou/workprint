@@ -1,6 +1,7 @@
 import type { Server } from 'node:http';
 import { performance } from 'node:perf_hooks';
 import type { Mastra } from '@mastra/core';
+import { stopNativeTurns } from '../agent/index.js';
 
 export const shutdownLimits = Object.freeze({ httpMs: 2000, totalMs: 7000 });
 
@@ -23,6 +24,13 @@ export function installServerShutdown(server: Server, mastra: Mastra, configured
     const totalTimer = setTimeout(force, remaining());
     let exitCode = 0;
     logger.info('Shutting down Mastra server', { signal });
+    // Running tools end first, with reason `shutdown`, so their turns end before the HTTP drain.
+    try {
+      stopNativeTurns(mastra);
+    } catch (error) {
+      exitCode = 1;
+      logger.error('Error while stopping running turns', { error });
+    }
     try {
       const httpMs = Math.min(configuredDrainMs, shutdownLimits.httpMs, remaining());
       const drained = new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));

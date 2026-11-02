@@ -23,12 +23,18 @@ export function chatTestTools(gateUrl: string): AgentTool[] {
       execute: async input => ({ echo: (input as { text: string }).text }),
     },
     {
-      id: 'test-gated', description: 'A test tool that waits until the test releases it.',
+      id: 'test-gated', description: 'A test tool that waits until the test releases it, and reports why it was stopped.',
       inputSchema: z.strictObject({}),
       phrase: 'Running the gated test tool…', doneSummary: () => 'Gated tool released',
-      execute: async (_input, { signal }) => {
-        const response = await fetch(gateUrl, { signal });
-        return { released: response.ok };
+      execute: async (_input, { signal, abortReason }) => {
+        try {
+          const response = await fetch(gateUrl, { signal });
+          return { released: response.ok };
+        } catch (error) {
+          // Tell the test why the signal fired before the tool ends.
+          if (signal.aborted) await fetch(`${gateUrl}/reason`, { method: 'POST', body: abortReason() ?? 'none', signal: AbortSignal.timeout(2000) }).catch(() => undefined);
+          throw error;
+        }
       },
     },
     {

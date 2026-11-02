@@ -28,7 +28,7 @@ export const systemPrompt = [
 
 // What each Mastra instance was bound with: its tools, so stream and history redaction use the same phrases,
 // and its video titler.
-const bindings = new WeakMap<Mastra, { tools: readonly AgentTool[]; limits: TurnLimits; nameVideo: NameVideo }>();
+const bindings = new WeakMap<Mastra, { tools: readonly AgentTool[]; limits: TurnLimits; nameVideo: NameVideo; shutdown: AbortController }>();
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 
 /**
@@ -56,13 +56,14 @@ export function bindNativeTurns(mastra: Mastra, turns: NativeTurns) {
   const storage = mastra.getStorage();
   if (!storage) throw new Error('Native assistant storage unavailable');
   const { limits } = turns;
+  const shutdown = new AbortController();
   mastra.addAgent(new Agent({
     id: nativeAssistantId, name: 'Assistant', instructions: systemPrompt,
     model: withStallLimit(turns.model, limits.stallMs),
     memory: createNativeTextMemory(storage), maxRetries: 0,
     // Zero automatic provider retries: drop Mastra's default retry and request-repair error processors.
     errorProcessorDefaults: false,
-    tools: nativeTools(turns.tools, turns.collaborators),
+    tools: nativeTools(turns.tools, turns.collaborators, shutdown.signal),
     inputProcessors: [completedSteps(limits.maxSteps)],
     defaultOptions: {
       maxSteps: limits.maxSteps,
@@ -70,13 +71,25 @@ export function bindNativeTurns(mastra: Mastra, turns: NativeTurns) {
     },
     durable: { cleanupTimeoutMs: limits.cleanupMs },
   }));
-  bindings.set(mastra, { tools: turns.tools, limits, nameVideo: createVideoTitler(turns.model, storage, limits) });
+  bindings.set(mastra, { tools: turns.tools, limits, nameVideo: createVideoTitler(turns.model, storage, limits), shutdown });
 }
 
 export function hasNativeTurns(mastra: Mastra) { return bindings.has(mastra); }
 
 /** The tools bound to this instance; none when turns are not bound. */
 export function nativeToolRegistry(mastra: Mastra): readonly AgentTool[] { return bindings.get(mastra)?.tools ?? []; }
+
+/**
+ * Server shutdown: running tools see their signal fire with reason `shutdown`, then every active turn is
+ * aborted as Stop aborts one, so no model step follows. Runs once; a no-op when turns are not bound.
+ */
+export function stopNativeTurns(mastra: Mastra) {
+  const binding = bindings.get(mastra);
+  if (!binding || binding.shutdown.signal.aborted) return;
+  binding.shutdown.abort(new Error('Server shutting down'));
+  const agent = mastra.getAgent(nativeAssistantId);
+  for (const run of agent.listActiveThreadRuns()) agent.abortRunStream(run.runId);
+}
 
 /** The limits this instance's turns were bound with; none when turns are not bound. */
 export function nativeTurnLimits(mastra: Mastra): TurnLimits | undefined { return bindings.get(mastra)?.limits; }
