@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Button as AriaButton, Dialog, Heading, Modal, ModalOverlay } from 'react-aria-components';
 import { createUploadSession, nativeConversations, type UploadSession } from '@workprint/api-client';
@@ -20,6 +20,7 @@ import { createChatSession, type ChatSession } from '../conversation/chat-sessio
 import { useChatSnapshot } from '../conversation/use-chat.js';
 import { LiveTurns } from '../conversation/live-turns.js';
 import { QuestionReview } from '../conversation/question.js';
+import { ChatImagesContext } from '../conversation/shown-images.js';
 import { useWorkspace } from './workspace.js';
 import { WorkspaceReadPlaceholder } from './workspace-placeholder.js';
 import { NativeHistory, RecentRows, Recents } from './native-views.js';
@@ -100,6 +101,7 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
   const recent = <><AriaButton className="wp-nav-label" onPress={() => void runNative('recents')}>Recents</AriaButton>{navigation && session ? sidebarPlaceholder.active ? <>{sidebarPlaceholder.visible && <p className="wp-sr-only" role="status">Loading Recents…</p>}<SkeletonRows count={4} compact visible={sidebarPlaceholder.visible} /></> : <>{quick.length > 0 && <RecentRows threads={quick} navigation={navigation} compact />}{navigation.recents.failed && !navigation.recents.value && <p className="wp-recents-empty">Recents couldn’t be loaded.</p>}{navigation.recents.value && !quick.length && <p className="wp-recents-empty">No videos yet.</p>}</> : <p className="wp-recents-empty">No videos yet.</p>}</>;
   const account = <AriaButton className="wp-account" onPress={() => { if (onAccountOpen) { setSurface(null); onAccountOpen(); } else setSurface('account'); }}><span className="wp-avatar" aria-hidden="true">{session ? session.name.slice(0, 1).toUpperCase() : ''}</span><span>{accountName}</span></AriaButton>;
   const projection = workspace.kind === 'settled' && workspace.result.ok ? workspace.result.value : null;
+  const chatImages = useMemo(() => ({ connection, scope, workspace: projection }), [connection, scope?.accountId, scope?.conversationId, projection]);
   const content = projection ? workspaceContent?.(projection) : undefined;
   const placeholder = workspace.kind === 'loading' ? <WorkspaceReadPlaceholder state="loading" /> : workspace.failure ? <WorkspaceReadPlaceholder state={workspace.failure} /> : undefined;
   const title = shown === 'navigation' ? 'Navigation' : shown === 'library' ? 'Library' : shown === 'new' ? 'New video' : shown === 'recents' ? 'Recents' : 'Account';
@@ -111,7 +113,7 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
         <div className="wp-recents" aria-busy={!!navigation?.recents.pending || sidebarPlaceholder.active}>{recent}</div><div className="wp-sidebar-spacer" />{account}
       </nav>
       <main ref={main} className="wp-main" data-layout={!chatState.turns.length && (!navigation?.history || navigation.history.kind === 'ready' && navigation.history.messages.length === 0) ? 'opening' : 'thread'} aria-label={navigation?.history ? 'Conversation' : 'New video'} aria-busy={navigation?.history ? navigation.history.kind === 'loading' : workspace.kind === 'loading'}>
-        {navigation?.history ? <NativeHistory state={navigation.history} navigation={navigation} live={chatState.turns.length ? liveTurns : null} follow={chatState.turns.length} /> : <div className="wp-thread"><Welcome owned={!!(navigation && session)} /></div>}
+        {navigation?.history ? <ChatImagesContext.Provider value={chatImages}><NativeHistory state={navigation.history} navigation={navigation} live={chatState.turns.length ? liveTurns : null} follow={chatState.turns.length} /></ChatImagesContext.Provider> : <div className="wp-thread"><Welcome owned={!!(navigation && session)} /></div>}
         {workspace.kind === 'settled' && workspace.result.ok && workspace.result.value.pendingQuestion ? <QuestionReview uploadSession={uploadSession} onUploaded={workspace.onUploaded} connection={connection} scope={scope} question={workspace.result.value.pendingQuestion} workspace={workspace.result.value} draft={draft} /> : <Composer uploadSession={uploadSession} onUploaded={workspace.onUploaded} native={native} chat={chat} sendBlocked={sendBlocked} draft={draft} connection={connection} scope={scope} />}
       </main>
       <aside className="wp-workspace" aria-label="This video"><WorkspaceTabs connection={connection} scope={scope} workspace={projection} onSaved={workspace.onSaved} onUsed={workspace.onUsed} {...(materialPrerequisites ? { materialPrerequisites } : {})} {...(storyboardPrerequisites ? { storyboardPrerequisites } : {})} {...(videoPrerequisites ? { videoPrerequisites } : {})} placeholder={placeholder} selectedKey={tab} onSelectionChange={(key) => setTab(key as WorkspaceTab)} {...(content === undefined ? {} : { contentOverride: content })} /></aside>
