@@ -30,6 +30,10 @@ function memoryJobs() {
     interrupted: async (_: string, id: string) => move(id, ['running'], { status: 'interrupted' }),
     resumed: async (_: string, id: string) => move(id, ['interrupted'], { status: 'running' }),
     get: async (_: string, id: string) => { const row = rows.get(id); if (!row) throw new GenerationJobError('not_found'); return row; },
+    list: async (owner: string, conversation: string, options: { limit: number; status?: JobStatus }) => {
+      const matching = [...rows.values()].filter(job => job.accountId === owner && job.conversationId === conversation && (!options.status || job.status === options.status)).reverse();
+      return { jobs: matching.slice(0, options.limit), nextCursor: null };
+    },
   };
 }
 
@@ -171,4 +175,28 @@ test('saved work that fails says whether the create was sent', async () => {
   after.jobs.started = async () => { throw new Error('storage down'); };
   assert.deepEqual(await after.runner.start(account, video, input, control()), { kind: 'unavailable', created: true });
   assert.equal(after.calls.submits, 1);
+});
+
+// Scoping and order are the SQL's, proven in generation-jobs.test.ts and the restart case in tool-activity.test.ts.
+test('stopped asks for this video\'s interrupted jobs, at most five, and gives each id with its frames; a failed read is unavailable', async () => {
+  const { runner, jobs } = harness();
+  const stop = async (owner: string, conversation: string, inputs: string[] = []) => {
+    const job = await jobs.begin(owner, conversation, { prompt: 'p', inputs });
+    await jobs.started(owner, job.id, `task-${job.id}`); await jobs.interrupted(owner, job.id);
+    return job.id;
+  };
+  const ids: string[] = [], frame = randomUUID();
+  for (let index = 0; index < 5; index++) ids.push(await stop(account, video));
+  ids.push(await stop(account, video, [frame]));
+  const list = jobs.list, asked: unknown[] = [];
+  jobs.list = async (owner, conversation, options) => { asked.push([owner, conversation, options]); return list(owner, conversation, options); };
+  await stop(randomUUID(), video); await stop(account, randomUUID());
+  const running = await jobs.begin(account, video, { prompt: 'p', inputs: [] }); await jobs.started(account, running.id, 'task-running');
+  const listed = await runner.stopped(account, video);
+  assert.ok(listed.kind === 'read');
+  assert.deepEqual(listed.jobs.map(job => job.jobId), ids.slice(1).reverse());
+  assert.deepEqual(listed.jobs.map(job => job.frames), [[frame], [], [], [], []]);
+  assert.deepEqual(asked, [[account, video, { limit: 5, status: 'interrupted' }]]);
+  jobs.list = async () => { throw new Error('storage down'); };
+  assert.deepEqual(await runner.stopped(account, video), { kind: 'unavailable' });
 });

@@ -444,9 +444,22 @@ For descriptive-only work, use editorial review and applicable existing checks. 
     - a video from a prompt alone;
     - playback in the chat and in Generated videos;
     - the `Interrupted` card;
-    - a resume using exactly one MiniMax task for that job. This condition is not visible in the UI and was not checked server-side.
+    - a resume using exactly one MiniMax task for that job. This is not visible in the UI. The QA database, read afterwards, shows two video jobs, each with 2 frames, a task id of its own and a saved clip. The second job's revision 5 is submitting, running, interrupted, running, succeeded: it was stopped and then resumed in the next turn on its one task. That proves the resume after Stop. A resume after a server restart was not exercised in QA.
 
     The scripted suites cover each of these: the 35-minute route bound and the minute display (Story 2), the job states and the one create on resume (Stories 3 and 5), and the chat and Videos playback journeys (Stories 6 and 7). The 6-minute turn has not been proven with live MiniMax.
+- **Sprint PR review (#103 at `252cd1c`):** 3/5. Security and conventions found nothing.
+  - **P1 (semantic):** after a server restart, the model had no way to learn a stopped job's id. The shutdown path ends the call with no result, read-workspace listed no jobs, and every restart test read the id from SQL.
+  - **Fixed in `fix/009-resume-after-restart`:**
+    - read-workspace now lists the video's stopped jobs (`stoppedVideos`, newest first, at most 5) with the id a resume takes and the image versions each started from;
+    - the restart test resumes with the id from that listing;
+    - the agent's workspace names use the shared `mediaVersionName`;
+    - the query-error test asserts its one create;
+    - the spec's `model-catalog` row no longer credits Sprint 009.
+  - **Deep pre-merge `--base main` at `252cd1c`:** failed 1 of 32 browser journeys. The cause was a race in the e2e helper `makeVideo`: Enter was pressed while the previous turn was still settling, so nothing was sent. Integration passed. The helper now waits for Send and checks that the box emptied. Diagnosis: `.checks/.logs/run-jx2xvyl2/diagnosis.md`.
+  - **P2s left as follow-ups:**
+    - A job can stay `running` with no waiter until the next restart. This happens when its `interrupted` write fails, or when a non-MiniMax error ends the wait. A resume then reads "still being made" (logic).
+    - The chat shows "This video couldn't be shown" with no player when only the poster fails. The Videos tab keeps the clip playable. Story 6's AC asked for this text (logic).
+    - Commit slips: the subject `Refactor(generation): Share bounded reads and waits` is 51 characters, and the body of `Feat(artifacts): Save generated videos` uses backticks. Neither was rewritten after its PR opened (pr-hygiene).
 - **Deviations, recorded in the story PRs:**
   - **Story 4:**
     - The test clip is 97 frames (4.04 s), not 4 s, because of the cut points in MiniMax's B-frame groups.
