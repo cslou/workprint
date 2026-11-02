@@ -59,7 +59,7 @@ export function bindNativeTurns(mastra: Mastra, turns: NativeTurns) {
   const shutdown = new AbortController();
   mastra.addAgent(new Agent({
     id: nativeAssistantId, name: 'Assistant', instructions: systemPrompt,
-    model: withStallLimit(turns.model, limits.stallMs),
+    model: withStallLimit(turns.model, limits.stallMs, shutdown.signal),
     memory: createNativeTextMemory(storage), maxRetries: 0,
     // Zero automatic provider retries: drop Mastra's default retry and request-repair error processors.
     errorProcessorDefaults: false,
@@ -74,14 +74,16 @@ export function bindNativeTurns(mastra: Mastra, turns: NativeTurns) {
   bindings.set(mastra, { tools: turns.tools, limits, nameVideo: createVideoTitler(turns.model, storage, limits), shutdown });
 }
 
-export function hasNativeTurns(mastra: Mastra) { return bindings.has(mastra); }
+/** True when turns are bound and the server is not shutting down, so new turns may start. */
+export function hasNativeTurns(mastra: Mastra) { const binding = bindings.get(mastra); return !!binding && !binding.shutdown.signal.aborted; }
 
 /** The tools bound to this instance; none when turns are not bound. */
 export function nativeToolRegistry(mastra: Mastra): readonly AgentTool[] { return bindings.get(mastra)?.tools ?? []; }
 
 /**
  * Server shutdown: running tools see their signal fire with reason `shutdown`, then every active turn is
- * aborted as Stop aborts one, so no model step follows. Runs once; a no-op when turns are not bound.
+ * aborted as Stop aborts one. No new turn is admitted after, and any model call still made is refused
+ * unsent, so no model step follows. Runs once; a no-op when turns are not bound.
  */
 export function stopNativeTurns(mastra: Mastra) {
   const binding = bindings.get(mastra);

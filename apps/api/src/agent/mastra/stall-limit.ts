@@ -12,13 +12,15 @@ type StreamCall = (options: { abortSignal?: AbortSignal }) => Promise<{ stream: 
 /**
  * Fails a model call when no data arrives for `stallMs`, including while waiting for the
  * response. Each received chunk resets the limit, so long replies are never cut off.
+ * Once `stop` fires (server shutdown), a running call is aborted and a new one is refused unsent.
  * Other model members pass through unchanged, bound to the original model.
  */
-export function withStallLimit(model: NativeTurnModel, stallMs: number): NativeTurnModel {
+export function withStallLimit(model: NativeTurnModel, stallMs: number, stop?: AbortSignal): NativeTurnModel {
   const target = model as unknown as Record<PropertyKey, unknown> & { doStream: StreamCall };
   const doStream: StreamCall = async (options) => {
+    stop?.throwIfAborted();
     const local = new AbortController();
-    const abortSignal = options.abortSignal ? AbortSignal.any([options.abortSignal, local.signal]) : local.signal;
+    const abortSignal = AbortSignal.any([options.abortSignal, local.signal, stop].filter(signal => signal !== undefined));
     let timer: ReturnType<typeof setTimeout> | undefined;
     const limited = <T>(work: Promise<T>) => new Promise<T>((resolve, reject) => {
       timer = setTimeout(() => { local.abort(); reject(new ModelStallError(stallMs)); }, stallMs);

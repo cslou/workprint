@@ -54,3 +54,17 @@ test('a response that never starts also stalls', async () => {
   await assert.rejects(read(withStallLimit(model, 60)), ModelStallError);
   assert.equal(seen.signal?.aborted, true);
 });
+
+test('once stop fires, a running call is aborted and a new one is refused unsent', async () => {
+  const stop = new AbortController();
+  const running = fakeModel(async () => stream([1], 5, true));
+  const pending = read(withStallLimit(running.model, 10_000, stop.signal));
+  await new Promise(resolve => setTimeout(resolve, 30));
+  stop.abort(new Error('Server shutting down'));
+  await assert.rejects(pending);
+  assert.equal(running.seen.signal?.aborted, true);
+  let calls = 0;
+  const later = fakeModel(async () => { calls++; return stream([1], 1); });
+  await assert.rejects(read(withStallLimit(later.model, 10_000, stop.signal)), { message: 'Server shutting down' });
+  assert.equal(calls, 0);
+});
