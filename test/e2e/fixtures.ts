@@ -110,8 +110,11 @@ export async function makeVideo(page: Page, backend: { provider: { script(...ste
   // This turn's reply is the one after those already shown, never an earlier reply's line.
   const replies = page.getByRole('list', { name: 'New messages' }).getByRole('listitem', { name: 'Assistant message' });
   const reply = replies.nth(await replies.count());
+  // The previous turn has settled only once Send is back; Enter while Stop shows sends nothing.
+  await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeVisible();
   await box.fill('Make a short video of the gallery bench');
   await box.press('Enter');
+  await expect(box).toHaveValue('');
   await expect(reply.getByText(/^Saved Video \d+ · Version 1$/)).toBeVisible({ timeout: 60_000 });
   await expect(reply.getByText(text, { exact: true })).toBeVisible();
   return reply;
