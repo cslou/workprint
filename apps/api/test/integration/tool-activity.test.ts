@@ -3,13 +3,13 @@ import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { setTimeout as wait } from 'node:timers/promises';
 import { Pool } from 'pg';
-import { createArtifactStore, createAssistantScripts, createVersionUses } from '../../src/artifacts/index.js';
+import { createArtifactStore, createArtifactWriters, createAssistantScripts, createVersionUses } from '../../src/artifacts/index.js';
 import { createAssistantScriptSaver } from '../../src/application/index.js';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
 import { createGenerationJobs } from '../../src/generation/index.js';
 import { accountBrowserFixture } from '../support/account-browser-fixture.js';
 import { chatComposition } from '../support/chat-composition.js';
-import { metaImageFake, testPng } from '../support/meta-image-fake.js';
+import { metaImageFake, testPng, type FakeImageStep } from '../support/meta-image-fake.js';
 import { generatedClip, miniMaxVideoFake } from '../support/minimax-video-fake.js';
 import { completed, nativeTurnClient, type ObservedTurn } from '../support/native-turn-client.js';
 import { scriptedProvider } from '../support/scripted-provider.js';
@@ -741,4 +741,219 @@ test('generate-video on a server that can\'t save videos refuses before any call
   assert.ok(completed(turn), JSON.stringify(turn.terminal));
   assert.equal(turn.chunks.filter(chunk => chunk.type === 'tool-activity').at(-1)?.payload?.summary, 'Not made: videos can’t be saved on this server');
   assert.deepEqual(minimax.requests, []);
+});
+
+type SheetView = { view: string; versionId: string };
+type SheetResult = { made: true; sheet: { versionId: string; label: string }; views: SheetView[]; given: number; landed: number; missing: { view: string; reason: string; message: string }[] }
+  | { made: false; reason: string; summary: string; message: string; kept?: SheetView[] };
+type SheetContent = { schemaVersion: 1; subject: { id: string; kind: string; name: string; description: string; continuityNotes: string[] }; references: (SheetView & { notes: string[] })[] };
+
+// generate-sheet through real turns over a script that lists Mara and the Gallery: the fake Meta answers, and storage
+// and the real decode check keep each view. Every request the fake records is one paid image in production.
+test('generate-sheet makes a script subject\'s views one at a time with Meta and saves them as its draft sheet', { timeout: 300000 }, async t => {
+  const provider = await scriptedProvider(); t.after(provider.close);
+  const meta = await metaImageFake(); t.after(meta.close);
+  const { storage, media } = testStack();
+  const fixture = await accountBrowserFixture({ artifacts: true, storage, media: media.toolchain, composition: chatComposition(provider, {}, { url: meta.url }) });
+  const pool = new Pool({ connectionString: fixture.servingUrl, max: 2 });
+  t.after(async () => { await pool.end(); await fixture.close(); });
+  const check = createOwnedConversationCheck(fixture.native), store = createArtifactStore(pool, check);
+  const saveScript = createAssistantScriptSaver(createAssistantScripts(pool, check).save);
+  const person = createArtifactWriters(pool, check).human;
+  const [owner, other] = [await fixture.auth.createAccount(), await fixture.auth.createAccount()];
+  const clients = new Map(await Promise.all([owner, other].map(async user => [user.id, nativeTurnClient(fixture.apiOrigin, await fixture.accessToken(user), user.id)] as const)));
+  const client = (user: { id: string }) => clients.get(user.id)!;
+
+  const toolResult = () => {
+    const content = (provider.requests[1]!.body as { messages: { role: string; content: unknown }[] }).messages.findLast(message => message.role === 'tool')?.content;
+    assert.ok(content !== undefined, 'tool result sent to the model');
+    return (typeof content === 'string' ? JSON.parse(content) : content) as SheetResult;
+  };
+  const sheetLines = (turn: ObservedTurn) => turn.chunks.filter(chunk => chunk.type === 'tool-activity' && chunk.payload?.tool === 'generate-sheet');
+  /** Starts a turn in which the model calls generate-sheet with `args`; the fake Meta answers `steps` first. */
+  const running = (user: { id: string }, video: string, args: Record<string, unknown>, steps: FakeImageStep[] = []) => {
+    provider.reset(); meta.reset(); meta.script(...steps);
+    provider.script({ toolCalls: [{ name: 'generate-sheet', args }] }, { text: ['Done'] });
+    let accept!: (id: string) => void;
+    const accepted = new Promise<string>(resolve => { accept = resolve; });
+    return { accepted, turn: client(user).turn(video, 'Make a sheet', 60000, id => accept(id)) };
+  };
+  /** One completed generate-sheet turn: what the tool gave the model and its activity lines. */
+  const sheet = async (user: { id: string }, video: string, args: Record<string, unknown>, steps: FakeImageStep[] = []) => {
+    const turn = await running(user, video, args, steps).turn;
+    assert.ok(completed(turn), JSON.stringify(turn.terminal));
+    return { result: toolResult(), lines: sheetLines(turn).map(chunk => [chunk.payload?.phrase, chunk.payload?.state, chunk.payload?.summary]), media: sheetLines(turn).at(-1)?.payload?.media };
+  };
+  /** Images made with generate-image in one turn, in order. */
+  const images = async (user: { id: string }, video: string, count = 1) => {
+    provider.reset(); meta.reset();
+    provider.script({ toolCalls: [{ name: 'generate-image', args: { prompt: 'A photo of Mara', count } }] }, { text: ['Done'] });
+    assert.ok(completed(await client(user).turn(video, 'Make an image')));
+    return (await made(video)).slice(-count).map(row => row.version_id);
+  };
+  const made = async (video: string) => (await pool.query<{ version_id: string }>("SELECT version_id FROM artifacts.versions WHERE origin_conversation_id=$1 AND kind='image' ORDER BY publication_revision", [video])).rows;
+  const sheetVersions = async (video: string) => Number((await pool.query<{ count: string }>("SELECT count(*) FROM artifacts.versions WHERE origin_conversation_id=$1 AND kind='reference'", [video])).rows[0]!.count);
+  /** The subject's current sheet: the version the video uses, its use and its content. */
+  const sheetOf = async (video: string, subject = 'mara') => {
+    for (const asset of (await store.workspace(owner.id, video)).assets) {
+      if (asset.version.kind !== 'reference' || !('content' in asset.version)) continue;
+      const content = asset.version.content as unknown as SheetContent;
+      if (content.subject.id === subject) return { version: asset.version, use: asset.use, content };
+    }
+    return undefined;
+  };
+  const gallery = { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'The Gallery', time: 'night' }, characters: [], script: [{ action: 'Mara waits.' }] }] };
+  /** A new video whose script lists Mara and the Gallery. */
+  const scripted = async () => {
+    const video = await client(owner).newVideo();
+    const saved = await saveScript(owner.id, video, { baseVersionId: null, content: gallery, subjects: [{ id: '', kind: 'character', name: 'Mara' }, { id: '', kind: 'place', name: 'The Gallery' }] });
+    assert.equal(saved.kind, 'saved', JSON.stringify(saved));
+    return video;
+  };
+  const view = (name: string) => ({ view: name, prompt: `${name}, standing still` });
+  const mara = (views: unknown[], extra: Record<string, unknown> = {}) => ({ subject: 'mara', description: 'A courier in a long grey coat.', continuityNotes: ['Keep the grey coat.'], views, ...extra });
+  const png = (seed: number) => `data:image/png;base64,${testPng({ seed }).toString('base64')}`;
+  const keep = 'Keep the same person as the input image: the same face, build, hair and clothing.';
+  const frame = (name: string) => `One reference view of Mara, a character, for a reference sheet: ${name}. A courier in a long grey coat. Keep consistent: Keep the grey coat.`;
+  const references = (content: SheetContent | undefined) => content?.references.map(reference => [reference.versionId, reference.view]);
+  const maraVideo = await scripted();
+
+  await t.test('a new sheet: views made in order, the first from its prompt and the rest keeping it, saved as one draft sheet', async () => {
+    const { result, lines, media: shown } = await sheet(owner, maraVideo, mara([view('Full-body front'), view('Three-quarter'), view('Face close-up')]));
+    assert.ok(result.made, JSON.stringify(result));
+    assert.deepEqual(meta.requests.map(request => [request.path, request.body.n, request.body.images]), [
+      ['/v1/images/generations', 1, undefined], ['/v1/images/edits', 1, [{ image_url: png(1) }]], ['/v1/images/edits', 1, [{ image_url: png(1) }]]]);
+    const prompts = meta.requests.map(request => String(request.body.prompt));
+    assert.ok(prompts[0]!.startsWith(frame('Full-body front')), prompts[0]);
+    assert.ok(prompts[1]!.startsWith(`${keep}\n\n${frame('Three-quarter')}`), prompts[1]);
+    assert.ok(prompts[2]!.startsWith(`${keep}\n\n${frame('Face close-up')}`) && prompts[2]!.endsWith('Face close-up, standing still'), prompts[2]);
+    const saved = await sheetOf(maraVideo);
+    assert.deepEqual([saved?.version.id, saved?.version.revision, saved?.version.createdBy, saved?.use?.state], [result.sheet.versionId, 1, 'assistant', 'draft']);
+    assert.deepEqual(references(saved?.content), result.views.map(item => [item.versionId, item.view]));
+    assert.deepEqual(result.views.map(item => item.view), ['Full-body front', 'Three-quarter', 'Face close-up']);
+    assert.deepEqual((await store.version(owner.id, result.sheet.versionId)).dependencies, result.views.map(item => item.versionId));
+    const [first, ...rest] = result.views;
+    assert.deepEqual((await store.version(owner.id, first!.versionId)).dependencies, []);
+    for (const item of rest) assert.deepEqual((await store.version(owner.id, item.versionId)).dependencies, [first!.versionId]);
+    assert.deepEqual(lines, [['Making a reference sheet…', 'running', undefined], ['Making a reference sheet…', 'done', 'Saved Mara · Version 1']]);
+    assert.deepEqual(shown, result.views.map(item => ({ kind: 'image', versionId: item.versionId })));
+  });
+
+  await t.test('a next version redoes a view by its name in place, keeping the base\'s spelling and its first view as the identity', async () => {
+    const before = await sheetOf(maraVideo);
+    const { result, lines } = await sheet(owner, maraVideo, mara([view('face close-up ')]));
+    assert.ok(result.made, JSON.stringify(result));
+    assert.deepEqual(meta.requests.map(request => [request.path, request.body.images]), [['/v1/images/edits', [{ image_url: png(1) }]]]);
+    const after = await sheetOf(maraVideo);
+    assert.deepEqual([after?.use?.id, after?.version.artifactId, after?.version.revision], [before?.use?.id, before?.version.artifactId, 2]);
+    const [front, side, face] = before!.content.references;
+    assert.deepEqual(references(after?.content), [[front!.versionId, 'Full-body front'], [side!.versionId, 'Three-quarter'], [result.views[2]!.versionId, 'Face close-up']]);
+    assert.notEqual(result.views[2]!.versionId, face!.versionId);
+    assert.deepEqual(lines.at(-1), ['Making a reference sheet…', 'done', 'Saved Mara · Version 2']);
+  });
+
+  await t.test('a failed redo keeps the sheet as it was, and a call past 5 views sends nothing', async () => {
+    const { result, lines } = await sheet(owner, maraVideo, mara([view('Three-quarter')]), [{ status: 400, error: { type: 'invalid_request_error', code: 'content_policy_violation', message: 'refused' } }]);
+    assert.ok(!result.made && result.reason === 'content_policy', JSON.stringify(result));
+    assert.deepEqual(lines.at(-1), ['Making a reference sheet…', 'done', 'Not made: the request was refused']);
+    assert.equal((await sheetOf(maraVideo))?.version.revision, 2); assert.equal(await sheetVersions(maraVideo), 2);
+    const full = await sheet(owner, maraVideo, mara([view('Hands'), view('Back'), view('Side')]));
+    assert.deepEqual(full.lines.at(-1), ['Making a reference sheet…', 'done', 'Not made: a sheet holds at most 5 views']);
+    assert.equal(meta.requests.length, 0);
+  });
+
+  await t.test('identity keeps every made view to a given image that stays out of the sheet; a view with image makes nothing', async () => {
+    const video = await scripted();
+    const [photo, existing] = await images(owner, video, 2);
+    const { result } = await sheet(owner, video, mara([view('Front'), { view: 'Coat', image: existing }, view('Face')], { identity: photo }));
+    assert.ok(result.made, JSON.stringify(result));
+    assert.deepEqual(meta.requests.map(request => [request.path, request.body.images]), [['/v1/images/edits', [{ image_url: png(1) }]], ['/v1/images/edits', [{ image_url: png(1) }]]]);
+    for (const request of meta.requests) assert.ok(String(request.body.prompt).startsWith(keep));
+    assert.deepEqual(result.views.map(item => item.view), ['Front', 'Coat', 'Face']); assert.equal(result.views[1]!.versionId, existing);
+    assert.ok(!result.views.some(item => item.versionId === photo));
+    for (const item of [result.views[0]!, result.views[2]!]) assert.deepEqual((await store.version(owner.id, item.versionId)).dependencies, [photo]);
+    // That image is in Mara's sheet only.
+    const gallerySheet = await sheet(owner, video, { ...mara([{ view: 'Wide', image: existing }]), subject: 'the-gallery' });
+    assert.deepEqual(gallerySheet.lines.at(-1), ['Making a reference sheet…', 'done', 'Not made: that image is already in Mara’s sheet']);
+    assert.equal(meta.requests.length, 0);
+  });
+
+  await t.test('each refusal before a paid call sends nothing to Meta', async () => {
+    const [theirs] = await images(other, await client(other).newVideo());
+    const capped = await scripted();
+    const [one] = await images(owner, capped);
+    await pool.query(`INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state)
+      SELECT $1,$2,gen_random_uuid()::text,$3,jsonb_build_object('purpose','reference','role','extra-'||n),'reference','draft' FROM generate_series(1,98) n`, [owner.id, capped, one]);
+    const unscripted = await client(owner).newVideo();
+    const cases: [string, Record<string, unknown>, string][] = [
+      [unscripted, mara([view('Front')]), 'Not made: there is no script yet; write it first'],
+      [maraVideo, { ...mara([view('Front')]), subject: 'ben' }, 'Not made: that subject isn’t in the script'],
+      [maraVideo, mara([view('Hands')], { identity: theirs }), 'Not made: an image wasn’t found'],
+      [maraVideo, mara(['Hands', 'Back', 'Side', 'Top', 'Feet', 'Coat'].map(view)), 'Not made: the sheet wasn’t valid'],
+      [capped, mara([view('Front')]), 'Not made: this video has too many saved items'],
+    ].map(([video, args, line]) => [video as string, args as Record<string, unknown>, line as string]);
+    for (const [video, args, line] of cases) {
+      const { lines } = await sheet(owner, video, args);
+      assert.deepEqual(lines.at(-1), ['Making a reference sheet…', 'done', line]);
+      assert.equal(meta.requests.length, 0, line);
+    }
+    // A person's sheet with more than 5 views is read but not revised.
+    const six = await images(owner, unscripted, 6);
+    const listed = await saveScript(owner.id, unscripted, { baseVersionId: null, content: gallery, subjects: [{ id: '', kind: 'character', name: 'Mara' }] });
+    assert.equal(listed.kind, 'saved');
+    await store.insert({ accountId: owner.id, conversationId: unscripted, kind: 'reference', createdBy: 'human', dependencies: six, use: { binding: { purpose: 'reference' }, state: 'draft' },
+      content: { schemaVersion: 1, subject: { id: 'mara', kind: 'character', name: 'Mara', description: 'Drawn by hand.', continuityNotes: ['n'] }, references: six.map((versionId, index) => ({ versionId, view: `View ${index + 1}`, notes: [] })) } });
+    const long = await sheet(owner, unscripted, mara([view('View 1')]));
+    assert.deepEqual(long.lines.at(-1), ['Making a reference sheet…', 'done', 'Not made: Mara’s sheet has over 5 views; trim it first']);
+    assert.equal(meta.requests.length, 0);
+  });
+
+  await t.test('a first view that fails saves nothing and makes no more; a later one leaves the sheet without it', async () => {
+    const video = await scripted();
+    const refused = { status: 400, error: { type: 'invalid_request_error', code: 'content_policy_violation', message: 'refused' } };
+    const first = await sheet(owner, video, mara([view('Front'), view('Side'), view('Face')]), [refused]);
+    assert.deepEqual(first.lines.at(-1), ['Making a reference sheet…', 'done', 'Not made: the request was refused']);
+    assert.equal(meta.requests.length, 1); assert.deepEqual(await made(video), []); assert.equal(await sheetVersions(video), 0);
+    const third = await sheet(owner, video, mara([view('Front'), view('Side'), view('Face')]), [{ images: [testPng({ seed: 11 })] }, { images: [testPng({ seed: 12 })] }, refused]);
+    assert.ok(third.result.made, JSON.stringify(third.result));
+    assert.deepEqual(third.result.views.map(item => item.view), ['Front', 'Side']);
+    assert.deepEqual(third.result.missing.map(item => [item.view, item.reason]), [['Face', 'content_policy']]);
+    assert.deepEqual(third.lines.at(-1), ['Making a reference sheet…', 'done', 'Saved Mara · Version 1 · 2 of 3 views']);
+  });
+
+  await t.test('a person\'s revision while a view is being made makes the save stale; the made views are kept as draft images', async () => {
+    const video = await scripted();
+    const base = await sheet(owner, video, mara([view('Full-body front'), view('Face close-up')]));
+    assert.ok(base.result.made);
+    const gate = released();
+    const { turn } = running(owner, video, mara([view('Full-body front'), view('Face close-up'), view('Hands')]), [{ images: [testPng({ seed: 21 })] }, { images: [testPng({ seed: 22 })] }, { hold: gate.promise }]);
+    await until(async () => meta.requests.length, count => count === 3, 'the third view\'s request');
+    const current = (await sheetOf(video))!;
+    await person.save(owner.id, video, { operationId: randomUUID(), artifactId: current.version.artifactId, baseVersionId: current.version.id, kind: 'reference', intendedUse: { purpose: 'reference' },
+      content: { ...current.content, subject: { ...current.content.subject, description: 'Revised by hand.' } }, dependencies: current.content.references.map(reference => reference.versionId) });
+    gate.release();
+    const ended = await turn;
+    assert.ok(completed(ended), JSON.stringify(ended.terminal));
+    const result = toolResult();
+    assert.ok(!result.made && result.reason === 'stale', JSON.stringify(result));
+    assert.deepEqual(result.kept?.map(item => item.view), ['Full-body front', 'Face close-up', 'Hands']);
+    assert.equal((await made(video)).length, 5); assert.equal(await sheetVersions(video), 2);
+    assert.equal((await sheetOf(video))?.content.subject.description, 'Revised by hand.');
+    assert.equal(sheetLines(ended).at(-1)?.payload?.summary, 'Not saved: the sheet changed; views kept as images');
+  });
+
+  await t.test('Stop while a view is being made ends the line incomplete: views saved before it stay, and no sheet is saved', async () => {
+    const video = await scripted();
+    const { accepted, turn } = running(owner, video, mara([view('Front'), view('Side'), view('Face')]), [{ images: [testPng({ seed: 31 })] }, { hang: true }]);
+    const runId = await accepted;
+    await until(async () => meta.requests.length, count => count === 2, 'the second view\'s request');
+    assert.equal((await client(owner).post('/api/agents/assistant/threads/abort', { threadId: video, resourceId: owner.id, expectedRunId: runId, clearPendingSignals: false })).status, 200);
+    const ended = await turn;
+    assert.ok(!completed(ended));
+    assert.equal((await made(video)).length, 1); assert.equal(await sheetVersions(video), 0);
+    assert.equal(meta.requests.length, 2);
+    const history = await client(owner).get(`/memory/threads/${video}/messages?page=0&perPage=20`);
+    const parts = (await history.json() as { messages: { content: { parts: Record<string, unknown>[] } }[] }).messages.flatMap(message => message.content.parts);
+    assert.deepEqual(parts.filter(part => part.type === 'tool-activity' && part.tool === 'generate-sheet').map(part => part.state), ['incomplete']);
+  });
 });
