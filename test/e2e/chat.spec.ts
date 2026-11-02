@@ -56,6 +56,12 @@ test('a pending dot holds the reply\'s place, and the thread follows the newest 
   const long = (word: string) => ` ${word}`.repeat(1500);
   const position = () => thread.evaluate(element => ({ top: element.scrollTop, bottom: element.scrollHeight - element.scrollTop - element.clientHeight }));
   const atEnd = () => expect.poll(async () => (await position()).bottom).toBeLessThanOrEqual(2);
+  /** Scrolls the hovered thread by mouse wheel and waits for the move to land. */
+  const wheel = async (delta: number) => {
+    const { top } = await position();
+    await page.mouse.wheel(0, delta);
+    await expect.poll(async () => (await position()).top).not.toBe(top);
+  };
   provider.script({ text: ['Opening', long('lake')], hold: 'before' });
   await signIn(page, account!);
   await message(page).fill('Write a long answer');
@@ -67,24 +73,40 @@ test('a pending dot holds the reply\'s place, and the thread follows the newest 
   await expect(live(page).locator('.wp-pending-dot')).toHaveCount(0);
   await atEnd();
 
-  // Scrolled up mid-reply, the reader keeps their place while the rest streams in below.
+  // Back at the end mid-reply, after a small scroll up, the thread follows again.
   provider.script({ text: ['Second', long('shore')], hold: 'mid' });
   await message(page).fill('And another');
   await message(page).press('Enter');
-  const reply = live(page).getByRole('listitem', { name: 'Assistant message' }).last();
+  let reply = live(page).getByRole('listitem', { name: 'Assistant message' }).last();
   await expect(reply).toHaveText('Second');
   await atEnd();
-  await thread.evaluate(element => new Promise<void>(resolve => { element.addEventListener('scroll', () => resolve(), { once: true }); element.scrollTop = 0; }));
+  await thread.hover();
+  await wheel(-10);
+  await wheel(1000);
   provider.release();
   await expect(reply).toContainText('shore');
   await expect(working(page)).toHaveCount(0);
-  expect((await position()).top).toBeLessThanOrEqual(2);
+  await atEnd();
+
+  // A scroll up of less than a line mid-reply leaves the end, and the rest streams in below.
+  provider.script({ text: ['Third', long('reed')], hold: 'mid' });
+  await message(page).fill('Once more');
+  await message(page).press('Enter');
+  reply = live(page).getByRole('listitem', { name: 'Assistant message' }).last();
+  await expect(reply).toHaveText('Third');
+  await atEnd();
+  const { top } = await position();
+  await wheel(-10);
+  provider.release();
+  await expect(reply).toContainText('reed');
+  await expect(working(page)).toHaveCount(0);
+  expect((await position()).top).toBe(top - 10);
 
   // A new send returns to the newest text.
-  provider.script({ text: ['Third'] });
-  await message(page).fill('One more');
+  provider.script({ text: ['Fourth'] });
+  await message(page).fill('The last one');
   await message(page).press('Enter');
-  await expect(live(page).getByRole('listitem', { name: 'Assistant message' }).last()).toHaveText('Third');
+  await expect(live(page).getByRole('listitem', { name: 'Assistant message' }).last()).toHaveText('Fourth');
   await atEnd();
 });
 
