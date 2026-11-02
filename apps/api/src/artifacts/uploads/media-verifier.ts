@@ -13,6 +13,22 @@ export function measuredMedia(expected: Readonly<{ kind: 'image' | 'video'; cont
   if (!parsed.success || !('media' in parsed.data)) throw new UploadError('invalid_input'); return parsed.data.media;
 }
 
+const busy = (error: unknown) => error instanceof MediaProcessError && error.code === 'capacity';
+
+/** The checker runs one job at a time: another job's turn is waited out, within `waitMs`. Each try has its own limit. */
+export async function verifyWhenFree(verifyMedia: MediaVerifier, input: Omit<Parameters<MediaVerifier>[0], 'signal'>, options: Readonly<{ waitMs: number; retryMs: number; signal?: AbortSignal | undefined }>): Promise<VerifiedMedia> {
+  const deadline = Date.now() + options.waitMs;
+  for (;;) {
+    try {
+      const attempt = AbortSignal.timeout(20_000);
+      return await verifyMedia({ ...input, signal: options.signal ? AbortSignal.any([options.signal, attempt]) : attempt });
+    } catch (error) {
+      if (!busy(error) || Date.now() + options.retryMs > deadline || options.signal?.aborted) throw error;
+      await new Promise(resolve => setTimeout(resolve, options.retryMs));
+    }
+  }
+}
+
 /** Trusted composition capability; actual immutable byte/decode proof, never caller authority. */
 export function createMediaVerifier(sandbox:MediaSandbox):MediaVerifier {
   return async input=>{

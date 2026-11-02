@@ -9,7 +9,7 @@ import { uploadRecords } from './records.js';
 import { completeUpload } from './completion.js';
 import { cleanupUpload } from './cleanup.js';
 import { createMediaAccess } from './access.js';
-import { measuredMedia } from './media-verifier.js';
+import { measuredMedia, verifyWhenFree } from './media-verifier.js';
 import type { OwnedCheck, UploadCollaborators, UploadRequest, VerifiedMedia } from './types.js';
 
 const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
@@ -52,7 +52,8 @@ export function createUploadCoordinator(pool: Pool, checkOwnedConversation: Owne
         if (snapshot.byteSize !== Number(row.byte_size) || snapshot.contentType !== row.content_type || digest(snapshot.bytes) !== snapshot.sha256) throw new UploadError('invalid_input');
         if (!collaborators.verifyMedia) throw new UploadError('not_implemented');
         const controller = new AbortController();
-        const verification = Promise.resolve().then(() => collaborators.verifyMedia!({ kind: row.kind, bytes: new Uint8Array(snapshot.bytes), contentType: row.content_type, signal: controller.signal }));
+        // An assistant image check holding the one-job checker is waited out, inside this confirm's own limit.
+        const verification = Promise.resolve().then(() => verifyWhenFree(collaborators.verifyMedia!, { kind: row.kind, bytes: new Uint8Array(snapshot.bytes), contentType: row.content_type }, { waitMs: 15_000, retryMs: 250, signal: controller.signal }));
         let timer: ReturnType<typeof setTimeout> | undefined;
         const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new UploadError('integration_failure')); }, 20000); });
         let verified: VerifiedMedia;
