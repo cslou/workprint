@@ -3,8 +3,8 @@ import { registerApiRoute, type ApiRoute } from '@mastra/core/server';
 import { PostgresStore } from '@mastra/pg';
 import { Pool } from 'pg';
 import { createOwnedConversationCheck, bindNativeTurns, productionTools, turnLimits, type AgentCollaborators, type AgentTool, type NativeTurnModel, type TurnLimits } from '../agent/index.js';
-import { createApplication, createAssistantScriptSaver, createGeneratedImageSaver, createGeneratedVideoSaver, createImageInputReader, createVideoJobs, createWorkspaceReader, type VideoJobTiming, withSavedWork, withManualSaves, withVersionUses, withGenerationRequests, withStoryboardEdits, withUploads } from '../application/index.js';
-import { createArtifactStore, createArtifactWriters, createAssistantScripts, createGeneratedImages, createGeneratedVideos, createVersionUses, createStoryboardEdits, createMediaVerifier, createUploadCoordinator } from '../artifacts/index.js';
+import { createApplication, createAssistantScriptSaver, createAssistantSheets, createGeneratedImageSaver, createGeneratedVideoSaver, createImageInputReader, createVideoJobs, createWorkspaceReader, type VideoJobTiming, withSavedWork, withManualSaves, withVersionUses, withGenerationRequests, withStoryboardEdits, withUploads } from '../application/index.js';
+import { createArtifactStore, createArtifactWriters, createAssistantReferences, createAssistantScripts, createGeneratedImages, createGeneratedVideos, createVersionUses, createStoryboardEdits, createMediaVerifier, createUploadCoordinator } from '../artifacts/index.js';
 import { configuredMediaSandbox, configuredObjectStorage } from '../storage/index.js';
 import { assertRestrictedRole } from '../db/index.js';
 import { createGenerationJobs, type MetaImageClient, type MiniMaxVideoClient } from '../generation/index.js';
@@ -131,6 +131,7 @@ export async function createBackend(routes: ApiRoute[] = [], turns?: TurnComposi
     const collaborators: AgentCollaborators = {
       readWorkspace: createWorkspaceReader(savedWork), saveScript: createAssistantScriptSaver(createAssistantScripts(pool, application.checkOwnedConversation).save),
       readImageInputs, saveGeneratedImage: createGeneratedImageSaver(generated.save),
+      sheets: createAssistantSheets(createAssistantReferences(pool, application.checkOwnedConversation)),
       // Images and videos are made only where they can be saved: without storage and the checker, no paid call is made.
       ...(turns.images && objects && verifyMedia ? { images: turns.images } : {}),
       ...(turns.videos && objects && verifyMedia ? { videos: createVideoJobs({

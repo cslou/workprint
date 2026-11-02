@@ -5,7 +5,13 @@ import { Pool } from 'pg';
 import { PostgresStore } from '@mastra/pg';
 import type { OperationRequest, Version } from '@workprint/contracts';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
-import { createArtifactStore, createArtifactWriters } from '../../src/artifacts/index.js';
+import { BUILT_IN_OWNER } from '../../src/artifacts/store.js';
+import { createArtifactStore, createArtifactWriters, createAssistantReferences, createAssistantScripts, createGeneratedImages, createMediaVerifier } from '../../src/artifacts/index.js';
+import { publishVersion } from '../../src/artifacts/publication.js';
+import { createAssistantScriptSaver, createAssistantSheets, type AssistantSheetOutcome, createGeneratedImageSaver, createImageInputReader } from '../../src/application/index.js';
+import { transaction } from '../../src/db/index.js';
+import { createMediaSandbox, createPrivateObjectStorage } from '../../src/storage/index.js';
+import { testPng } from '../support/meta-image-fake.js';
 import { createNativeConversation } from '../support/native-conversations.js';
 import { query } from '../support/postgres.js';
 import { testStack, type TestDatabase } from '../support/test-stack.js';
@@ -179,5 +185,140 @@ describe('manual save writers', { timeout: 120000 }, () => {
   await store.workspace('writer-a', a.id); await store.history('writer-a', base.artifactId); await store.version('writer-a', detached.version.id); await store.library('writer-a');
   assert.deepEqual(await fingerprint(), beforeReads, 'Reading workspace/history never consumes pending manual changes');
   for (const sql of ['UPDATE artifacts.commands SET result=result', 'DELETE FROM artifacts.manual_changes', "UPDATE artifacts.conversation_uses SET binding='{}'"]) await assert.rejects(query(db.servingUrl, sql));
+  });
+});
+
+// The assistant's sheet saves, called directly with images saved as generate-image saves them.
+test('the assistant saves a script subject\'s sheet as a draft, never over newer work, and never one image in two sheets', { timeout: 120000 }, async t => {
+  const db = await testStack().testDatabase();
+  const { storage: service, media } = testStack();
+  const sandbox = await createMediaSandbox(media.toolchain);
+  const native = new PostgresStore({ id: 'assistant-sheets', connectionString: db.setupUrl, schemaName: 'mastra' });
+  const pool = new Pool({ connectionString: db.servingUrl, max: 4 }), sealer = new Pool({ connectionString: db.setupUrl, max: 1 });
+  t.after(async () => { await pool.end(); await sealer.end(); await native.close(); await sandbox.close(); await db.close(); });
+  await native.init(); await db.grantServing(); await applyArtifactMigrations(db.setupUrl);
+  const check = createOwnedConversationCheck(native), store = createArtifactStore(pool, check);
+  const images = createGeneratedImages(pool, check, { storage: createPrivateObjectStorage(service), verifyMedia: createMediaVerifier(sandbox) });
+  const saveImage = createGeneratedImageSaver(images.save), readInputs = createImageInputReader(store, images.read);
+  const references = createAssistantReferences(pool, check), sheets = createAssistantSheets(references);
+  const saveScript = createAssistantScriptSaver(createAssistantScripts(pool, check).save);
+  const account = 'sheet-owner', other = 'sheet-other';
+  const conversation = async (owner: string) => (await createNativeConversation(native, owner)).id;
+  const video = await conversation(account), elsewhere = await conversation(account), unscripted = await conversation(account);
+  const foreignVideo = await conversation(other);
+  let seed = 0;
+  const saved = (outcome: AssistantSheetOutcome) => { assert.equal(outcome.kind, 'saved', JSON.stringify(outcome)); return outcome as Extract<AssistantSheetOutcome, { kind: 'saved' }>; };
+  const image = async (owner: string, conversation: string, extra: { inputs?: string[]; revises?: string } = {}) => {
+    const saved = await saveImage(owner, conversation, { bytes: testPng({ seed: ++seed }), contentType: 'image/png', inputs: extra.inputs ?? [], ...(extra.revises ? { revises: extra.revises } : {}) });
+    assert.equal(saved.kind, 'saved'); return (saved as { versionId: string }).versionId;
+  };
+  const scene = (characters: string[]) => ({ schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'The Gallery', time: 'night' }, characters, script: [{ action: 'Mara waits.' }] }] });
+  const subjects = (mara: string) => [{ id: '', kind: 'character' as const, name: mara }, { id: '', kind: 'place' as const, name: 'The Gallery' }];
+  const first = await saveScript(account, video, { baseVersionId: null, content: scene([]), subjects: subjects('Mara') });
+  assert.equal(first.kind, 'saved');
+  const views = (ids: string[]) => ids.map((versionId, index) => ({ versionId, view: ['Full-body front', 'Three-quarter', 'Face close-up', 'Hands', 'Back', 'Side'][index]!, notes: [] }));
+  const mara = (ids: string[], baseVersionId: string | null) => ({ subjectId: 'mara', description: 'A courier in a long grey coat.', continuityNotes: ['Keep the grey coat.'], views: views(ids), baseVersionId });
+  const versionRow = async (id: string) => (await pool.query<{ revision: number; created_by: string; artifact_id: string; content: { subject: unknown; references: { versionId: string; view: string }[] } }>('SELECT revision,created_by,artifact_id,content FROM artifacts.versions WHERE version_id=$1', [id])).rows[0]!;
+  const sheetUse = async (versionId: string) => (await pool.query<{ use_id: string; state: string; purpose: string }>('SELECT use_id,state,purpose FROM artifacts.conversation_uses WHERE version_id=$1', [versionId])).rows;
+  const references_ = async (conversation: string) => Number((await pool.query<{ count: string }>("SELECT count(*) FROM artifacts.versions WHERE origin_conversation_id=$1 AND kind='reference'", [conversation])).rows[0]!.count);
+  const [i1, i2, i3, i4] = [await image(account, video), await image(account, video), await image(account, video), await image(account, video)];
+
+  const v1 = saved(await sheets.save(account, video, mara([i1, i2, i3], null)));
+  assert.deepEqual([v1.revision, v1.subjectName], [1, 'Mara']);
+  const row1 = await versionRow(v1.versionId);
+  assert.equal(row1.created_by, 'assistant');
+  assert.deepEqual(row1.content.subject, { id: 'mara', kind: 'character', name: 'Mara', description: 'A courier in a long grey coat.', continuityNotes: ['Keep the grey coat.'] });
+  assert.deepEqual(row1.content.references.map(reference => [reference.versionId, reference.view]), [[i1, 'Full-body front'], [i2, 'Three-quarter'], [i3, 'Face close-up']]);
+  assert.deepEqual((await store.version(account, v1.versionId)).dependencies, [i1, i2, i3]);
+  const [use1] = await sheetUse(v1.versionId);
+  assert.deepEqual([use1?.state, use1?.purpose], ['draft', 'reference']);
+
+  await t.test('a next version on the current sheet stays on its use; a rename in the script names the next version', async () => {
+    const v2 = saved(await sheets.save(account, video, mara([i1, i2, i3, i4], v1.versionId)));
+    assert.equal(v2.revision, 2);
+    assert.deepEqual((await sheetUse(v2.versionId)).map(use => [use.use_id, use.state]), [[use1!.use_id, 'draft']]);
+    const renamed = await saveScript(account, video, { baseVersionId: first.kind === 'saved' ? first.versionId : '', content: scene(['Mara']), subjects: [{ id: 'mara', kind: 'character', name: 'Mara Vale' }, { id: 'the-gallery', kind: 'place', name: 'The Gallery' }] });
+    assert.equal(renamed.kind, 'saved');
+    const v3 = saved(await sheets.save(account, video, mara([i1, i2, i3, i4], v2.versionId)));
+    assert.deepEqual([v3.revision, v3.subjectName], [3, 'Mara Vale']);
+    assert.deepEqual((await versionRow(v3.versionId)).content.subject, { id: 'mara', kind: 'character', name: 'Mara Vale', description: 'A courier in a long grey coat.', continuityNotes: ['Keep the grey coat.'] });
+    // An older base is stale and saves nothing.
+    assert.deepEqual(await sheets.save(account, video, mara([i1], v1.versionId)), { kind: 'stale' });
+    assert.deepEqual(await sheets.save(account, video, mara([i1], null)), { kind: 'stale' });
+    assert.equal(await references_(video), 3);
+  });
+
+  const current = async () => (await store.workspace(account, video)).assets.find(asset => asset.version.kind === 'reference' && (asset.version as unknown as { content: { subject: { id: string } } }).content.subject.id === 'mara')!.version.id;
+
+  await t.test('a subject must be in the script, and a place\'s sheet has kind environment', async () => {
+    assert.deepEqual(await sheets.save(account, video, { ...mara([i1], null), subjectId: 'ben' }), { kind: 'not_in_script' });
+    const loose = await image(account, unscripted);
+    assert.deepEqual(await sheets.save(account, unscripted, mara([loose], null)), { kind: 'no_script' });
+    const i5 = await image(account, video);
+    const gallery = saved(await sheets.save(account, video, { subjectId: 'the-gallery', description: 'A white gallery.', continuityNotes: ['Keep the skylight.'], views: views([i5]), baseVersionId: null }));
+    assert.deepEqual((await versionRow(gallery.versionId)).content.subject, { id: 'the-gallery', kind: 'environment', name: 'The Gallery', description: 'A white gallery.', continuityNotes: ['Keep the skylight.'] });
+    // An image in Mara's sheet can't be in the Gallery's, but stays allowed in Mara's next version.
+    assert.deepEqual(await sheets.save(account, video, { subjectId: 'the-gallery', description: 'A white gallery.', continuityNotes: ['Keep the skylight.'], views: views([i5, i1]), baseVersionId: gallery.versionId }), { kind: 'in_other_sheet', subjectName: 'Mara Vale' });
+    assert.equal((await sheets.save(account, video, mara([i1, i2], await current()))).kind, 'saved');
+  });
+
+  await t.test('a view must be a checked image this video uses, or one the base sheet holds', async () => {
+    const base = await current();
+    const theirs = await image(other, foreignVideo), otherVideos = await image(account, elsewhere);
+    for (const id of [theirs, otherVideos, randomUUID(), 'not an id', first.kind === 'saved' ? first.versionId : '']) assert.deepEqual(await sheets.save(account, video, mara([i1, id], base)), { kind: 'not_found' }, id);
+    // An image record without its checked object is not a verified image.
+    const unchecked = await transaction(pool, client => publishVersion(client, { accountId: account, conversationId: video, kind: 'image', media: { contentType: 'image/png', byteSize: 10, width: 64, height: 48 }, dependencies: [], createdBy: 'assistant' }));
+    assert.deepEqual(await sheets.save(account, video, mara([unchecked.id], base)), { kind: 'invalid', field: 'images' });
+    assert.deepEqual(await sheets.save(account, video, mara([i1, i2, i3, i4, otherVideos, theirs], base)), { kind: 'invalid', field: 'images' }, 'six views');
+    assert.deepEqual(await sheets.save(account, video, { ...mara([i1, i1], base) }), { kind: 'invalid', field: 'images' }, 'one image twice');
+    assert.deepEqual(await sheets.save(account, video, { ...mara([i1], base), views: [{ versionId: i1, view: ' ', notes: [] }] }), { kind: 'invalid', field: 'images' }, 'an empty view name');
+  });
+
+  await t.test('a view whose own use moved on stays in the sheet and still counts as used', async () => {
+    const base = await current();
+    const edited = await image(account, video, { inputs: [i2], revises: i2 });
+    assert.notEqual(edited, i2);
+    assert.ok(!(await store.workspace(account, video)).assets.some(asset => asset.version.id === i2), 'i2\'s own use moved to its next version');
+    saved(await sheets.save(account, video, mara([i1, i2], base)));
+    assert.equal((await readInputs(account, video, [i2])).kind, 'read', 'a sheet view counts as used for inputImages');
+  });
+
+  await t.test('a person\'s sheet with more than 5 views stays valid but the assistant can\'t revise it; a built-in sheet starts an owned one', async () => {
+    const people = (await createNativeConversation(native, account)).id;
+    const listed = await saveScript(account, people, { baseVersionId: null, content: scene([]), subjects: subjects('Mara') });
+    assert.equal(listed.kind, 'saved');
+    const six = [];
+    for (let n = 0; n < 6; n++) six.push(await image(account, people));
+    const theirs = await store.insert({ accountId: account, conversationId: people, kind: 'reference', createdBy: 'human', dependencies: six, content: { schemaVersion: 1, subject: { id: 'mara', kind: 'character', name: 'Mara', description: 'Drawn by hand.', continuityNotes: ['n'] }, references: views(six) }, use: { binding: { purpose: 'reference', role: 'mara' }, state: 'approved' } });
+    assert.deepEqual(await sheets.save(account, people, mara(six.slice(0, 3), theirs.id)), { kind: 'invalid', field: 'images' });
+    assert.equal(await references_(people), 1);
+    // A built-in sheet in use for the subject: the assistant's save starts the account's own sheet on that use.
+    const builtIns = await conversation(BUILT_IN_OWNER);
+    const sealed = await store.insert({ accountId: BUILT_IN_OWNER, conversationId: builtIns, kind: 'reference', createdBy: 'human', dependencies: [], content: { schemaVersion: 1, subject: { id: 'mara', kind: 'character', name: 'Mara', description: 'A shared example.', continuityNotes: ['n'] }, references: [] } });
+    await sealer.query('UPDATE artifacts.artifacts SET built_in=true WHERE owner_id=$1 AND artifact_id=$2', [BUILT_IN_OWNER, sealed.artifactId]);
+    const reused = await conversation(account);
+    assert.equal((await saveScript(account, reused, { baseVersionId: null, content: scene([]), subjects: subjects('Mara') })).kind, 'saved');
+    const view = await image(account, reused);
+    const useId = randomUUID();
+    await pool.query("INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state) VALUES($1,$2,$3,$4,$5,'reference','draft')", [account, reused, useId, sealed.id, { purpose: 'reference' }]);
+    const owned = saved(await sheets.save(account, reused, mara([view], sealed.id)));
+    const ownedRow = await versionRow(owned.versionId);
+    assert.deepEqual([owned.revision, ownedRow.artifact_id === sealed.artifactId], [1, false]);
+    assert.deepEqual((await sheetUse(owned.versionId)).map(use => [use.use_id, use.state]), [[useId, 'draft']]);
+  });
+
+  await t.test('at the use limit a new sheet has no room and a next version still saves; useRoom counts what is left', async () => {
+    const full = (await createNativeConversation(native, account)).id;
+    const listed = await saveScript(account, full, { baseVersionId: null, content: scene([]), subjects: subjects('Mara') });
+    assert.equal(listed.kind, 'saved');
+    const [a, b] = [await image(account, full), await image(account, full)];
+    const sheet = saved(await sheets.save(account, full, mara([a], null)));
+    assert.deepEqual(await sheets.useRoom(account, full), { kind: 'room', room: 96 });
+    await pool.query(`INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state)
+      SELECT $1,$2,gen_random_uuid()::text,$3,jsonb_build_object('purpose','reference','role','extra-'||n),'reference','draft' FROM generate_series(1,96) n`, [account, full, b]);
+    assert.deepEqual(await sheets.useRoom(account, full), { kind: 'room', room: 0 });
+    assert.deepEqual(await sheets.save(account, full, { subjectId: 'the-gallery', description: 'A white gallery.', continuityNotes: ['n'], views: views([b]), baseVersionId: null }), { kind: 'no_room' });
+    assert.equal((await sheets.save(account, full, mara([a, b], sheet.versionId))).kind, 'saved');
+    assert.deepEqual(await sheets.useRoom(account, randomUUID()), { kind: 'not_found' });
   });
 });
