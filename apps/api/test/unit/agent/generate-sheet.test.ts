@@ -42,6 +42,7 @@ function harness(options: Options = {}) {
     sheets: {
       save: async (_account, _video, input) => { calls.saves.push(input); return options.save ?? { kind: 'saved', versionId: randomUUID(), revision: 1, subjectName: 'Mara' }; },
       useRoom: async () => ({ kind: 'room', room: options.room ?? 100 }),
+      readView: async () => ({ kind: 'not_found' }),
     },
     ...(options.noClient ? {} : { images: {
       generate: async () => meta(calls.generate++ + calls.edit),

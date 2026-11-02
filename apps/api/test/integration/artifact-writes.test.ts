@@ -285,6 +285,10 @@ test('the assistant saves a script subject\'s sheet as a draft, never over newer
     assert.ok(!(await store.workspace(account, video)).assets.some(asset => asset.version.id === i2), 'i2\'s own use moved to its next version');
     saved(await sheets.save(account, video, mara([i1, i2], base)));
     assert.equal((await readInputs(account, video, [i2])).kind, 'read', 'a sheet view counts as used for inputImages');
+    // read-workspace reads that view on its own; an edited image, another video's view or another account's read is not a view.
+    const view = await sheets.readView(account, video, i2);
+    assert.ok(view.kind === 'found' && view.version.id === i2 && view.version.kind === 'image', JSON.stringify(view));
+    for (const [owner, conversation, id] of [[account, video, edited], [account, elsewhere, i2], [other, video, i2]] as const) assert.deepEqual(await sheets.readView(owner, conversation, id), { kind: 'not_found' }, `${owner} ${id}`);
   });
 
   await t.test('a person\'s sheet with more than 5 views stays valid but the assistant can\'t revise it; a built-in sheet starts an owned one', async () => {

@@ -1,9 +1,9 @@
-import { savedReferenceContentSchema, savedScriptContentSchema, scriptSubjects, subjectNameKey, type ScriptSubject } from '@workprint/contracts';
+import { currentSheets, savedScriptContentSchema, scriptSubjects, subjectNameKey, type CurrentSheet, type ScriptSubject } from '@workprint/contracts';
 import { maxSheetViewName, maxSheetViews, usedImageVersions } from '../artifacts/index.js';
 import { MetaImageError, type MetaImageClient } from '../generation/index.js';
 import type { AssistantSheets } from './assistant-references.js';
 import { metaImageFailure, saveFailure, type ImageFailure, type ReadImageInputs, type SaveGeneratedImage } from './generated-images.js';
-import type { OwnedWorkspace, ReadOwnedWorkspace } from './workspace-reads.js';
+import type { ReadOwnedWorkspace } from './workspace-reads.js';
 
 /** One view to put in a sheet: an existing image (`image`) or one made from `prompt`. Empty means none. */
 export type SheetViewRequest = Readonly<{ view: string; prompt: string; image: string; notes: readonly string[]; size: string }>;
@@ -60,15 +60,7 @@ export function sheetViewPrompt(subject: ScriptSubject, request: Pick<SheetReque
   return [withIdentity ? keepLines[subject.kind] : '', sheetViewFrame(subject, view.view, request.description, request.continuityNotes), view.prompt.trim()].filter(Boolean).join('\n\n');
 }
 
-type Sheet = { versionId: string; subjectId: string; references: { versionId: string; view: string; notes: string[] }[] };
-/** The video's current sheets in workspace order. */
-function currentSheets(workspace: OwnedWorkspace): Sheet[] {
-  return workspace.assets.flatMap(({ version }) => {
-    if (version.kind !== 'reference' || !('content' in version)) return [];
-    const sheet = savedReferenceContentSchema.safeParse(version.content);
-    return sheet.success ? [{ versionId: version.id, subjectId: sheet.data.subject.id, references: sheet.data.references }] : [];
-  });
-}
+type Sheet = CurrentSheet;
 
 /** One planned view: kept from the base or an existing image (`versionId`), or one to make. `replaces` is the base view it remakes. */
 type Planned = { view: string; notes: string[]; versionId?: string; make?: SheetViewRequest; replaces?: string };
@@ -83,7 +75,7 @@ async function resolve(makers: SheetMakers, accountId: string, videoId: string, 
   const subjects = scriptSubjects(script.data);
   const subject = subjects.find(candidate => candidate.id === subjectId.trim());
   if (!subject) return { kind: 'refused', reason: 'not_in_script' } as const;
-  return { kind: 'found', workspace: read.workspace, subjects, subject } as const;
+  return { kind: 'found', workspace: read.workspace, subject } as const;
 }
 
 /**
@@ -94,7 +86,7 @@ async function resolve(makers: SheetMakers, accountId: string, videoId: string, 
 function plan(base: Sheet | undefined, views: readonly SheetViewRequest[]): Planned[] | undefined {
   const given = views.map(view => ({ ...view, view: view.view.trim(), image: none(view.image) }));
   if (given.some(view => !view.view || (!view.image && !view.prompt.trim())) || new Set(given.map(view => subjectNameKey(view.view))).size !== given.length) return undefined;
-  const planned: Planned[] = (base?.references ?? []).map(reference => ({ view: reference.view, notes: [...reference.notes], versionId: reference.versionId }));
+  const planned: Planned[] = (base?.views ?? []).map(reference => ({ view: reference.view, notes: [...reference.notes], versionId: reference.versionId }));
   for (const view of given) {
     const at = planned.findIndex(item => subjectNameKey(item.view) === subjectNameKey(view.view));
     const old = at >= 0 ? planned[at] : undefined;
@@ -115,24 +107,24 @@ export async function makeSheet(makers: SheetMakers, accountId: string, videoId:
   if (!images) return { kind: 'refused', reason: 'unsaveable' };
   const found = await resolve(makers, accountId, videoId, request.subject);
   if (found.kind !== 'found') return found;
-  const { workspace, subjects, subject } = found;
+  const { workspace, subject } = found;
   const all = currentSheets(workspace), current = all.find(sheet => sheet.subjectId === subject.id);
   const planned = plan(current, request.views);
   if (!planned) return { kind: 'invalid', field: 'views' };
-  if (current && current.references.length > sheetViewCap) return { kind: 'too_long', subjectName: subject.name };
+  if (current && current.views.length > sheetViewCap) return { kind: 'too_long', subjectName: subject.name };
   if (planned.length > sheetViewCap) return { kind: 'refused', reason: 'too_many_views' };
   // A person's sheet can hold names the save refuses, and a remade view keeps its name; checked before any paid view.
   if (planned.some(item => item.view.trim().length > sheetViewNameCap)) return { kind: 'unrevisable', subjectName: subject.name };
 
   // Existing images must be ones the video uses, and each is in one sheet only.
   const used = usedImageVersions(workspace), identity = none(request.identity);
-  const placed = planned.flatMap(item => item.versionId && !current?.references.some(reference => reference.versionId === item.versionId) ? [item.versionId] : []);
+  const placed = planned.flatMap(item => item.versionId && !current?.views.some(reference => reference.versionId === item.versionId) ? [item.versionId] : []);
   if ([identity, ...placed].some(id => id && !used.has(id))) return { kind: 'refused', reason: 'image_not_found' };
   // Every view's image, kept ones too, is in this sheet only: people's sheets can share an image.
   // A failed remake puts its base image back, so that image counts too.
   const listed = planned.flatMap(item => [item.versionId, item.replaces].filter((id): id is string => Boolean(id)));
-  const holder = all.find(sheet => sheet !== current && sheet.references.some(reference => listed.includes(reference.versionId)));
-  if (holder) return { kind: 'in_other_sheet', subjectName: subjects.find(candidate => candidate.id === holder.subjectId)?.name ?? holder.subjectId };
+  const holder = all.find(sheet => sheet !== current && sheet.views.some(reference => listed.includes(reference.versionId)));
+  if (holder) return { kind: 'in_other_sheet', subjectName: holder.subjectName };
   const toMake = planned.filter(item => item.make).length;
   const room = await sheets.useRoom(accountId, videoId);
   if (room.kind !== 'room') return { kind: 'refused', reason: 'work_unavailable' };
@@ -140,7 +132,7 @@ export async function makeSheet(makers: SheetMakers, accountId: string, videoId:
 
   // The identity input: `identity`, else the sheet's first view (for a next version, the base's first view even when
   // it is remade). A new sheet whose first view is made has none until that view is made.
-  const identityId = identity || current?.references[0]?.versionId || (planned[0]?.make ? '' : planned[0]?.versionId ?? '');
+  const identityId = identity || current?.views[0]?.versionId || (planned[0]?.make ? '' : planned[0]?.versionId ?? '');
   let input: Identity | undefined;
   if (identityId) {
     const read = await makers.readImageInputs(accountId, videoId, [identityId]);

@@ -95,3 +95,65 @@ test('the listing gives the script\'s subjects with their ids, and 50 subjects w
   assert.equal(listed.items[0]?.name, 'Script · Version 1', 'the script still fits beside the subjects');
   assert.ok(listed.truncated);
 });
+
+const subjectScript = (subjects: { id: string; kind: 'character' | 'place' | 'prop'; name: string }[]): Version => ({ ...base('s'), kind: 'script', content: { schemaVersion: 1, subjects,
+  scenes: [{ heading: { setting: 'INT.', location: 'The Gallery', time: 'Night' }, characters: subjects.filter(subject => subject.kind === 'character').map(subject => subject.name), script: [{ action: 'She waits.' }] }] } });
+const sheetVersion = (id: string, subject: string, views: [string, string][]): Version => ({ ...base(id), kind: 'reference', content: { schemaVersion: 1,
+  subject: { id: subject, kind: 'character', name: 'Old name', description: 'A courier.', continuityNotes: ['n'] }, references: views.map(([versionId, view]) => ({ versionId, view, notes: [] })) } });
+const readTool = productionTools.find(candidate => candidate.id === 'read-workspace')!;
+const reading = (space: OwnedWorkspace, readView: AgentCollaborators['sheets']['readView']) => {
+  const collaborators: AgentCollaborators = { readWorkspace: async () => ({ kind: 'found', workspace: space }), saveScript: async () => ({ kind: 'unavailable' }), readImageInputs: async () => ({ kind: 'not_found' }),
+    saveGeneratedImage: async () => ({ kind: 'unavailable' }), sheets: { ...unusedSheets, readView } };
+  const signal = new AbortController().signal;
+  return (input: Record<string, unknown>) => readTool.execute(input, { scope: { accountId: 'a', videoId: 'v' }, collaborators, signal, abortReason: () => undefined }) as Promise<Record<string, unknown>>;
+};
+
+test('a sheet\'s images are listed under its subject by name, and item mode reads the sheet, a view and a view whose use moved on', async () => {
+  // Mara's sheet lists v1, v2 and v3; v3's own use has moved on to its next version, v3b.
+  const sheet = sheetVersion('sh', 'mara', [['v1', 'Full-body front'], ['v2', 'Three-quarter'], ['v3', 'Face close-up']]);
+  const v3b: Version = { ...image('v3b'), artifactId: 'artifact-v3', revision: 2 };
+  const space = workspace([image('i1'), image('v1'), image('v2'), v3b, image('i5'), sheet], { script: work(subjectScript([{ id: 'mara', kind: 'character', name: 'Mara' }, { id: 'the-gallery', kind: 'place', name: 'The Gallery' }]), 'script') });
+  const reads: string[] = [];
+  const read = reading(space, async (_account, _video, versionId) => { reads.push(versionId); return { kind: 'found', version: { ...image('v3'), artifactId: 'artifact-v3' } }; });
+  const listed = await read({}) as { subjects: unknown[]; items: { name: string; versionId: string }[]; total: number };
+  assert.deepEqual(listed.subjects, [
+    { id: 'mara', kind: 'character', name: 'Mara', sheet: { versionId: 'sh', views: [{ view: 'Full-body front', versionId: 'v1' }, { view: 'Three-quarter', versionId: 'v2' }, { view: 'Face close-up', versionId: 'v3' }] } },
+    { id: 'the-gallery', kind: 'place', name: 'The Gallery' },
+  ]);
+  // The views aren't items; every other image keeps its number, and the sheet is named by the script's name.
+  assert.deepEqual(listed.items.map(item => item.name), ['Script · Version 1', 'Image 1 · Version 1', 'Image 4 · Version 2', 'Image 5 · Version 1', 'Mara · Version 1']);
+  assert.equal(listed.total, 5);
+  const item = async (versionId: string) => ((await read({ versionId })) as { item?: Record<string, unknown> }).item;
+  assert.deepEqual((await item('sh'))?.content, sheet.kind === 'reference' && 'content' in sheet ? sheet.content : undefined);
+  assert.deepEqual([(await item('v2'))?.name, (await item('v2'))?.use], ['Mara · Three-quarter', 'reference']);
+  assert.deepEqual(reads, [], 'a view the video uses is read from the workspace');
+  assert.deepEqual([(await item('v3'))?.name, (await item('v3'))?.use, (await item('v3'))?.revision], ['Mara · Face close-up', 'sheet view', 1]);
+  assert.deepEqual(await read({ versionId: 'elsewhere' }), { found: false, reason: 'not_found' });
+  assert.ok(reads.every(id => id === 'v3'), 'only a sheet\'s own view is read on its own');
+  // The read of a moved-on view can fail like any other read.
+  assert.deepEqual(await reading(space, async () => ({ kind: 'unavailable' }))({ versionId: 'v3' }), { found: false, reason: 'unavailable' });
+});
+
+test('50 subjects with full sheets stay within 16 KiB, and every sheet image is listed under a subject or as an item', async () => {
+  for (const long of [true, false]) {
+    const subjects = Array.from({ length: 50 }, (_, index) => ({ id: long ? `${'s'.repeat(80)}-${index}` : `subject-${index}`, kind: 'prop' as const, name: long ? `${String(index).padStart(2, '0')}${'n'.repeat(78)}` : `Prop ${index}` }));
+    const views = (index: number) => Array.from({ length: 5 }, (_, view) => [`00000000-0000-4000-8000-${String(index * 10 + view).padStart(12, '0')}`, `${'w'.repeat(76)} ${view}`] as [string, string]);
+    const sheets = subjects.map((subject, index) => sheetVersion(`sheet-${index}`, subject.id, views(index)));
+    const images = subjects.flatMap((_, index) => views(index).map(([id]) => image(id)));
+    // A second sheet for the first subject, and a sheet for a subject the script doesn't list.
+    const extra = [sheetVersion('second', subjects[0]!.id, [['x1', 'Back']]), sheetVersion('orphan', 'gone', [['x2', 'Front']])];
+    const space = workspace([image('x1'), image('x2'), ...images, ...sheets, ...extra], { script: work(subjectScript(subjects), 'script') });
+    const listed = await reading(space, async () => ({ kind: 'not_found' }))({}) as { subjects: { sheet?: { versionId: string; views?: { versionId: string }[] } }[]; items: { name: string; versionId: string }[]; total: number };
+    assert.ok(Buffer.byteLength(JSON.stringify(listed)) <= listingBounds.bytes, `long ${long}`);
+    assert.equal(listed.subjects.length, 50);
+    assert.equal(listed.items[0]?.name, 'Script · Version 1', 'the script still fits beside the subjects');
+    // Views listed under a subject aren't items; every other sheet image still is, named by its sheet.
+    const underSubjects = new Set(listed.subjects.flatMap(subject => subject.sheet?.views?.map(view => view.versionId) ?? []));
+    assert.equal(underSubjects.size > 0, !long, 'short subjects leave room for views; the longest leave none');
+    assert.equal(listed.total, 1 + images.length + 2 + sheets.length + extra.length - underSubjects.size);
+    assert.ok(!listed.items.some(item => underSubjects.has(item.versionId)));
+    const names = new Map(listed.items.map(item => [item.versionId, item.name]));
+    assert.deepEqual([names.get('x1'), names.get('x2')], [`${subjects[0]!.name} · Back`, 'Old name · Front'], 'a second sheet\'s and an unlisted subject\'s images are items');
+    if (!long) assert.deepEqual(listed.subjects.at(-1)?.sheet, undefined, 'a sheet past the share is left to the items');
+  }
+});

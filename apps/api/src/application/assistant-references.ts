@@ -1,3 +1,4 @@
+import type { Version } from '@workprint/contracts';
 import { ArtifactError, SheetSaveError, type AssistantSheetInput, type AssistantSheetSave } from '../artifacts/index.js';
 import { logFailure } from './failure-log.js';
 
@@ -10,11 +11,14 @@ export type AssistantSheetOutcome =
 export type SaveAssistantSheet = (accountId: string, videoId: string, input: AssistantSheetInput) => Promise<AssistantSheetOutcome>;
 /** How many more uses the video can hold, or `unavailable`. */
 export type SheetUseRoom = (accountId: string, videoId: string) => Promise<{ kind: 'room'; room: number } | { kind: 'not_found' } | { kind: 'unavailable' }>;
-export type AssistantSheets = Readonly<{ save: SaveAssistantSheet; useRoom: SheetUseRoom }>;
+/** One image a current sheet lists, even when its own use has moved on; anything else is `not_found`. */
+export type ReadSheetView = (accountId: string, videoId: string, versionId: string) => Promise<{ kind: 'found'; version: Version } | { kind: 'not_found' } | { kind: 'unavailable' }>;
+export type AssistantSheets = Readonly<{ save: SaveAssistantSheet; useRoom: SheetUseRoom; readView: ReadSheetView }>;
 
 type Capability = Readonly<{
   save: (account: string, conversation: string, input: AssistantSheetInput) => Promise<AssistantSheetSave>;
   useRoom: (account: string, conversation: string) => Promise<number>;
+  view: (account: string, conversation: string, versionId: string) => Promise<Version>;
 }>;
 
 /** In-process sheet saves for agent tools, over the assistant-only sheet capability. */
@@ -39,6 +43,13 @@ export function createAssistantSheets(capability: Capability): AssistantSheets {
       try { return { kind: 'room', room: await capability.useRoom(accountId, videoId) }; } catch (error) {
         if (error instanceof ArtifactError && error.code === 'not_found') return { kind: 'not_found' };
         logFailure('Sheet use room read failed', error);
+        return { kind: 'unavailable' };
+      }
+    },
+    async readView(accountId, videoId, versionId) {
+      try { return { kind: 'found', version: await capability.view(accountId, videoId, versionId) }; } catch (error) {
+        if (error instanceof ArtifactError && error.code === 'not_found') return { kind: 'not_found' };
+        logFailure('Sheet view read failed', error);
         return { kind: 'unavailable' };
       }
     },
