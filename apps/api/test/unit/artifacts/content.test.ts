@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { parseContent } from '../../../src/artifacts/content.js';
+import { assertContentDependencies, parseContent } from '../../../src/artifacts/content.js';
 
 const script = { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'Station', time: 'morning' }, characters: ['Ada'], script: [{ action: 'Ada puts her bag on the bench.' }, { dialogue: { character: 'Ada', text: 'The train is late.' } }] }] };
 
@@ -69,4 +69,11 @@ test('an assistant storyboard\'s Shot fields parse, an old storyboard without th
   const ten = parseContent('storyboard', { ...plan, shots: [{ ...shot, references: Array.from({ length: 10 }, (_, n) => reference(`subject-${n}`)) }] });
   assert.ok('shots' in ten);
   assert.equal(ten.shots[0]!.references!.length, 10);
+});
+
+test('a storyboard depends only on its source script and reference versions', () => {
+  const plan = parseContent('storyboard', { schemaVersion: 1, sourceScriptVersionId: 'script-v1', shots: [{ shotId: 'shot-one', order: 0, intent: 'Mara arrives', panels: [{ panelId: 'panel-one', order: 0, description: 'The door.', references: [] }] }] });
+  assert.doesNotThrow(() => assertContentDependencies(plan, new Map([['script-v1', { kind: 'script' }], ['sheet-v1', { kind: 'reference' }]])));
+  assert.throws(() => assertContentDependencies(plan, new Map([['script-v1', { kind: 'script' }], ['image-v1', { kind: 'image' }]])), { code: 'invalid_input' });
+  assert.throws(() => assertContentDependencies(plan, new Map([['script-v1', { kind: 'script' }], ['script-v0', { kind: 'script' }]])), { code: 'invalid_input' });
 });
