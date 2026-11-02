@@ -49,6 +49,45 @@ test('a new video streams its first reply, then reload shows the saved conversat
   await expect(recents(page).getByRole('button')).toHaveCount(1);
 });
 
+test('a pending dot holds the reply\'s place, and the thread follows the newest text unless scrolled up', async ({ page, backend }) => {
+  const [account] = await backend.accounts(1);
+  const { provider } = backend;
+  const thread = page.getByLabel('Conversation history');
+  const long = (word: string) => ` ${word}`.repeat(1500);
+  const position = () => thread.evaluate(element => ({ top: element.scrollTop, bottom: element.scrollHeight - element.scrollTop - element.clientHeight }));
+  const atEnd = () => expect.poll(async () => (await position()).bottom).toBeLessThanOrEqual(2);
+  provider.script({ text: ['Opening', long('lake')], hold: 'before' });
+  await signIn(page, account!);
+  await message(page).fill('Write a long answer');
+  await message(page).press('Enter');
+  await expect(live(page).locator('.wp-reply-pending')).toBeVisible();
+  await expect(working(page)).toBeVisible();
+  provider.release();
+  await expect(working(page)).toHaveCount(0);
+  await expect(live(page).locator('.wp-pending-dot')).toHaveCount(0);
+  await atEnd();
+
+  // Scrolled up mid-reply, the reader keeps their place while the rest streams in below.
+  provider.script({ text: ['Second', long('shore')], hold: 'mid' });
+  await message(page).fill('And another');
+  await message(page).press('Enter');
+  const reply = live(page).getByRole('listitem', { name: 'Assistant message' }).last();
+  await expect(reply).toHaveText('Second');
+  await atEnd();
+  await thread.evaluate(element => new Promise<void>(resolve => { element.addEventListener('scroll', () => resolve(), { once: true }); element.scrollTop = 0; }));
+  provider.release();
+  await expect(reply).toContainText('shore');
+  await expect(working(page)).toHaveCount(0);
+  expect((await position()).top).toBeLessThanOrEqual(2);
+
+  // A new send returns to the newest text.
+  provider.script({ text: ['Third'] });
+  await message(page).fill('One more');
+  await message(page).press('Enter');
+  await expect(live(page).getByRole('listitem', { name: 'Assistant message' }).last()).toHaveText('Third');
+  await atEnd();
+});
+
 test('the first reply names the video: Recents and the history heading show the title, and both keep it after reload', async ({ page, backend }) => {
   const [account] = await backend.accounts(1);
   const { provider } = backend;
@@ -295,6 +334,8 @@ test('read-workspace reads the uploaded image: the done line, the answer, and bo
   const reply = live(page).getByRole('listitem', { name: 'Assistant message' }).last();
   await expect(reply.getByText('Read 1 saved item', { exact: true })).toBeVisible();
   await provider.held();
+  // The reply waits for its text after the finished tool line.
+  await expect(reply.locator('.wp-pending-dot')).toBeVisible();
   // What the model received from the tool: the image by name and exact version id.
   const result = toolBody(provider.requests.at(-1)!);
   expect(result).toContain('Image 1 · Version 1');
@@ -302,6 +343,7 @@ test('read-workspace reads the uploaded image: the done line, the answer, and bo
   provider.release();
   await expect(reply.getByText('You have one image saved.', { exact: true })).toBeVisible();
   await expect(working(page)).toHaveCount(0);
+  await expect(reply.locator('.wp-pending-dot')).toHaveCount(0);
 
   await page.reload();
   const savedReply = saved(page).getByRole('listitem', { name: 'Assistant message' }).last();
