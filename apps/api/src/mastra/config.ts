@@ -1,6 +1,6 @@
 import { databaseUrl } from '../db/index.js';
 import { assistantModels } from '../agent/index.js';
-import { metaImageBaseUrl } from '../generation/index.js';
+import { metaImageBaseUrl, miniMaxVideoBaseUrl } from '../generation/index.js';
 import { loadSupabaseConfig } from './auth.js';
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -16,6 +16,9 @@ export function loadServerConfig(env: Environment) {
   if (!model) invalid('DEFAULT_ASSISTANT_MODEL');
   const apiKey = env.META_API_KEY;
   if (!apiKey || !/^[\x21-\x7e]{8,4096}$/.test(apiKey)) invalid('META_API_KEY');
+  // Video is optional: without its key the server starts and supplies no video client.
+  const videoKey = env.MINIMAX_API_KEY;
+  if (videoKey !== undefined && !/^[\x21-\x7e]{8,4096}$/.test(videoKey)) invalid('MINIMAX_API_KEY');
   const port = env.PORT ?? '4111';
   if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) invalid('PORT');
   if (env.MIGRATION_DATABASE_URL) invalid('MIGRATION_DATABASE_URL must not enter the serving process');
@@ -30,5 +33,5 @@ export function loadServerConfig(env: Environment) {
       browserOrigin = url.origin;
     } catch { invalid('WORKPRINT_BROWSER_ORIGIN'); }
   }
-  return { connectionString, assistant: { model, apiKey }, images: { apiKey, baseUrl: metaImageBaseUrl }, port: Number(port), supabase: loadSupabaseConfig(env), browserOrigin };
+  return { connectionString, assistant: { model, apiKey }, images: { apiKey, baseUrl: metaImageBaseUrl }, videos: videoKey ? { apiKey: videoKey, baseUrl: miniMaxVideoBaseUrl } : undefined, port: Number(port), supabase: loadSupabaseConfig(env), browserOrigin };
 }
