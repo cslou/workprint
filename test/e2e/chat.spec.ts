@@ -670,3 +670,84 @@ test('an edit of one image is its next version: Assets keeps one row, with the e
   await expect(dialog.getByText('Viewing version 1', { exact: true })).toBeVisible();
   await expect(dialog.getByText('Image saved · Version 1', { exact: true })).toBeVisible();
 });
+
+test('Assets lists each script subject with its sheet and images, Other last, with no status; the sheet shows its views', async ({ page, backend }) => {
+  test.slow();
+  const [account] = await backend.accounts(1);
+  const { provider, meta } = backend;
+  meta.reset();
+  const panel = page.getByRole('tabpanel');
+  const turn = async (call: { name: string; args: Record<string, unknown> }, ask: string, done: string) => {
+    provider.script({ toolCalls: [call] }, { text: [`${ask} done.`] });
+    await message(page).fill(ask);
+    await message(page).press('Enter');
+    const reply = live(page).getByRole('listitem', { name: 'Assistant message' }).last();
+    await expect(reply.getByText(done, { exact: true })).toBeVisible({ timeout: 45_000 });
+    await expect(reply.getByText(`${ask} done.`, { exact: true })).toBeVisible();
+    return reply;
+  };
+  await signIn(page, account!);
+  const script = { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'The Gallery', time: 'night' }, characters: ['Mara'], script: [{ action: 'Mara finds the key.' }] }] };
+  await turn({ name: 'update-script', args: { baseVersionId: null, script, subjects: [{ id: '', kind: 'character', name: 'Mara' }, { id: '', kind: 'place', name: 'The Gallery' }, { id: '', kind: 'prop', name: 'The key' }] } }, 'Write the script', 'Saved version 1');
+  await page.getByRole('tab', { name: 'Assets', exact: true }).click();
+  const subjects = panel.locator('.wp-subject');
+  // Subjects appear once the script is saved, in kind order, each still empty.
+  await expect(subjects).toHaveCount(3);
+  await expect(subjects.locator('.wp-subject-entry')).toHaveText([/^Mara\s*Character\s*Empty$/, /^The Gallery\s*Place\s*Empty$/, /^The key\s*Prop\s*Empty$/]);
+
+  const views = ['Full-body front', 'Three-quarter', 'Face close-up'];
+  const sheetLine = await turn({ name: 'generate-sheet', args: { subject: 'mara', description: 'A courier in a long grey coat.', continuityNotes: ['Keep the grey coat.'], views: views.map(view => ({ view, prompt: `${view}, standing still` })) } }, 'Make Mara\'s sheet', 'Saved Mara · Version 1');
+  // The images under the line are named by subject and view.
+  for (const view of views) await expect(sheetLine.locator(`img[alt="Mara · ${view}"]`)).toBeVisible();
+  await turn({ name: 'generate-image', args: { prompt: 'Mara on a bench', subject: 'mara' } }, 'Make one of Mara', 'Saved Image 4 · Version 1');
+  await turn({ name: 'generate-image', args: { prompt: 'An empty bench' } }, 'Make a bench', 'Saved Image 5 · Version 1');
+
+  const mara = panel.getByRole('region', { name: 'Mara', exact: true });
+  const holds = async () => {
+    await expect(subjects).toHaveCount(4);
+    await expect(subjects.locator('.wp-subject-entry b')).toHaveText(['Mara', 'The Gallery', 'The key', 'Other']);
+    // Mara has her sheet and one image; the sheet's views have no rows of their own, and nothing shows a status.
+    await expect(mara.locator('.wp-asset-row')).toHaveCount(2);
+    await expect(mara.locator('.wp-asset-row').first()).toHaveAccessibleName(/^Mara · Version 1/);
+    await expect(mara.locator('.wp-asset-row small').first()).toHaveText('Character sheet · 3 views');
+    await expect(mara.locator('.wp-asset-row').last()).toHaveAccessibleName(/^Image 4 · Version 1/);
+    await expect(mara.locator('.wp-status')).toHaveCount(0);
+    for (const name of ['The Gallery', 'The key']) await expect(panel.getByRole('region', { name, exact: true }).locator('.wp-status')).toHaveText('Empty');
+    await expect(panel.getByRole('region', { name: 'Other', exact: true }).locator('.wp-asset-row')).toHaveAccessibleName(/^Image 5 · Version 1/);
+    // The open sheet shows its three images, captioned by view, with no status and no view count.
+    await mara.locator('.wp-asset-row').first().click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.locator('figcaption')).toHaveText(views);
+    for (const view of views) await expect.poll(() => dialog.getByRole('img', { name: `Mara · ${view}`, exact: true }).evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+    await expect(dialog.locator('.wp-status')).toHaveCount(0);
+    await expect(dialog.getByText('Missing views')).toHaveCount(0);
+    await expect(dialog.locator('.wp-sheet-kicker')).toHaveText('Character');
+    // Selecting a view opens the image viewer on that exact version.
+    const close = dialog.locator('figure').filter({ hasText: 'Face close-up' });
+    const id = await close.getAttribute('data-view-version-id');
+    await close.getByRole('button', { name: 'Open Mara · Face close-up', exact: true }).click();
+    await expect(page.locator(`.wp-upload-media[data-media-version-id="${id}"]`)).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(1);
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  };
+  await holds();
+
+  await page.reload();
+  await page.getByRole('tab', { name: 'Assets', exact: true }).click();
+  for (const view of views) await expect(saved(page).locator(`img[alt="Mara · ${view}"]`)).toBeVisible();
+  await holds();
+
+  // One image that can't be read says so in its own slot; the other views still show.
+  const sheet = await backend.read<{ assets: { version: { kind: string; content?: { references: { versionId: string; view: string }[] } } }[] }>(account!, `/v1/conversations/${videoId(page)}/workspace`);
+  const refused = sheet.assets.find(asset => asset.version.kind === 'reference')!.version.content!.references.find(reference => reference.view === 'Three-quarter')!.versionId;
+  await page.route(`**/v1/versions/${refused}/media`, route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'integration_failure', message: 'Media unavailable' } }) }));
+  await page.reload();
+  await page.getByRole('tab', { name: 'Assets', exact: true }).click();
+  await mara.locator('.wp-asset-row').first().click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.locator('figure').filter({ hasText: 'Three-quarter' })).toContainText('This image couldn’t be shown');
+  for (const view of ['Full-body front', 'Face close-up']) await expect.poll(() => dialog.getByRole('img', { name: `Mara · ${view}`, exact: true }).evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  await expect(dialog.getByText('This image couldn’t be shown')).toHaveCount(1);
+});
