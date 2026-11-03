@@ -1428,7 +1428,7 @@ test('generate-panel makes a panel\'s image from the Shot\'s sheets and saves it
   };
   const args = (target: { shotId: string; panelId: string }, extra: Record<string, unknown> = {}) => ({ shot: target.shotId, panel: target.panelId, prompt: 'Preserve the room. Change only: Mara steps in.', ...extra });
 
-  await t.test('panel 1 sends the picked views with their preface; panel 2 sends panel 1\'s image first at its size; each is its panel\'s own image', async () => {
+  await t.test('panel 1 sends the picked views with their preface; panel 2 sends its views, then panel 1\'s image last at its size; each is its panel\'s own image', async () => {
     const p = await prepared();
     const one = await panel(owner, p.video, args(p.first, { images: [p.g1, p.m2], size: '1536x1024' }), [{ images: [testPng({ width: 96, height: 54, seed: 77 })] }]);
     assert.ok(one.result.made, JSON.stringify(one.result));
@@ -1445,8 +1445,8 @@ test('generate-panel makes a panel\'s image from the Shot\'s sheets and saves it
 
     const two = await panel(owner, p.video, args(p.second, { images: [p.m1], size: '1024x1024' }));
     assert.ok(two.result.made, JSON.stringify(two.result));
-    assert.deepEqual([meta.requests[0]!.body.size, meta.requests[0]!.body.images], ['96x54', [{ image_url: await dataUrl(v1.id) }, { image_url: await dataUrl(p.m1) }]]);
-    assert.match(String(meta.requests[0]!.body.prompt), /^Input 1: Shot 1 · Panel 1\.1 — keep camera, setting and staging\nInput 2: Mara · Full-body front — Her face\.\n\n/);
+    assert.deepEqual([meta.requests[0]!.body.size, meta.requests[0]!.body.images], ['96x54', [{ image_url: await dataUrl(p.m1) }, { image_url: await dataUrl(v1.id) }]]);
+    assert.match(String(meta.requests[0]!.body.prompt), /^Input 1: Mara · Full-body front — Her face\.\nInput 2: Shot 1 · Panel 1\.1 — match the setting, people and light; not its camera or framing\n\n/);
     const second = await store.version(owner.id, two.result.versionId);
     assert.deepEqual([second.artifactId, second.revision, two.summary], [panelArtifactId(p.video, p.second), 1, 'Saved Shot 1 · Panel 1.2 · Version 1']);
 

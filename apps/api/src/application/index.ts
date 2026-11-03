@@ -62,7 +62,7 @@ export { createAssistantSheets, type AssistantSheetOutcome, type AssistantSheets
 export { makeSheet, sheetViewCap, sheetViewNameCap, sheetViewPrompt, type SheetMakers, type SheetOutcome, type SheetRequest, type SheetView, type SheetViewRequest } from './sheets.js';
 export { optionalId } from './optional-id.js';
 export { imageVersionNames, workspaceVersions, type WorkspaceVersion } from './workspace-versions.js';
-export { anchorJob, maxPanelInputs, otherImageJob, panelInputs, type PanelInput, type PanelInputs, type PanelRequest } from './panel-inputs.js';
+export { continuityJob, maxPanelInputs, otherImageJob, panelInputs, type PanelInput, type PanelInputs, type PanelRequest } from './panel-inputs.js';
 export { createAssistantPanelImages, type AssistantPanelImages, type PanelSaveOutcome } from './assistant-panel-images.js';
 export { makePanel, type MakePanelRequest, type PanelMakers, type PanelOutcome } from './panels.js';
 export { createGeneratedImageSaver, createImageInputReader, metaImageFailure, requestOneImage, type OneImage, type GeneratedImageOutcome, type ImageFailure, type ImageInputsOutcome, type ReadImageInputs, type SaveGeneratedImage } from './generated-images.js';

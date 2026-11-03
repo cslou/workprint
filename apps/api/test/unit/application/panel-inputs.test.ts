@@ -57,16 +57,17 @@ test('empty images pass every referenced sheet whole; other picked images come a
   ]);
 });
 
-test('a later panel puts panel 1\'s current image first and keeps its size; a person\'s choice is the anchor', () => {
+test('a later panel is made from the sheet views, with panel 1\'s current image last for continuity at its size; a person\'s choice is panel 1\'s image', () => {
   const made = image('p1-v1', 1536, 864, 'assistant'), chosen = image('chosen', 1024, 1024);
   const shots = (first: ReturnType<typeof panel>) => [{ shotId: 's1', order: 0, intent: 'Mara arrives.', references, panels: [first, panel('p2', 1)], chosenVideoVersionId: null }];
   const second = inputs(resolve(workspace({ shots: shots(panel('p1', 0, [made])) }), { panel: 'p2', images: ['m3'] }));
-  assert.deepEqual(second.inputs, [{ versionId: 'p1-v1', label: 'Shot 1 · Panel 1.1', job: 'keep camera, setting and staging' }, { versionId: 'm3', label: 'Mara · Face close-up', job: 'Her face and coat.' }]);
+  assert.deepEqual(second.inputs, [{ versionId: 'm3', label: 'Mara · Face close-up', job: 'Her face and coat.' }, { versionId: 'p1-v1', label: 'Shot 1 · Panel 1.1', job: 'match the setting, people and light; not its camera or framing' }]);
+  assert.equal(second.preface, 'Input 1: Mara · Face close-up — Her face and coat.\nInput 2: Shot 1 · Panel 1.1 — match the setting, people and light; not its camera or framing');
   assert.deepEqual(second.size, { width: 1536, height: 864 });
   const over = inputs(resolve(workspace({ shots: shots(panel('p1', 0, [made, chosen], 'chosen')) }), { panel: 'p2', images: ['m3'] }));
-  assert.deepEqual([over.inputs[0]!.versionId, over.size], ['chosen', { width: 1024, height: 1024 }]);
-  // Picking panel 1's image again keeps its first place.
-  assert.deepEqual(inputs(resolve(workspace({ shots: shots(panel('p1', 0, [made])) }), { panel: 'p2', images: ['p1-v1', 'm3'] })).inputs.map(input => input.versionId), ['p1-v1', 'm3']);
+  assert.deepEqual([over.inputs.at(-1)!.versionId, over.size], ['chosen', { width: 1024, height: 1024 }]);
+  // Picking panel 1's image too keeps it last, for continuity only.
+  assert.deepEqual(inputs(resolve(workspace({ shots: shots(panel('p1', 0, [made])) }), { panel: 'p2', images: ['p1-v1', 'm3'] })).inputs.map(input => [input.versionId, input.job]), [['m3', 'Her face and coat.'], ['p1-v1', 'match the setting, people and light; not its camera or framing']]);
 });
 
 test('refusals: no first-panel image, an unknown Shot or panel, an image the video doesn\'t use, more than 10 inputs', () => {
@@ -100,14 +101,14 @@ test('a referenced subject that left the script is gone, named by its sheet or i
   assert.deepEqual(resolve(keyless), { kind: 'subject_gone', subjectName: 'the-key' });
 });
 
-test('later panels of a person\'s three-panel Shot anchor on panel 1 with its size', () => {
+test('later panels of a person\'s three-panel Shot take panel 1 for continuity, with its size', () => {
   const first = image('p1-v1', 800, 600, 'assistant');
   const space = workspace({ shots: [
     { shotId: 's0', order: 0, intent: 'Before.', panels: [panel('q1', 0)], chosenVideoVersionId: null },
     { shotId: 's1', order: 1, intent: 'Three beats.', panels: [panel('p3', 2), panel('p1', 0, [first]), panel('p2', 1)], chosenVideoVersionId: null },
   ] });
   const third = inputs(resolve(space, { panel: 'p3' }));
-  assert.deepEqual(third.inputs, [{ versionId: 'p1-v1', label: 'Shot 2 · Panel 2.1', job: 'keep camera, setting and staging' }]);
+  assert.deepEqual(third.inputs, [{ versionId: 'p1-v1', label: 'Shot 2 · Panel 2.1', job: 'match the setting, people and light; not its camera or framing' }]);
   assert.deepEqual(third.size, { width: 800, height: 600 });
 });
 
@@ -137,7 +138,7 @@ test('only a subject\'s first current sheet is passed; a view of its other sheet
   ]);
 });
 
-test('a later panel\'s anchor counts toward the 10-input limit', () => {
+test('a later panel\'s panel 1 counts toward the 10-input limit', () => {
   const first = image('p1-v1', 640, 360, 'assistant'), many = Array.from({ length: 10 }, (_, index) => image(`x${index}`));
   const space = workspace({ assets: many.map(version => use(version)), shots: [{ shotId: 's1', order: 0, intent: 'Mara arrives.', panels: [panel('p1', 0, [first]), panel('p2', 1)], chosenVideoVersionId: null }] });
   assert.deepEqual(resolve(space, { panel: 'p2', images: many.map(version => version.id) }), { kind: 'too_many', count: 11 });
