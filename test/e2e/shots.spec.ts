@@ -181,6 +181,9 @@ test('the agent\'s storyboard shows each Shot\'s panel images as they are made, 
   const script = { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'The Gallery', time: 'night' }, characters: ['Mara'], script: [{ action: 'Mara finds the key.' }] }] };
   await turn({ name: 'update-script', args: { baseVersionId: null, script, subjects: [{ id: '', kind: 'character', name: 'Mara' }, { id: '', kind: 'place', name: 'The Gallery' }] } }, 'Write the script', 'Saved version 1');
   const views = ['Full-body front', 'Three-quarter', 'Face close-up'];
+  // MiniMax takes images of 256 pixels or more on their short side, so the sheet views and panels are video-sized.
+  const { testPng } = await loadSupport<typeof MetaImages>('meta-image-fake');
+  meta.script(...views.map((_, index) => ({ images: [testPng({ width: 512, height: 288, seed: 20 + index })] })));
   await turn({ name: 'generate-sheet', args: { subject: 'mara', description: 'A courier in a long grey coat.', continuityNotes: ['Keep the grey coat.'], views: views.map(view => ({ view, prompt: `${view}, standing still` })) } }, 'Make Mara\'s sheet', 'Saved Mara · Version 1');
   const storyboard = { base: '', shots: [{ intent: 'Mara finds the key.', durationS: 6, framing: 'medium', action: 'Mara lifts the key from the bench.',
     dialogue: [{ character: 'Mara', text: 'There you are.' }, { character: 'Narrator', text: 'She had looked for years.', delivery: 'voice_over' }],
@@ -190,8 +193,6 @@ test('the agent\'s storyboard shows each Shot\'s panel images as they are made, 
   const videoId = new URL(page.url()).searchParams.get('conversation')!;
   const { storyboard: { shots: [shot] } } = await backend.read<{ storyboard: { shots: { shotId: string; panels: { panelId: string; order: number }[] }[] } }>(account!, `/v1/conversations/${videoId}/workspace`);
   const [first, second] = [...shot!.panels].sort((a, b) => a.order - b.order);
-  // MiniMax takes frames of 256 pixels or more on their short side, so the panels are video-sized.
-  const { testPng } = await loadSupport<typeof MetaImages>('meta-image-fake');
   meta.script({ images: [testPng({ width: 512, height: 288, seed: 11 })] }, { images: [testPng({ width: 512, height: 288, seed: 12 })] });
 
   const panel = page.getByRole('tabpanel');
@@ -206,6 +207,11 @@ test('the agent\'s storyboard shows each Shot\'s panel images as they are made, 
   await expect.poll(() => image(1).evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   await turn({ name: 'generate-panel', args: { shot: shot!.shotId, panel: second!.panelId, prompt: 'Change only her hands.', images: [] } }, 'Make panel 2', 'Saved Shot 1 · Panel 1.2 · Version 1');
   await turn({ name: 'generate-shot', args: { shot: shot!.shotId, prompt: 'She lifts the key into the light.' } }, 'Make the Shot', 'Saved Shot 1 · Video · Version 1');
+  // The clip is made from Mara's first sheet view, both panels, then her next view (the Gallery has no sheet), at
+  // 16:9 for the Shot's 6 s.
+  const sent = () => minimax.requests.find(request => request.method === 'POST')!.body as { ratio: string; duration: number; content: { type: string; role?: string; text?: string }[] };
+  expect([sent().ratio, sent().duration, sent().content.map(item => item.role ?? item.type)]).toEqual(['16:9', 6, ['text', ...Array(4).fill('reference_image')]]);
+  expect(sent().content[0]!.text).toMatch(/^Image 1: Mara, A courier in a long grey coat\. Keep Mara's face, hair, build and clothing as shown\.\nImage 2: the storyboard panel for this Shot\./);
 
   const shown = (locator: Locator) => expect.poll(() => locator.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   // Selecting a panel's image opens the viewer on its current version, with that image shown, and closes back to `inside`.
@@ -348,4 +354,8 @@ test('the agent\'s storyboard shows each Shot\'s panel images as they are made, 
   await expect(row.locator('summary small')).toHaveText('medium · 8 s · 2 panels');
   await expect(image(1)).toHaveAttribute('data-displayed-version-id', v2);
   await boardHolds('Mara finds the key at last.', 8);
+  // The next Shot video runs for the length the person set.
+  minimax.reset();
+  await turn({ name: 'generate-shot', args: { shot: shot!.shotId, prompt: 'She lifts the key into the light.' } }, 'Make the Shot again', 'Saved Shot 1 · Video · Version 2');
+  expect(sent().duration).toBe(8);
 });

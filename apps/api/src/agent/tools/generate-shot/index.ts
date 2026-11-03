@@ -11,29 +11,31 @@ function refused(reason: ShotRefusal): GenerateShotResult {
   switch (reason) {
     case 'unsaveable': case 'work_unavailable': return videoRefusal(reason);
     case 'not_found': return { made: false, reason, summary: 'Not made: that Shot wasn’t found', message: 'Not made: shot must be a Shot id from read-workspace\'s storyboard. Call read-workspace and try once more. Nothing was sent.' };
-    case 'needs_panels': return { made: false, reason, summary: 'Not made: make the Shot’s panels first', message: 'Not made: the Shot\'s video starts on its first panel\'s image and ends on its second\'s, and a panel has no image yet. Make its panels with generate-panel first. Nothing was sent.' };
-    case 'too_long': return { made: false, reason, summary: 'Not made: the Shot’s text is too long for the video prompt', message: `Not made: the Shot's action, camera note and dialogue with this prompt are over MiniMax's ${maxVideoPromptCharacters} characters. Shorten the prompt, or save the storyboard with a shorter action or camera note. Nothing was sent.` };
+    case 'needs_panels': return { made: false, reason, summary: 'Not made: make the Shot’s panels first', message: 'Not made: the Shot\'s video is made from its subjects\' sheets and its panels\' images, and a panel has no image yet. Make its panels with generate-panel first. Nothing was sent.' };
+    case 'too_long': return { made: false, reason, summary: 'Not made: the Shot’s text is too long for the video prompt', message: `Not made: the Shot's image labels, action, camera note and dialogue with this prompt are over MiniMax's ${maxVideoPromptCharacters} characters. Shorten the prompt, or save the storyboard with a shorter action or camera note. Nothing was sent.` };
   }
 }
 
 /**
- * The server picks a Shot's frames and text, so where generate-video's messages point the model at its frames or
- * fields, generate-shot's say what the model can change here: the panels or the motion prompt. The lines are shared.
+ * The server picks a Shot's images (its sheets' views and its panels) and text, so where generate-video's messages
+ * point the model at its frames or fields, generate-shot's say what the model can change here: the panels, the sheets
+ * or the motion prompt. The lines are shared.
  */
 const shotMessages: Readonly<Partial<Record<VideoReason, string>>> = {
-  input_not_found: 'Not made: a panel\'s image is no longer one this video uses. Call read-workspace, make the Shot\'s panels again with generate-panel, then try once more. Nothing was sent.',
-  invalid: 'Not made: MiniMax would not take the Shot\'s panel images as frames, for example their size. Remake the Shot\'s panels with generate-panel, or tell the user. Nothing was sent.',
+  input_not_found: 'Not made: a sheet view or panel image is no longer one this video uses. Call read-workspace, make the Shot\'s panels or the sheet again, then try once more. Nothing was sent.',
+  invalid: 'Not made: MiniMax would not take one of the Shot\'s sheet views or panel images, for example its size. Remake that panel with generate-panel or that view with generate-sheet, or tell the user. Nothing was sent.',
+  checks: 'Not saved: the video MiniMax made could not be accepted: it failed the media checks or was too large. Tell the user; do not retry in this turn.',
   refused: 'Not made: MiniMax refused this request, for example its content. Rephrase the motion prompt, or ask the user how to change the Shot.',
 };
 const forShot = (result: VideoResult): VideoResult => !result.made && shotMessages[result.reason] ? { ...result, message: shotMessages[result.reason]! } : result;
 
-/** Makes one storyboard Shot's video with MiniMax from its panels and its text, and saves it as that Shot's next draft video. */
+/** Makes one storyboard Shot's video with MiniMax from its subjects' sheets, its panels and its text, and saves it as that Shot's next draft video. */
 export const generateShotTool = defineTool({
   id: 'generate-shot',
   description: [
     'Make one storyboard Shot\'s video with MiniMax and save it as that Shot\'s next draft video. It waits until the clip is made, usually a few minutes. Saving is never approval: the user chooses Shot videos.',
-    'shot is a Shot id from read-workspace\'s storyboard. Make the Shot\'s panels first: the server sends its first panel\'s current image as the first frame and its second panel\'s as the last frame, and puts the Shot\'s action, camera note and dialogue in the video prompt itself.',
-    'Write prompt about motion only: how the action moves between the two frames and how the camera moves (for example a slow push-in or a pan left). Do not repeat the action or dialogue, describe the frames, or add story facts.',
+    'shot is a Shot id from read-workspace\'s storyboard. Make the Shot\'s panels first. The server makes the video at 16:9 from reference images: the sheet views of the subjects the Shot names, and its first panel\'s current image (and its last panel\'s) as the framing to aim for. It labels each image in the video prompt and adds the Shot\'s action, camera note and dialogue itself.',
+    'Write prompt about motion only: how the action moves and how the camera moves (for example a slow push-in or a pan left). Do not repeat the action or dialogue, describe the images, or add story facts.',
     'The video runs for the Shot\'s length from the storyboard, which the user can change; a Shot with no length runs 6 seconds. To change it, save the storyboard with the new length first.',
     'Each call makes a new paid video. If it stops waiting, its result gives a jobId: resume it with generate-video when the user asks.',
   ].join(' '),
