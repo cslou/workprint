@@ -46,7 +46,7 @@ test('picked views take their reference\'s role and purpose, in role order, with
   const opening = { shotId: 's0', order: 0, intent: 'Mara walks in.', references, positions: { start: 'Mara frame left.', end: 'Mara at the bench, frame right.' }, panels: [panel('p0', 0)], chosenVideoVersionId: null };
   const kneeling = { shotId: 's1', order: 1, intent: 'Mara kneels.', references, positions: { start: 'Mara at the bench.', end: 'Mara holds the key up.' }, panels: [panel('p1', 0)], chosenVideoVersionId: null };
   const placed = inputs(resolve(workspace({ shots: [opening, kneeling] }), { images: ['g2'] }));
-  assert.equal(placed.preface, 'Input 1: The Gallery · Reverse angle — The white room.\nPositions: starts Mara at the bench; ends Mara holds the key up.\nPrevious Shot ended: Mara at the bench, frame right.');
+  assert.equal(placed.preface, 'Input 1: The Gallery · Reverse angle — The white room.\nPositions: starts Mara at the bench; ends Mara holds the key up.\nPrevious Shot ended: Mara at the bench, frame right.\nThis panel shows the Shot as it starts.');
 });
 
 test('empty images pass every referenced sheet whole; other picked images come after the sheet views', () => {

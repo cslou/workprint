@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { makeShot, shotReferences, shotVideoPrompt, type NewVideo, type OwnedWorkspace, type ShotMakers } from '../../../src/application/index.js';
+import { makeShot, positionLines, shotReferences, shotVideoPrompt, type NewVideo, type OwnedWorkspace, type ShotMakers } from '../../../src/application/index.js';
 
 type Version = OwnedWorkspace['assets'][number]['version'];
 type Shot = OwnedWorkspace['storyboard']['shots'][number];
@@ -162,4 +162,29 @@ test('every refusal comes before the job runner is asked', async () => {
   assert.deepEqual(crowded.started, []);
   const unsaveable = makers([shot()]);
   assert.deepEqual(await makeShot({ readWorkspace: unsaveable.value.readWorkspace }, 'account', 'video', request, control), { kind: 'shot_refused', reason: 'unsaveable' });
+});
+
+const at = (place: string) => [{ subjectId: place, role: 'environment' as const, purpose: 'The room.' }];
+const positioned = (shotId: string, order: number, fields: Partial<Shot> = {}): Shot => ({ shotId, order, intent: 'Mara moves.', panels: [], chosenVideoVersionId: null, ...fields });
+const walk = { start: 'Mara enters frame left, walking toward frame right.', end: 'Mara kneels at the bench, frame right.' };
+const kneel = { start: 'Mara kneels at the bench, frame right', end: 'Mara stands with the key, facing the camera;' };
+
+test('a Shot\'s positions, then the previous Shot\'s end when the action can carry on', () => {
+  const first = positioned('s1', 0, { references: at('the-gallery'), positions: walk }), second = positioned('s2', 1, { references: at('the-gallery'), positions: kneel });
+  // Story order, not array order; each line ends once, whatever the position's own punctuation.
+  assert.deepEqual(positionLines([second, first], first), ['Positions: starts Mara enters frame left, walking toward frame right; ends Mara kneels at the bench, frame right.']);
+  assert.deepEqual(positionLines([second, first], second), ['Positions: starts Mara kneels at the bench, frame right; ends Mara stands with the key, facing the camera.', 'Previous Shot ended: Mara kneels at the bench, frame right.']);
+  // Another place: the previous end doesn't carry on. Neither naming a place: it does.
+  assert.deepEqual(positionLines([first, { ...second, references: at('the-street') }], { ...second, references: at('the-street') }).length, 1);
+  const unplaced = [positioned('s1', 0, { positions: walk }), positioned('s2', 1, { positions: kneel })];
+  assert.equal(positionLines(unplaced, unplaced[1]!)[1], 'Previous Shot ended: Mara kneels at the bench, frame right.');
+  // What's missing gives no line: a Shot without positions, a previous Shot without them.
+  const bare = positioned('s2', 1, { references: at('the-gallery') });
+  assert.deepEqual(positionLines([first, bare], bare), ['Previous Shot ended: Mara kneels at the bench, frame right.']);
+  assert.deepEqual(positionLines([positioned('s1', 0, { references: at('the-gallery') }), bare], bare), []);
+  // One Shot naming a place and the other none: the previous end doesn't carry on.
+  const loose = positioned('s2', 1, { positions: kneel });
+  assert.deepEqual(positionLines([first, loose], loose), ['Positions: starts Mara kneels at the bench, frame right; ends Mara stands with the key, facing the camera.']);
+  // A position that is only punctuation is kept as written rather than emptied.
+  assert.deepEqual(positionLines([positioned('s1', 0, { positions: { start: '…', end: '.' } })], positioned('s1', 0, { positions: { start: '…', end: '.' } })), ['Positions: starts …; ends ..']);
 });
