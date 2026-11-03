@@ -13,6 +13,7 @@ import type { MaterialPresentation } from './presentation.js';
 import { useOwnedImage } from '../api/use-owned-image.js';
 import { useNearViewport } from '../ui/use-near-viewport.js';
 import { useSavedMedia } from '../versions/use-saved-media.js';
+import { shotsLabel, subjectShotNumbers } from '../workspace/projection.js';
 import './assets.css';
 
 type Workspace = OperationResponse<'workspace'>;
@@ -47,8 +48,9 @@ export function Assets(props: ScriptProps) {
     : <MediaRow key={work.use?.id ?? work.version.id} {...props} work={work} name={mediaVersionName(names.labels, work.version, names.views)} />;
   return <div className="wp-assets">{groups.map(group => {
     const title = group.subject?.name ?? 'Other';
+    const shots = group.subject ? shotsLabel(subjectShotNumbers(workspace.storyboard.shots, group.subject.id)) : '';
     return <section key={group.subject?.id ?? ''} className="wp-subject" aria-label={title}>
-      <div className="wp-subject-entry"><span><b>{title}</b>{group.subject && <small>{kindLabel[group.subject.kind]}</small>}</span>{group.empty && <span className="wp-subject-empty">Empty</span>}</div>
+      <div className="wp-subject-entry"><span><b>{title}</b>{group.subject && <small>{kindLabel[group.subject.kind]}{shots && ` · ${shots}`}</small>}</span>{group.empty && <span className="wp-subject-empty">Empty</span>}</div>
       {group.sheets.map(row)}{group.items.map(row)}
     </section>;
   })}</div>;

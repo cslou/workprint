@@ -24,3 +24,14 @@ export function deliveryLabel(line: Line, sceneCharacters: ReadonlySet<string>):
   return character;
 }
 
+/** The numbers of the Shots that name a subject, in storyboard order; none when the storyboard can't be ordered. */
+export function subjectShotNumbers(shots: readonly Shot[], subjectId: string): number[] {
+  return (orderedStoryboard(shots) ?? []).filter(row => row.shot.references?.some(reference => reference.subjectId === subjectId)).map(row => row.number);
+}
+
+/** "Shot 1", "Shots 1 and 2", "Shots 1, 2 and 3"; empty for none. */
+export function shotsLabel(numbers: readonly number[]): string {
+  if (!numbers.length) return '';
+  if (numbers.length === 1) return `Shot ${numbers[0]}`;
+  return `Shots ${numbers.slice(0, -1).join(', ')} and ${numbers.at(-1)}`;
+}
