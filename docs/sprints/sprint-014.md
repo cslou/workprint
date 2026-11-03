@@ -9,7 +9,7 @@
 - The app shows the word "Workprint" in Italiana as its makeshift logo, without the composer's upload limits line, the "Attach photos" label or the Videos tab's Export card.
 - Muse Wonder (`meta/muse-wonder-1.0`) is the default chat model, once a live check on Lou's go shows it works with the tools.
 
-**Status:** 🟡 Planning. Drafted 2026-11-04 from Lou's Sprint 012/013 QA discussion; waiting for Lou's approval. Whether Questions (B-014, B-016) joins this sprint is still Lou's call.
+**Status:** 🔵 In Progress. Drafted 2026-11-04 from Lou's Sprint 012/013 QA discussion and approved by Lou the same day, with one paid live run of the gallery video after Story 4 ("yup approved. feel free to run the test"). Questions (B-014, B-016) move to Sprint 015. Lou asked for a lean test set ("Lets not go too crazy with the tests").
 
 ---
 
@@ -41,12 +41,13 @@
     - the logo is the word "Workprint" in Italiana; remove the upload limits line, "Attach photos" and the Export card;
     - the default model becomes Muse Wonder.
   - **Research (an X search Lou ran, 2026-11-04):** people keeping multi-shot AI video consistent state screen geography in plain words ("frame left", "toward frame right", which side the camera is on), name the camera as shot size, angle and one movement, and always give the location reference. The prompts already label each image's job.
-  - **No paid calls in tests.** The Meta and MiniMax fakes record what they receive. Paid calls happen only at Lou's QA, and Story 5's live check, on his go.
+  - **No paid calls in tests.** The Meta and MiniMax fakes record what they receive. Paid calls happen only at Lou's QA, the live gallery run he approved, and Story 5's live check, on his go.
+  - **A lean test set.** Each story keeps the few tests that prove its rules and updates the existing suites its change breaks; no new suites.
 - **Non-goals:**
   - the previous video's last frame or the previous Shot's panel as an input;
   - making Shots in order (the system prompt is unchanged);
   - a second panel per Shot by default;
-  - Questions (B-014, B-016) unless Lou adds them;
+  - Questions (B-014, B-016), moved to Sprint 015;
   - a designed logo, a model picker, or removing the export module itself (only its card is hidden).
 
 ### Affected Flows
@@ -54,28 +55,29 @@
 - **New flows introduced:** None. Positions are a new Shot field inside the existing storyboard flows.
 
 ### Verification Strategy
-- **Functional:** unit tests for the storyboard tool's schema and refusals and for the prompts; integration through real turns (`tool-activity.test.ts`) for a save refused without a place and a save with positions; e2e for editing positions and for Story 1's UI; one live chat check for Story 5.
+- **Functional:** unit tests for the storyboard tool's schema and refusals and for the prompts; integration through real turns (`tool-activity.test.ts`) for a save refused without a place and a save with positions; e2e for editing positions and for Story 1's UI; one live gallery run after Story 4 and one live chat check for Story 5.
 - **Regression:** the storyboard, panel and Shot video suites (`tool-activity.test.ts` storyboard and generate blocks, `storyboard-revisions.test.ts`, `shot-video-choice.test.ts`), `agent-loop.test.ts`, `shots.spec.ts` and `chat.spec.ts`; the unit tier and `pnpm check` per story; the deep gate once at completion.
-- **Lou's QA** judges whether the Shots match; a test can't.
+- **Whether the Shots match** is a model result no automated test can prove. The live gallery run gives an early answer before Lou's QA, which judges it.
 
 ### Tests requiring extra consideration
 - `shots.spec.ts` (about 1.5 min) for editing positions; it already covers editing a Shot's length.
+- The live gallery run (paid Muse, Meta and MiniMax calls, approved by Lou on 2026-11-04) runs once after Story 4.
 - Story 5's live chat check makes paid Muse Wonder calls, run once on Lou's go.
 
 ### Stories
 **Constraints:** Target 5-8 stories per sprint. Each story should be small enough to review, verify, and merge independently. Split stories that combine unrelated outcomes or cannot be verified with a clear functional/regression verification plan.
 
-**Order:** Story 1 is already built and merges into `sprint-014` first, so Stories 2–5 branch after it and its `shots.spec.ts` and `design.md` edits. Stories 2, 3 and 4 then go in order. Story 5 comes after Story 2 (its live check uses the new save-storyboard schema) and before Lou's QA, so the QA judges Muse Wonder.
+**Order:** Story 1 is already built and merges into `sprint-014` first, so Stories 2–5 branch after it and its `shots.spec.ts` and `design.md` edits. Stories 2, 3 and 4 then go in order, followed by the live gallery run (on Muse Spark). Story 5 comes last, before Lou's QA, so the QA judges Muse Wonder.
 
 #### Story 1: A makeshift wordmark and a tidier composer and Videos tab
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
-  - [ ] Follows sprint template
-  - [ ] Acceptance criteria are specific and testable
-  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
-  - [ ] Story is small enough to review and merge independently
-  - [ ] Reviewed by sub-agent
-  - [ ] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Follows sprint template
+  - [x] Acceptance criteria are specific and testable
+  - [x] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
+  - [x] Story is small enough to review and merge independently
+  - [x] Reviewed by sub-agent
+  - [x] Review findings addressed or explicitly recorded
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: P2s: no check of the accessible name, the docked label or the licence; the manual look had no pass condition.
   - Resolution: the accessible name is what the e2e finds the button by; a `chat.spec.ts` case checks the docked "+ Attach"; the licence is kept in the repo beside the font (it isn't a served file); the look is Sprint Completion's QA item 4.
@@ -101,16 +103,16 @@
 
 #### Story 2: Every Shot names its place and its positions
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
-  - [ ] Follows sprint template
-  - [ ] Acceptance criteria are specific and testable
-  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
-  - [ ] Story is small enough to review and merge independently
-  - [ ] Reviewed by sub-agent
-  - [ ] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Follows sprint template
+  - [x] Acceptance criteria are specific and testable
+  - [x] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
+  - [x] Story is small enough to review and merge independently
+  - [x] Reviewed by sub-agent
+  - [x] Review findings addressed or explicitly recorded
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: P1: the place rule's save paths weren't stated, so a person's length edit on an earlier storyboard, or a script with no place, could be refused. P2s: no length bound; keyword tests of the description prove nothing; three deliverables in one story.
-  - Resolution: the place rule applies only to the agent's save-storyboard, and only when the script lists a place; a person's edits are never refused for it (regression case added). `start` and `end` are at most 300 characters. The description's rules are editorial, judged at Lou's QA. The prompt work is now Story 3. Round 2 (4/5), P2s: every suite with scripted saves is listed in regression, and reading a storyboard without positions has a case.
+  - Resolution: the place rule applies only to the agent's save-storyboard, and only when the script lists a place; a person's edits are never refused for it (regression case added). `start` and `end` are at most 300 characters. The description's rules are editorial, judged at Lou's QA. The prompt work is now Story 3. Round 2 (4/5), P2s: every suite with scripted saves is listed in regression, and reading a storyboard without positions has a case. Trimmed at Lou's approval: the no-place script and the old-storyboard read are unit cases, not separate turns.
 - **As** a filmmaker, **I want** the storyboard to cut only where the camera changes, name every Shot's place and say where everyone starts and ends, **so that** my Shots can match across the cuts.
 - **Dependencies:** Story 1 merged.
 - **Acceptance criteria:**
@@ -119,12 +121,11 @@
   - [ ] **Person edits are never refused for the place rule**: a length, intent or positions edit of an earlier Shot with no place still saves.
   - [ ] **When to cut.** save-storyboard's description says: a new Shot only when the camera set-up changes (a new angle or shot size) or time or place jumps; continuous action in one space stays in one Shot, up to 15 s; each Shot's start follows the previous Shot's end; every Shot names its place, even a close-up; the camera note is shot size, angle and at most one movement, for example "Medium, from her left, camera slowly follows her".
 - **Functional verification:**
-  - [ ] Unit (`apps/api/test/unit/agent/save-storyboard.test.ts`): a Shot without positions, or with an empty or 301-character start, is refused by the schema; the place refusal's message. Pass: each case as stated.
-  - [ ] Integration (`tool-activity.test.ts`, real turns): a save whose Shot names no place (the script lists the gallery) ends with the refusal and no new version; a save with positions lists them in the next read-workspace; a script with no place saves. Pass: as stated.
+  - [ ] Unit (`apps/api/test/unit/agent/save-storyboard.test.ts`): a Shot without positions, or with an empty or 301-character start, is refused by the tool's schema, while a saved Shot without positions still parses; the place refusal's message. Pass: each case as stated.
+  - [ ] Integration (`tool-activity.test.ts`, real turns): a save whose Shot names no place (the script lists the gallery) ends with the refusal and no new version; a save with positions lists them in the next read-workspace. Pass: as stated.
   - [ ] Integration (`storyboard-revisions.test.ts`): a person's length edit of an earlier storyboard whose Shot names no place saves. Pass: a new version.
 - **Regression verification:**
-  - [ ] Every suite whose scripted save-storyboard calls now need positions: `tool-activity.test.ts` (storyboard and generate blocks), `storyboard-revisions.test.ts`, `shot-video-choice.test.ts`, `agent-loop.test.ts` and `shots.spec.ts`. Pass: green after their scripted saves gain positions.
-  - [ ] Integration: read-workspace on a storyboard saved without positions lists its Shots and omits positions. Pass: as stated.
+  - [ ] The existing suites whose scripted saves now need positions, run once after updating them: `tool-activity.test.ts`, `storyboard-revisions.test.ts`, `shot-video-choice.test.ts`, `agent-loop.test.ts` and `shots.spec.ts`. Pass: green.
 - **Editorial/design verification:** the cutting and camera rules are prose for the model, checked by reading the description and judged at Lou's QA items 1–2, not by keyword tests. Spec §8.3 Storyboard and §10's save-storyboard guidance name positions, the place rule and the cutting rule.
 - **Manual-only behavior verification:** Lou's QA items 1–2.
 - **Planned commits:**
@@ -134,16 +135,16 @@
 
 #### Story 3: Panel and video prompts carry the positions
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
-  - [ ] Follows sprint template
-  - [ ] Acceptance criteria are specific and testable
-  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
-  - [ ] Story is small enough to review and merge independently
-  - [ ] Reviewed by sub-agent
-  - [ ] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Follows sprint template
+  - [x] Acceptance criteria are specific and testable
+  - [x] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
+  - [x] Story is small enough to review and merge independently
+  - [x] Reviewed by sub-agent
+  - [x] Review findings addressed or explicitly recorded
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: P2s: only one line format was fixed; a Shot whose previous Shot has no positions wasn't covered; the system prompt's check wasn't named; no check at the longest positions.
-  - Resolution: both formats are given; that case is covered; `agent-loop.test.ts`'s byte-identical test is named; a unit case at 300-character positions.
+  - Resolution: both formats are given; that case is covered; `agent-loop.test.ts`'s byte-identical test is named; a unit case at 300-character positions. Trimmed at Lou's approval: the panel preface is proven by its unit case, so only generate-shot has a turn.
 - **As** a filmmaker, **I want** each panel and Shot video to be told where everyone starts and ends, and where the previous Shot ended, **so that** the pictures follow the plan.
 - **Dependencies:** Story 2.
 - **Acceptance criteria:**
@@ -153,9 +154,9 @@
   - [ ] The system prompt is unchanged.
 - **Functional verification:**
   - [ ] Unit (`apps/api/test/unit/application/shots.test.ts` and `panel-inputs.test.ts` or the panel test that builds the preface): the exact lines for each case above; 300-character positions within the limit. Pass: exact text.
-  - [ ] Integration (`tool-activity.test.ts` generate-panel and generate-shot): the Meta and MiniMax fakes receive the lines. Pass: as stated.
+  - [ ] Integration (`tool-activity.test.ts` generate-shot): the MiniMax fake receives the lines. Pass: as stated.
 - **Regression verification:**
-  - [ ] `tool-activity.test.ts` generate blocks, `shot-video-choice.test.ts`, and `agent-loop.test.ts` ("the static prompt and tool list are byte-identical across turns"). Pass: green.
+  - [ ] `tool-activity.test.ts` generate blocks and `agent-loop.test.ts` ("the static prompt and tool list are byte-identical across turns"). Pass: green.
 - **Editorial/design verification:** spec §8.3 Videos and Storyboard's panel bullets name the lines.
 - **Manual-only behavior verification:** Lou's QA item 3.
 - **Planned commits:**
@@ -164,16 +165,16 @@
 
 #### Story 4: A person changes a Shot's positions
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
-  - [ ] Follows sprint template
-  - [ ] Acceptance criteria are specific and testable
-  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
-  - [ ] Story is small enough to review and merge independently
-  - [ ] Reviewed by sub-agent
-  - [ ] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Follows sprint template
+  - [x] Acceptance criteria are specific and testable
+  - [x] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
+  - [x] Story is small enough to review and merge independently
+  - [x] Reviewed by sub-agent
+  - [x] Review findings addressed or explicitly recorded
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: P2s: no state for a Shot without positions or text for the refusal; the unchanged edit and the next panel weren't verified; the place rule could refuse a person's edit.
-  - Resolution: "Positions · not set" and both fields required; the refusal text is given; unit and e2e cases added; Story 2 keeps person edits out of the place rule. Round 2 (4/5), P2s: the display strings and the summary row have checks, and the server applies the same bounds, with a refusal case.
+  - Resolution: "Positions · not set" and both fields required; the refusal text is given; unit and e2e cases added; Story 2 keeps person edits out of the place rule. Round 2 (4/5), P2s: the display strings and the summary row have checks, and the server applies the same bounds, with a refusal case. Trimmed at Lou's approval: the summary row and the overlong edit rest on the shared schema and the unit cases; the e2e checks one fake request.
 - **As** a filmmaker, **I want** to see and correct where people start and end in each Shot, **so that** I can fix a mismatch before paying for panels and videos.
 - **Dependencies:** Story 3.
 - **Acceptance criteria:**
@@ -182,8 +183,8 @@
   - [ ] The next panel and Shot video use the edited positions.
 - **Functional verification:**
   - [ ] Unit (`apps/web/test/unit/storyboard/storyboard-edit.test.ts`): the edit body carries only that Shot's positions; an empty field is refused with its text; an unchanged edit sends nothing; the display strings "Starts: … / Ends: …" and "Positions · not set". Pass: as stated.
-  - [ ] Integration (`storyboard-revisions.test.ts`): a positions edit saves the next version and changes nothing else; an empty or 301-character edit is refused by the API with no new version. Pass: as stated.
-  - [ ] E2E (`shots.spec.ts` journey): edit Shot 1's end, reload and see it; the tab's summary row shows no positions; the next generate-panel's Meta request and generate-shot's MiniMax request (fakes) carry it. Pass: as stated.
+  - [ ] Integration (`storyboard-revisions.test.ts`): a positions edit saves the next version and changes nothing else; an empty edit is refused by the API with no new version. Pass: as stated.
+  - [ ] E2E (`shots.spec.ts` journey): edit Shot 1's end, reload and see it; the next generate-shot's MiniMax request (fake) carries it. Pass: as stated.
 - **Regression verification:**
   - [ ] `shots.spec.ts` whole (the length and intent edits still work). Pass: green.
 - **Editorial/design verification:** design.md's Storyboard section names the positions editor beside the length.
@@ -195,13 +196,13 @@
 
 #### Story 5: Muse Wonder is the default chat model
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
-  - [ ] Follows sprint template
-  - [ ] Acceptance criteria are specific and testable
-  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
-  - [ ] Story is small enough to review and merge independently
-  - [ ] Reviewed by sub-agent
-  - [ ] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Follows sprint template
+  - [x] Acceptance criteria are specific and testable
+  - [x] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
+  - [x] Story is small enough to review and merge independently
+  - [x] Reviewed by sub-agent
+  - [x] Review findings addressed or explicitly recorded
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: P2s: no failure path; the live check's tool wasn't named; server start, Spark staying allowed and the QA host weren't checked; the spec locations were vague.
   - Resolution: a failure path; the live check calls save-storyboard (nested `positions`) and read-workspace; config unit cases; the QA host script and the exact spec lines are named. Round 2 (4/5), P2: on the failure path, one live Spark save-storyboard call confirms the nested argument before QA.
@@ -230,7 +231,8 @@ After all implementation stories are complete, perform this checklist before spr
 
 - [ ] Confirm all stories met their acceptance criteria using recorded implementation and verification evidence.
 - [ ] Run the applicable regression suite on the combined sprint branch (`.checks/regression.sh --tier=deep`).
-- [ ] Run any planned cross-story checks not covered by that suite: spec §8.3 and §10, design.md and this doc against the code; and spec §10's Phase 3 packaging table and its Agent tool guidance line ("until B-014 lands (Sprint 014)") renumbered to match this sprint and Lou's decision on Questions.
+- [ ] Run any planned cross-story checks not covered by that suite: spec §8.3 and §10, design.md and this doc against the code; and spec §10's Phase 3 packaging table and its Agent tool guidance line ("until B-014 lands (Sprint 014)") renumbered: 014 is this sprint and Questions is Sprint 015.
+- [ ] **Live gallery run** (paid; approved by Lou on 2026-11-04; once, after Story 4, before Story 5). On a local build with the real providers, the QA prompt "make a 20-second video of Mara finding a key in a gallery", saying yes to each step through the Shot videos and a join. Record the storyboard (Shots, places, positions), the panels and the joined video beside the earlier QA finding. Pass: QA items 1–3 below hold as judged from the saved storyboard and the joined video's frames; Lou sees the result before QA. A fail is recorded, and the fix is planned with Lou before QA.
 - [ ] **Lou's QA** (manual; on a QA host when he asks; live Muse Wonder, Meta and MiniMax calls on his go). In a fresh video, ask "make a 20-second video of Mara finding a key in a gallery" and say yes to each step. Pass:
   1. the storyboard keeps continuous action in one Shot and cuts only where the camera changes;
   2. every Shot names the gallery and shows start and end positions, which he can change in "View storyboard";
