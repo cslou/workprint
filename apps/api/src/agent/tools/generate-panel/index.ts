@@ -44,7 +44,7 @@ const panelSize = imageSize.refine(value => {
   if (value === 'auto') return true;
   const [width, height] = value.split('x').map(Number) as [number, number];
   return width / height > videoFrameRatio.min && width / height < videoFrameRatio.max;
-}, `A panel's shape must be "auto" or WxH with width ÷ height between ${videoFrameRatio.min} and ${videoFrameRatio.max}, so it can be a Shot video's frame`);
+}, `A panel's shape must be "auto" or WxH with width ÷ height above ${videoFrameRatio.min} and below ${videoFrameRatio.max}, so it can be a Shot video's frame`);
 
 /** Makes one panel's image with Meta from the Shot's sheets and saves it as the next version of that panel's image. */
 export const generatePanelTool = defineTool({
@@ -62,7 +62,7 @@ export const generatePanelTool = defineTool({
     prompt: z.string().min(1).max(32000).refine(text => text.trim().length > 0, 'The prompt is empty').describe('Preserve, Change only and Reject if, from the Shot.'),
     // More than Meta takes is accepted here, so the model is told the count rather than that its call was invalid.
     images: z.array(z.string().max(200)).max(maxPanelInputs * 2).default([]).describe('Image versionIds from read-workspace this panel is made from; empty for every sheet the Shot names.'),
-    size: panelSize.default('auto').describe(`"auto" or WxH, width ÷ height between ${videoFrameRatio.min} and ${videoFrameRatio.max} on every call, for a Shot's first panel; a later panel takes the first panel's size.`),
+    size: panelSize.default('auto').describe(`"auto" or WxH, width ÷ height above ${videoFrameRatio.min} and below ${videoFrameRatio.max} on every call, for a Shot's first panel; a later panel takes the first panel's size.`),
   }),
   phrase: 'Making a panel…',
   // A refusal still finishes the line. Mastra hands back an input validation failure as `{ error: true }`.
