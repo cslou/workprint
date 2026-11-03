@@ -2,9 +2,9 @@
 // placeholder key and no network. `--live` makes ONE real, paid MiniMax-H3 768P 5 s prompt-only
 // generation (about $0.40), polls it, downloads the clip, probes and decodes it with the pinned
 // toolchain, and saves the sanitized shapes, the clip and its probe. `--references <png>…` (Sprint
-// 012) sends those 1 to 9 PNGs as reference images instead, at 16:9 for 6 s, or with no paths three
-// generated sample PNGs (1376x768, 1024x1024, 768x1376); dry, it checks the fake got each one as a
-// reference_image in order. Never run by a gate: only on request. Run through
+// 012) sends those 1 to 9 PNGs as reference images instead, at 16:9 for 6 s; dry, with no paths, it
+// uses three generated sample PNGs (1376x768, 1024x1024, 768x1376), and it checks the fake got each one
+// as a reference_image in order. A paid run always needs real paths. Never run by a gate: only on request. Run through
 // `pnpm live:video [--live] [--references <png>…]`, which compiles the tests; only `--live` starts
 // the shared test stack, for the pinned toolchain.
 import assert from 'node:assert/strict';
@@ -22,6 +22,8 @@ const referencePaths = (() => {
   const after = process.argv.slice(at + 1), end = after.findIndex(arg => arg.startsWith('--'));
   return end < 0 ? after : after.slice(0, end);
 })();
+// A paid run never sends the generated samples: it stops before the stack starts.
+assert.ok(!live || !referencePaths || referencePaths.length, 'live:video --live --references needs the PNG paths; samples are for the dry run only');
 if (live && !process.env.WORKPRINT_TEST_STACK) {
   const run = spawnSync(process.execPath, [join(import.meta.dirname, '../test-stack.mjs'), process.execPath, import.meta.filename, ...process.argv.slice(2)], { stdio: 'inherit' });
   process.exit(run.status ?? 1);
