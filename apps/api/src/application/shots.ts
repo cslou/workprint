@@ -45,7 +45,8 @@ function sceneCharacters(workspace: OwnedWorkspace): Set<string> {
 
 /**
  * Makes one Shot's video from the storyboard the video uses. The frames and the text come from the Shot alone: its
- * first panel's current image is the first frame and, with two or more panels, its last panel's is the last frame.
+ * first panel's current image is the first frame and, with two or more panels, its last panel's is the last frame,
+ * unless it is the same image.
  * Every refusal comes before any job is saved or sent: an unknown Shot, a panel with no image, or a prompt longer
  * than MiniMax takes. The job carries the Shot, so a resume still saves its clip there.
  */
@@ -64,7 +65,9 @@ export async function makeShot(makers: ShotMakers, accountId: string, videoId: s
   if (!frames.length || frames.some(id => id === undefined)) return refused('needs_panels');
   const prompt = shotVideoPrompt(shot, sceneCharacters(read.workspace), request.prompt);
   if (prompt.length > maxVideoPromptCharacters) return refused('too_long');
-  const [firstFrame, lastFrame] = frames as string[];
+  // A person may choose one image for both panels: the clip then starts on it, with no last frame of its own.
+  const [firstFrame, last] = frames as string[];
+  const lastFrame = last === firstFrame ? undefined : last;
   return videos.start(accountId, videoId, {
     prompt, durationS: request.durationS, ratio: '16:9', firstFrame: firstFrame!, ...(lastFrame ? { lastFrame } : {}), target: { shotId: shot.shotId },
   }, control);

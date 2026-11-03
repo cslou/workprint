@@ -46,6 +46,10 @@ test('a Shot\'s first and last panels are its frames, and the job carries the Sh
   const one = makers([shot({ panels: [panel('p1', 0, [image('a1')])] })]);
   await makeShot(one.value, 'account', 'video', request, control);
   assert.deepEqual([one.started[0]?.firstFrame, 'lastFrame' in one.started[0]!], ['a1', false]);
+  // A person chose one image for both panels: it is the first frame only, since MiniMax takes each image once.
+  const same = makers([shot({ panels: [panel('p1', 0, [image('a1')]), panel('p2', 1, [image('a1')])] })]);
+  await makeShot(same.value, 'account', 'video', request, control);
+  assert.deepEqual([same.started[0]?.firstFrame, 'lastFrame' in same.started[0]!], ['a1', false]);
 });
 
 test('every refusal comes before the job runner is asked', async () => {

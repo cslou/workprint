@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { makeShot, type ShotRefusal } from '../../../application/index.js';
 import { maxVideoPromptCharacters, videoDurations } from '../../../generation/index.js';
 import { defineTool } from '../define.js';
-import { savedClip, videoDoneSummary, videoRefusal, videoResult, type VideoResult } from '../video-shared.js';
+import { savedClip, videoDoneSummary, videoRefusal, videoResult, type VideoReason, type VideoResult } from '../video-shared.js';
 
 export type GenerateShotResult = VideoResult | { made: false; reason: Extract<ShotRefusal, 'not_found' | 'needs_panels' | 'too_long'>; summary: string; message: string };
 
@@ -15,6 +15,17 @@ function refused(reason: ShotRefusal): GenerateShotResult {
     case 'too_long': return { made: false, reason, summary: 'Not made: the Shot’s text is too long for the video prompt', message: `Not made: the Shot's action, camera note and dialogue with this prompt are over MiniMax's ${maxVideoPromptCharacters} characters. Shorten the prompt, or save the storyboard with a shorter action or camera note. Nothing was sent.` };
   }
 }
+
+/**
+ * The server picks a Shot's frames and text, so where generate-video's messages point the model at its frames or
+ * fields, generate-shot's say what the model can change here: the panels or the motion prompt. The lines are shared.
+ */
+const shotMessages: Readonly<Partial<Record<VideoReason, string>>> = {
+  input_not_found: 'Not made: a panel\'s image is no longer one this video uses. Call read-workspace, make the Shot\'s panels again with generate-panel, then try once more. Nothing was sent.',
+  invalid: 'Not made: MiniMax would not take the Shot\'s panel images as frames, for example their size. Remake the Shot\'s panels with generate-panel, or tell the user. Nothing was sent.',
+  refused: 'Not made: MiniMax refused this request, for example its content. Rephrase the motion prompt, or ask the user how to change the Shot.',
+};
+const forShot = (result: VideoResult): VideoResult => !result.made && shotMessages[result.reason] ? { ...result, message: shotMessages[result.reason]! } : result;
 
 /** Makes one storyboard Shot's video with MiniMax from its panels and its text, and saves it as that Shot's next draft video. */
 export const generateShotTool = defineTool({
@@ -42,6 +53,6 @@ export const generateShotTool = defineTool({
     // A shutdown ends the turn as incomplete; the job stays running for the next start to mark interrupted.
     // A call stopped before its create made nothing, and ends incomplete too.
     if (outcome.kind === 'shutdown' || outcome.kind === 'not_started') signal.throwIfAborted();
-    return videoResult(context, outcome, true);
+    return forShot(await videoResult(context, outcome, true));
   },
 });

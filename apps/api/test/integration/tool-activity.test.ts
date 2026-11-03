@@ -852,11 +852,13 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
     const p = await shotBoard();
     const long = await shoot(owner, p.video, { shot: p.opening, prompt: 'x'.repeat(6900) });
     assert.deepEqual([long.result.made, long.summary], [false, 'Not made: the Shot’s text is too long for the video prompt']);
-    for (const [user, video, shot] of [[other, await client(other).newVideo(), p.opening], [owner, p.video, randomUUID()]] as const) {
+    // Another account's video, another of the owner's own videos, and an unknown Shot.
+    const elsewhere = await client(owner).newVideo();
+    for (const [user, video, shot] of [[other, await client(other).newVideo(), p.opening], [owner, elsewhere, p.opening], [owner, p.video, randomUUID()]] as const) {
       const away = await shoot(user, video, { shot, prompt: 'A slow push-in.' });
       assert.deepEqual([away.result.made, away.summary], [false, 'Not made: that Shot wasn’t found']);
     }
-    assert.deepEqual([minimax.requests, await jobs(unmade.video), await jobs(p.video)], [[], [], []]);
+    assert.deepEqual([minimax.requests, await jobs(unmade.video), await jobs(p.video), await jobs(elsewhere)], [[], [], [], []]);
   });
 
   await t.test('a Shot job stopped or past its poll deadline keeps its Shot, and generate-video\'s resume saves it there with one create', async () => {

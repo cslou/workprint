@@ -4,9 +4,8 @@ import { z } from 'zod';
 import { clipUseSchema, idSchema, MAX_UPLOAD_VIDEO_BYTES, useSchema, type Version } from '@workprint/contracts';
 import { transaction } from '../db/index.js';
 import type { PrivateObjectStorage } from '../storage/index.js';
-import { derivedArtifactId, ensureDerivedArtifact, movableUse } from './derived-artifacts.js';
-import { digest, requireUseRoom, withStoredObjects } from './generated-media.js';
-import { requireOwnedConversation } from './generated-images.js';
+import { bindDerivedDraft, derivedArtifactId, ensureDerivedArtifact, hasDerivedRoom, movableUse, type DerivedBinding } from './derived-artifacts.js';
+import { digest, requireOwnedConversation, requireUseRoom, withStoredObjects } from './generated-media.js';
 import { hasTarget, usedPlan } from './panel-targets.js';
 import { usedImageVersions } from './workspace-images.js';
 import { lockPublicationOwner, publishVersion } from './publication.js';
@@ -14,7 +13,7 @@ import { createArtifactStore } from './store.js';
 import { UploadError, uploadError } from './uploads/errors.js';
 import { measuredMedia, verifyWhenFree } from './uploads/media-verifier.js';
 import type { MediaVerifier, OwnedCheck } from './uploads/types.js';
-import { requireRoom, useRoom, UseRoomError } from './use-room.js';
+import { requireRoom, UseRoomError } from './use-room.js';
 
 type VideoVersion = Extract<Version, { kind: 'image' | 'video' }> & { kind: 'video' };
 /** A storyboard Shot a clip was made for. */
@@ -35,7 +34,7 @@ const binding = { purpose: 'video' } as const;
 
 /** The id of a Shot's own video artifact, derived from the video and Shot. */
 export const shotArtifactId = (conversation: string, shotId: string) => derivedArtifactId('shot', [conversation, shotId]);
-const shotBinding = (shotId: string) => ({ purpose: 'shot_video', shotId });
+const shotBinding = (shotId: string): DerivedBinding => ({ purpose: 'shot_video', shotId });
 /** The draft use on the latest version of the Shot's own video, which the next version moves. */
 const shotUse = (client: Parameters<typeof movableUse>[0], account: string, conversation: string, shotId: string, lock: boolean) =>
   movableUse(client, account, conversation, shotArtifactId(conversation, shotId), shotBinding(shotId), lock);
@@ -55,7 +54,7 @@ export function createGeneratedVideos(pool: Pool, checkOwnedConversation: OwnedC
     async hasShotRoom(account: string, conversation: string, shotId: string): Promise<boolean> {
       try {
         await requireOwnedConversation(checkOwnedConversation, account, conversation);
-        return Boolean(await shotUse(pool, account, conversation, shotId, false)) || await useRoom(pool, account, conversation) > 0;
+        return await hasDerivedRoom(pool, account, conversation, shotArtifactId(conversation, shotId), shotBinding(shotId));
       } catch (error) { throw uploadError(error); }
     },
 
@@ -102,14 +101,12 @@ export function createGeneratedVideos(pool: Pool, checkOwnedConversation: OwnedC
           await client.query(insertObject, [account, key, version.id, digest(bytes), bytes.length, 'video/mp4']);
           await client.query(insertObject, [account, posterKey, version.id, digest(poster.bytes), poster.bytes.length, poster.contentType]);
           await client.query('INSERT INTO artifacts.media_objects(owner_id,version_id,generated_key,generated_poster_key,sha256) VALUES($1,$2,$3,$4,$5)', [account, version.id, key, posterKey, digest(bytes)]);
-          // A made clip is a draft: technical success never grants approval, and a person's choice stays as it is.
           if (shot) {
-            const use = useSchema.parse({ id: moved ?? randomUUID(), versionId: version.id, binding: shotBinding(shot), state: 'draft' });
-            if (moved) await client.query('UPDATE artifacts.conversation_uses SET version_id=$1 WHERE owner_id=$2 AND use_id=$3', [version.id, account, moved]);
-            else await client.query("INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state) VALUES($1,$2,$3,$4,$5,'shot_video','draft')", [account, conversation, use.id, version.id, use.binding]);
+            const use = useSchema.parse({ id: await bindDerivedDraft(client, account, conversation, version.id, shotBinding(shot), moved), versionId: version.id, binding: shotBinding(shot), state: 'draft' });
             await options.within?.(client, clip);
             return { version: clip, use, gone: false };
           }
+          // A made clip is a draft: technical success never grants approval.
           const use = clipUseSchema.parse({ id: randomUUID(), versionId: version.id, binding, state: 'draft' });
           await client.query("INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state) VALUES($1,$2,$3,$4,$5,'video','draft')", [account, conversation, use.id, version.id, binding]);
           await options.within?.(client, clip);

@@ -80,6 +80,17 @@ test('the job runner\'s refusals and a cap race read as the video tools say them
   const waiting = await run(raced.collaborators, tool.inputSchema.parse(args()));
   assert.deepEqual([waiting.reason, waiting.jobId, line(waiting)?.summary], ['waiting_for_room', jobId, 'Not saved yet: this video has too many saved items']);
   assert.match(String(waiting.message), new RegExp(`resume set to "${jobId}"`));
+  // Where generate-video points at its frames, generate-shot points at the panels or the motion prompt.
+  const frames = harness({ outcome: { kind: 'invalid', detail: 'firstFrame.dimensions' } });
+  const invalid = await run(frames.collaborators, tool.inputSchema.parse(args()));
+  assert.deepEqual([invalid.reason, line(invalid)?.summary], ['invalid', 'Not made: the request wasn’t valid']);
+  assert.match(String(invalid.message), /generate-panel/); assert.doesNotMatch(String(invalid.message), /field/);
+  const lost = harness({ outcome: { kind: 'input_not_found' } });
+  assert.match(String((await run(lost.collaborators, tool.inputSchema.parse(args()))).message), /make the Shot's panels again/);
+  const refused = harness({ outcome: { kind: 'failed', jobId, reason: 'provider_error', provider: 'invalid_request' } });
+  const content = await run(refused.collaborators, tool.inputSchema.parse(args()));
+  assert.deepEqual([content.reason, line(content)?.summary], ['refused', 'Not made: MiniMax refused the request']);
+  assert.match(String(content.message), /motion prompt/); assert.doesNotMatch(String(content.message), /frames/);
   const stopped = harness({ outcome: { kind: 'interrupted', jobId } });
   assert.equal(line(await run(stopped.collaborators, tool.inputSchema.parse(args())))?.summary, 'Stopped waiting for the video');
 });

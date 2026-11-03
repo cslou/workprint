@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import type { Version } from '@workprint/contracts';
-import { derivedArtifactId, ensureDerivedArtifact, movableUse } from './derived-artifacts.js';
-import { assistantImageKeeper, publishImage, requireOwnedConversation, type GeneratedImageCollaborators } from './generated-images.js';
+import { bindDerivedDraft, derivedArtifactId, ensureDerivedArtifact, hasDerivedRoom, movableUse, type DerivedBinding } from './derived-artifacts.js';
+import { assistantImageKeeper, publishImage, type GeneratedImageCollaborators } from './generated-images.js';
+import { requireOwnedConversation } from './generated-media.js';
 import { hasTarget, usedPlan } from './panel-targets.js';
 import { uploadError } from './uploads/errors.js';
 import type { OwnedCheck } from './uploads/types.js';
-import { requireRoom, useRoom, UseRoomError } from './use-room.js';
+import { requireRoom, UseRoomError } from './use-room.js';
 
 /** A panel of the storyboard the video uses. */
 export type PanelTarget = Readonly<{ shotId: string; panelId: string }>;
@@ -17,7 +18,7 @@ export type PanelImageSave = Readonly<{ version: Extract<Version, { kind: 'image
 
 /** The id of a panel's own image artifact, derived from the video, Shot and panel. */
 export const panelArtifactId = (conversation: string, target: PanelTarget) => derivedArtifactId('panel', [conversation, target.shotId, target.panelId]);
-const panelBinding = (target: PanelTarget) => ({ purpose: 'panel_image', shotId: target.shotId, panelId: target.panelId });
+const panelBinding = (target: PanelTarget): DerivedBinding => ({ purpose: 'panel_image', shotId: target.shotId, panelId: target.panelId });
 /** The draft use on the latest version of the panel's own image, which the next version moves. */
 const panelUse = (client: Parameters<typeof movableUse>[0], account: string, conversation: string, target: PanelTarget, lock: boolean) =>
   movableUse(client, account, conversation, panelArtifactId(conversation, target), panelBinding(target), lock);
@@ -34,7 +35,7 @@ export function createPanelImages(pool: Pool, checkOwnedConversation: OwnedCheck
     async hasRoom(account: string, conversation: string, target: PanelTarget): Promise<boolean> {
       try {
         await requireOwnedConversation(checkOwnedConversation, account, conversation);
-        return Boolean(await panelUse(pool, account, conversation, target, false)) || await useRoom(pool, account, conversation) > 0;
+        return await hasDerivedRoom(pool, account, conversation, panelArtifactId(conversation, target), panelBinding(target));
       } catch (error) { throw uploadError(error); }
     },
 
@@ -56,9 +57,7 @@ export function createPanelImages(pool: Pool, checkOwnedConversation: OwnedCheck
           const moved = await panelUse(client, account, conversation, input, true);
           if (!moved) await room();
           const version = await publishImage(client, account, conversation, image, input.inputs, artifactId);
-          // A made image is a draft: technical success never grants approval, and a person's choice stays as it is.
-          if (moved) await client.query("UPDATE artifacts.conversation_uses SET version_id=$1 WHERE owner_id=$2 AND use_id=$3", [version.id, account, moved]);
-          else await client.query("INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state) VALUES($1,$2,$3,$4,$5,'panel_image','draft')", [account, conversation, randomUUID(), version.id, panelBinding(input)]);
+          await bindDerivedDraft(client, account, conversation, version.id, panelBinding(input), moved);
           return { version, gone: false };
         }, { signal, label: 'Panel image' });
       } catch (error) {
