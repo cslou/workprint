@@ -15,19 +15,25 @@ export function measuredMedia(expected: Readonly<{ kind: 'image' | 'video'; cont
 
 const busy = (error: unknown) => error instanceof MediaProcessError && error.code === 'capacity';
 
-/** The checker runs one job at a time: another job's turn is waited out, within `waitMs`. Each try has its own limit. */
-export async function verifyWhenFree(verifyMedia: MediaVerifier, input: Omit<Parameters<MediaVerifier>[0], 'signal'>, options: Readonly<{ waitMs: number; retryMs: number; signal?: AbortSignal | undefined }>): Promise<VerifiedMedia> {
+export type WhenFreeOptions = Readonly<{ waitMs: number; retryMs: number; signal?: AbortSignal | undefined }>;
+
+/** The media sandbox runs one job at a time: another job's turn is waited out, within `waitMs`. Each try has its own limit. */
+export async function whenFree<T>(job: (signal: AbortSignal) => Promise<T>, options: WhenFreeOptions): Promise<T> {
   const deadline = Date.now() + options.waitMs;
   for (;;) {
     try {
       const attempt = AbortSignal.timeout(20_000);
-      return await verifyMedia({ ...input, signal: options.signal ? AbortSignal.any([options.signal, attempt]) : attempt });
+      return await job(options.signal ? AbortSignal.any([options.signal, attempt]) : attempt);
     } catch (error) {
       if (!busy(error) || Date.now() + options.retryMs > deadline || options.signal?.aborted) throw error;
       await new Promise(resolve => setTimeout(resolve, options.retryMs));
     }
   }
 }
+
+/** A media check that waits its turn, as `whenFree` does. */
+export const verifyWhenFree = (verifyMedia: MediaVerifier, input: Omit<Parameters<MediaVerifier>[0], 'signal'>, options: WhenFreeOptions): Promise<VerifiedMedia> =>
+  whenFree(signal => verifyMedia({ ...input, signal }), options);
 
 /** Trusted composition capability; actual immutable byte/decode proof, never caller authority. */
 export function createMediaVerifier(sandbox:MediaSandbox):MediaVerifier {
