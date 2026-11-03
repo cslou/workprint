@@ -2,7 +2,7 @@
 
 **Date:** Start after Lou approves this plan, from `main` at `4d34530` (Sprint 009 merged as PR #103) – End after completion gates and Lou's QA
 **Goal:** In a local build, a signed-in user writes a script with the agent, and the script names its subjects: the characters, places and props that need a look. Assets shows each subject at once, empty until something is made for it. The user asks for a subject's reference sheet; the agent calls one tool, generate-sheet, which makes a light set of one-view images (at most 5), each later view made from the first so they match, and saves them as that subject's sheet with a view name for each image. Other images the agent makes for a subject are filed under it. Assets shows each subject with its sheet, laid out as a sheet, and its other images, live and after a reload.
-**Status:** 🟡 Implemented; Lou's QA passed on 2026-11-03 (see Final Review; the merge to main waits for Lou's command)
+**Status:** 🟢 Complete. Lou's QA passed on 2026-11-03 (see Final Review); merged to `main` with Sprint 011 on Lou's command (#113, 2026-11-03)
 
 ---
 
@@ -497,4 +497,4 @@ Sprint-specific completion items:
     - Commit `6d3421e` (Story 2) has a 53-character subject; it was not amended after its PR opened (pr-hygiene).
     - The Sprint 011 plan and its backlog and packaging edits ride in this PR: they were committed first on `sprint-010`, as the handoff says (pr-hygiene).
 - **New Dependencies:** None.
-- **Pending:** the sprint PR's review and the merge to `main` on Lou's command. Lou's QA passed (2026-11-03).
+- **Merged:** to `main` as #113 on Lou's command (2026-11-03), carrying Sprint 011 (#133). The deep pre-merge gate passed at `b571f7b`.
