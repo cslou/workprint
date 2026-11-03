@@ -75,6 +75,7 @@ test('each refusal has its own line, and none starts a job', async () => {
     const result = await run(collaborators, tool.inputSchema.parse(args(change)));
     assert.deepEqual([result.made, line(result)?.summary, line(result)?.media, started], [false, summary, undefined, []], summary);
     assert.equal(typeof result.message, 'string');
+    assert.doesNotMatch(String(result.message), /frame/, summary);
   }
 });
 
@@ -89,7 +90,12 @@ test('the job runner\'s refusals and a cap race read as the video tools say them
   const images = harness({ outcome: { kind: 'invalid', detail: 'referenceImages.dimensions' } });
   const invalid = await run(images.collaborators, tool.inputSchema.parse(args()));
   assert.deepEqual([invalid.reason, line(invalid)?.summary], ['invalid', 'Not made: the request wasn’t valid']);
-  assert.match(String(invalid.message), /generate-panel/); assert.doesNotMatch(String(invalid.message), /field/);
+  assert.match(String(invalid.message), /generate-panel/); assert.match(String(invalid.message), /generate-sheet/);
+  assert.doesNotMatch(String(invalid.message), /field|frame/);
+  const unchecked = harness({ outcome: { kind: 'failed', jobId, reason: 'check_refused' } });
+  const checks = await run(unchecked.collaborators, tool.inputSchema.parse(args()));
+  assert.deepEqual([checks.reason, line(checks)?.summary], ['checks', 'Not saved: the video didn’t pass checks']);
+  assert.match(String(checks.message), /media checks/); assert.doesNotMatch(String(checks.message), /frame/);
   const lost = harness({ outcome: { kind: 'input_not_found' } });
   assert.match(String((await run(lost.collaborators, tool.inputSchema.parse(args()))).message), /make the Shot's panels or the sheet again/); assert.doesNotMatch(String((await run(lost.collaborators, tool.inputSchema.parse(args()))).message), /frame/);
   const refused = harness({ outcome: { kind: 'failed', jobId, reason: 'provider_error', provider: 'invalid_request' } });
