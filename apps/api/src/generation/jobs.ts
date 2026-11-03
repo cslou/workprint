@@ -6,12 +6,13 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
+import { maxReferenceImages } from './minimax-video.js';
 
 export type JobStatus = 'submitting' | 'running' | 'interrupted' | 'succeeded' | 'failed';
 export type JobFailure = 'invalid_input' | 'provider_error' | 'outcome_unknown' | 'expired' | 'check_refused';
 export type VideoJob = Readonly<{
   id: string; accountId: string; conversationId: string; purpose: 'video';
-  /** Exact saved image versions sent as frames, in order. */
+  /** Exact saved image versions sent as frames or as reference images, in order. */
   inputs: readonly string[];
   /** The storyboard Shot the job makes a video for, when it was started for one. */
   target?: JobTarget;
@@ -28,6 +29,8 @@ export class GenerationJobError extends Error {
   constructor(readonly code: GenerationJobErrorCode) { super(`Generation job ${code.replace('_', ' ')}`); }
 }
 
+/** A job saves at most this many input images: two frames, or up to MiniMax's reference image limit. */
+const maxJobInputs = maxReferenceImages;
 /** MiniMax keeps a task queryable for 7 days from submission; after that a waiting job can only be expired. */
 export const jobLifetimeDays = 7;
 
@@ -79,7 +82,7 @@ export function createGenerationJobs(pool: Pool) {
     /** Saves a job as `submitting` before its paid create is sent, with the Shot it is for. Only the prompt's digest is kept. */
     async begin(account: string, conversation: string, input: { readonly prompt: string; readonly inputs: readonly string[]; readonly target?: JobTarget | undefined }): Promise<VideoJob> {
       if (!id(account) || !id(conversation) || typeof input.prompt !== 'string' || !input.prompt) throw new GenerationJobError('invalid_input');
-      if (input.inputs.length > 2 || !input.inputs.every(id) || new Set(input.inputs).size !== input.inputs.length) throw new GenerationJobError('invalid_input');
+      if (input.inputs.length > maxJobInputs || !input.inputs.every(id) || new Set(input.inputs).size !== input.inputs.length) throw new GenerationJobError('invalid_input');
       if (input.target !== undefined && !id(input.target.shotId)) throw new GenerationJobError('invalid_input');
       const digest = createHash('sha256').update(input.prompt).digest('hex');
       const saved = await pool.query<Row>(

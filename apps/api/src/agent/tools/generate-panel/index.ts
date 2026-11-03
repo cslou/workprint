@@ -37,23 +37,23 @@ function refused(outcome: Exclude<PanelOutcome, { kind: 'saved' }>): GeneratePan
   }
 }
 
-// A panel becomes a Shot video's frame, so its shape stays strictly inside MiniMax's frame ratio: Meta keeps the
+// A panel becomes a Shot video's reference image, so its shape stays strictly inside MiniMax's image ratio: Meta keeps the
 // shape it is asked for but picks the pixels, and rounding at an exact limit could tip it over. Checked on every
 // call, though a later panel's size is ignored. "auto" leaves the shape to Meta.
 const panelSize = imageSize.refine(value => {
   if (value === 'auto') return true;
   const [width, height] = value.split('x').map(Number) as [number, number];
   return width / height > videoFrameRatio.min && width / height < videoFrameRatio.max;
-}, `A panel's shape must be "auto" or WxH with width ÷ height above ${videoFrameRatio.min} and below ${videoFrameRatio.max}, so it can be a Shot video's frame`);
+}, `A panel's shape must be "auto" or WxH with width ÷ height above ${videoFrameRatio.min} and below ${videoFrameRatio.max}, so it can be a Shot video's reference image`);
 
 /** Makes one panel's image with Meta from the Shot's sheets and saves it as the next version of that panel's image. */
 export const generatePanelTool = defineTool({
   id: 'generate-panel',
   description: [
     'Make one storyboard panel\'s image with Meta, from the Shot\'s reference sheets, and save it as that panel\'s next draft image. Saving is never approval: the user chooses panels.',
-    'shot and panel are ids from read-workspace\'s storyboard. Make a Shot\'s first panel before its second: the server puts the first panel\'s image first, keeps its camera, setting and staging, and gives the second the same size so both frames match.',
+    'shot and panel are ids from read-workspace\'s storyboard. Make a Shot\'s first panel before its second. A second panel is made from the sheet views and shows the new picture its description sets out: the server adds the first panel\'s image last, only to match the setting, people and light, not its camera or framing, and gives the second panel the first\'s size.',
     'Pick only the images this panel needs in images, as an artist would: usually the relevant views of the sheets the Shot names (a face close-up for a close shot, a wide master for the place), not whole sheets; other images the video uses, such as one in a character\'s group, only when the user asks. Empty images passes every sheet the Shot names, whole. The server orders and labels the inputs and tells Meta what each is for.',
-    'Write the prompt from the Shot as three short parts: Preserve (camera, crop, staging, setting, each character\'s look and clothing, and how many of each prop there are, as the inputs show them), Change only (this panel\'s one action, pose, expression or camera change), and Reject if (camera drift, changed clothing or faces, moved furniture, duplicate or missing props, extra people).',
+    'Write the prompt from the Shot and the panel\'s description as three short parts: Preserve (the setting, each character\'s look and clothing, and how many of each prop there are, as the inputs show them, and for a first panel the camera, crop and staging the Shot sets out), Change only (this panel\'s one action, pose or expression, or for a second panel the new camera and framing its description sets out), and Reject if (changed clothing or faces, moved furniture, duplicate or missing props, extra people, or camera drift in a first panel).',
     'Show one visible moment. Do not invent story facts or force a style. Each call is one paid image.',
   ].join(' '),
   inputSchema: z.strictObject({

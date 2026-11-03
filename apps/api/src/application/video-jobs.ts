@@ -1,5 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises';
-import { GenerationJobError, MiniMaxVideoError, validateVideoRequest, type GenerationJobs, type JobFailure, type JobTarget, type MiniMaxVideoClient, type MiniMaxVideoErrorCode, type VideoFrame, type VideoRatio, type VideoRequest } from '../generation/index.js';
+import { GenerationJobError, maxReferenceImages, MiniMaxVideoError, validateVideoRequest, type GenerationJobs, type JobFailure, type JobTarget, type MiniMaxVideoClient, type MiniMaxVideoErrorCode, type VideoFrame, type VideoRatio, type VideoRequest } from '../generation/index.js';
 import { logFailure } from './failure-log.js';
 import type { ReadImageInputs } from './generated-images.js';
 import type { SaveGeneratedVideo } from './generated-videos.js';
@@ -7,8 +7,11 @@ import type { SaveGeneratedVideo } from './generated-videos.js';
 /** Why the caller's signal fired: Stop and the turn deadline interrupt a job; a shutdown leaves it running. */
 export type VideoAbortReason = 'stop' | 'deadline' | 'shutdown';
 export type VideoRunControl = Readonly<{ signal: AbortSignal; abortReason: () => VideoAbortReason | undefined }>;
-/** A new video. `firstFrame` and `lastFrame` are image version ids this video uses. `target`: the Shot it is made for. */
-export type NewVideo = Readonly<{ prompt: string; durationS: number; ratio: VideoRatio; firstFrame?: string; lastFrame?: string; target?: JobTarget }>;
+/**
+ * A new video. `firstFrame` and `lastFrame`, or else 1–9 `referenceImageIds`, are image version ids this video uses.
+ * `target`: the Shot it is made for.
+ */
+export type NewVideo = Readonly<{ prompt: string; durationS: number; ratio: VideoRatio; firstFrame?: string; lastFrame?: string; referenceImageIds?: readonly string[]; target?: JobTarget }>;
 /** Why MiniMax didn't make the video: a refused create (its client code), or its own failed or cancelled task. */
 export type VideoProviderFailure = Exclude<MiniMaxVideoErrorCode, 'aborted'> | 'task_failed' | 'task_cancelled';
 
@@ -36,8 +39,11 @@ export type VideoJobTiming = Readonly<{ pollIntervalMs: number; pollDeadlineMs: 
 export const videoJobTiming: VideoJobTiming = Object.freeze({ pollIntervalMs: 10_000, pollDeadlineMs: 30 * 60_000 });
 
 type Jobs = Pick<GenerationJobs, 'begin' | 'started' | 'failed' | 'interrupted' | 'resumed' | 'get' | 'list'>;
-/** One job of this video that stopped waiting: its id is what a resume names. `frames` are its exact input image versions, in order. */
-export type StoppedVideo = Readonly<{ jobId: string; frames: readonly string[]; submittedAt: Date }>;
+/**
+ * One job of this video that stopped waiting: its id is what a resume names. `images` are its exact input image
+ * versions, in order: its frames, or its reference images.
+ */
+export type StoppedVideo = Readonly<{ jobId: string; images: readonly string[]; submittedAt: Date }>;
 export type StoppedVideosOutcome = { kind: 'read'; jobs: readonly StoppedVideo[] } | { kind: 'unavailable' };
 /** At most this many stopped jobs are listed, newest first. */
 export const stoppedVideosLimit = 5;
@@ -136,21 +142,26 @@ export function createVideoJobs(collaborators: VideoJobCollaborators) {
   }
 
   return Object.freeze({
-    /** Starts a new job: its frames and request are checked before anything is saved or sent. */
+    /** Starts a new job: its images and request are checked before anything is saved or sent. */
     start: (account: string, video: string, input: NewVideo, control: VideoRunControl) => guarded('Video job failed', async sent => {
-      const ids = [input.firstFrame, input.lastFrame].filter((id): id is string => id !== undefined);
-      // A job and a clip's dependencies name each image once, so one image can't be both frames.
-      if (ids.length === 2 && ids[0] === ids[1]) return { kind: 'invalid', detail: 'lastFrame' };
-      let frames: VideoFrame[] = [];
+      const references = input.referenceImageIds;
+      // Reference images and frames are two kinds of request; a count MiniMax refuses is refused before any read.
+      if (references !== undefined && (input.firstFrame !== undefined || input.lastFrame !== undefined || !references.length || references.length > maxReferenceImages)) return { kind: 'invalid', detail: 'referenceImages' };
+      const ids = references !== undefined ? [...references] : [input.firstFrame, input.lastFrame].filter((id): id is string => id !== undefined);
+      // A job and a clip's dependencies name each image once, so one image can't be both frames, or two references.
+      if (new Set(ids).size !== ids.length) return { kind: 'invalid', detail: references !== undefined ? 'referenceImages' : 'lastFrame' };
+      let images: VideoFrame[] = [];
       if (ids.length) {
         const read = await readImageInputs(account, video, ids);
         if (read.kind !== 'read') return read.kind === 'not_found' ? { kind: 'input_not_found' } : { kind: 'unavailable', created: false };
-        frames = read.images.map(image => ({ dataUrl: image.dataUrl, width: image.width, height: image.height }));
+        images = read.images.map(image => ({ dataUrl: image.dataUrl, width: image.width, height: image.height }));
       }
+      const frames = references !== undefined ? [] : images;
       const [first, last] = input.firstFrame === undefined ? [undefined, frames[0]] : [frames[0], frames[1]];
       const request: VideoRequest = {
         prompt: input.prompt, durationS: input.durationS,
         ...(frames.length ? {} : { ratio: input.ratio }), ...(first ? { firstFrame: first } : {}), ...(last ? { lastFrame: last } : {}),
+        ...(references !== undefined ? { referenceImages: images } : {}),
       };
       try { validateVideoRequest(request); } catch (error) {
         if (error instanceof MiniMaxVideoError) return { kind: 'invalid', ...(error.detail ? { detail: error.detail } : {}) };
@@ -208,7 +219,7 @@ export function createVideoJobs(collaborators: VideoJobCollaborators) {
     async stopped(account: string, video: string): Promise<StoppedVideosOutcome> {
       try {
         const page = await jobs.list(account, video, { limit: stoppedVideosLimit, status: 'interrupted' });
-        return { kind: 'read', jobs: page.jobs.map(job => ({ jobId: job.id, frames: job.inputs, submittedAt: job.submittedAt })) };
+        return { kind: 'read', jobs: page.jobs.map(job => ({ jobId: job.id, images: job.inputs, submittedAt: job.submittedAt })) };
       } catch (error) {
         logFailure('Stopped video jobs read failed', error);
         return { kind: 'unavailable' };

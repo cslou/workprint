@@ -4,6 +4,11 @@ Convention: `docs/conventions/backlog-management.md` (selected harness root; AGE
 
 ## Inbox
 
+### B-046 — Shrink reference images if their size becomes a problem
+- Context: Sprint 012 planning (2026-11-03). Reference images are sent to MiniMax as stored, as Base64 in the request body. Nine sheet PNGs come to about 36 MB, under the 64 MiB cap; the Shot 1 test used 1,536 px JPEGs at 1.3 MB.
+- Open decision: whether to downscale or re-encode reference images before sending, if body size, upload time or MiniMax limits become a problem.
+- References: Sprint 012 Story 2 (the request shape and the per-image checks in `apps/api/src/generation/minimax-video.ts`).
+
 ### B-042 — Bring a removed subject's work back from the Library
 - Context: Sprint 010's sprint-PR review (2026-11-03) found that a subject removed from the script in one save and added back by name in a later save gets its old id, and with it the sheet and images still filed under that id (`apps/api/src/artifacts/script-subjects.ts`, the `same` lookup). This applies to a different kind with the same name too (a prop "Mara" after the character "Mara"). Lou (2026-11-03): whether a subject's work comes back is a Library feature, recorded here for now. The current behaviour stays until then.
 - Open decision: whether a re-added subject reclaims its old work automatically, starts fresh with its old work offered from the Library, or does either only for the same kind.
@@ -19,11 +24,19 @@ Convention: `docs/conventions/backlog-management.md` (selected harness root; AGE
 - References: PR #93 (`apps/web/src/materials/assets.tsx` wraps the image viewer in history; `apps/api/src/artifacts/generated-images.ts` makes an approved image's edit a new image); PR #91 body, Pending (the approval and refresh P2s from its re-review); `apps/web/src/versions/review.tsx` (the closed Version history disclosure); `apps/web/src/conversation/shown-images.tsx` (the chat viewer, with no history); `apps/web/src/shell/workspace-tabs.tsx` (no `onUsed` for Assets); spec §8.3 Images and SC2 (why an approval is never replaced); B-036 (edits are not journaled).
 
 ## Next
+### B-043 — Shot videos from reference images
+- Context: Lou's QA of Sprint 011 (2026-11-03). Shot videos are made from the first and last panels as MiniMax `first_frame` / `last_frame` (`apps/api/src/application/shots.ts`). Lou worried that frames are too strict, and frames force the panel's 3:2 shape. Two paid MiniMax-H3 reference-to-video (`reference_image`) runs on the QA images kept the subjects, followed the panel's framing and came out 16:9. Lou: "I would say this test passes."
+- Problem: Frame-based Shot videos copy the panel too literally, can't take the subjects' sheet views, and come out in the panel's shape rather than 16:9. The agent also has no say in a Shot's length, and a second panel is made as an edit of the first, so it keeps the first's camera.
+- Outcome: Each Shot has a length the agent sets and a person can change. Its video is made from up to 9 reference images (the named subjects' sheet views and the Shot's panels), each labelled in the prompt, at 16:9 and the Shot's length. A Shot has a second panel only when its picture changes a lot, for example when the camera moves from one part of a room to another. Pass: a Shot video plays at 16:9, keeps the subjects, and runs for the Shot's length.
+- References: MiniMax V2 `/v2/video_generation` reference-to-video (up to 9 `reference_image` items; not combinable with frames); MiniMax's H3 prompt guides (speaker ids and `<d>[English] …</d>` dialogue tags); B-018 and B-019 (the storyboard and Shot videos, Sprint 011).
+- Work: [Sprint 012](sprints/sprint-012.md) Stories 1–4.
+
 ### B-041 — System prompt for the production workflow
 - Context: Lou, 2026-11-03, while planning Sprints 010 and 011. Schedule right after Sprint 011.
 - Problem: The system prompt is three static lines (`apps/api/src/agent/mastra/native-turns.ts:23`). Each tool explains itself, but nothing tells the agent the agreed workflow or how its pieces fit together.
 - Outcome: The system prompt covers the workflow (script, then reference sheets, then the storyboard, then panels, then Shot videos), how sheets feed panels and panels and Shot text feed videos, and to show the person each step before the next paid one. It stays static so provider prefix caching holds. Pass: a fresh conversation asked to make a short video follows the steps in order and asks before paid steps.
 - References: Sprints 010 and 011; `~/projects/animation-studio/.pi/skills/create-storyboard/SKILL.md`; the Muse Spark notes.
+- Work: [Sprint 012](sprints/sprint-012.md) Story 5.
 
 
 MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority order. B-021 to B-025 were added the same day from the former Sprint 006/007 plans and the gaps they exposed, placed where their dependencies need them. B-034 was added the same day from Lou's Sprint 006 decision that the agent names the video, and is ranked second because the new Sprint 006 includes it. In this file, "former Sprint 006/007" means the deleted plans at `eb98e49`; plain "Sprint 006" means the current [Sprint 006 plan](sprints/sprint-006.md). Sprint allocation is in spec §10 [Phase 3 sprint packaging](specs/implementation-spec-001.md#phase-3-sprint-packaging). Spec story IDs (P3-S*, P4-S*) and the "reduced-delivery amendment" or "Submission and recovery contract" cited below refer to text removed from the spec on 2026-11-01; read it with `git show eb98e49:docs/specs/implementation-spec-001.md`. The same applies to the former Sprint 006/007 plans, `git show eb98e49:docs/sprints/sprint-006.md` (and `sprint-007.md`). Each tool lives in its own directory under the agent module and calls application functions in process, never application HTTP routes (implementation spec §10). Assistant saves and generations never count as human approval (AGENTS.md).
@@ -146,7 +159,7 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
   - Stream-copy joining needs matching codec, resolution and frame rate, so incompatible clips fail with a clear message rather than being re-encoded in the MVP.
   - Run ffmpeg inside the existing bounded media sandbox, and verify the output like any other video.
 - References: `~/projects/animation-studio/.pi/skills/assemble-video/SKILL.md` (stream-copy joining with compatibility checks) and `.pi/lib/ffmpeg.mjs`; `apps/api/src/storage/media/sandbox.ts` (the existing ffmpeg sandbox); B-019.
-- Constraint: Its own sprint (012), after reference sheets (010) and the storyboard (011) (Lou, 2026-11-03). It joins the generated and Shot videos.
+- Constraint: Its own sprint (013), after reference sheets (010), the storyboard (011) and reference-to-video Shots (012) (Lou, 2026-11-03). It joins the generated and Shot videos.
 
 Moved after video (Lou, 2026-11-02): AskUserQuestion (B-014) and image options (B-016) wait until video generation (B-025, B-019, B-020) is done. Until then the agent asks in plain chat text.
 
@@ -238,6 +251,29 @@ After video generation (Lou, 2026-11-02, from Sprint 008 QA): B-038 and B-039 wa
 ## Later
 
 Deprioritized: everything here waits until the Next items are done (Lou, 2026-11-01). Nothing here is ranked.
+
+### B-044 — Consistent voices and lip sync through MiniMax speech
+- Context: Lou's QA of the reference-to-video test (2026-11-03): "audio is correct in general but does not match the face, but we will fix that later." Lou wants it in a later sprint. Research the same day (`docs/research/voices-and-speech-2026-11.md`, private) proposes the design below.
+- Problem: MiniMax-H3 makes each Shot's sound itself, so a character's voice changes from Shot to Shot and the lips don't follow the line. Workprint has no voice asset, no audio media type and no speech client.
+- Outcome:
+  - Each speaking character has a voice under its subject, separate from its sheet: a saved, versioned asset with a sample clip, made by the agent as a draft and chosen by a person with "Use this version". MiniMax's voice id stays on the server. Preset or designed voices only, no cloning (account verification and consent).
+  - Each Shot with dialogue gets one dialogue track made in those voices (`speech-2.8-hd`, about $0.006 a line), exactly the Shot's length with about 1 s of silence first, saved as the Shot's own work. It goes stale when a line or a voice changes.
+  - generate-shot sends the track as `reference_audio` with timed lines (`At 00:01.000, Mara (S1) says: <d>…</d>`) and refuses a Shot with dialogue but no current track. New tools make a voice and a Shot's track; the track tool says how many seconds the speech needs and never changes a length a person set.
+  - The system prompt's order becomes script → sheets and voices → storyboard → panels → dialogue tracks → Shot videos.
+  - Lou's decisions (2026-11-03):
+    - A narrator is a subject of its own kind, listed by the script when it has narration lines: a voice with no sheet. Assets shows it in its own "Narrator" group beside characters, places and props.
+    - A voice is not part of the sheet. It is its own version under the subject, shown beside the sheet in the subject's group, so changing a voice never makes a new sheet version and redoing a sheet view never touches the voice.
+    - People can hear the audio: each voice has a sample to play, with "Use this version", and each Shot's dialogue track plays in the Shot's row before its video is made.
+  - Pass: two Shots with Mara's lines sound like the same voice, and in each her mouth moves in time with her own words. Lou judges it at QA. A changed line or voice makes the track stale, and generate-shot refuses it until it is remade.
+- Constraint: Needs an audio media type (file check, storage, player, one fixed format so joining still works). MiniMax takes at most 3 audio clips of 2–15 s, 15 s in total, and 12 files with the images, so the job input cap rises from 9 to 12.
+- Blocker: A paid test (about $1.92, four 6 s runs on QA Shot 1, on Lou's go) must show that H3's lips follow supplied speech on the hosted API before this is scheduled. It isn't documented, and outside reports conflict. Open decisions for Lou: whether the speech call may be resent when its answer is lost; whether to swap our track into the clip; when to pay a designed voice's $3.
+- References: `docs/research/voices-and-speech-2026-11.md` and its folder of saved docs (private); MiniMax speech `/v1/t2a_v2`, voice design and pricing; MiniMax V2 video `reference_audio`; H3 prompt guides (`ref-en.txt` §2.4, §4.2); Sprint 012 Stories 1 and 3; B-020; B-045.
+
+### B-045 — Narration and voice-over as their own track
+- Context: Research for Sprint 012 and B-044 (2026-11-03). A voice-over line in a Shot's prompt ("says in an off-screen voiceover … while her lips remain completely closed") is the only way to ask H3 for narration today, and it is made per Shot.
+- Problem: Narration made inside each Shot's clip can't run across Shots, change without remaking the clip, or keep one voice. Sending it as a Shot's audio could make mouths move.
+- Outcome: Narration and voice-over are made with MiniMax speech, in the narrator's or the character's voice from B-044 (a narrator is its own subject in Assets, Lou 2026-11-03), as their own track and laid over the joined video, re-encoding the audio once while the video is copied untouched. Pass: a narration line plays across two joined Shots in one voice, and no character's mouth moves with it.
+- References: B-020 (joining clips, Sprint 013); B-044 (voices); `docs/research/voices-and-speech-2026-11.md` (private); Sprint 012 Story 3 (the voice-over prompt form).
 
 ### B-037 — Delete saved work
 - Problem: Saved work is append-only. Images (uploaded or generated), scripts and videos can be versioned but never deleted, so a user can't remove an unwanted image from Assets or storage. Lou raised it while planning Sprint 008 (2026-11-02): "we probably need that in the future".

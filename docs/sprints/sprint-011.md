@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-03, stacked on `sprint-010` (Lou: "Go: 010 then 011 stacked") – End after completion gates and Lou's QA
 **Goal:** In a local build, a signed-in user asks the agent to storyboard the script. The agent saves a storyboard of Shots from the current script: each Shot carries its purpose, framing, action, dialogue, camera note, the reference sheets it uses with each one's job, and one or two panels, whose images become the video's first and last frames. The agent makes each panel's image from that Shot's chosen sheet views (and, for a second panel, the first panel's image), then makes each Shot's video from its panel images and the Shot's text. The Storyboard tab shows the Shots and panel images, and the Videos tab plays each Shot's video, live and after a reload.
-**Status:** 🟡 Implemented; Lou's QA passed on 2026-11-03 (see Final Review; the merge waits for Lou's command)
+**Status:** 🟢 Complete. Lou's QA passed on 2026-11-03 (see Final Review); merged into `sprint-010` (#133) and with it to `main` (#113) on Lou's command, 2026-11-03
 
 ---
 

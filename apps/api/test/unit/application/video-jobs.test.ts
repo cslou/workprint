@@ -38,17 +38,17 @@ function memoryJobs() {
 }
 
 function harness(options: { frames?: ImageInputsOutcome; submit?: () => Promise<{ taskId: string }>; tasks?: (() => Promise<VideoTask>)[]; download?: () => Promise<Uint8Array>; save?: GeneratedVideoOutcome['kind']; room?: boolean } = {}) {
-  const jobs = memoryJobs(), calls = { submits: 0, queries: 0, downloads: 0, saves: 0, targets: [] as unknown[] };
+  const jobs = memoryJobs(), calls = { submits: 0, queries: 0, downloads: 0, saves: 0, reads: 0, targets: [] as unknown[], requests: [] as unknown[], dependencies: [] as unknown[] };
   const runner = createVideoJobs({
     jobs,
     client: {
-      submit: async () => { calls.submits++; return options.submit ? options.submit() : { taskId: 'task-1' }; },
+      submit: async request => { calls.submits++; calls.requests.push(request); return options.submit ? options.submit() : { taskId: 'task-1' }; },
       query: async () => { const next = options.tasks?.[calls.queries++]; return next ? next() : { status: 'succeeded', result: { url: 'https://example.invalid/clip.mp4' } }; },
       download: async () => { calls.downloads++; return options.download ? options.download() : new Uint8Array([1]); },
     },
-    readImageInputs: async () => options.frames ?? { kind: 'not_found' },
+    readImageInputs: async () => { calls.reads++; return options.frames ?? { kind: 'not_found' }; },
     saveVideo: async (_account, _video, saved) => {
-      calls.saves++; calls.targets.push(saved.target);
+      calls.saves++; calls.targets.push(saved.target); calls.dependencies.push(saved.frames);
       const kind = options.save ?? 'saved';
       return kind === 'saved' ? { kind, versionId: randomUUID(), width: 1344, height: 768, durationMs: 4042, gone: false } : { kind };
     },
@@ -70,6 +70,37 @@ test('frames and the request are checked before any job is saved or sent', async
   const same = harness(), id = randomUUID();
   assert.deepEqual(await same.runner.start(account, video, { ...input, firstFrame: id, lastFrame: id }, control()), { kind: 'invalid', detail: 'lastFrame' });
   for (const run of [lastOnly, small, missing, same]) { assert.equal(run.jobs.rows.size, 0); assert.equal(run.calls.submits, 0); }
+});
+
+test('a reference job sends its images as references with the ratio, and saves them as its inputs and the clip\'s dependencies', async () => {
+  const images = [frame(1376, 768), frame(1024, 1024), frame(768, 1376)];
+  const run = harness({ frames: { kind: 'read', images } });
+  const ids = images.map(image => image.versionId);
+  const outcome = await run.runner.start(account, video, { ...input, referenceImageIds: ids, target: { shotId: 'shot-1' } }, control());
+  assert.equal(outcome.kind, 'saved', JSON.stringify(outcome));
+  assert.deepEqual(run.calls.requests, [{ prompt: input.prompt, durationS: 6, ratio: '16:9', referenceImages: images.map(({ dataUrl, width, height }) => ({ dataUrl, width, height })) }]);
+  assert.deepEqual([...run.jobs.rows.values()].map(job => [job.inputs, job.target]), [[ids, { shotId: 'shot-1' }]]);
+  assert.deepEqual(run.calls.dependencies, [ids]);
+  // A stopped reference job resumes with the same images.
+  const controller = new AbortController();
+  const stopped = harness({ frames: { kind: 'read', images }, tasks: [async () => { controller.abort(); return { status: 'running' }; }] });
+  const interrupted = await stopped.runner.start(account, video, { ...input, referenceImageIds: ids }, control(controller));
+  assert.equal(interrupted.kind, 'interrupted', JSON.stringify(interrupted));
+  assert.equal((await stopped.runner.resume(account, video, (interrupted as { jobId: string }).jobId, control())).kind, 'saved');
+  assert.deepEqual(stopped.calls.dependencies, [ids]);
+});
+
+test('reference images with frames, a repeated one, none or more than 9 are refused before any read or job', async () => {
+  const id = randomUUID();
+  const cases = [
+    { referenceImageIds: [randomUUID()], firstFrame: randomUUID() }, { referenceImageIds: [randomUUID()], lastFrame: randomUUID() },
+    { referenceImageIds: [id, id] }, { referenceImageIds: [] }, { referenceImageIds: Array.from({ length: 10 }, () => randomUUID()) },
+  ];
+  for (const change of cases) {
+    const run = harness({ frames: { kind: 'read', images: [frame()] } });
+    assert.deepEqual(await run.runner.start(account, video, { ...input, ...change }, control()), { kind: 'invalid', detail: 'referenceImages' }, JSON.stringify(change));
+    assert.deepEqual([run.calls.reads, run.jobs.rows.size, run.calls.submits], [0, 0, 0]);
+  }
 });
 
 test('a refused create fails its job by what MiniMax said, and an unknown outcome is never sent again', async () => {
@@ -196,7 +227,7 @@ test('stopped asks for this video\'s interrupted jobs, at most five, and gives e
   const listed = await runner.stopped(account, video);
   assert.ok(listed.kind === 'read');
   assert.deepEqual(listed.jobs.map(job => job.jobId), ids.slice(1).reverse());
-  assert.deepEqual(listed.jobs.map(job => job.frames), [[frame], [], [], [], []]);
+  assert.deepEqual(listed.jobs.map(job => job.images), [[frame], [], [], [], []]);
   assert.deepEqual(asked, [[account, video, { limit: 5, status: 'interrupted' }]]);
   jobs.list = async () => { throw new Error('storage down'); };
   assert.deepEqual(await runner.stopped(account, video), { kind: 'unavailable' });

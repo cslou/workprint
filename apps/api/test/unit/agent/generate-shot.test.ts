@@ -12,17 +12,17 @@ const image = (id: string) => ({ id, artifactId: `artifact-${id}`, kind: 'image'
 const panel = (panelId: string, order: number, candidates: unknown[]) => ({ panelId, order, description: `Panel ${panelId}`, references: [], candidateImageVersions: candidates, approvedImageVersionId: null });
 
 /** One Shot with two panels; the second has no image when `unmade`. A made clip is that Shot's version 1. */
-function workspace(options: { unmade?: boolean; action?: string } = {}) {
+function workspace(options: { unmade?: boolean; action?: string; durationS?: number } = {}) {
   const clip = { id: clipId, artifactId: 'artifact-clip', kind: 'video', revision: 1, media: { contentType: 'video/mp4', byteSize: 4, width: 1344, height: 768, durationMs: 6000 }, createdBy: 'assistant', createdAt: new Date().toISOString(), dependencies: [] };
   return {
     script: null, assets: [], generatedVideos: [],
-    storyboard: { work: null, shots: [{ shotId: 's1', order: 0, intent: 'Mara arrives.', ...(options.action ? { action: options.action } : {}),
+    storyboard: { work: null, shots: [{ shotId: 's1', order: 0, intent: 'Mara arrives.', ...(options.action ? { action: options.action } : {}), ...(options.durationS ? { durationS: options.durationS } : {}),
       panels: [panel('p1', 0, [image('a1')]), panel('p2', 1, options.unmade ? [] : [image('b1')])], chosenVideoVersionId: null, candidateVideoVersions: [clip] }] },
     videos: [], pendingQuestion: null, activeWork: [], selectionRevision: '0',
   } as unknown as OwnedWorkspace;
 }
 
-type Options = { outcome?: VideoJobOutcome; unmade?: boolean; action?: string; noVideos?: boolean; unreadable?: boolean };
+type Options = { outcome?: VideoJobOutcome; unmade?: boolean; action?: string; durationS?: number; noVideos?: boolean; unreadable?: boolean };
 function harness(options: Options = {}) {
   const started: NewVideo[] = [];
   const collaborators: AgentCollaborators = {
@@ -41,17 +41,22 @@ const run = (collaborators: AgentCollaborators, args: unknown) =>
 const args = (extra: Record<string, unknown> = {}) => ({ shot: 's1', prompt: 'A slow push-in.', ...extra });
 const line = (output: unknown) => projectToolActivity(productionTools, { toolCallId: 'call_1', toolName: 'generate-shot', state: 'done', input: args(), output });
 
-test('the Shot\'s frames, text and target go to the job runner; a saved clip is named and shown under its line', async () => {
+test('the Shot\'s reference images, labelled text and target go to the job runner; a saved clip is named and shown under its line', async () => {
   const { collaborators, started } = harness();
   const result = await run(collaborators, tool.inputSchema.parse(args({ shot: ' s1 ' })));
-  assert.deepEqual(started, [{ prompt: 'Mara arrives.\n\nNo one speaks.\n\nA slow push-in.', durationS: 6, ratio: '16:9', firstFrame: 'a1', lastFrame: 'b1', target: { shotId: 's1' } }], 'a padded id still names the Shot; the length defaults to 6 s');
+  const prompt = 'Image 1: the storyboard panel for this Shot. Frame the Shot like this panel.\nImage 2: the Shot\'s last storyboard panel. End the Shot on this framing.'
+    + '\n\nMara arrives.\n\nNo one speaks.\n\nA slow push-in.\n\nThe action completes within the Shot, and it ends on a settled moment.';
+  assert.deepEqual(started, [{ prompt, durationS: 6, ratio: '16:9', referenceImageIds: ['a1', 'b1'], target: { shotId: 's1' } }], 'a padded id still names the Shot; a Shot without a length runs 6 s');
+  const timed = harness({ durationS: 9 });
+  await run(timed.collaborators, tool.inputSchema.parse(args()));
+  assert.equal(timed.started[0]?.durationS, 9, 'the Shot\'s own length');
   assert.deepEqual([line(result)?.summary, line(result)?.media], ['Saved Shot 1 · Video · Version 1', [{ kind: 'video', versionId: clipId }]]);
   const gone = harness({ outcome: { kind: 'saved', jobId, versionId: randomUUID(), width: 1344, height: 768, durationMs: 6000, gone: true } });
   assert.equal(line(await run(gone.collaborators, tool.inputSchema.parse(args())))?.summary, 'Saved 1 video (its Shot is gone)');
 });
 
-test('the input schema keeps the motion prompt and the length within MiniMax\'s bounds', () => {
-  for (const bad of [{ prompt: '   ' }, { prompt: '' }, { durationS: 3 }, { durationS: 16 }, { durationS: 6.5 }, { shot: '' }, { firstFrame: 'a1' }]) {
+test('the input schema keeps the motion prompt within MiniMax\'s bounds, and takes no length: the Shot has it', () => {
+  for (const bad of [{ prompt: '   ' }, { prompt: '' }, { durationS: 6 }, { shot: '' }, { firstFrame: 'a1' }]) {
     assert.equal(tool.inputSchema.safeParse(args(bad)).success, false, JSON.stringify(bad));
   }
   assert.equal(line({ error: true })?.summary, 'Not made: the request wasn’t valid');
@@ -70,6 +75,7 @@ test('each refusal has its own line, and none starts a job', async () => {
     const result = await run(collaborators, tool.inputSchema.parse(args(change)));
     assert.deepEqual([result.made, line(result)?.summary, line(result)?.media, started], [false, summary, undefined, []], summary);
     assert.equal(typeof result.message, 'string');
+    assert.doesNotMatch(String(result.message), /frame/, summary);
   }
 });
 
@@ -80,13 +86,18 @@ test('the job runner\'s refusals and a cap race read as the video tools say them
   const waiting = await run(raced.collaborators, tool.inputSchema.parse(args()));
   assert.deepEqual([waiting.reason, waiting.jobId, line(waiting)?.summary], ['waiting_for_room', jobId, 'Not saved yet: this video has too many saved items']);
   assert.match(String(waiting.message), new RegExp(`resume set to "${jobId}"`));
-  // Where generate-video points at its frames, generate-shot points at the panels or the motion prompt.
-  const frames = harness({ outcome: { kind: 'invalid', detail: 'firstFrame.dimensions' } });
-  const invalid = await run(frames.collaborators, tool.inputSchema.parse(args()));
+  // Where generate-video points at its frames, generate-shot points at the panels, the sheets or the motion prompt.
+  const images = harness({ outcome: { kind: 'invalid', detail: 'referenceImages.dimensions' } });
+  const invalid = await run(images.collaborators, tool.inputSchema.parse(args()));
   assert.deepEqual([invalid.reason, line(invalid)?.summary], ['invalid', 'Not made: the request wasn’t valid']);
-  assert.match(String(invalid.message), /generate-panel/); assert.doesNotMatch(String(invalid.message), /field/);
+  assert.match(String(invalid.message), /generate-panel/); assert.match(String(invalid.message), /generate-sheet/);
+  assert.doesNotMatch(String(invalid.message), /field|frame/);
+  const unchecked = harness({ outcome: { kind: 'failed', jobId, reason: 'check_refused' } });
+  const checks = await run(unchecked.collaborators, tool.inputSchema.parse(args()));
+  assert.deepEqual([checks.reason, line(checks)?.summary], ['checks', 'Not saved: the video didn’t pass checks']);
+  assert.match(String(checks.message), /media checks/); assert.doesNotMatch(String(checks.message), /frame/);
   const lost = harness({ outcome: { kind: 'input_not_found' } });
-  assert.match(String((await run(lost.collaborators, tool.inputSchema.parse(args()))).message), /make the Shot's panels again/);
+  assert.match(String((await run(lost.collaborators, tool.inputSchema.parse(args()))).message), /make the Shot's panels or the sheet again/); assert.doesNotMatch(String((await run(lost.collaborators, tool.inputSchema.parse(args()))).message), /frame/);
   const refused = harness({ outcome: { kind: 'failed', jobId, reason: 'provider_error', provider: 'invalid_request' } });
   const content = await run(refused.collaborators, tool.inputSchema.parse(args()));
   assert.deepEqual([content.reason, line(content)?.summary], ['refused', 'Not made: MiniMax refused the request']);

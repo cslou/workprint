@@ -83,6 +83,20 @@ test('saved video jobs move only along their closed transitions', { timeout: 120
     for (const target of ['{"shotId":""}', '{"shotId":1}', '{"shotId":"a","panelId":"b"}', '"shot-1"', '[]']) await assert.rejects(insert(target), { code: '23514' }, target);
   });
 
+  await t.test('a reference job keeps its 9 inputs through a restart, and 10, or a change to them, is refused', async () => {
+    const nine = Array.from({ length: 9 }, (_, index) => `reference-${index + 1}`);
+    const job = await jobs.begin(owner, conversation, { prompt: 'Shot 1 from references', inputs: nine, target: { shotId: 'shot-1' } });
+    assert.deepEqual(job.inputs, nine);
+    await jobs.started(owner, job.id, `task-${job.id}`);
+    assert.equal((await jobs.interruptWaiting()).interrupted >= 1, true);
+    assert.deepEqual([(await jobs.get(owner, job.id)).status, (await jobs.get(owner, job.id)).inputs], ['interrupted', nine], 'the restart pass keeps the inputs');
+    assert.deepEqual((await jobs.resumed(owner, job.id)).inputs, nine, 'a resume keeps the inputs');
+    const ten = [...nine, 'reference-10'];
+    await assert.rejects(jobs.begin(owner, conversation, { prompt: 'Too many', inputs: ten }), refused('invalid_input'));
+    await assert.rejects(store.setup.query("INSERT INTO generation.requests(owner_id,request_id,conversation_id,purpose,prompt_sha256,inputs,status) VALUES($1,$2,$3,'video',repeat('a',64),$4,'submitting')", [owner, randomUUID(), conversation, ten]), { code: '23514' }, 'the database refuses 10');
+    await assert.rejects(store.setup.query('UPDATE generation.requests SET inputs=$2,status=\'interrupted\',revision=revision+1 WHERE request_id=$1', [job.id, nine.slice(1)]), { code: '23514' }, 'the inputs stay fixed');
+  });
+
   await t.test('a certainly refused or unknown create fails the submitting job with its reason', async () => {
     for (const reason of ['invalid_input', 'provider_error', 'outcome_unknown'] as const) {
       const job = await jobs.begin(owner, conversation, { prompt: 'Refused', inputs: [] });

@@ -72,8 +72,8 @@ test('the listing gives the video\'s stopped jobs with their resume ids, only wh
     const signal = new AbortController().signal;
     return tool.execute({}, { scope, collaborators, signal, abortReason: () => undefined }) as Promise<Record<string, unknown>>;
   };
-  const listed = await run({ kind: 'read', jobs: [{ jobId: 'job-2', frames: ['i1'], submittedAt: new Date('2026-11-03T16:34:37Z') }, { jobId: 'job-1', frames: [], submittedAt: new Date('2026-11-03T16:30:11Z') }] });
-  assert.deepEqual(listed.stoppedVideos, [{ jobId: 'job-2', frames: ['i1'], submittedAt: '2026-11-03T16:34:37.000Z' }, { jobId: 'job-1', frames: [], submittedAt: '2026-11-03T16:30:11.000Z' }]);
+  const listed = await run({ kind: 'read', jobs: [{ jobId: 'job-2', images: ['i1'], submittedAt: new Date('2026-11-03T16:34:37Z') }, { jobId: 'job-1', images: [], submittedAt: new Date('2026-11-03T16:30:11Z') }] });
+  assert.deepEqual(listed.stoppedVideos, [{ jobId: 'job-2', images: ['i1'], submittedAt: '2026-11-03T16:34:37.000Z' }, { jobId: 'job-1', images: [], submittedAt: '2026-11-03T16:30:11.000Z' }]);
   assert.deepEqual(asked, [['account', 'video']]);
   assert.equal(listed.total, 1);
   for (const quiet of [await run(), await run({ kind: 'read', jobs: [] }), await run({ kind: 'unavailable' })]) {
@@ -171,11 +171,11 @@ test('an image is listed with its subjectId only while the script lists that sub
 const boardVersion = (shots: unknown[]): Version => ({ ...base('board', 2), createdBy: 'assistant', kind: 'storyboard', content: { schemaVersion: 1, sourceScriptVersionId: 's', shots } } as Version);
 const madeImage = (id: string, revision: number, at: string): Version => ({ ...image(id), artifactId: 'artifact-panel', revision, createdBy: 'assistant', createdAt: at });
 
-test('the listing gives the storyboard once, with each Shot\'s ids, text, references and current panel images', async () => {
+test('the listing gives the storyboard once, with each Shot\'s ids, text, length, references and current panel images', async () => {
   const person = image('view-1'), first = madeImage('panel-v1', 1, '2026-11-02T00:00:00.000Z'), second = madeImage('panel-v2', 2, '2026-11-03T00:00:00.000Z');
   const shots = [
     { shotId: 's2', order: 1, intent: 'The key turns.', panels: [{ panelId: 'p3', order: 0, description: 'The key.', references: [], candidateImageVersions: [], approvedImageVersionId: null }], chosenVideoVersionId: null },
-    { shotId: 's1', order: 0, intent: 'Mara arrives.', framing: 'wide', action: 'Rain.', references: [{ subjectId: 'mara', role: 'identity', purpose: 'Her face.' }],
+    { shotId: 's1', order: 0, intent: 'Mara arrives.', framing: 'wide', action: 'Rain.', durationS: 8, references: [{ subjectId: 'mara', role: 'identity', purpose: 'Her face.' }],
       panels: [
         { panelId: 'p2', order: 1, description: 'At the desk.', references: [], candidateImageVersions: [person, second, first], approvedImageVersionId: 'view-1' },
         { panelId: 'p1', order: 0, description: 'In the doorway.', references: [], candidateImageVersions: [first, second], approvedImageVersionId: null },
@@ -185,7 +185,7 @@ test('the listing gives the storyboard once, with each Shot\'s ids, text, refere
   const space = workspace([], { storyboard: { work: work(board, 'storyboard'), shots } } as Partial<OwnedWorkspace>);
   const listed = await reading(space, async () => ({ kind: 'not_found' }))({}) as { storyboard: unknown; items: { name: string; use: string }[] };
   assert.deepEqual(listed.storyboard, { name: 'Storyboard · Version 2', versionId: 'board', state: 'Draft', detail: 'panels', truncated: false, shots: [
-    { shotId: 's1', intent: 'Mara arrives.', framing: 'wide', references: [{ subjectId: 'mara', role: 'identity' }], panels: [
+    { shotId: 's1', intent: 'Mara arrives.', framing: 'wide', durationS: 8, references: [{ subjectId: 'mara', role: 'identity' }], panels: [
       { panelId: 'p1', description: 'In the doorway.', imageVersionId: 'panel-v2' }, { panelId: 'p2', description: 'At the desk.', imageVersionId: 'view-1' },
     ] },
     { shotId: 's2', intent: 'The key turns.', panels: [{ panelId: 'p3', description: 'The key.' }] },
@@ -197,7 +197,7 @@ test('the listing gives the storyboard once, with each Shot\'s ids, text, refere
 });
 
 test('a 100-Shot storyboard with 200-character intents steps down, says truncated, and stays within 16 KiB', async () => {
-  const shotsOf = (count: number, intent: string, idLength = 30) => Array.from({ length: count }, (_, index) => ({ shotId: `${'s'.repeat(idLength)}-${String(index).padStart(3, '0')}`, order: index, intent, framing: 'wide',
+  const shotsOf = (count: number, intent: string, idLength = 30) => Array.from({ length: count }, (_, index) => ({ shotId: `${'s'.repeat(idLength)}-${String(index).padStart(3, '0')}`, order: index, intent, framing: 'wide', durationS: 15,
     panels: [{ panelId: `${'p'.repeat(30)}-${index}a`, order: 0, description: 'd'.repeat(200), references: [], candidateImageVersions: [], approvedImageVersionId: null }], chosenVideoVersionId: null }));
   const list = async (shots: ReturnType<typeof shotsOf>) => {
     const space = workspace(Array.from({ length: 30 }, (_, index) => image(`i${index}`)), { storyboard: { work: work(boardVersion(shots), 'storyboard'), shots } } as Partial<OwnedWorkspace>);
@@ -226,12 +226,12 @@ test('a 100-Shot storyboard with 200-character intents steps down, says truncate
 test('beside subjects with sheets and stopped videos, a 100-Shot storyboard steps down and the listing stays within 16 KiB', async () => {
   const subjects = Array.from({ length: 30 }, (_, index) => ({ id: `${'m'.repeat(60)}-${index}`, kind: 'character' as const, name: `${'N'.repeat(70)}${index}` }));
   const sheets = subjects.map((subject, index) => ({ ...sheetVersion(`sh${index}`, subject.id, [[`v${index}a`, 'Full-body front'], [`v${index}b`, 'Face close-up']]) }));
-  const shots = Array.from({ length: 100 }, (_, index) => ({ shotId: `${'s'.repeat(30)}-${index}`, order: index, intent: 'i'.repeat(200), framing: 'wide',
+  const shots = Array.from({ length: 100 }, (_, index) => ({ shotId: `${'s'.repeat(30)}-${index}`, order: index, intent: 'i'.repeat(200), framing: 'wide', durationS: 15,
     panels: [{ panelId: `${'p'.repeat(30)}-${index}`, order: 0, description: 'd'.repeat(200), references: [], candidateImageVersions: [], approvedImageVersionId: null }], chosenVideoVersionId: null }));
   const views = sheets.flatMap((_, index) => [image(`v${index}a`), image(`v${index}b`)]);
   const space = workspace([...views, ...sheets, ...Array.from({ length: 20 }, (_, index) => image(`i${index}`))], { script: work(subjectScript(subjects), 'script'), storyboard: { work: work(boardVersion(shots), 'storyboard'), shots } } as Partial<OwnedWorkspace>);
   const collaborators: AgentCollaborators = { readWorkspace: async () => ({ kind: 'found', workspace: space }), saveScript: async () => ({ kind: 'unavailable' }), saveStoryboard: async () => ({ kind: 'unavailable' }), readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }), sheets: unusedSheets,
-    videos: { start: async () => ({ kind: 'not_found' }), resume: async () => ({ kind: 'not_found' }), stopped: async () => ({ kind: 'read', jobs: Array.from({ length: 10 }, (_, index) => ({ jobId: `job-${index}`, frames: [`i${index}`], submittedAt: new Date('2026-11-03T16:34:37Z') })) }) } };
+    videos: { start: async () => ({ kind: 'not_found' }), resume: async () => ({ kind: 'not_found' }), stopped: async () => ({ kind: 'read', jobs: Array.from({ length: 10 }, (_, index) => ({ jobId: `job-${index}`, images: [`i${index}`], submittedAt: new Date('2026-11-03T16:34:37Z') })) }) } };
   const listed = await readTool.execute({}, { scope: { accountId: 'a', videoId: 'v' }, collaborators, signal: new AbortController().signal, abortReason: () => undefined }) as { subjects: unknown[]; stoppedVideos: unknown[]; storyboard: { detail: string; truncated: boolean; shots: unknown[] }; items: unknown[] };
   assert.equal(listed.subjects.length, 30); assert.equal(listed.stoppedVideos.length, 10);
   assert.ok(Buffer.byteLength(JSON.stringify(listed)) <= listingBounds.bytes, String(Buffer.byteLength(JSON.stringify(listed))));

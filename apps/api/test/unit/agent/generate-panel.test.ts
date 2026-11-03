@@ -78,13 +78,13 @@ test('a panel\'s shape must suit a Shot video\'s frame: width ÷ height strictly
   assert.equal(tool.inputSchema.safeParse(input({ panel: 'p2', size: '4000x1000' })).success, false);
 });
 
-test('a later panel takes the first panel\'s image first and its size; the given size is ignored', async () => {
+test('a later panel takes the sheet views, then the first panel\'s image last, and its size; the given size is ignored', async () => {
   const first = version('p1-v1', 'image', { media: media(1536, 864) });
   const { collaborators, calls } = harness({ space: workspace({ first }) });
   assert.equal((await run(collaborators, input({ panel: 'p2', images: ['g1'], size: '1024x1024' }))).made, true);
-  assert.deepEqual(calls.reads, [['p1-v1', 'g1']]);
+  assert.deepEqual(calls.reads, [['g1', 'p1-v1']]);
   assert.equal(calls.edit[0]!.size, '1536x864');
-  assert.match(String(calls.edit[0]!.prompt), /^Input 1: Shot 1 · Panel 1\.1 — keep camera, setting and staging\nInput 2: The Gallery · Wide master — The room\.\n\n/);
+  assert.match(String(calls.edit[0]!.prompt), /^Input 1: The Gallery · Wide master — The room\.\nInput 2: Shot 1 · Panel 1\.1 — match the setting, people and light; not its camera or framing\n\n/);
 });
 
 test('the saved line names the panel; a panel that left the storyboard says so', async () => {

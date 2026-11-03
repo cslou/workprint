@@ -29,7 +29,8 @@ export type GeneratedVideoCollaborators = Readonly<{
   capacityWaitMs?: number; capacityRetryMs?: number;
 }>;
 
-const framesSchema = z.array(idSchema).max(2).refine(ids => new Set(ids).size === ids.length);
+// A clip's input images: its frames, or up to 9 reference images (MiniMax's limit).
+const framesSchema = z.array(idSchema).max(9).refine(ids => new Set(ids).size === ids.length);
 const binding = { purpose: 'video' } as const;
 
 /** The id of a Shot's own video artifact, derived from the video and Shot. */
