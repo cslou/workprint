@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
-import { savedStoryboardContentSchema, storyboardEditSchema } from '@workprint/contracts';
+import { savedStoryboardContentSchema, shotDurations, storyboardEditSchema } from '@workprint/contracts';
+import { videoDurations } from '../../../src/generation/index.js';
 
 const shotId = randomUUID(), panelId = randomUUID();
 const board = (fields: Record<string, unknown> = {}) => ({ schemaVersion: 1, sourceScriptVersionId: randomUUID(),
@@ -19,4 +20,8 @@ test('a Shot\'s length is a whole number of seconds from 4 to 15, and a storyboa
     assert.equal(storyboardEditSchema.safeParse(edit({ durationS })).success, false, `edit ${String(durationS)}`);
   }
   assert.equal(storyboardEditSchema.safeParse(edit()).success, true, 'an edit may leave the length alone');
+});
+
+test('a Shot\'s length range is the range a video can be made at', () => {
+  assert.deepEqual(shotDurations, videoDurations);
 });

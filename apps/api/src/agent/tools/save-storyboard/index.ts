@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { shotDurations, shotRoles } from '@workprint/contracts';
+import { shotDurationSchema, shotDurations, shotRoles } from '@workprint/contracts';
 import { optionalId, type AssistantStoryboardOutcome } from '../../../application/index.js';
 import { defineTool } from '../define.js';
 
@@ -61,7 +61,7 @@ const shot = z.strictObject({
   dialogue: z.array(line).max(20).default([]).describe('The script\'s lines spoken in this Shot, in order.'),
   cameraNote: z.string().max(2000).default('').describe('How the camera frames or moves.'),
   references: z.array(reference).max(10).default([]).describe('The subjects whose sheets this Shot uses, each once.'),
-  durationS: z.number().int().min(shotDurations.min).max(shotDurations.max).describe(`How long the Shot runs, in whole seconds, ${shotDurations.min} to ${shotDurations.max}; its video is made at this length.`),
+  durationS: shotDurationSchema.describe(`How long the Shot runs, in whole seconds, ${shotDurations.min} to ${shotDurations.max}; its video is made at this length.`),
   panels: z.array(panel).min(1).max(2).describe('1 panel, or 2 when the action or camera changes without a cut.'),
 });
 

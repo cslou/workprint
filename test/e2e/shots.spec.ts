@@ -31,8 +31,9 @@ test('a Shot video choice survives reload and can be changed to another exact ve
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await choose(second);
-  // A storyboard saved before Shots had a length says so on its board.
+  // A storyboard saved before Shots had a length shows none in its summary, and says so on its board.
   await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
+  await expect(page.locator('.wp-storyboard-shot[data-shot-id="platform-shot"] summary small')).toHaveText(/^\d+ panels?$/);
   await page.getByRole('tabpanel').getByRole('button', { name: 'View storyboard', exact: true }).click();
   await expect(page.getByRole('dialog').locator('.wp-shot-length-text').first()).toHaveText('Length · not set');
   await page.keyboard.press('Escape');
@@ -328,9 +329,11 @@ test('the agent\'s storyboard shows each Shot\'s panel images as they are made, 
   await board.getByRole('button', { name: 'Edit Shot length', exact: true }).click();
   const seconds = board.getByRole('spinbutton', { name: 'Length in seconds' });
   await expect(seconds).toHaveValue('6');
-  await seconds.fill('16');
-  await board.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(board.locator('.wp-shot-length').getByRole('status')).toHaveText('Enter a whole number of seconds from 4 to 15.');
+  for (const typed of ['16', '6.5']) {
+    await seconds.fill(typed);
+    await board.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(board.locator('.wp-shot-length').getByRole('status')).toHaveText('Enter a whole number of seconds from 4 to 15.');
+  }
   await seconds.fill('8');
   await board.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(seconds).toHaveCount(0);
