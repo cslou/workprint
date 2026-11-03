@@ -358,4 +358,30 @@ test('the agent\'s storyboard shows each Shot\'s panel images as they are made, 
   minimax.reset();
   await turn({ name: 'generate-shot', args: { shot: shot!.shotId, prompt: 'She lifts the key into the light.' } }, 'Make the Shot again', 'Saved Shot 1 · Video · Version 2');
   expect(sent().duration).toBe(8);
+
+  // Joining is free: Shot 1's video and a generated clip join into one draft video, shown in the chat and listed in
+  // Generated videos. Version 1 of the Shot's video is no longer used once Version 2 took its draft use.
+  await turn({ name: 'generate-video', args: { prompt: 'The gallery at dawn.' } }, 'Make a gallery clip', 'Saved Video 1 · Version 1');
+  const { storyboard: { shots: [made] }, generatedVideos } = await backend.read<{ storyboard: { shots: { candidateVideoVersions?: { id: string }[] }[] }; generatedVideos: { version: { id: string } }[] }>(account!, `/v1/conversations/${videoId}/workspace`);
+  const clips = [...made!.candidateVideoVersions!.map(version => version.id), ...generatedVideos.map(item => item.version.id)];
+  expect(clips).toHaveLength(2);
+  const shotVideos = async () => (await backend.read<{ storyboard: { shots: { chosenVideoVersionId: string | null; candidateVideoVersions?: { id: string }[] }[] } }>(account!, `/v1/conversations/${videoId}/workspace`)).storyboard.shots.map(item => [item.chosenVideoVersionId, item.candidateVideoVersions?.map(version => version.id)]);
+  const before = await shotVideos();
+  await turn({ name: 'join-videos', args: { clips, showInChat: true } }, 'Join the Shot videos', 'Joined 2 clips');
+  // The Shot's own video, its use and its choice are unchanged.
+  expect(await shotVideos()).toEqual(before);
+  const reply = page.getByRole('list', { name: 'New messages' }).getByRole('listitem', { name: 'Assistant message' }).last();
+  await shown(reply.locator('img[alt="Video 2 · Version 1"]'));
+  await page.getByRole('tab', { name: 'Videos', exact: true }).click();
+  const joined = panel.locator('.wp-video-row[data-version-id]').filter({ hasText: 'Video 2 · Version 1' });
+  await expect(joined).toHaveCount(1);
+  // The fake MiniMax's clip is 4.04 s, so the two join to 8.08 s.
+  await expect(joined.locator('.wp-video-metadata')).toHaveText('0:08');
+  await joined.getByRole('button', { name: 'Play Video 2 · Version 1', exact: true }).click();
+  const viewer = page.getByRole('dialog');
+  await expect(viewer.locator('.wp-clip-surface[data-ready="true"]')).toHaveCount(1);
+  await viewer.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect.poll(async () => ['playing', 'ended'].includes(await viewer.locator('.wp-clip-surface').getAttribute('data-player-status') ?? '')
+    || await viewer.locator('.wp-clip-media').evaluate(node => (node as HTMLVideoElement).currentTime > 0), { timeout: 10_000 }).toBe(true);
+  await page.keyboard.press('Escape');
 });

@@ -7,7 +7,7 @@
 - A Shot has a second panel only when its picture changes a lot, for example when the camera moves from one part of the room to another.
 - A person sees and can change a Shot's length in "View storyboard".
 
-**Status:** 🔵 In Progress; the combined-branch checks passed (2026-11-03). Waiting on Lou's QA and his merge command.
+**Status:** 🔵 In Progress; merged into `main` (#141, 2026-11-03) at Lou's request so Sprint 013 could start. Lou's QA, and B-041's pass condition, are still open.
 
 ---
 

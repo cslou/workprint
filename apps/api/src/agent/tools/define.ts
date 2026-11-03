@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { AssistantPanelImages, AssistantSheets, ReadImageInputs, ReadOwnedWorkspace, SaveAssistantScript, SaveAssistantStoryboard, SaveGeneratedImage, VideoJobs } from '../../application/index.js';
+import type { AssistantPanelImages, AssistantSheets, JoinVideos, ReadImageInputs, ReadOwnedWorkspace, SaveAssistantScript, SaveAssistantStoryboard, SaveGeneratedImage, VideoJobs } from '../../application/index.js';
 import type { MetaImageClient } from '../../generation/index.js';
 
 /** Trusted scope from the admitted native run, never from model arguments. */
@@ -20,6 +20,8 @@ export type AgentCollaborators = Readonly<{
   images?: Pick<MetaImageClient, 'generate' | 'edit'>;
   /** Absent without storage, the media checker or a MiniMax key (or a test's MiniMax fake); the tool then refuses before any call. */
   videos?: Pick<VideoJobs, 'start' | 'resume' | 'stopped'>;
+  /** Joins saved clips into one; absent without storage or the media sandbox, and the tool then refuses. */
+  joins?: JoinVideos;
 }>;
 
 /** Why a tool's signal fired: the exact-turn Stop, the turn deadline or a server shutdown. */

@@ -1,12 +1,25 @@
 import { createHash } from 'node:crypto';
-import type { PoolClient } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { idSchema } from '@workprint/contracts';
 import type { PrivateObjectStorage } from '../storage/index.js';
+import { protectedMediaObjects } from './media-objects.js';
 import { useRoom } from './use-room.js';
 import { UploadError, uploadError } from './uploads/errors.js';
 import type { OwnedCheck } from './uploads/types.js';
 
 export const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+
+/**
+ * A media version's exact stored bytes, read within `maxBytes` only while they are still the ones that were checked
+ * and saved: a missing object is `not_found`, a changed one `integration_failure`.
+ */
+export async function readCheckedMedia(pool: Pool, storage: PrivateObjectStorage, version: Readonly<{ id: string; media: Readonly<{ byteSize: number }> }>, owner: string, maxBytes: number): Promise<Buffer> {
+  const [object] = await protectedMediaObjects(pool, [version.id], owner);
+  if (!object) throw new UploadError('not_found');
+  const stored = await storage.read(object.objectKey, Math.min(version.media.byteSize, maxBytes));
+  if (stored.byteSize !== version.media.byteSize || digest(stored.bytes) !== object.sha256) throw new UploadError('integration_failure');
+  return stored.bytes;
+}
 
 /** An assistant-made object to store privately before its save commits. */
 export type GeneratedObject = Readonly<{ key: string; bytes: Buffer; contentType: string }>;

@@ -5,5 +5,7 @@ export { StorageError } from './errors.js';
 export type { StorageFailure } from './errors.js';
 export { createMediaSandbox } from './media/sandbox.js';
 export { configuredMediaSandbox } from './media/config.js';
-export type { MediaSandbox } from './media/sandbox.js';
+export type { MediaJoinSession, MediaSandbox } from './media/sandbox.js';
+export { MEDIA_JOIN_CLIPS, type MediaJoinPlan } from './media/join.js';
+export { MEDIA_JOB_BYTES } from './media/sandbox-config.js';
 export { MediaProcessError } from './media/errors.js';
