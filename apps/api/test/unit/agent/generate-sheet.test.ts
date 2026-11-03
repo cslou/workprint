@@ -31,7 +31,7 @@ function harness(options: Options = {}) {
   const meta = options.meta ?? (async () => ({ images: [png], requestId: null, usage: null }));
   const collaborators: AgentCollaborators = {
     readWorkspace: async () => options.unreadable ? { kind: 'unavailable' } : { kind: 'found', workspace: workspace(images, options.sheets ?? [], options.script ?? true) },
-    saveScript: async () => ({ kind: 'unavailable' }),
+    saveScript: async () => ({ kind: 'unavailable' }), saveStoryboard: async () => ({ kind: 'unavailable' }),
     readImageInputs: async (_account, _video, ids) => { calls.edits.push(...ids); return ids.every(id => images.includes(id) || options.sheets?.some(sheet => sheet.views.includes(id))) ? { kind: 'read', images: ids.map(versionId => ({ versionId, dataUrl: 'data:image/png;base64,AA==', width: 64, height: 48 })) } : { kind: 'not_found' }; },
     saveGeneratedImage: async (_account, _video, image) => {
       const kind = failing.shift();
@@ -78,9 +78,12 @@ test('a view needs an image or a prompt, and two views can\'t share a name ignor
   }
 });
 
-test('each kind\'s prompt is the keep line with an identity input, then the frame, then the view\'s prompt', () => {
+test('each kind\'s prompt is the keep line with an identity input, then the frame framed for its kind, then the view\'s prompt', () => {
   const request = { description: 'Seen at night.', continuityNotes: ['Keep it', 'Same light'] };
-  const frame = (name: string, kind: string) => `One reference view of ${name}, a ${kind}, for a reference sheet: Wide. Seen at night. Keep consistent: Keep it; Same light. Show this single view only, on a plain neutral background with even light, with no text, labels, borders or other views.`;
+  // A person or object stands on a plain background; a place fills the frame, since a plain page around it is drawn as a mounted picture.
+  const plain = 'Show this single view only, on a plain neutral background with even light, with no text, labels, borders or other views.';
+  const framing = { character: plain, place: 'Show this single view only, with the place itself filling the whole frame, and no text, labels, borders, background page or other views.', prop: plain };
+  const frame = (name: string, kind: keyof typeof framing) => `One reference view of ${name}, a ${kind}, for a reference sheet: Wide. Seen at night. Keep consistent: Keep it; Same light. ${framing[kind]}`;
   const keep = {
     character: 'Keep the same person as the input image: the same face, build, hair and clothing.',
     place: 'Keep the same place as the input image: the same layout, architecture and light.',

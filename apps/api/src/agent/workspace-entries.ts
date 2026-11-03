@@ -1,5 +1,5 @@
-import { currentSheets, currentSubjects, mediaVersionName, savedScriptContentSchema, scriptSubjects, sheetViews, workspaceMediaLabels, type ScriptSubject, type Version as SavedVersion } from '@workprint/contracts';
-import type { OwnedWorkspace } from '../application/index.js';
+import { currentPanelImage, currentSheets, mediaVersionName, savedScriptContentSchema, scriptSubjects, sheetViews, workspaceMediaLabels, type ScriptSubject, type Version as SavedVersion } from '@workprint/contracts';
+import { workspaceVersions, type OwnedWorkspace } from '../application/index.js';
 
 type Version = OwnedWorkspace['assets'][number]['version'];
 type State = 'Draft' | 'Ready';
@@ -12,8 +12,6 @@ export type WorkspaceItem = { name: string; kind: Version['kind']; versionId: st
 export type WorkspaceListing = { items: WorkspaceItem[]; total: number; truncated: boolean };
 /** One item in full: the exact version's saved content, or its media facts. */
 export type WorkspaceItemDetail = { name: string; kind: Version['kind']; versionId: string; revision: number; use: string; state: State } & ({ content: unknown } | { media: unknown });
-
-type Entry = { name: string; use: string; state: State; version: Version; subjectId?: string | undefined };
 
 const clip = (text: string, limit: number = listingBounds.text) => {
   const flat = text.replace(/\s+/g, ' ').trim();
@@ -78,42 +76,65 @@ export function workspaceSubjects(workspace: OwnedWorkspace): WorkspaceSubject[]
 /** The image versions listed as views under the subjects, which the listing then leaves out of its items. */
 export const subjectViewIds = (subjects: readonly WorkspaceSubject[]): ReadonlySet<string> => new Set(subjects.flatMap(subject => subject.sheet?.views?.map(view => view.versionId) ?? []));
 
-/** Every exact version the video uses, in workspace order, each once, with a name a person would recognise. */
-export function workspaceEntries(workspace: OwnedWorkspace): Entry[] {
-  const clips = workspace.generatedVideos ?? [];
-  const entries: Entry[] = [], seen = new Set<string>(), labels = workspaceMediaLabels(workspace), views = sheetViews(workspace);
-  const sheetNames = new Map(currentSheets(workspace).map(sheet => [sheet.versionId, sheet.subjectName]));
-  // An image is filed under a subject only while the script lists it, as in Assets; otherwise it is under Other.
-  const listed = new Set(currentSubjects(workspace).map(subject => subject.id));
-  const add = (entry: Entry) => { if (!seen.has(entry.version.id)) { seen.add(entry.version.id); entries.push(entry); } };
-  const revision = (version: Version) => `Version ${version.revision}`;
-  if (workspace.script) add({ name: `Script · ${revision(workspace.script.version)}`, use: 'script', state: workspace.script.state, version: workspace.script.version });
-  for (const asset of workspace.assets) {
-    const { version } = asset;
-    // Uploaded and made media keep no filename, so they are named by kind and order, or by subject and view in a sheet
-    // (the shared rule). A sheet is named by its subject's current script name.
-    const subject = 'content' in version && version.kind === 'reference' ? sheetNames.get(version.id) ?? strings(record(record(version.content).subject).name) : '';
-    add({ name: subject ? `${clip(subject, 80)} · ${revision(version)}` : mediaVersionName(labels, version, views), use: 'reference', state: asset.state, version, subjectId: asset.subjectId && listed.has(asset.subjectId) ? asset.subjectId : undefined });
+/**
+ * A storyboard Shot as the model sees it in a listing. It never has the Shot's action, dialogue, camera note or
+ * reference purposes, and long text is clipped: item mode on the storyboard gives those.
+ */
+export type ListedShot = {
+  shotId: string; intent?: string; framing?: string; references?: { subjectId: string; role: string }[];
+  panels?: { panelId: string; description: string; imageVersionId?: string }[];
+};
+/**
+ * The current storyboard, listed once: its version and its Shots in order. `detail` says what each Shot gives: `panels`
+ * (ids, text, references and panels), `intents` or `ids`; `truncated` says panels or Shots were left out.
+ */
+export type WorkspaceStoryboard = { name: string; versionId: string; state: State; detail: 'panels' | 'intents' | 'ids'; truncated: boolean; shots: ListedShot[] };
+
+/** What the storyboard always leaves of the listing's byte bound for the items beside it. */
+const itemReserve = listingBounds.bytes / 8;
+
+const byOrder = <T extends { order: number }>(items: readonly T[]) => [...items].sort((a, b) => a.order - b.order);
+
+/**
+ * The video's storyboard within the listing's byte bound, beside the rest of `envelope` and a reserve for items: each
+ * Shot with its id, intent, framing, subject references and panels (id, description and current image); when that
+ * doesn't fit, Shot ids and intents; then Shot ids; then the first Shot ids that fit. Undefined with no storyboard.
+ */
+export function workspaceStoryboard(workspace: OwnedWorkspace, envelope: Readonly<Record<string, unknown>> = {}): WorkspaceStoryboard | undefined {
+  // `,"storyboard":` joins it to the envelope.
+  const budget = listingBounds.bytes - itemReserve - bytesOf(envelope) - 14;
+  const work = workspace.storyboard.work;
+  if (!work) return undefined;
+  const shots = byOrder(workspace.storyboard.shots);
+  const intent = (shot: typeof shots[number]) => shot.intent ? { intent: clip(shot.intent) } : {};
+  const full: ListedShot[] = shots.map(shot => ({
+    shotId: shot.shotId, ...intent(shot), ...(shot.framing ? { framing: clip(shot.framing) } : {}),
+    ...(shot.references?.length ? { references: shot.references.map(({ subjectId, role }) => ({ subjectId, role })) } : {}),
+    panels: byOrder(shot.panels).map(panel => { const image = currentPanelImage(panel); return { panelId: panel.panelId, description: clip(panel.description), ...(image ? { imageVersionId: image.id } : {}) }; }),
+  }));
+  const head = { name: `Storyboard · Version ${work.version.revision}`, versionId: work.version.id, state: work.state };
+  const steps: [WorkspaceStoryboard['detail'], ListedShot[]][] = [['panels', full], ['intents', shots.map(shot => ({ shotId: shot.shotId, ...intent(shot) }))], ['ids', shots.map(shot => ({ shotId: shot.shotId }))]];
+  for (const [detail, listed] of steps) {
+    const candidate: WorkspaceStoryboard = { ...head, detail, truncated: detail !== 'panels', shots: listed };
+    if (bytesOf(candidate) <= budget) return candidate;
   }
-  for (const made of clips) add({ name: mediaVersionName(labels, made.version), use: 'generated video', state: made.state, version: made.version });
-  if (workspace.storyboard.work) add({ name: `Storyboard · ${revision(workspace.storyboard.work.version)}`, use: 'storyboard', state: workspace.storyboard.work.state, version: workspace.storyboard.work.version });
-  [...workspace.storyboard.shots].sort((a, b) => a.order - b.order).forEach((shot, shotIndex) => {
-    const shotNumber = shotIndex + 1;
-    [...shot.panels].sort((a, b) => a.order - b.order).forEach((panel, panelIndex) => {
-      for (const version of panel.candidateImageVersions) add({ name: `Shot ${shotNumber} · Panel ${shotNumber}.${panelIndex + 1} · ${revision(version)}`, use: 'panel image', state: panel.approvedImageVersionId === version.id ? 'Ready' : 'Draft', version });
-    });
-    for (const version of shot.candidateVideoVersions ?? []) add({ name: `Shot ${shotNumber} · Video · ${revision(version)}`, use: 'shot video', state: shot.chosenVideoVersionId === version.id ? 'Ready' : 'Draft', version });
-  });
-  return entries;
+  const fitted: WorkspaceStoryboard = { ...head, detail: 'ids', truncated: true, shots: [] };
+  for (const shot of shots) {
+    if (bytesOf({ ...fitted, shots: [...fitted.shots, { shotId: shot.shotId }] }) > budget) break;
+    fitted.shots.push({ shotId: shot.shotId });
+  }
+  return fitted;
 }
 
 /**
  * A compact listing within the item, byte and text bounds; `truncated` says items were left out.
  * The byte bound covers the whole tool result the model receives, including its envelope.
  */
-export function listWorkspace(workspace: OwnedWorkspace, envelope: Readonly<Record<string, unknown>> = {}, listedViews: ReadonlySet<string> = new Set()): WorkspaceListing {
-  // Images listed as views under a subject are not listed again as items; item mode still reads them.
-  const entries = workspaceEntries(workspace).filter(entry => !(entry.use === 'reference' && entry.version.kind === 'image' && listedViews.has(entry.version.id)));
+export function listWorkspace(workspace: OwnedWorkspace, envelope: Readonly<Record<string, unknown>> = {}, listedViews: ReadonlySet<string> = new Set(), listedStoryboard?: string): WorkspaceListing {
+  // Images listed as views under a subject, and a storyboard listed on its own, are not listed again as items; item
+  // mode still reads them.
+  const entries = workspaceVersions(workspace).filter(entry => !(entry.use === 'reference' && entry.version.kind === 'image' && listedViews.has(entry.version.id))
+    && !(entry.use === 'storyboard' && entry.version.id === listedStoryboard));
   const listing: WorkspaceListing = { items: [], total: entries.length, truncated: false };
   for (const entry of entries) {
     const item: WorkspaceItem = { name: clip(entry.name), kind: entry.version.kind, versionId: entry.version.id, use: entry.use, state: entry.state, text: summary(entry.version), ...(entry.subjectId ? { subjectId: entry.subjectId } : {}) };
@@ -134,7 +155,7 @@ export function sheetViewItem(workspace: OwnedWorkspace, version: SavedVersion):
 
 /** One item in full, only when the video uses that exact version. */
 export function workspaceItem(workspace: OwnedWorkspace, versionId: string): WorkspaceItemDetail | null {
-  const entry = workspaceEntries(workspace).find(candidate => candidate.version.id === versionId);
+  const entry = workspaceVersions(workspace).find(candidate => candidate.version.id === versionId);
   if (!entry) return null;
   const { version } = entry;
   const base = { name: entry.name, kind: version.kind, versionId: version.id, revision: version.revision, use: entry.use, state: entry.state };

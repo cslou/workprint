@@ -29,6 +29,7 @@ type Props = {
   caption: string;
   trigger: ReactElement;
 } & (UseProps | { [Key in keyof UseProps]?: undefined });
+export type SingleClipViewerProps = Props;
 const copy = {
   loading: 'Loading this video…',
   unauthenticated: 'Sign-in required to load this video.',

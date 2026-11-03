@@ -1,10 +1,11 @@
 import { z } from 'zod';
 import { idSchema } from './models.js';
+import { dialogueLineSchema, shotFields } from './shot-fields.js';
 
 const text = z.string().max(20000).refine(value => value.trim().length > 0, 'Text is required');
 const names = z.array(text).max(100);
 const unique = (values: readonly (string | number)[]) => new Set(values).size === values.length;
-const dialogue = z.strictObject({ character: text, text, delivery: z.enum(['voice_over', 'off_screen']).optional() });
+const dialogue = dialogueLineSchema;
 const scene = z.strictObject({
   heading: z.strictObject({ setting: text, location: text, time: text }),
   characters: names,
@@ -57,7 +58,7 @@ export const savedReferenceContentSchema = z.strictObject({
   references: z.array(referenceImage).max(100).refine(items => unique(items.map(item => item.versionId)), 'Reference versions must be distinct'),
 });
 const panel = z.strictObject({ panelId: idSchema, order: z.number().int().nonnegative(), description: text, references: z.array(idSchema).max(100).refine(unique, 'Reference versions must be distinct') });
-const shot = z.strictObject({ shotId: idSchema, order: z.number().int().nonnegative(), intent: text, panels: z.array(panel).min(1).max(100) });
+const shot = z.strictObject({ shotId: idSchema, order: z.number().int().nonnegative(), intent: text, ...shotFields, panels: z.array(panel).min(1).max(100) });
 export const savedStoryboardContentSchema = z.strictObject({ schemaVersion: z.literal(1), sourceScriptVersionId: idSchema, shots: z.array(shot).min(1).max(100) }).superRefine((value, context) => {
   const ids = value.shots.map(item => item.shotId);
   const panelIds = value.shots.flatMap(item => item.panels.map(panel => panel.panelId));

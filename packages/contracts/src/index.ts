@@ -2,10 +2,14 @@ import { z } from 'zod';
 import { contentSchema, exportSchema, generationRequestSchema, generationStatusSchema, idSchema, intendedUseSchema, kindSchema, proposalSchema, questionSchema, revisionSchema, storyboardEditSchema, useBindingSchema, useSchema, versionSchema, workspaceSchema } from './models.js';
 export * from './models.js';
 export * from './saved-content.js';
+export * from './shot-fields.js';
+export * from './panel-image.js';
+export * from './storyboard-names.js';
 export * from './response-limits.js';
 export * from './upload-limits.js';
 export * from './asset-labels.js';
 export * from './script-subjects.js';
+export * from './dialogue-voice.js';
 export * from './sheet-views.js';
 export * from './subject-groups.js';
 

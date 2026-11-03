@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Version } from '@workprint/contracts';
-import { savedMaterialPresentation } from '../../../src/materials/content.js';
+import { savedMaterialPresentation, shotsLabel } from '../../../src/materials/content.js';
 
 const view = (n: number) => `3333333${n}-3333-4333-8333-333333333333`;
 const sheet = (kind: 'character' | 'environment' | 'prop', name: string): Extract<Version, { content: unknown }> => ({ id: 'v1', artifactId: 'artifact', kind: 'reference', revision: 1, createdBy: 'assistant', createdAt: '2026-11-03T00:00:00Z', dependencies: [view(1), view(2)],
@@ -15,4 +15,8 @@ test('a sheet reads by its kind: a place, stored as environment, reads Place, an
     assert.equal(shown?.sheet?.name, 'The Gallery');
     assert.deepEqual(shown?.sheet?.views, [{ versionId: view(1), view: 'Wide master' }, { versionId: view(2), view: 'Reverse angle' }]);
   }
+});
+
+test('a subject\'s Shots read as a list', () => {
+  assert.deepEqual([[], [1], [1, 2], [1, 2, 3]].map(shotsLabel), ['', 'Shot 1', 'Shots 1 and 2', 'Shots 1, 2 and 3']);
 });

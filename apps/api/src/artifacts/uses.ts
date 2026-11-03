@@ -1,9 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
-import { idSchema, operations, savedStoryboardContentSchema, useSchema, type OperationRequest, type OperationResponse } from '@workprint/contracts';
+import { idSchema, operations, useSchema, type OperationRequest, type OperationResponse } from '@workprint/contracts';
 import { transaction } from '../db/index.js';
 import { ArtifactError } from './errors.js';
 import { canonicalJson } from './manual-content.js';
+import { hasTarget, storyboardPlan as plan, usedPlan } from './panel-targets.js';
 import { lockPublicationOwner } from './publication.js';
 import { advanceSelectionRevision, affectedVersions, changedShots, selectionRevision, shotOrderChanged, upstreamAffected } from './selection.js';
 import { createArtifactStore } from './store.js';
@@ -11,13 +12,6 @@ import { createArtifactStore } from './store.js';
 type Command = OperationRequest<'useVersion'>['body'];
 type Result = OperationResponse<'useVersion'>;
 type Query = Pick<PoolClient, 'query'>;
-
-const plan = (content: unknown) => savedStoryboardContentSchema.safeParse(content).data ?? null;
-/** The conversation's used Storyboard, locked against concurrent replacement while a decision binds to it. */
-async function usedPlan(client: Query, account: string, conversation: string, lock: boolean) {
-  return (await client.query<{ version_id: string; version_owner_id: string; content: unknown }>(`SELECT u.version_id,u.version_owner_id,v.content FROM artifacts.conversation_uses u JOIN artifacts.versions v ON v.owner_id=u.version_owner_id AND v.version_id=u.version_id
-    WHERE u.owner_id=$1 AND u.conversation_id=$2 AND u.purpose='storyboard'${lock ? ' FOR SHARE OF u' : ''}`, [account, conversation])).rows[0];
-}
 
 /** Human exact-use capability. It publishes no version; Panel-image and Shot-video decisions keep one approved choice per target. */
 export function createVersionUses(pool: Pool, checkOwnedConversation: Parameters<typeof createArtifactStore>[1]) {
@@ -48,8 +42,7 @@ export function createVersionUses(pool: Pool, checkOwnedConversation: Parameters
       if (body.purpose === 'reference' ? !['reference', 'image', 'video'].includes(version.kind) : version.kind !== (body.purpose === 'panel_image' ? 'image' : body.purpose === 'shot_video' ? 'video' : body.purpose)) throw new ArtifactError('invalid_input');
       // Panel images and Shot videos bind only to an existing Shot/Panel of the Storyboard this conversation uses.
       const target = decision ? await usedPlan(pool, account, conversation, false) : undefined;
-      const shot = plan(target?.content)?.shots.find(item => 'shotId' in body && item.shotId === body.shotId);
-      if (decision && (!shot || (body.purpose === 'panel_image' && !shot.panels.some(panel => panel.panelId === body.panelId)))) throw new ArtifactError('invalid_input');
+      if (decision && !hasTarget(target?.content, { shotId: 'shotId' in body ? body.shotId : '', panelId: 'panelId' in body ? body.panelId : undefined })) throw new ArtifactError('invalid_input');
       return transaction(pool, async client => {
         await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [canonicalJson(['artifact-command', ...scope])]);
         const retried = await replay(client);

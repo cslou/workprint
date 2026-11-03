@@ -57,9 +57,15 @@ export { withSavedWork, type SavedWorkApplication, type SavedWorkReads } from '.
 export { withStoryboardEdits, type StoryboardEditApplication } from './storyboard-edits.js';
 export { createWorkspaceReader, type OwnedWorkspace, type OwnedWorkspaceRead, type ReadOwnedWorkspace } from './workspace-reads.js';
 export { createAssistantScriptSaver, type AssistantScriptOutcome, type SaveAssistantScript } from './assistant-scripts.js';
+export { createAssistantStoryboardSaver, type AssistantStoryboardOutcome, type SaveAssistantStoryboard } from './assistant-storyboards.js';
 export { createAssistantSheets, type AssistantSheetOutcome, type AssistantSheets, type ReadSheetView, type SaveAssistantSheet, type SheetUseRoom } from './assistant-references.js';
 export { makeSheet, sheetViewCap, sheetViewNameCap, sheetViewPrompt, type SheetMakers, type SheetOutcome, type SheetRequest, type SheetView, type SheetViewRequest } from './sheets.js';
 export { optionalId } from './optional-id.js';
-export { createGeneratedImageSaver, createImageInputReader, metaImageFailure, type GeneratedImageOutcome, type ImageFailure, type ImageInputsOutcome, type ReadImageInputs, type SaveGeneratedImage } from './generated-images.js';
+export { imageVersionNames, workspaceVersions, type WorkspaceVersion } from './workspace-versions.js';
+export { anchorJob, maxPanelInputs, otherImageJob, panelInputs, type PanelInput, type PanelInputs, type PanelRequest } from './panel-inputs.js';
+export { createAssistantPanelImages, type AssistantPanelImages, type PanelSaveOutcome } from './assistant-panel-images.js';
+export { makePanel, type MakePanelRequest, type PanelMakers, type PanelOutcome } from './panels.js';
+export { createGeneratedImageSaver, createImageInputReader, metaImageFailure, requestOneImage, type OneImage, type GeneratedImageOutcome, type ImageFailure, type ImageInputsOutcome, type ReadImageInputs, type SaveGeneratedImage } from './generated-images.js';
 export { createGeneratedVideoSaver, type GeneratedVideoOutcome, type SaveGeneratedVideo } from './generated-videos.js';
+export { makeShot, shotVideoPrompt, type MakeShotRequest, type ShotMakers, type ShotOutcome, type ShotRefusal } from './shots.js';
 export { createVideoJobs, videoJobTiming, type NewVideo, type VideoAbortReason, type VideoJobCollaborators, type VideoJobOutcome, type VideoJobs, type VideoJobTiming, type VideoProviderFailure, type VideoRunControl, type StoppedVideo, type StoppedVideosOutcome } from './video-jobs.js';

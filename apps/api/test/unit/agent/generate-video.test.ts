@@ -15,7 +15,7 @@ function harness(outcome: VideoJobOutcome, withVideos = true) {
   const calls: { start: NewVideo[]; resume: string[] } = { start: [], resume: [] };
   const collaborators: AgentCollaborators = {
     readWorkspace: async () => ({ kind: 'unavailable' }),
-    saveScript: async () => ({ kind: 'unavailable' }), sheets: unusedSheets,
+    saveScript: async () => ({ kind: 'unavailable' }), saveStoryboard: async () => ({ kind: 'unavailable' }), sheets: unusedSheets,
     readImageInputs: async () => ({ kind: 'not_found' }),
     saveGeneratedImage: async () => ({ kind: 'unavailable' }),
     ...(withVideos ? { videos: { start: async (_a: string, _v: string, input: NewVideo) => { calls.start.push(input); return outcome; }, resume: async (_a: string, _v: string, id: string) => { calls.resume.push(id); return outcome; }, stopped: async () => ({ kind: 'read' as const, jobs: [] }) } } : {}),

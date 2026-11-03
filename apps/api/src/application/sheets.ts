@@ -1,8 +1,8 @@
 import { currentSheets, savedScriptContentSchema, scriptSubjects, subjectNameKey, type CurrentSheet, type ScriptSubject } from '@workprint/contracts';
 import { maxSheetViewName, maxSheetViews, usedImageVersions } from '../artifacts/index.js';
-import { MetaImageError, type MetaImageClient } from '../generation/index.js';
+import type { MetaImageClient } from '../generation/index.js';
 import type { AssistantSheets } from './assistant-references.js';
-import { metaImageFailure, saveFailure, type ImageFailure, type ReadImageInputs, type SaveGeneratedImage } from './generated-images.js';
+import { requestOneImage, saveFailure, type ImageFailure, type ReadImageInputs, type SaveGeneratedImage } from './generated-images.js';
 import { optionalId } from './optional-id.js';
 import type { ReadOwnedWorkspace } from './workspace-reads.js';
 
@@ -44,13 +44,23 @@ const keepLines: Readonly<Record<ScriptSubject['kind'], string>> = {
   prop: 'Keep the same object as the input image: the same design, shape and materials.',
 };
 
+/**
+ * How a made view is framed, by kind. A person or object stands alone on a plain background; a place is the place
+ * itself, since a plain background around a place makes Meta draw it as a picture mounted on a page.
+ */
+const framingLines: Readonly<Record<ScriptSubject['kind'], string>> = {
+  character: 'Show this single view only, on a plain neutral background with even light, with no text, labels, borders or other views.',
+  place: 'Show this single view only, with the place itself filling the whole frame, and no text, labels, borders, background page or other views.',
+  prop: 'Show this single view only, on a plain neutral background with even light, with no text, labels, borders or other views.',
+};
+
 /** The fixed sheet-view frame of every made view's prompt. */
 function sheetViewFrame(subject: ScriptSubject, view: string, description: string, notes: readonly string[]) {
   return [
     `One reference view of ${subject.name}, a ${subject.kind}, for a reference sheet: ${view}.`,
     description.trim(),
     notes.length ? `Keep consistent: ${notes.map(note => note.trim()).join('; ')}.` : '',
-    'Show this single view only, on a plain neutral background with even light, with no text, labels, borders or other views.',
+    framingLines[subject.kind],
   ].filter(Boolean).join(' ');
 }
 
@@ -144,27 +154,19 @@ export async function makeSheet(makers: SheetMakers, accountId: string, videoId:
   for (const item of planned) {
     if (!item.make) continue;
     signal.throwIfAborted();
-    const meta = { prompt: sheetViewPrompt(subject, request, item.make, Boolean(input)), n: 1, size: item.make.size, outputFormat: 'png' as const, reasoningStrength: 'high' as const, tools: { imageSearch: true, webSearch: true, shell: true } };
     let failure: ImageFailure | undefined;
-    try {
-      const result = input ? await images.edit({ ...meta, images: [{ dataUrl: input.dataUrl }] }, signal) : await images.generate(meta, signal);
-      const image = result.images[0];
-      // Nothing from a response is saved after Stop.
+    const response = await requestOneImage(images, { prompt: sheetViewPrompt(subject, request, item.make, Boolean(input)), size: item.make.size, inputs: input ? [input] : [] }, signal);
+    if (response.kind === 'failed') failure = response.failure;
+    else {
+      const { image } = response;
+      const saved = await makers.saveGeneratedImage(accountId, videoId, { bytes: image.bytes, contentType: image.contentType, inputs: input ? [input.versionId] : [], subject: subject.id }, signal);
       signal.throwIfAborted();
-      if (!image) failure = { reason: 'unavailable' };
-      else {
-        const saved = await makers.saveGeneratedImage(accountId, videoId, { bytes: image.bytes, contentType: image.contentType, inputs: input ? [input.versionId] : [], subject: subject.id }, signal);
-        signal.throwIfAborted();
-        if (saved.kind === 'saved') {
-          item.versionId = saved.versionId;
-          made.push({ view: item.view, versionId: saved.versionId });
-          // A new sheet's first made view, with no identity given, is the identity of the views after it.
-          input ??= { versionId: saved.versionId, dataUrl: `data:${image.contentType};base64,${Buffer.from(image.bytes).toString('base64')}` };
-        } else failure = saveFailure(saved);
-      }
-    } catch (error) {
-      if (error instanceof MetaImageError && error.code === 'aborted') signal.throwIfAborted();
-      failure = metaImageFailure(error);
+      if (saved.kind === 'saved') {
+        item.versionId = saved.versionId;
+        made.push({ view: item.view, versionId: saved.versionId });
+        // A new sheet's first made view, with no identity given, is the identity of the views after it.
+        input ??= { versionId: saved.versionId, dataUrl: `data:${image.contentType};base64,${Buffer.from(image.bytes).toString('base64')}` };
+      } else failure = saveFailure(saved);
     }
     delete item.make;
     if (!failure) continue;
