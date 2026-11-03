@@ -441,7 +441,7 @@ Sprint-specific completion items:
   - Audit is NON-PASS, as approved: the same 2 moderate advisories, `@hono/node-server` (B-004) and `minimatch` GHSA-g3hv-75wg-m249 (B-008). There are no high or critical advisories.
   - Logs: `outputs/verification/sprint-011/deep-1751b27/`.
 - **Cross-story checks:** none beyond the deep gate. Story 6's journey (`shots.spec.ts`) runs the whole chain in one browser test: script, sheet, storyboard, both panels, Shot video, the tabs and a reload. It is in that gate.
-- **Live checks:** at `1751b27`, `pnpm live:image` and `pnpm live:video` pass in dry mode (`"mode": "dry", "pass": true`, against the loopback fakes). Logs: `outputs/verification/sprint-011/live-dry-1751b27/`. This sprint made no paid call. Lou's QA host makes them on his requests.
+- **Live checks:** at `1751b27`, `pnpm live:image` and `pnpm live:video` pass in dry mode. The head wasn't saved when they ran; it is the only commit between their logs' times (10:40) and the next commit, and the folder's `head.txt` says so (`"mode": "dry", "pass": true`, against the loopback fakes). Logs: `outputs/verification/sprint-011/live-dry-1751b27/`. This sprint made no paid call. Lou's QA host makes them on his requests.
 - **Spec:**
   - §8.3 gains a Storyboard block: save-storyboard, generate-panel, generate-shot and the tabs.
   - §8.5 gains assistant drafts beside a person's choice.
@@ -461,15 +461,18 @@ Sprint-specific completion items:
     - Two refusal lines are shortened to fit 60 characters; the field is in the model's message.
     - A tooling fix for the push gate's EPERM race.
     - One commit subject is 52 characters.
-  - **Story 3:** the image naming moved to `packages/contracts/src/storyboard-names.ts` and `application/workspace-versions.ts`, shared rather than copied.
+  - **Story 3:** the image naming moved to `packages/contracts/src/storyboard-names.ts` and `application/workspace-versions.ts`, shared rather than copied. The anchor's "Shot N · Panel N.M" comes from `storyboardNames`, not `workspace-entries.ts` as the AC says.
   - **Story 4:**
     - The subject-gone line is shortened.
     - `images` takes up to 20 ids, so over 10 is refused with its count.
     - The gone label uses the workspace's number.
     - Commit 1 has no tests of its own.
+    - A cap taken while Meta works reads "Not saved: this video has too many saved items", not the pre-call "Not made: …" line the AC repeats, since the image was made.
   - **Story 5:**
     - The clip shows under the line.
-    - "No one speaks." comes before the motion.
+    - "No one speaks." comes before the motion; the ticked test item's "ends with" means the dialogue paragraph.
+    - Only the first and last panels need images, and a last image that is the first's sends a first frame only.
+    - A Shot job's frames are checked as the account's images whether or not its Shot remains, not only for the gone fallback the AC names. A live Shot's frame that lost its use still saves.
     - The cap-race line is "Not saved yet: …".
     - Shared derived-artifact code.
     - One commit subject is 54 characters.
@@ -479,5 +482,6 @@ Sprint-specific completion items:
     - The panel's version links stay.
     - B-042 was added to the backlog.
 - **Accepted P2s:**
+  - **Story 2:** the envelope cap is pre-existing and still open. Subjects and stopped videos have no hard cap of their own, so a very large read-workspace envelope could still pass 16 KiB. The truncation-wording P2 was fixed in #118.
   - **Story 6:** `lineVoice` and `deliveryLabel` spell out the delivery union instead of using `dialogueLineSchema`'s type; a new delivery would fail to compile, not misbehave. No test drives a panel description edit, which uses the same unchanged editor as the Shot intent edit.
 - **New Dependencies:** None.
