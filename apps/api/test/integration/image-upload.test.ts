@@ -294,6 +294,20 @@ describe('assistant-made clips are checked with the MiniMax allowance and saved 
       assert.equal(poster.status, 200); assert.equal(hash(new Uint8Array(await poster.arrayBuffer())), objects[0]!.sha256);
       assert.deepEqual(access.measured, { width: GENERATED_CLIP.width, height: GENERATED_CLIP.height, durationMs: GENERATED_CLIP.durationMs, hasAudio: true });
 
+      await t.test('a clip made from 9 reference images has those 9 versions as its dependencies, in order', async () => {
+        const saveImage = createGeneratedImageSaver(createGeneratedImages(pool, check, { storage, verifyMedia: verify }).save);
+        const references: string[] = [];
+        for (let seed = 20; seed < 29; seed++) {
+          const image = await saveImage(account, video, { bytes: testPng({ seed }), contentType: 'image/png', inputs: [] });
+          assert.equal(image.kind, 'saved'); if (image.kind !== 'saved') return;
+          references.push(image.versionId);
+        }
+        const job = await waiting(references);
+        const made = await saveClip(account, video, { bytes: clip, frames: references, jobId: job.id });
+        assert.equal(made.kind, 'saved', JSON.stringify(made)); if (made.kind !== 'saved') return;
+        assert.deepEqual((await store.version(account, made.versionId)).dependencies, references);
+      });
+
       await t.test('the same clip as an upload is refused, and refused or failed saves store nothing', async () => {
         await assert.rejects(verify({ kind: 'video', bytes: clip, contentType: 'video/mp4', signal: AbortSignal.timeout(20000) }), { code: 'unsupported' }, 'uploads keep every rule');
         // Another account's image, saved before the counts are taken.
