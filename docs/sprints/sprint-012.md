@@ -1,6 +1,6 @@
 # Sprint 012 — Reference-to-video Shots and the workflow prompt
 
-**Date:** 2026-11-03 planning, starting after Sprint 011's QA fixes merge (stacked on `sprint-011`) – End after completion gates and Lou's QA
+**Date:** 2026-11-03 planning, starting from `main` after Sprints 010 and 011 merged (#113) – End after completion gates and Lou's QA
 **Goal:** In a local build, a signed-in user asks the agent to make a short video.
 - The agent follows the workflow its system prompt sets out: script, then reference sheets, then a storyboard where every Shot has a length, then panels, then Shot videos. It shows the person each step before the next paid one.
 - Each Shot's video is made with MiniMax's reference-to-video mode. The inputs are the sheet views of the subjects the Shot names, plus its panels as the framing guide, each labelled in the prompt. The clip is 16:9 and runs for the Shot's length.
@@ -15,8 +15,8 @@
 
 ### Project Context
 - **Repo:** `/Users/lou/projects/workprint`.
-  - Branch `sprint-012` is cut from `sprint-011` after Sprint 011's QA fixes (PR #130) merge, stacked as 011 was on 010. Story branches come from `sprint-012`.
-  - Sprint 010 (PR #113 into `main`) and Sprint 011 (its integration PR into `sprint-010`) wait for Lou's merge command. Their later commits are merged into `sprint-012`.
+  - Branch `sprint-012` holds this plan. It was cut from `sprint-011` and has `main` merged in since Sprints 010 and 011 reached `main` (#133, #113), so it is `main` plus these planning docs. Story branches come from `sprint-012`, and the sprint PR targets `main`.
+  - Sprint 011's review fixes (#134) are in: `changedShots` compares every Shot field, so a changed length journals the Shot's work; and generate-panel takes only shapes strictly inside `videoFrameRatio` (0.4–2.5), shared with the video client.
 - **Tech stack:** as Sprint 011.
   - MiniMax Video V2: `MiniMax-H3`, 768P, `POST /v2/video_generation`. Today the client sends only `first_frame` / `last_frame` images.
   - Meta images: `requestOneImage`, PNG, with `size` either `auto` or a shape `WxH`. Meta returns its own pixels for a shape, so asking for `1536x1024` gives 1920×1280.
@@ -75,7 +75,7 @@
 
     - After the labels come the action, the camera note, the dialogue in MiniMax's form, and a closing line: the action completes and the Shot ends on a settled moment.
     - It must fit 7,000 characters, or the Shot is refused `too_long` as today.
-  - **Images are sent as they are stored.** No downscaling: 9 sheet PNGs come to about 36 MB as Base64, under the 64 MiB cap. The client keeps its per-image checks: PNG or JPEG, 256–5,760 px, aspect 0.4–2.5, at most 30 MB.
+  - **Images are sent as they are stored.** No downscaling: 9 sheet PNGs come to about 36 MB as Base64, under the 64 MiB cap. The client keeps its per-image checks: PNG or JPEG, 256–5,760 px, aspect 0.4–2.5 (`videoFrameRatio`), at most 30 MB.
   - **No paid calls in tests.** The MiniMax and Meta fakes record what they receive; tests assert the exact `content` items, roles, labels and ratio. Paid calls happen only at Lou's QA, on his go.
   - **Budget (Lou, MVP testing budget).** Targeted tests per story, plus the commit and push gates; new cases in existing files and harnesses; no screenshot or visual suites.
 - **Non-goals:**
