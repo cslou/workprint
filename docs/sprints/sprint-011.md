@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-03, stacked on `sprint-010` (Lou: "Go: 010 then 011 stacked") – End after completion gates and Lou's QA
 **Goal:** In a local build, a signed-in user asks the agent to storyboard the script. The agent saves a storyboard of Shots from the current script: each Shot carries its purpose, framing, action, dialogue, camera note, the reference sheets it uses with each one's job, and one or two panels, whose images become the video's first and last frames. The agent makes each panel's image from that Shot's chosen sheet views (and, for a second panel, the first panel's image), then makes each Shot's video from its panel images and the Shot's text. The Storyboard tab shows the Shots and panel images, and the Videos tab plays each Shot's video, live and after a reload.
-**Status:** 🟡 In progress
+**Status:** 🟡 Implemented; Lou's QA in progress (see Final Review; the merge waits for QA and Lou's command)
 
 ---
 
@@ -393,21 +393,21 @@ This sprint has 6 stories: the storyboard save, its tool, panel inputs, generate
 
 After all implementation stories are complete, perform this checklist before sprint integration. This is a completion step, not a separate story.
 
-- [ ] Confirm all stories met their acceptance criteria using recorded implementation and verification evidence.
-- [ ] Run the applicable regression suite on the combined sprint branch.
-- [ ] Run any planned cross-story checks not covered by that suite.
-- [ ] Record results and unresolved issues in a brief `## Final Review`.
+- [x] Confirm all stories met their acceptance criteria using recorded implementation and verification evidence.
+- [x] Run the applicable regression suite on the combined sprint branch.
+- [x] Run any planned cross-story checks not covered by that suite.
+- [x] Record results and unresolved issues in a brief `## Final Review`.
 
 For descriptive-only work, use editorial review and applicable existing checks. Preserve applicable design checks and approval gates. Failed, ambiguous, or unrun required checks remain non-pass.
 
 Sprint-specific completion items:
 - [x] Fold storyboard creation into spec §8.3, assistant drafts beside a person's choice into §8.5, and the Shot target into §8.7, with the §4 `artifacts`, `generation` and `agent` rows.
-- [ ] Deep gate on the combined branch; `pnpm live:image` and `pnpm live:video` pass dry.
+- [x] Deep gate on the combined branch; `pnpm live:image` and `pnpm live:video` pass dry.
 - [ ] A QA build for Lou with live Muse Spark, Meta and MiniMax: storyboard a short script with sheets, make the panels, and make one Shot video (one paid MiniMax call per Shot Lou asks for). Pass:
   - each Shot shows its fields and 1–2 panel images in the Storyboard tab, with no status pill;
   - in the QA database, each panel's Meta inputs are the images the agent picked, and panel 2's first input is panel 1's image;
   - the Shot video's frames are its panel images, and it plays in the Shot's row after a reload.
-- [ ] Hand B-041 (the system prompt) to the next planning round.
+- [x] Hand B-041 (the system prompt) to the next planning round.
 
 ### Rules
 - Before authorized delivery, read canonical `docs/conventions/delivery-workflow.md` (resolved via AGENTS.md §12) for sprint branching, PRs and review/fix/merge mechanics; shared gates remain in AGENTS.md.
@@ -426,3 +426,58 @@ Sprint-specific completion items:
 - Sprint doc includes a brief `## Final Review` with completion evidence, unresolved issues, and a New Dependencies field containing dependencies or `None`.
 - Sprint-integration PR is reviewed, passes the required gates, and is merged only after the explicit user merge command.
 - If the sprint introduces new flows, they are folded into the implementation spec before sprint integration.
+
+## Final Review
+
+- **Outcome:** the goal is met in the scripted build. Lou's live QA of Sprints 010 and 011 together is in progress on a QA host at `1751b27` (Lou asked for it on 2026-11-03). Every story AC and verification item is met, with the deviations recorded below. Each story merged into `sprint-011` after an independent review of its final head scored at least 4/5 with no open P0/P1. The verdicts are recorded in the PR bodies:
+  - Story 1, #115 (assistant storyboards): 3/5, then 5/5. The P1 was a read case that didn't go through the strict workspace contract.
+  - Story 2, #116 (save-storyboard and the agent's view): 4/5, then 4/5.
+  - Story 3, #117 (panel inputs from sheets): 4/5, then 5/5.
+  - Story 4, #118 (generate-panel): 4/5, then 5/5.
+  - Story 5, #119 (generate-shot): 4/5, then 5/5.
+  - Story 6, #120 (the tabs): 3/5, then 4/5. The two P1s were verification gaps: a regression claim `saves.spec` doesn't cover, and no proof that a person's chosen panel shows. The journey now proves both.
+- **Combined-branch verification:** the deep gate (`.checks/regression.sh --tier=deep`, 481 s, run `.checks/.logs/run-qmwlyuup`) passed at `1751b27`. That head is the `sprint-011` code after Story 6, plus this spec fold.
+  - Results: unit 265/265, tooling 6/6, integration 185/185, browser 34/34.
+  - Audit is NON-PASS, as approved: the same 2 moderate advisories, `@hono/node-server` (B-004) and `minimatch` GHSA-g3hv-75wg-m249 (B-008). There are no high or critical advisories.
+  - Logs: `outputs/verification/sprint-011/deep-1751b27/`.
+- **Cross-story checks:** none beyond the deep gate. Story 6's journey (`shots.spec.ts`) runs the whole chain in one browser test: script, sheet, storyboard, both panels, Shot video, the tabs and a reload. It is in that gate.
+- **Live checks:** at `1751b27`, `pnpm live:image` and `pnpm live:video` pass in dry mode (`"mode": "dry", "pass": true`, against the loopback fakes). Logs: `outputs/verification/sprint-011/live-dry-1751b27/`. This sprint made no paid call. Lou's QA host makes them on his requests.
+- **Spec:**
+  - §8.3 gains a Storyboard block: save-storyboard, generate-panel, generate-shot and the tabs.
+  - §8.5 gains assistant drafts beside a person's choice.
+  - §8.7 gains Shot jobs.
+  - The §4 `contracts`, `application`, `agent`, `artifacts` and `generation` rows, and the sprint table, name this sprint's parts.
+- **QA build for Lou:** running at `1751b27` (http://127.0.0.1:4179, live Muse Spark, Meta and MiniMax). It covers Sprint 010's QA item and this sprint's. Its pass conditions are in Sprint Completion above and stay unchecked until Lou reports.
+- **B-041** (the system prompt) is first in the backlog's Next, for the next planning round.
+- **Lou's decisions during the sprint (2026-11-03):**
+  - **Voice-over.** The agent decides by the speaker it names. A scene character's own voice-over reads "Mara (voice-over)" and is voiced as hers; any other voice-over is "Narration". `lineVoice` in contracts is the one rule.
+  - **Re-added subjects.** Whether a subject removed and added back by name gets its old work is a Library feature, B-042. Until then it does.
+- **Deviations, recorded in the story PRs:**
+  - **Story 1:**
+    - The saver is wired in Story 2, with its tool.
+    - The read case is in `artifact-writes.test.ts`.
+    - A kept panel keeps a person's references.
+  - **Story 2:**
+    - Two refusal lines are shortened to fit 60 characters; the field is in the model's message.
+    - A tooling fix for the push gate's EPERM race.
+    - One commit subject is 52 characters.
+  - **Story 3:** the image naming moved to `packages/contracts/src/storyboard-names.ts` and `application/workspace-versions.ts`, shared rather than copied.
+  - **Story 4:**
+    - The subject-gone line is shortened.
+    - `images` takes up to 20 ids, so over 10 is refused with its count.
+    - The gone label uses the workspace's number.
+    - Commit 1 has no tests of its own.
+  - **Story 5:**
+    - The clip shows under the line.
+    - "No one speaks." comes before the motion.
+    - The cap-race line is "Not saved yet: …".
+    - Shared derived-artifact code.
+    - One commit subject is 54 characters.
+  - **Story 6:**
+    - The voice-over label, as decided above.
+    - Videos needed no change, so planned commit 2 became the Assets Shot line.
+    - The panel's version links stay.
+    - B-042 was added to the backlog.
+- **Accepted P2s:**
+  - **Story 6:** `lineVoice` and `deliveryLabel` spell out the delivery union instead of using `dialogueLineSchema`'s type; a new delivery would fail to compile, not misbehave. No test drives a panel description edit, which uses the same unchanged editor as the Shot intent edit.
+- **New Dependencies:** None.
