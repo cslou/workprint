@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { makeShot, type ShotRefusal } from '../../../application/index.js';
+import { defaultShotDurationS, makeShot, type ShotRefusal } from '../../../application/index.js';
 import { maxVideoPromptCharacters } from '../../../generation/index.js';
 import { defineTool } from '../define.js';
 import { savedClip, videoDoneSummary, videoRefusal, videoResult, type VideoReason, type VideoResult } from '../video-shared.js';
@@ -36,7 +36,7 @@ export const generateShotTool = defineTool({
     'Make one storyboard Shot\'s video with MiniMax and save it as that Shot\'s next draft video. It waits until the clip is made, usually a few minutes. Saving is never approval: the user chooses Shot videos.',
     'shot is a Shot id from read-workspace\'s storyboard. Make the Shot\'s panels first. The server makes the video at 16:9 from reference images: the sheet views of the subjects the Shot names, and its first panel\'s current image (and its last panel\'s) as the framing to aim for. It labels each image in the video prompt and adds the Shot\'s action, camera note and dialogue itself.',
     'Write prompt about motion only: how the action moves and how the camera moves (for example a slow push-in or a pan left). Do not repeat the action or dialogue, describe the images, or add story facts.',
-    'The video runs for the Shot\'s length from the storyboard, which the user can change; a Shot with no length runs 6 seconds. To change it, save the storyboard with the new length first.',
+    `The video runs for the Shot's length from the storyboard, which the user can change; a Shot with no length runs ${defaultShotDurationS} seconds. To change it, save the storyboard with the new length first.`,
     'Each call makes a new paid video. If it stops waiting, its result gives a jobId: resume it with generate-video when the user asks.',
   ].join(' '),
   inputSchema: z.strictObject({
