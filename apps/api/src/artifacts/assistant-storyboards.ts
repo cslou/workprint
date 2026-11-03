@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import { z } from 'zod';
-import { idSchema, roleKinds, savedStoryboardContentSchema, scriptSubjects, useSchema, type dialogueLineSchema, type shotReferenceSchema, type Version } from '@workprint/contracts';
+import { idSchema, roleKinds, savedStoryboardContentSchema, scriptSubjects, useSchema, type dialogueLineSchema, type shotPositionsSchema, type shotReferenceSchema, type Version } from '@workprint/contracts';
 import { transaction } from '../db/index.js';
 import { assertBase, lockedUse, namedBase, publishDraftUse } from './assistant-base.js';
 import { assertContentDependencies, parseContent } from './content.js';
@@ -22,7 +22,7 @@ export type AssistantPanelInput = Readonly<{ panelId: string; description: strin
 export type AssistantShotInput = Readonly<{
   shotId: string; intent: string; framing?: string; action?: string; cameraNote?: string; durationS?: number;
   dialogue?: readonly z.infer<typeof dialogueLineSchema>[]; references?: readonly z.infer<typeof shotReferenceSchema>[];
-  panels: readonly AssistantPanelInput[];
+  positions?: z.infer<typeof shotPositionsSchema>; panels: readonly AssistantPanelInput[];
 }>;
 /** `baseVersionId` is the storyboard version the assistant last read, or null when the video had none. */
 export type AssistantStoryboardInput = Readonly<{ baseVersionId: string | null; shots: readonly AssistantShotInput[] }>;
@@ -34,10 +34,12 @@ const binding = { purpose: 'storyboard' } as const;
 
 /**
  * Why a storyboard can't be saved, with the field at fault: `not_in_script` for a referenced subject the script
- * doesn't list, `role` for a role that doesn't fit the subject's kind, `invalid` for anything else.
+ * doesn't list, `role` for a role that doesn't fit the subject's kind, `no_place` for a Shot that names none of the
+ * script's places, `invalid` for anything else.
  */
 export class StoryboardSaveError extends Error {
-  constructor(readonly reason: 'no_script' | 'not_in_script' | 'role' | 'invalid' | 'no_room', readonly field?: string) {
+  /** `shot` is the Shot at fault, counted from 1, for `no_place`. */
+  constructor(readonly reason: 'no_script' | 'not_in_script' | 'role' | 'no_place' | 'invalid' | 'no_room', readonly field?: string, readonly shot?: number) {
     super(`Storyboard not saved: ${reason}`);
   }
 }
@@ -51,6 +53,8 @@ function plannedShots(input: AssistantStoryboardInput, base: Plan | null, script
   if (input.shots.length < 1 || input.shots.length > 100) throw invalid('shots');
   const subjects = new Map(scriptSubjects(script).map(subject => [subject.id, subject]));
   const speakers = new Set(script.scenes.flatMap(scene => scene.characters.map(name => name.trim())));
+  // When the script lists a place, every Shot names one, so even a close-up keeps its room.
+  const placed = [...subjects.values()].some(subject => subject.kind === 'place');
   const baseShots = new Map((base?.shots ?? []).map(shot => [shot.shotId, shot]));
   const keptShots = new Set<string>();
   return input.shots.map((shot, index) => {
@@ -75,6 +79,7 @@ function plannedShots(input: AssistantStoryboardInput, base: Plan | null, script
       if (!subject) throw new StoryboardSaveError('not_in_script', `${at}.references[${position}].subjectId`);
       if (!roleKinds[reference.role].includes(subject.kind)) throw new StoryboardSaveError('role', `${at}.references[${position}].role`);
     });
+    if (placed && !shot.references?.some(reference => reference.role === 'environment')) throw new StoryboardSaveError('no_place', `${at}.references`, index + 1);
     shot.dialogue?.forEach((line, position) => {
       if (line.delivery !== 'voice_over' && !speakers.has(line.character.trim())) throw invalid(`${at}.dialogue[${position}].character`);
     });
@@ -84,6 +89,7 @@ function plannedShots(input: AssistantStoryboardInput, base: Plan | null, script
       ...(shot.dialogue !== undefined ? { dialogue: [...shot.dialogue] } : {}), ...(shot.cameraNote !== undefined ? { cameraNote: shot.cameraNote } : {}),
       ...(shot.references !== undefined ? { references: [...shot.references] } : {}),
       ...(shot.durationS !== undefined ? { durationS: shot.durationS } : {}),
+      ...(shot.positions !== undefined ? { positions: { ...shot.positions } } : {}),
       panels,
     };
   });
