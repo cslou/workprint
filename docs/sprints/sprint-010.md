@@ -450,7 +450,7 @@ Sprint-specific completion items:
 - **Cross-story checks:** none beyond the deep gate. The planned browser journey (Story 6) and the integration blocks (Stories 1–5) are in it.
 - **Live checks:** at `da42e3d`, `pnpm live:image` passes in dry mode (`"mode": "dry", "pass": true`, the loopback Meta fake). Log: `outputs/verification/sprint-010/live-dry-da42e3d/`. No paid call was made this sprint.
 - **Spec:** §8.3 gains a "Subjects and reference sheets" block, and the §4 `contracts`, `application`, `agent` and `artifacts` rows name this sprint's parts. Joining clips is credited to Sprint 012 throughout.
-- **QA build for Lou:** Lou tested Sprints 010 and 011 together on one QA host at `1751b27` (2026-11-03) and reported "it all works". In the QA database, each sheet's later views depend on its first view (Mara's, Night Gallery's and Brass Key's), and Mara's sheet has later versions (it is at version 3). Three conditions rest on Lou's report alone: Assets showing each subject Empty after the script, the redone view leaving the other views unchanged, and the one-off image under the character. Lou's follow-ups (panel and poster display, place views drawn on a grey page) were fixed in Sprint 011's PR #130.
+- **QA build for Lou:** Lou tested Sprints 010 and 011 together on one QA host at `1751b27` (2026-11-03) and reported "it all works". In the QA database, each sheet's later views depend on its first view (Mara's, Night Gallery's and Brass Key's), and Mara's sheet has later versions (it is at version 3). Four conditions rest on Lou's report alone: Assets showing each subject Empty after the script, the redone view being the sheet's next version, the other views staying unchanged, and the one-off image under the character. Lou's follow-ups (panel and poster display, place views drawn on a grey page) were fixed in Sprint 011's PR #130.
 - **Deviations:**
   - **Completion order:** the spec fold was committed after the deep gate, not before it. The gate ran at `da42e3d` with the fold uncommitted in the checkout; the fold is docs only, the quick and standard gates passed on its commit, and the deep gate runs again on the merge to `main`.
 - **Deviations, recorded in the story PRs:**
@@ -497,4 +497,4 @@ Sprint-specific completion items:
     - Commit `6d3421e` (Story 2) has a 53-character subject; it was not amended after its PR opened (pr-hygiene).
     - The Sprint 011 plan and its backlog and packaging edits ride in this PR: they were committed first on `sprint-010`, as the handoff says (pr-hygiene).
 - **New Dependencies:** None.
-- **Pending:** Lou's QA build (on his word), then the sprint PR's review and the merge to `main` on Lou's command.
+- **Pending:** the sprint PR's review and the merge to `main` on Lou's command. Lou's QA passed (2026-11-03).
