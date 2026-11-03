@@ -29,15 +29,12 @@ function message(outcome: Exclude<AssistantStoryboardOutcome, { kind: 'saved' }>
     case 'not_found': return 'Not saved: base is not this video\'s storyboard. Call read-workspace and pass the storyboard\'s versionId, or empty when the video has none.';
     case 'not_in_script': return `Not saved: ${outcome.field} is not a subject the script lists. Use a subject id from read-workspace, or add the subject to the script with update-script first.`;
     case 'role': return `Not saved: ${outcome.field} doesn't fit the subject's kind. identity is for a character, environment for a place, prop for a prop, and composition for any.`;
-    case 'no_place': return `Not saved: Shot ${shotNumber(outcome.field)} names no place. Add the place it happens in to its references.`;
+    case 'no_place': return `Not saved: Shot ${outcome.shot} names no place. Add the place it happens in to its references, with the environment role.`;
     case 'invalid': return `Not saved: ${outcome.field} is not valid. A kept shotId or panelId must be one from the current storyboard, under its own Shot, and a speaker must be a character in the scene unless voice_over. Fix it and try once more.`;
     case 'no_room': return 'Not saved: this video has too many saved items. Tell the user; do not retry.';
     case 'unavailable': return 'Not saved: saving is unavailable right now. Tell the user and do not retry in this turn.';
   }
 }
-
-/** The Shot a field such as `shots[2].references` is in, counted from 1. */
-const shotNumber = (field: string) => Number(/^shots\[(\d+)\]/.exec(field)?.[1] ?? 0) + 1;
 
 const deliveries = ['voice_over', 'off_screen'] as const;
 /** Optional text from the model: empty, whitespace or "null" means none. */
@@ -83,7 +80,7 @@ export const saveStoryboardTool = defineTool({
     'Pass base: the storyboard\'s versionId from read-workspace, or empty when the video has no storyboard yet. Send every Shot in full each time: a Shot left out is dropped, so read the storyboard in full (read-workspace with its versionId) before changing it. If a save is refused, follow the result message.',
     `Read the whole script first. A Shot is one camera set-up: start a new Shot only when the camera set-up changes (a new angle or shot size) or time or place jumps. Continuous action in one space stays in one Shot, up to ${shotDurations.max} seconds. Use as few Shots as tell the script clearly.`,
     'Give each Shot its intent, framing, action, the script\'s dialogue spoken in it with each line\'s delivery, and a camera note: shot size, angle and at most one movement, for example "Medium, from her left, camera slowly follows her". Context goes in action, never in dialogue.',
-    'Give each Shot its positions: start and end say where each person and key object is in the frame and which way they face or move, in frame-left and frame-right terms, and which side the camera is on, for example start "Mara enters frame left, walking toward frame right; the bench is frame right" and end "Mara kneels at the bench, frame right, facing the camera". Each Shot\'s start follows from the previous Shot\'s end.',
+    'Give each Shot its positions: start and end say where each person and key object is in the frame and which way they face or move, in frame-left and frame-right terms, and which side the camera is on, for example start "Mara enters frame left, walking toward frame right; the bench is frame right" and end "Mara kneels at the bench, frame right, facing the camera". When the action continues from the previous Shot, its start follows from that Shot\'s end.',
     'A Shot has one key panel. Add a second only when the picture changes a lot within the Shot, for example when the camera moves from one part of the room to another, or from wide to close. Never add one for a small change of pose or expression.',
     'A Shot\'s video is made from its sheets and its first and last panels, which set the framing.',
     'Name each Shot\'s sheets in references: a subject the script lists, with one role and one job each. When the script lists a place, every Shot names the place it happens in with the environment role, even a close-up.',

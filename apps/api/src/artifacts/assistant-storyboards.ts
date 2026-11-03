@@ -38,7 +38,8 @@ const binding = { purpose: 'storyboard' } as const;
  * script's places, `invalid` for anything else.
  */
 export class StoryboardSaveError extends Error {
-  constructor(readonly reason: 'no_script' | 'not_in_script' | 'role' | 'no_place' | 'invalid' | 'no_room', readonly field?: string) {
+  /** `shot` is the Shot at fault, counted from 1, for `no_place`. */
+  constructor(readonly reason: 'no_script' | 'not_in_script' | 'role' | 'no_place' | 'invalid' | 'no_room', readonly field?: string, readonly shot?: number) {
     super(`Storyboard not saved: ${reason}`);
   }
 }
@@ -78,7 +79,7 @@ function plannedShots(input: AssistantStoryboardInput, base: Plan | null, script
       if (!subject) throw new StoryboardSaveError('not_in_script', `${at}.references[${position}].subjectId`);
       if (!roleKinds[reference.role].includes(subject.kind)) throw new StoryboardSaveError('role', `${at}.references[${position}].role`);
     });
-    if (placed && !shot.references?.some(reference => reference.role === 'environment')) throw new StoryboardSaveError('no_place', `${at}.references`);
+    if (placed && !shot.references?.some(reference => reference.role === 'environment')) throw new StoryboardSaveError('no_place', `${at}.references`, index + 1);
     shot.dialogue?.forEach((line, position) => {
       if (line.delivery !== 'voice_over' && !speakers.has(line.character.trim())) throw invalid(`${at}.dialogue[${position}].character`);
     });

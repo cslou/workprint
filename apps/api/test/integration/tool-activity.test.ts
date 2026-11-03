@@ -1366,7 +1366,7 @@ test('save-storyboard saves the Shot plan from the current script, and read-work
   // A Shot that names no place, when the script lists one, is refused with its Shot number, and nothing is saved.
   const unplaced = await turn<Saved>(video, 'save-storyboard', { base: third.result.versionId, shots: [shots[0], { ...shots[1], references: [] }] });
   assert.deepEqual([unplaced.result.saved, unplaced.lines.at(-1)?.[2]], [false, 'Not saved: a Shot names no place']);
-  assert.ok(!unplaced.result.saved && unplaced.result.message === 'Not saved: Shot 2 names no place. Add the place it happens in to its references.', JSON.stringify(unplaced.result));
+  assert.ok(!unplaced.result.saved && unplaced.result.message === 'Not saved: Shot 2 names no place. Add the place it happens in to its references, with the environment role.', JSON.stringify(unplaced.result));
   assert.equal((await store.workspace(owner.id, video)).storyboard.work?.version.id, third.result.versionId);
 
   // A stale base gets its line, and nothing is saved.

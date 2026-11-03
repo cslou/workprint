@@ -62,7 +62,7 @@ test('every refusal has its line and a message the model can follow, with the fi
     [{ kind: 'not_found' }, 'Not saved: that storyboard wasn’t found', /base is not this video's storyboard/],
     [{ kind: 'not_in_script', field: 'shots[0].references[0].subjectId' }, 'Not saved: a subject isn’t in the script; add it first', /^Not saved: shots\[0\]\.references\[0\]\.subjectId is not a subject the script lists/],
     [{ kind: 'role', field: 'shots[1].references[0].role' }, 'Not saved: a subject’s role doesn’t match its kind', /^Not saved: shots\[1\]\.references\[0\]\.role doesn't fit/],
-    [{ kind: 'no_place', field: 'shots[1].references' }, 'Not saved: a Shot names no place', /^Not saved: Shot 2 names no place\. Add the place it happens in to its references\.$/],
+    [{ kind: 'no_place', field: 'shots[1].references', shot: 2 }, 'Not saved: a Shot names no place', /^Not saved: Shot 2 names no place\. Add the place it happens in to its references, with the environment role\.$/],
     [{ kind: 'invalid', field: 'shots[0].panels[0].panelId' }, 'Not saved: the storyboard wasn’t valid', /^Not saved: shots\[0\]\.panels\[0\]\.panelId is not valid/],
     [{ kind: 'no_room' }, 'Not saved: this video has too many saved items', /do not retry/],
     [{ kind: 'unavailable' }, 'Not saved: saved work is unavailable', /do not retry in this turn/],
