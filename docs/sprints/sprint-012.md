@@ -7,7 +7,7 @@
 - A Shot has a second panel only when its picture changes a lot, for example when the camera moves from one part of the room to another.
 - A person sees and can change a Shot's length in "View storyboard".
 
-**Status:** 🟡 Implemented; Sprint Completion passed on the combined branch (2026-11-03). Waiting on Lou's QA and his merge command.
+**Status:** 🔵 In Progress; the combined-branch checks passed (2026-11-03). Waiting on Lou's QA and his merge command.
 
 ---
 
@@ -410,7 +410,7 @@ For descriptive-only work, use editorial review and applicable existing checks. 
   - Story 2, #136 (reference images in the client and job store): 4/5, then 4/5, then 5/5.
   - Story 3, #137 (Shot videos from references): 3/5, then 5/5. The P1 was that a sheet view MiniMax refuses (too small, or outside 0.4–2.5) failed every Shot naming its subject. Such views are now left out (`videoImageFits`).
   - Story 4, #138 (the second panel): 4/5, then 5/5.
-  - Story 5, #139 (the workflow prompt): 4/5, then 4/5, then 5/5.
+  - Story 5, #139 (the workflow prompt): 4/5, then 5/5, then 5/5.
 - **Combined-branch verification:** the deep gate (`.checks/regression.sh --tier=deep`, 464 s, run `.checks/.logs/run-xuuttqhf`) passed at `fced786`, the `sprint-012` head after Story 5.
   - Results: unit 281/281, tooling 6/6, integration 190/190, browser 34/34.
   - Audit is NON-PASS, as approved: the same 2 moderate advisories, `@hono/node-server` GHSA-rmxm-3fg6-px4f (B-004) and `minimatch` GHSA-g3hv-75wg-m249 (B-008). There are no high or critical advisories.
@@ -426,7 +426,7 @@ For descriptive-only work, use editorial review and applicable existing checks. 
   - the G1/G2 sprint lists are corrected;
   - the §4 storyboard PATCH includes `durationS`.
 
-  The stale "frame" comment in generate-panel was fixed too.
+  generate-panel's comment and its shape refusal now say a panel is a Shot video's reference image, not its frame.
 - **QA build for Lou:** not started. A QA host starts only when Lou asks, and it makes paid Muse Spark, Meta and MiniMax calls. Its pass items are in Sprint Completion above. B-041's three manual steps are in Story 5 and PR #139.
 - **Deviations, recorded in the story PRs:**
   - **Story 1:** commit `9c9a8b1`'s subject is 51 characters. It is accepted because history isn't rewritten after a PR opens.

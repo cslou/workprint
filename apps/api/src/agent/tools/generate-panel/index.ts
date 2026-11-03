@@ -44,7 +44,7 @@ const panelSize = imageSize.refine(value => {
   if (value === 'auto') return true;
   const [width, height] = value.split('x').map(Number) as [number, number];
   return width / height > videoFrameRatio.min && width / height < videoFrameRatio.max;
-}, `A panel's shape must be "auto" or WxH with width ÷ height above ${videoFrameRatio.min} and below ${videoFrameRatio.max}, so it can be a Shot video's frame`);
+}, `A panel's shape must be "auto" or WxH with width ÷ height above ${videoFrameRatio.min} and below ${videoFrameRatio.max}, so it can be a Shot video's reference image`);
 
 /** Makes one panel's image with Meta from the Shot's sheets and saves it as the next version of that panel's image. */
 export const generatePanelTool = defineTool({
