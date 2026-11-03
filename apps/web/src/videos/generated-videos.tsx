@@ -34,7 +34,7 @@ function GeneratedVideo({ connection, scope, clip, label }: { connection: Browse
   return <div className="wp-video-row" data-version-id={version.id}>
     <div className="wp-video-head"><b className="wp-video-title">{label}</b></div>
     <SingleClipViewer connection={connection} scope={scope} version={version} caption={label}
-      trigger={<AriaButton ref={box} className="wp-video-thumbnail wp-generated-video-poster" aria-label={`Play ${label}`}>
+      trigger={<AriaButton ref={box} className="wp-video-thumbnail wp-video-poster" aria-label={`Play ${label}`}>
         {poster.phase === 'ready' && poster.url ? <img src={poster.url} alt="" onError={poster.fail} /> : null}<PlayMark />
       </AriaButton>} />
     {/* A poster that can't be read leaves the clip playable; the row says so instead of looking still loading. */}

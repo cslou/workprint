@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
+import { Button as AriaButton } from 'react-aria-components';
 import type { OperationResponse, Version } from '@workprint/contracts';
 import type { BrowserClient } from '../api/client.js';
 import type { ReadScope } from '../api/use-scoped-read.js';
-import { Button } from '../ui/controls.js';
+import { useOwnedImage } from '../api/use-owned-image.js';
 import { EmptyState, WorkspaceEmpty } from '../ui/panel.js';
-import { SingleClipViewer } from '../media/viewer.js';
+import { formatClipTime, PlayMark, SingleClipViewer } from '../media/viewer.js';
 import { Feedback, StatusPill } from '../ui/status.js';
-import { VersionReview } from '../versions/review.js';
+import { useNearViewport } from '../ui/use-near-viewport.js';
+import { VersionReview, type ReviewSelection } from '../versions/review.js';
 import { VersionUse } from '../versions/use.js';
 import { useExactVersion } from '../versions/reads.js';
 import { orderedStoryboard } from '../workspace/projection.js';
@@ -57,7 +59,24 @@ function VideoCandidate({ connection, scope, workspace, prerequisites, row, choi
   return <div className="wp-video-row" data-shot-id={row.shotId}>
     <VersionReview connection={connection} scope={scope} version={version} currentUse={selected?.use ?? null} selectedVersionId={row.selected} selectionRevision={selected?.selectionRevision ?? workspace.selectionRevision} onUsed={value => onUsed(value, version)} binding={{ purpose: 'shot_video', shotId: row.shotId }} {...(prerequisites ? { historyPrerequisite: prerequisites.versions } : {})}>{(visible, _editable, selection) => {
       const image = prerequisites?.images?.find(image => image.versionId === visible.id && image.revision === visible.revision);
-      return <><div className="wp-video-head"><span className="wp-video-number">{row.number}</span><b className="wp-video-title">{row.title}</b>{(selection.currentUse?.versionId ?? row.selected) === visible.id && <StatusPill state="chosen" />}</div>{image && <img className="wp-video-thumbnail" src={image.src} alt={image.alt} />}<span className="wp-video-metadata"><SingleClipViewer connection={connection} scope={scope} version={visible} caption={`Shot ${row.number} · Version ${visible.revision}`} binding={{ purpose: 'shot_video', shotId: row.shotId }} currentUse={selection.currentUse} selectedVersionId={row.selected} selectionRevision={selection.selectionRevision} onUsed={selection.onUsed} trigger={<Button variant="quiet" aria-label={`View Shot ${row.number} version ${visible.revision}`}>Version {visible.revision}{visible.kind === 'video' && visible.media.durationMs !== undefined ? ` · ${(visible.media.durationMs / 1000).toFixed(1)} s` : ''}</Button>} /></span><VersionUse connection={connection} scope={scope} version={visible} binding={{ purpose: 'shot_video', shotId: row.shotId }} currentUse={selection.currentUse} selectedVersionId={row.selected} selectionRevision={selection.selectionRevision} onUsed={selection.onUsed} /></>;
+      return <><div className="wp-video-head"><span className="wp-video-number">{row.number}</span><b className="wp-video-title">{row.title}</b>{(selection.currentUse?.versionId ?? row.selected) === visible.id && <StatusPill state="chosen" />}</div><ShotClip connection={connection} scope={scope} version={visible} shotId={row.shotId} number={row.number} selected={row.selected} selection={selection} {...(image ? { image } : {})} /><VersionUse connection={connection} scope={scope} version={visible} binding={{ purpose: 'shot_video', shotId: row.shotId }} currentUse={selection.currentUse} selectedVersionId={row.selected} selectionRevision={selection.selectionRevision} onUsed={selection.onUsed} /></>;
     }}</VersionReview>
   </div>;
+}
+
+/**
+ * A Shot video's poster, read once near view, as the button that plays it, then its version and length. A display
+ * composition's supplied image stands in for the poster; a poster that can't be read leaves the clip playable and says so.
+ */
+function ShotClip({ connection, scope, version, shotId, number, selected, selection, image }: { connection: BrowserClient; scope: ReadScope | null; version: Version; shotId: string; number: number; selected: string | null; selection: ReviewSelection; image?: { src: string; alt: string } }) {
+  const [box, near] = useNearViewport<HTMLElement>();
+  const poster = useOwnedImage(connection, near && !image ? version : null);
+  const failed = !image && (poster.phase === 'error' || poster.phase === 'expired');
+  const src = image?.src ?? (poster.phase === 'ready' ? poster.url : null);
+  const length = version.kind === 'video' && version.media.durationMs !== undefined ? formatClipTime(version.media.durationMs) : null;
+  return <>
+    <SingleClipViewer connection={connection} scope={scope} version={version} caption={`Shot ${number} · Version ${version.revision}`} binding={{ purpose: 'shot_video', shotId }} currentUse={selection.currentUse} selectedVersionId={selected} selectionRevision={selection.selectionRevision} onUsed={selection.onUsed}
+      trigger={<AriaButton ref={box} className="wp-video-thumbnail wp-video-poster" aria-label={`View Shot ${number} version ${version.revision}`}>{src ? <img src={src} alt="" onError={poster.fail} /> : null}<PlayMark /></AriaButton>} />
+    <span className="wp-video-metadata">{[`Version ${version.revision}`, length, failed ? 'The poster couldn’t be shown' : null].filter(Boolean).join(' · ')}</span>
+  </>;
 }
