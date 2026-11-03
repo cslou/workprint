@@ -66,6 +66,13 @@ test('a later panel is made from the sheet views, with panel 1\'s current image 
   assert.deepEqual(second.size, { width: 1536, height: 864 });
   const over = inputs(resolve(workspace({ shots: shots(panel('p1', 0, [made, chosen], 'chosen')) }), { panel: 'p2', images: ['m3'] }));
   assert.deepEqual([over.inputs.at(-1)!.versionId, over.size], ['chosen', { width: 1024, height: 1024 }]);
+  // Picking only panel 1's image means every sheet the Shot names, whole, with panel 1 still last.
+  const only = inputs(resolve(workspace({ shots: shots(panel('p1', 0, [made])) }), { panel: 'p2', images: ['p1-v1'] })).inputs.map(input => input.versionId);
+  assert.deepEqual([only.length > 1, only.at(-1), only.filter(id => id === 'p1-v1').length], [true, 'p1-v1', 1]);
+  assert.deepEqual(only, [...inputs(resolve(workspace({ shots: shots(panel('p1', 0, [made])) }), { panel: 'p2' })).inputs.map(input => input.versionId)]);
+  // A sheet view that is panel 1's image is sent once, last, for continuity only.
+  const viewed = inputs(resolve(workspace({ shots: shots(panel('p1', 0, [image('m3', 640, 360, 'assistant')])) }), { panel: 'p2', images: ['m1', 'm3'] }));
+  assert.deepEqual(viewed.inputs.map(input => [input.versionId, input.job]), [['m1', 'Her face and coat.'], ['m3', 'match the setting, people and light; not its camera or framing']]);
   // Picking panel 1's image too keeps it last, for continuity only.
   assert.deepEqual(inputs(resolve(workspace({ shots: shots(panel('p1', 0, [made])) }), { panel: 'p2', images: ['p1-v1', 'm3'] })).inputs.map(input => [input.versionId, input.job]), [['m3', 'Her face and coat.'], ['p1-v1', 'match the setting, people and light; not its camera or framing']]);
 });

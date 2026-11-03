@@ -53,13 +53,15 @@ export function panelInputs(workspace: OwnedWorkspace, request: PanelRequest): P
     if (!listed.has(subjectId)) return { kind: 'subject_gone', subjectName: sheets.find(sheet => sheet.subjectId === subjectId)?.subjectName ?? subjectId };
   }
 
-  const used = usedImageVersions(workspace), picked = [...new Set(request.images)];
-  if (picked.some(id => !used.has(id))) return { kind: 'image_not_found' };
+  const used = usedImageVersions(workspace), requested = [...new Set(request.images)];
+  if (requested.some(id => !used.has(id))) return { kind: 'image_not_found' };
+  // Panel 1's image is only ever the last, continuity input: picking it adds nothing, and picking only it means every sheet.
+  const picked = requested.filter(id => id !== continuity?.versionId);
   const inputs: PanelInput[] = [];
-  const chosen = new Set(picked), claimed = new Set<string>(continuity ? [continuity.versionId] : []);
+  const chosen = new Set(picked), claimed = new Set<string>();
   for (const reference of references) {
     for (const view of subjectSheets.get(reference.subjectId)?.views ?? []) {
-      if (picked.length && !chosen.has(view.versionId)) continue;
+      if (view.versionId === continuity?.versionId || (picked.length && !chosen.has(view.versionId))) continue;
       claimed.add(view.versionId);
       inputs.push({ versionId: view.versionId, label: '', job: reference.purpose });
     }
