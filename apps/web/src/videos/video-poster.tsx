@@ -15,13 +15,14 @@ export function VideoPoster({ viewer, label, lead, image }: { viewer: ViewerProp
   const [box, near] = useNearViewport<HTMLElement>();
   const { version } = viewer;
   const poster = useOwnedImage(viewer.connection, near && !image ? version : null);
-  const [suppliedFailed, setSuppliedFailed] = useState(false);
-  const failed = image ? suppliedFailed : poster.phase === 'error' || poster.phase === 'expired';
+  // Which supplied image failed, so another version's supplied poster in the same slot is tried afresh.
+  const [failedSrc, setFailedSrc] = useState<string>();
+  const failed = image ? failedSrc === image.src : poster.phase === 'error' || poster.phase === 'expired';
   const src = failed ? undefined : image?.src ?? (poster.phase === 'ready' ? poster.url : undefined);
   const length = version.kind === 'video' && version.media.durationMs !== undefined ? formatClipTime(version.media.durationMs) : null;
   const line = [lead, length, failed ? 'The poster couldn’t be shown' : null].filter(Boolean);
   return <>
-    <SingleClipViewer {...viewer} trigger={<AriaButton ref={box} className="wp-video-thumbnail wp-video-poster" aria-label={label}>{src ? <img src={src} alt="" onError={image ? () => setSuppliedFailed(true) : poster.fail} /> : null}<PlayMark /></AriaButton>} />
+    <SingleClipViewer {...viewer} trigger={<AriaButton ref={box} className="wp-video-thumbnail wp-video-poster" aria-label={label}>{src ? <img src={src} alt="" onError={image ? () => setFailedSrc(image.src) : poster.fail} /> : null}<PlayMark /></AriaButton>} />
     {line.length ? <span className="wp-video-metadata">{line.join(' · ')}</span> : null}
   </>;
 }
