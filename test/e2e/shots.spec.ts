@@ -31,6 +31,13 @@ test('a Shot video choice survives reload and can be changed to another exact ve
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await choose(second);
+  // A storyboard saved before Shots had a length shows none in its summary, and says so on its board.
+  await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
+  await expect(page.locator('.wp-storyboard-shot[data-shot-id="platform-shot"] summary small')).toHaveText(/^\d+ panels?$/);
+  await page.getByRole('tabpanel').getByRole('button', { name: 'View storyboard', exact: true }).click();
+  await expect(page.getByRole('dialog').locator('.wp-shot-length-text').first()).toHaveText('Length · not set');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 
   await page.reload();
   await openVideos();
@@ -175,7 +182,7 @@ test('the agent\'s storyboard shows each Shot\'s panel images as they are made, 
   await turn({ name: 'update-script', args: { baseVersionId: null, script, subjects: [{ id: '', kind: 'character', name: 'Mara' }, { id: '', kind: 'place', name: 'The Gallery' }] } }, 'Write the script', 'Saved version 1');
   const views = ['Full-body front', 'Three-quarter', 'Face close-up'];
   await turn({ name: 'generate-sheet', args: { subject: 'mara', description: 'A courier in a long grey coat.', continuityNotes: ['Keep the grey coat.'], views: views.map(view => ({ view, prompt: `${view}, standing still` })) } }, 'Make Mara\'s sheet', 'Saved Mara · Version 1');
-  const storyboard = { base: '', shots: [{ intent: 'Mara finds the key.', framing: 'medium', action: 'Mara lifts the key from the bench.',
+  const storyboard = { base: '', shots: [{ intent: 'Mara finds the key.', durationS: 6, framing: 'medium', action: 'Mara lifts the key from the bench.',
     dialogue: [{ character: 'Mara', text: 'There you are.' }, { character: 'Narrator', text: 'She had looked for years.', delivery: 'voice_over' }],
     cameraNote: 'A slow push-in.', references: [{ subjectId: 'mara', role: 'identity', purpose: 'Her face.' }, { subjectId: 'the-gallery', role: 'environment', purpose: 'The room.' }],
     panels: [{ description: 'Mara reaches for the key.' }, { description: 'Mara holds the key up.' }] }] };
@@ -211,11 +218,12 @@ test('the agent\'s storyboard shows each Shot\'s panel images as they are made, 
     await expect(viewer).toHaveCount(0);
   };
   // The board is the detailed view: each Shot's text and its panel images; a board panel opens the same viewer.
-  const boardHolds = async (intent: string) => {
+  const boardHolds = async (intent: string, seconds: number) => {
     await panel.getByRole('button', { name: 'View storyboard', exact: true }).click();
     const board = page.getByRole('dialog');
     const section = board.locator(`.wp-board-shot[data-shot-id="${shot!.shotId}"]`);
     await expect(section.locator('header b')).toHaveText(intent);
+    await expect(section.locator('.wp-shot-length-text')).toHaveText(`Length · ${seconds} s`);
     await expect(section.locator('.wp-storyboard-action')).toHaveText('Mara lifts the key from the bench.');
     await expect(section.locator('.wp-storyboard-dialogue li b')).toHaveText(['Mara', 'Narration']);
     await expect(section.locator('.wp-storyboard-dialogue li q')).toHaveText(['There you are.', 'She had looked for years.']);
@@ -230,15 +238,15 @@ test('the agent\'s storyboard shows each Shot\'s panel images as they are made, 
 
   const holds = async () => {
     await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
-    // The tab is the summary: the intent, framing, panel count and panel images, without the Shot's text.
+    // The tab is the summary: the intent, framing, length, panel count and panel images, without the Shot's text.
     await expect(row.locator('summary')).toContainText('Mara finds the key.');
-    await expect(row.locator('summary small')).toHaveText('medium · 2 panels');
+    await expect(row.locator('summary small')).toHaveText('medium · 6 s · 2 panels');
     await expect(row.locator('.wp-storyboard-action, .wp-storyboard-dialogue, .wp-storyboard-camera')).toHaveCount(0);
     for (const n of [1, 2]) await shown(image(n));
     await expect(row.getByText('Planned panel', { exact: true })).toHaveCount(0);
     await expect(panel.locator('.wp-status')).toHaveCount(0);
     await opens(row, (await image(1).getAttribute('data-displayed-version-id'))!);
-    await boardHolds('Mara finds the key.');
+    await boardHolds('Mara finds the key.', 6);
 
     // The Shot row has the assistant's draft, with no status, and it plays; it isn't a Generated video.
     await page.getByRole('tab', { name: 'Videos', exact: true }).click();
@@ -316,12 +324,28 @@ test('the agent\'s storyboard shows each Shot\'s panel images as they are made, 
   await board.getByRole('textbox', { name: 'Shot intent' }).fill('Mara finds the key at last.');
   await board.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(board.getByRole('textbox', { name: 'Shot intent' })).toHaveCount(0);
+  // A person changes the Shot's length there too: a length out of range saves nothing, and a whole number from 4 to
+  // 15 saves.
+  await board.getByRole('button', { name: 'Edit Shot length', exact: true }).click();
+  const seconds = board.getByRole('spinbutton', { name: 'Length in seconds' });
+  await expect(seconds).toHaveValue('6');
+  for (const typed of ['16', '6.5']) {
+    await seconds.fill(typed);
+    await board.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(board.locator('.wp-shot-length').getByRole('status')).toHaveText('Enter a whole number of seconds from 4 to 15.');
+  }
+  await seconds.fill('8');
+  await board.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(seconds).toHaveCount(0);
+  await expect(board.locator('.wp-shot-length-text')).toHaveText('Length · 8 s');
   await page.keyboard.press('Escape');
   await expect(board).toHaveCount(0);
   await expect(row.locator('summary b')).toHaveText('Mara finds the key at last.');
+  await expect(row.locator('summary small')).toHaveText('medium · 8 s · 2 panels');
   await page.reload();
   await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
   await expect(row.locator('summary b')).toHaveText('Mara finds the key at last.');
+  await expect(row.locator('summary small')).toHaveText('medium · 8 s · 2 panels');
   await expect(image(1)).toHaveAttribute('data-displayed-version-id', v2);
-  await boardHolds('Mara finds the key at last.');
+  await boardHolds('Mara finds the key at last.', 8);
 });

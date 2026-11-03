@@ -7,7 +7,7 @@ import type { AssistantStoryboardInput } from '../../../src/artifacts/index.js';
 import { unusedSheets } from '../../support/unused-sheets.js';
 
 const tool = productionTools.find(candidate => candidate.id === 'save-storyboard')!;
-const shot = (extra: Record<string, unknown> = {}) => ({ intent: 'Mara arrives.', panels: [{ description: 'Mara in the doorway.' }], ...extra });
+const shot = (extra: Record<string, unknown> = {}) => ({ intent: 'Mara arrives.', durationS: 6, panels: [{ description: 'Mara in the doorway.' }], ...extra });
 
 /** One save-storyboard call against a save that answers `outcome`; returns the result, its line and what the save received. */
 async function call(args: Record<string, unknown>, outcome: AssistantStoryboardOutcome = { kind: 'saved', versionId: 'board-v1', revision: 1 }) {
@@ -24,7 +24,7 @@ async function call(args: Record<string, unknown>, outcome: AssistantStoryboardO
 test('empty and "null" optional values are harmless: no base, new ids, no field, a line spoken on screen', async () => {
   const sent = await call({ base: ' null ', shots: [shot({ shotId: 'NULL', framing: 'null', action: '', cameraNote: ' ', dialogue: [{ character: 'Mara', text: 'Hello?', delivery: 'null' }], references: [{ subjectId: ' mara ', role: 'identity', purpose: 'Her face.' }], panels: [{ panelId: 'null', description: 'Mara in the doorway.' }] })] });
   assert.equal(sent.parsed, true);
-  assert.deepEqual(sent.received, [{ baseVersionId: null, shots: [{ shotId: '', intent: 'Mara arrives.', dialogue: [{ character: 'Mara', text: 'Hello?' }], references: [{ subjectId: 'mara', role: 'identity', purpose: 'Her face.' }], panels: [{ panelId: '', description: 'Mara in the doorway.' }] }] }]);
+  assert.deepEqual(sent.received, [{ baseVersionId: null, shots: [{ shotId: '', intent: 'Mara arrives.', durationS: 6, dialogue: [{ character: 'Mara', text: 'Hello?' }], references: [{ subjectId: 'mara', role: 'identity', purpose: 'Her face.' }], panels: [{ panelId: '', description: 'Mara in the doorway.' }] }] }]);
   assert.deepEqual([sent.phrase, sent.summary], ['Saving the storyboard…', 'Saved Storyboard · Version 1']);
   // Order is array order; kept ids, set fields and a known delivery pass through.
   const kept = await call({ base: 'board-v1', shots: [shot({ shotId: 's2', framing: 'wide', dialogue: [{ character: 'Narrator', text: 'Late.', delivery: 'voice_over' }, { character: 'Mara', text: 'Here.', delivery: 'whisper' }] }), shot({ shotId: 's1', panels: [{ panelId: 'p1', description: 'A' }, { panelId: '', description: 'B' }] })] }, { kind: 'saved', versionId: 'board-v2', revision: 2 });
@@ -38,7 +38,10 @@ test('empty and "null" optional values are harmless: no base, new ids, no field,
 
 test('no input is nullable, and the schema bounds Shots and panels', async () => {
   assert.ok(!JSON.stringify(z.toJSONSchema(tool.inputSchema)).includes('"null"'));
-  for (const args of [{ shots: [] }, { shots: [shot({ panels: [] })] }, { shots: [shot({ panels: [1, 2, 3].map(n => ({ description: `P${n}` })) })] }, { shots: [shot({ references: [{ subjectId: 'mara', role: 'lighting', purpose: 'x' }] })] }, { shots: [shot({ intent: ' ' })] }]) {
+  // A Shot's length is required, in whole seconds from 4 to 15.
+  for (const durationS of [4, 15]) assert.deepEqual((await call({ shots: [shot({ durationS })] })).received[0]?.shots[0]?.durationS, durationS);
+  const unlengthed = { intent: 'Mara arrives.', panels: [{ description: 'Mara in the doorway.' }] };
+  for (const args of [{ shots: [unlengthed] }, ...[3, 16, 6.5].map(durationS => ({ shots: [shot({ durationS })] })), { shots: [] }, { shots: [shot({ panels: [] })] }, { shots: [shot({ panels: [1, 2, 3].map(n => ({ description: `P${n}` })) })] }, { shots: [shot({ references: [{ subjectId: 'mara', role: 'lighting', purpose: 'x' }] })] }, { shots: [shot({ intent: ' ' })] }]) {
     assert.equal((await call(args)).parsed, false, JSON.stringify(args));
   }
   const refused = projectToolActivity(productionTools, { toolCallId: 'c', toolName: 'save-storyboard', state: 'done', input: {}, output: { error: true } });

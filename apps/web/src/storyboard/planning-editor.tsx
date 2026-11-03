@@ -7,6 +7,7 @@ import type { ReadScope } from '../api/use-scoped-read.js';
 import { WorkspaceEmpty } from '../ui/panel.js';
 import { ManualVersionEditor } from '../versions/manual-editor.js';
 import { VersionTextSection, saveFeedback } from '../versions/text-section.js';
+import { editedShots, submitStoryboardEdit } from './storyboard-edit.js';
 
 type Workspace = OperationResponse<'workspace'>;
 export type PlanningTarget = { kind: 'shot'; shotId: string } | { kind: 'panel'; shotId: string; panelId: string };
@@ -40,17 +41,14 @@ function BoundPlanningEditor({ connection, scope, workspace, target, draft, onEd
   const label = target.kind === 'shot' ? 'Shot intent' : 'Panel description';
   const save = async () => {
     if (connection.kind !== 'configured' || !scope?.conversationId || busy.current || pending) return;
-    const submitted = shots.map(item => ({ shotId: item.shotId, order: item.order, ...(item.intent === undefined ? {} : { intent: item.intent }), ...(target.kind === 'shot' && item.shotId === target.shotId ? { intent: text } : {}), panels: item.panels.map(value => ({ panelId: value.panelId, order: value.order, description: target.kind === 'panel' && item.shotId === target.shotId && value.panelId === target.panelId ? text : value.description, references: [...value.references] })) }));
     busy.current = true; setPending(true); setFeedback(null);
     try {
-      const result = await connection.client.editStoryboard({ params: { id: scope.conversationId }, query: {}, body: { operationId: crypto.randomUUID(), baseVersionId: base.id, shots: submitted } });
-      if (!active.current) return;
-      if (!result.ok) { setFeedback(saveFeedback(result.error.code)); return; }
-      const next = result.value;
-      if (next.selectionRevision < latestRevision.current) return;
-      if (next.version.kind !== 'storyboard' || next.version.artifactId !== base.artifactId || next.version.id === base.id || next.version.revision <= base.revision) { setFeedback(saveFeedback('invalid_response')); return; }
+      const change = target.kind === 'shot' ? { shotId: target.shotId, intent: text } : { shotId: target.shotId, panel: { panelId: target.panelId, description: text } };
+      const outcome = await submitStoryboardEdit(connection.client, scope.conversationId, base, editedShots(shots, change), () => latestRevision.current);
+      if (!active.current || outcome.kind === 'superseded') return;
+      if (outcome.kind === 'refused') { setFeedback(saveFeedback(outcome.code)); return; }
       // The composition owner supplies the next public projection; no opaque JSON is guessed.
-      await onEdited(next);
+      await onEdited(outcome.value);
     } catch { if (active.current) setFeedback(saveFeedback('transport_failure')); }
     finally { busy.current = false; if (active.current || draft) setPending(false); }
   };

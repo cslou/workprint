@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { shotRoles } from '@workprint/contracts';
+import { shotDurationSchema, shotDurations, shotRoles } from '@workprint/contracts';
 import { optionalId, type AssistantStoryboardOutcome } from '../../../application/index.js';
 import { defineTool } from '../define.js';
 
@@ -61,6 +61,7 @@ const shot = z.strictObject({
   dialogue: z.array(line).max(20).default([]).describe('The script\'s lines spoken in this Shot, in order.'),
   cameraNote: z.string().max(2000).default('').describe('How the camera frames or moves.'),
   references: z.array(reference).max(10).default([]).describe('The subjects whose sheets this Shot uses, each once.'),
+  durationS: shotDurationSchema.describe(`How long the Shot runs, in whole seconds, ${shotDurations.min} to ${shotDurations.max}; its video is made at this length.`),
   panels: z.array(panel).min(1).max(2).describe('1 panel, or 2 when the action or camera changes without a cut.'),
 });
 
@@ -74,6 +75,8 @@ export const saveStoryboardTool = defineTool({
     'Give each Shot its intent, framing, action, the script\'s dialogue spoken in it with each line\'s delivery, and a camera note. Context goes in action, never in dialogue.',
     'A Shot has 1 panel, or 2 when the action or camera changes without a cut; its panels become its video\'s first and last frames.',
     'Name each Shot\'s sheets in references: a subject the script lists, with one role and one job each.',
+    `Give each Shot its length in durationS, ${shotDurations.min} to ${shotDurations.max} seconds: about 2.5 spoken words per second of its dialogue, plus the time its action needs, with a beat of silence at each end, rounded up to a whole second.`,
+    'read-workspace shows each Shot\'s current length, and the user can change it. A save sets the length you send, so send back the length a Shot already has unless the user asks you to change it.',
     'Keep each Shot\'s shotId and each panel\'s panelId from read-workspace so their images and videos stay; leave them empty for new ones.',
     'Show the user the Shot plan before making panels.',
   ].join(' '),
@@ -88,7 +91,7 @@ export const saveStoryboardTool = defineTool({
     const shots = input.shots.map(given => {
       const framing = optional(given.framing), action = optional(given.action), cameraNote = optional(given.cameraNote);
       return {
-        shotId: optionalId(given.shotId), intent: given.intent,
+        shotId: optionalId(given.shotId), intent: given.intent, durationS: given.durationS,
         ...(framing ? { framing } : {}), ...(action ? { action } : {}), ...(cameraNote ? { cameraNote } : {}),
         // An unknown delivery is a line spoken on screen.
         ...(given.dialogue.length ? { dialogue: given.dialogue.map(spoken => {

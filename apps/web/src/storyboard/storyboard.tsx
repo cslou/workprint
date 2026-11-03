@@ -16,6 +16,7 @@ import type { SetStateAction } from 'react';
 import { orderedStoryboard } from '../workspace/projection.js';
 import type { StoryboardPrerequisites } from './presentation.js';
 import { PanelImage, ShotText } from './shot-details.js';
+import { ShotLength } from './shot-length.js';
 import './storyboard.css';
 
 type Workspace = OperationResponse<'workspace'>;
@@ -56,13 +57,14 @@ function ScopedStoryboard({ connection, scope, workspace, prerequisites, onSaved
       <div className="wp-storyboard-board">{rows.map(({ shot, number, panels }) => <section className="wp-board-shot" key={shot.shotId} data-shot-id={shot.shotId}>
         <header><span className="wp-shot-number">{number}</span><b>{shot.intent ?? `Shot ${number}`}</b></header>
         <PlanningEditor {...common} target={{ kind: 'shot', shotId: shot.shotId }} draft={draftFor({ kind: 'shot', shotId: shot.shotId })} onEdited={edited} />
+        <ShotLength connection={connection} scope={scope} workspace={current} shotId={shot.shotId} onEdited={edited} />
         <div className="wp-board-text"><ShotText workspace={current} shot={shot} camera={facts?.shots?.find(value => value.shotId === shot.shotId)?.camera} /></div>
         <div className="wp-board-grid">{panels.map(({ panel, number: panelNumber }) => <section className="wp-board-panel" key={panel.panelId} data-panel-id={panel.panelId}><PanelThumbnail {...common} {...choices} shotId={shot.shotId} panel={panel} shotNumber={number} panelNumber={panelNumber} {...(facts ? { facts } : {})} /><b>{number}.{panelNumber}</b><PlanningEditor {...common} target={{ kind: 'panel', shotId: shot.shotId, panelId: panel.panelId }} draft={draftFor({ kind: 'panel', shotId: shot.shotId, panelId: panel.panelId })} onEdited={edited} /><PanelVersions {...common} {...choices} shotId={shot.shotId} panel={panel} shotNumber={number} panelNumber={panelNumber} {...(facts ? { facts } : {})} /></section>)}</div>
       </section>)}</div>
     </ViewerDialog>
     {rows.map(({ shot, number, panels }) => {
       const fact = facts?.shots?.find(value => value.shotId === shot.shotId);
-      return <details className="wp-storyboard-shot" key={shot.shotId} data-shot-id={shot.shotId} open><summary><span className="wp-shot-number">{number}</span><span className="wp-shot-title"><b>{shot.intent ?? `Shot ${number}`}</b><small>{shot.framing ? `${shot.framing} · ` : ''}{fact?.duration ? `${fact.duration} · ` : ''}{panels.length} panel{panels.length === 1 ? '' : 's'}</small></span>{fact?.status && <span className={`wp-status wp-status-${fact.status.toLowerCase()}`}>{fact.status}</span>}<svg className="wp-storyboard-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></summary>
+      return <details className="wp-storyboard-shot" key={shot.shotId} data-shot-id={shot.shotId} open><summary><span className="wp-shot-number">{number}</span><span className="wp-shot-title"><b>{shot.intent ?? `Shot ${number}`}</b><small>{shot.framing ? `${shot.framing} · ` : ''}{shot.durationS !== undefined ? `${shot.durationS} s · ` : fact?.duration ? `${fact.duration} · ` : ''}{panels.length} panel{panels.length === 1 ? '' : 's'}</small></span>{fact?.status && <span className={`wp-status wp-status-${fact.status.toLowerCase()}`}>{fact.status}</span>}<svg className="wp-storyboard-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></summary>
         <div className="wp-storyboard-body">{panels.map(({ panel, number: panelNumber }) => <div className="wp-storyboard-panel" key={panel.panelId} data-panel-id={panel.panelId}><PanelThumbnail {...common} {...choices} shotId={shot.shotId} panel={panel} shotNumber={number} panelNumber={panelNumber} {...(facts ? { facts } : {})} /><div className="wp-storyboard-panel-text"><span className="wp-panel-number">{number}.{panelNumber}</span><PanelVersions {...common} {...choices} shotId={shot.shotId} panel={panel} shotNumber={number} panelNumber={panelNumber} {...(facts ? { facts } : {})} /></div></div>)}</div>
       </details>;
     })}

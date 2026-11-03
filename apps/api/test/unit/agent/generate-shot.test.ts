@@ -12,17 +12,17 @@ const image = (id: string) => ({ id, artifactId: `artifact-${id}`, kind: 'image'
 const panel = (panelId: string, order: number, candidates: unknown[]) => ({ panelId, order, description: `Panel ${panelId}`, references: [], candidateImageVersions: candidates, approvedImageVersionId: null });
 
 /** One Shot with two panels; the second has no image when `unmade`. A made clip is that Shot's version 1. */
-function workspace(options: { unmade?: boolean; action?: string } = {}) {
+function workspace(options: { unmade?: boolean; action?: string; durationS?: number } = {}) {
   const clip = { id: clipId, artifactId: 'artifact-clip', kind: 'video', revision: 1, media: { contentType: 'video/mp4', byteSize: 4, width: 1344, height: 768, durationMs: 6000 }, createdBy: 'assistant', createdAt: new Date().toISOString(), dependencies: [] };
   return {
     script: null, assets: [], generatedVideos: [],
-    storyboard: { work: null, shots: [{ shotId: 's1', order: 0, intent: 'Mara arrives.', ...(options.action ? { action: options.action } : {}),
+    storyboard: { work: null, shots: [{ shotId: 's1', order: 0, intent: 'Mara arrives.', ...(options.action ? { action: options.action } : {}), ...(options.durationS ? { durationS: options.durationS } : {}),
       panels: [panel('p1', 0, [image('a1')]), panel('p2', 1, options.unmade ? [] : [image('b1')])], chosenVideoVersionId: null, candidateVideoVersions: [clip] }] },
     videos: [], pendingQuestion: null, activeWork: [], selectionRevision: '0',
   } as unknown as OwnedWorkspace;
 }
 
-type Options = { outcome?: VideoJobOutcome; unmade?: boolean; action?: string; noVideos?: boolean; unreadable?: boolean };
+type Options = { outcome?: VideoJobOutcome; unmade?: boolean; action?: string; durationS?: number; noVideos?: boolean; unreadable?: boolean };
 function harness(options: Options = {}) {
   const started: NewVideo[] = [];
   const collaborators: AgentCollaborators = {
@@ -44,14 +44,17 @@ const line = (output: unknown) => projectToolActivity(productionTools, { toolCal
 test('the Shot\'s frames, text and target go to the job runner; a saved clip is named and shown under its line', async () => {
   const { collaborators, started } = harness();
   const result = await run(collaborators, tool.inputSchema.parse(args({ shot: ' s1 ' })));
-  assert.deepEqual(started, [{ prompt: 'Mara arrives.\n\nNo one speaks.\n\nA slow push-in.', durationS: 6, ratio: '16:9', firstFrame: 'a1', lastFrame: 'b1', target: { shotId: 's1' } }], 'a padded id still names the Shot; the length defaults to 6 s');
+  assert.deepEqual(started, [{ prompt: 'Mara arrives.\n\nNo one speaks.\n\nA slow push-in.', durationS: 6, ratio: '16:9', firstFrame: 'a1', lastFrame: 'b1', target: { shotId: 's1' } }], 'a padded id still names the Shot; a Shot without a length runs 6 s');
+  const timed = harness({ durationS: 9 });
+  await run(timed.collaborators, tool.inputSchema.parse(args()));
+  assert.equal(timed.started[0]?.durationS, 9, 'the Shot\'s own length');
   assert.deepEqual([line(result)?.summary, line(result)?.media], ['Saved Shot 1 · Video · Version 1', [{ kind: 'video', versionId: clipId }]]);
   const gone = harness({ outcome: { kind: 'saved', jobId, versionId: randomUUID(), width: 1344, height: 768, durationMs: 6000, gone: true } });
   assert.equal(line(await run(gone.collaborators, tool.inputSchema.parse(args())))?.summary, 'Saved 1 video (its Shot is gone)');
 });
 
-test('the input schema keeps the motion prompt and the length within MiniMax\'s bounds', () => {
-  for (const bad of [{ prompt: '   ' }, { prompt: '' }, { durationS: 3 }, { durationS: 16 }, { durationS: 6.5 }, { shot: '' }, { firstFrame: 'a1' }]) {
+test('the input schema keeps the motion prompt within MiniMax\'s bounds, and takes no length: the Shot has it', () => {
+  for (const bad of [{ prompt: '   ' }, { prompt: '' }, { durationS: 6 }, { shot: '' }, { firstFrame: 'a1' }]) {
     assert.equal(tool.inputSchema.safeParse(args(bad)).success, false, JSON.stringify(bad));
   }
   assert.equal(line({ error: true })?.summary, 'Not made: the request wasn’t valid');

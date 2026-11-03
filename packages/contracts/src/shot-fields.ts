@@ -18,6 +18,10 @@ export const roleKinds: Readonly<Record<ShotRole, readonly ('character' | 'place
 /** A Shot's use of a subject, by its script id; the subject's current sheet is what a panel is made from. */
 export const shotReferenceSchema = z.strictObject({ subjectId: z.string().max(200).regex(slug), role: z.enum(shotRoles), purpose: bounded(120) });
 
+/** How long a Shot runs, in whole seconds: the lengths a Shot video can be made at. */
+export const shotDurations = { min: 4, max: 15 } as const;
+export const shotDurationSchema = z.number().int().min(shotDurations.min).max(shotDurations.max);
+
 /**
  * The optional Shot fields an assistant storyboard fills (additive to schema version 1), shared by saved content and
  * the workspace projection so a workspace holding an agent storyboard still parses.
@@ -28,4 +32,6 @@ export const shotFields = {
   dialogue: z.array(dialogueLineSchema).max(20).optional(),
   cameraNote: bounded(2000).optional(),
   references: z.array(shotReferenceSchema).max(10).refine(items => new Set(items.map(item => item.subjectId)).size === items.length, 'Each subject is referenced once per Shot').optional(),
+  /** The Shot's length: the agent sets it, a person can change it, and its video is made at it. */
+  durationS: shotDurationSchema.optional(),
 };
