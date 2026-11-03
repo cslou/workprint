@@ -56,6 +56,8 @@ test('the Muse Spark agent loop runs tools, enforces its limits and fails withou
     assert.ok(completed(await turn(video, 'Second turn')));
     assert.equal(bodies().length, 3);
     for (const body of bodies()) assert.deepEqual(body.messages[0], { role: 'system', content: systemPrompt });
+    // The sixth step names the join tool, the order and that it needs no yes.
+    assert.match(systemPrompt, /^6\. .*Shot order.*\(join-videos\).*chosen video, else its latest.*needs no yes\.$/m);
   });
 
   await t.test('a tool call runs and its result reaches the next step', async () => {

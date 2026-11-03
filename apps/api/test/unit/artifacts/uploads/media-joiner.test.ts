@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createMediaJoiner, joinCheck, parseJoinProbe, type JoinProbe } from '../../../../src/artifacts/uploads/media-joiner.js';
+import { createMediaJoiner, joinCheck, joinWhenFree, parseJoinProbe, type JoinProbe } from '../../../../src/artifacts/uploads/media-joiner.js';
 import { UploadError } from '../../../../src/artifacts/index.js';
 import { MediaProcessError, type MediaJoinSession, type MediaSandbox } from '../../../../src/storage/index.js';
 
@@ -64,4 +64,14 @@ test('the joiner returns no bytes when the output doesn\'t decode to every clip\
   // A plan the join refuses, such as a clip whose probe claims more than an hour.
   await assert.rejects(createMediaJoiner(sandbox(async () => { throw new MediaProcessError('invalid_input'); }))(clips), invalid);
   await assert.rejects(createMediaJoiner(sandbox(async () => { throw new MediaProcessError('deadline'); }))(clips), (error: unknown) => error instanceof MediaProcessError && error.code === 'deadline');
+});
+
+test('a joiner waits out another job\'s turn, within its wait', async () => {
+  let tries = 0;
+  const once = joinWhenFree(async () => { tries += 1; if (tries === 1) throw new MediaProcessError('capacity'); return { kind: 'incompatible', clip: 2, difference: 'x' }; }, { waitMs: 1000, retryMs: 1 });
+  assert.equal((await once([new Uint8Array([1]), new Uint8Array([2])])).kind, 'incompatible');
+  assert.equal(tries, 2);
+  // Still busy at the end of the wait: the capacity error is the result.
+  const busy = joinWhenFree(async () => { throw new MediaProcessError('capacity'); }, { waitMs: 5, retryMs: 1 });
+  await assert.rejects(busy([new Uint8Array([1]), new Uint8Array([2])]), (error: unknown) => error instanceof MediaProcessError && error.code === 'capacity');
 });

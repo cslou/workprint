@@ -8,7 +8,7 @@ export type VideoReason =
   | 'rate_limited' | 'unavailable' | 'task_failed' | 'task_cancelled' | 'checks' | 'not_found' | 'busy' | 'already_saved' | 'not_resumable'
   | 'jobs_unavailable' | 'work_unavailable' | 'frame_unused' | 'no_room' | 'waiting_for_room';
 /** One saved clip, named as read-workspace names it; the name is left out when the workspace can't be read. */
-type SavedClip = { versionId: string; label?: string; width: number; height: number; durationS: number };
+export type SavedClip = { versionId: string; label?: string; width: number; height: number; durationS: number };
 /** `gone`: the job's Shot left the storyboard, so its clip was saved as a generated video. */
 export type VideoResult =
   | { made: true; video: SavedClip; jobId: string; showInChat: boolean; gone?: true }
@@ -67,7 +67,7 @@ const providerReasons: Readonly<Record<VideoProviderFailure, Fixed>> = {
 export const videoRefusal = (reason: Fixed, jobId?: string): VideoResult => ({ made: false, reason, message: messages[reason], ...(jobId ? { jobId } : {}) });
 
 /** Names a saved clip as read-workspace does, so the model and the user see the same name. */
-async function labelOf(context: ToolContext, versionId: string) {
+export async function labelOf(context: ToolContext, versionId: string) {
   const read = await context.collaborators.readWorkspace(context.scope.accountId, context.scope.videoId);
   return read.kind === 'found' ? workspaceItem(read.workspace, versionId)?.name : undefined;
 }

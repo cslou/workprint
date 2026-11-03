@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { setTimeout as wait } from 'node:timers/promises';
 import { Pool } from 'pg';
-import { createArtifactStore, createArtifactWriters, createAssistantReferences, createAssistantScripts, createAssistantStoryboards, createGeneratedImages, createStoryboardEdits, createVersionUses, panelArtifactId, shotArtifactId } from '../../src/artifacts/index.js';
+import { createArtifactStore, createArtifactWriters, createAssistantReferences, createAssistantScripts, createAssistantStoryboards, createGeneratedImages, createGeneratedVideos, createMediaVerifier, createStoryboardEdits, UploadError, createVersionUses, panelArtifactId, shotArtifactId } from '../../src/artifacts/index.js';
 import { createAssistantScriptSaver, createAssistantSheets, createAssistantStoryboardSaver, shotEnding } from '../../src/application/index.js';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
 import { createGenerationJobs } from '../../src/generation/index.js';
-import { createPrivateObjectStorage } from '../../src/storage/index.js';
+import { createMediaSandbox, createPrivateObjectStorage } from '../../src/storage/index.js';
 import { accountBrowserFixture } from '../support/account-browser-fixture.js';
 import { chatComposition } from '../support/chat-composition.js';
 import { metaImageFake, testPng, type FakeImageStep } from '../support/meta-image-fake.js';
@@ -1557,5 +1558,95 @@ test('generate-panel makes a panel\'s image from the Shot\'s sheets and saves it
     assert.equal(line?.summary, 'Not saved: this video has too many saved items');
     assert.equal((await pool.query('SELECT 1 FROM artifacts.versions WHERE artifact_id=$1', [panelArtifactId(p.video, p.lone)])).rowCount, 0);
     assert.deepEqual([await useCount(p.video), await panelUses(p.video, p.lone)], [100, []]);
+  });
+});
+
+// join-videos through real turns: clips are saved through the real check, and the server's own sandbox joins them.
+test('join-videos joins saved clips in order into a new draft clip of the video, keeping the originals', { timeout: 300000 }, async t => {
+  const provider = await scriptedProvider(); t.after(provider.close);
+  const { storage, media } = testStack();
+  const fixture = await accountBrowserFixture({ artifacts: true, storage, media: media.toolchain, composition: chatComposition(provider) });
+  const pool = new Pool({ connectionString: fixture.servingUrl, max: 4 });
+  const objects = createPrivateObjectStorage(storage);
+  const sandbox = await createMediaSandbox(media.toolchain);
+  t.after(async () => { await sandbox.close(); objects.close(); await pool.end(); await fixture.close(); });
+  const check = createOwnedConversationCheck(fixture.native), store = createArtifactStore(pool, check);
+  const clips = createGeneratedVideos(pool, check, { storage: objects, verifyMedia: createMediaVerifier(sandbox) });
+  const [owner, other] = [await fixture.auth.createAccount(), await fixture.auth.createAccount()];
+  const clients = new Map(await Promise.all([owner, other].map(async user => [user.id, nativeTurnClient(fixture.apiOrigin, await fixture.accessToken(user), user.id)] as const)));
+  const client = (user: { id: string }) => clients.get(user.id)!;
+  const clip = await readFile('apps/api/test/support/fixtures/minimax-clip.mp4'), small = await readFile('apps/api/test/support/fixtures/minimax-clip-small.mp4');
+  const saved = async (user: { id: string }, video: string, bytes: Buffer) => (await clips.save(user.id, video, { bytes, frames: [] })).version;
+  /** One completed turn in which the model calls join-videos with `args`: what the tool gave the model, its lines and the media under the last. */
+  const join = async (user: { id: string }, video: string, args: Record<string, unknown>) => {
+    provider.reset();
+    provider.script({ toolCalls: [{ name: 'join-videos', args }] }, { text: ['Done'] });
+    const turn = await client(user).turn(video, 'Join my clips', 120000);
+    assert.ok(completed(turn), JSON.stringify(turn.terminal));
+    const content = (provider.requests[1]!.body as { messages: { role: string; content: unknown }[] }).messages.findLast(message => message.role === 'tool')?.content;
+    assert.ok(content !== undefined, 'tool result sent to the model');
+    const lines = turn.chunks.filter(chunk => chunk.type === 'tool-activity' && chunk.payload?.tool === 'join-videos').map(chunk => chunk.payload);
+    return { result: (typeof content === 'string' ? JSON.parse(content) : content) as { made: boolean; reason?: string; message?: string; video?: { versionId: string; durationS: number } }, lines };
+  };
+  const objectCount = async (user: { id: string }) => Number((await pool.query<{ count: string }>('SELECT count(*) FROM artifacts.generated_objects WHERE owner_id=$1', [user.id])).rows[0]!.count);
+
+  await t.test('two saved clips join, in order, into a draft clip whose dependencies are the clips; the originals are unchanged', async () => {
+    const video = await client(owner).newVideo();
+    const [first, second] = [await saved(owner, video, clip), await saved(owner, video, clip)];
+    const before = await store.workspace(owner.id, video);
+    const { result, lines } = await join(owner, video, { clips: [second.id, first.id], showInChat: true });
+    assert.ok(result.made, JSON.stringify(result));
+    assert.deepEqual(lines.map(line => [line?.phrase, line?.state, line?.summary]), [['Joining clips…', 'running', undefined], ['Joining clips…', 'done', 'Joined 2 clips']]);
+    assert.deepEqual(lines.at(-1)?.media, [{ kind: 'video', versionId: result.video!.versionId }]);
+    const joined = await store.version(owner.id, result.video!.versionId);
+    assert.deepEqual(joined.dependencies, [second.id, first.id]);
+    assert.ok(joined.kind === 'video' && Math.abs(joined.media.durationMs! - 8084) <= 42, `8.083 s within one frame: ${JSON.stringify(joined)}`);
+    const after = await store.workspace(owner.id, video);
+    assert.deepEqual(after.generatedVideos?.map(item => [item.version.id, item.state]), [...(before.generatedVideos ?? []).map(item => [item.version.id, item.state]), [joined.id, 'Draft']]);
+    assert.deepEqual(after.generatedVideos?.slice(0, 2), before.generatedVideos);
+  });
+
+  await t.test('another account\'s clip is not found: nothing is joined or stored', async () => {
+    const video = await client(owner).newVideo(), foreign = await client(other).newVideo();
+    const mine = await saved(owner, video, clip), theirs = await saved(other, foreign, clip);
+    const [objectsBefore, clipsBefore] = [await objectCount(owner), (await store.workspace(owner.id, video)).generatedVideos?.length];
+    const { result, lines } = await join(owner, video, { clips: [mine.id, theirs.id] });
+    assert.deepEqual([result.made, result.reason, lines.at(-1)?.summary], [false, 'not_found', 'Couldn’t join those clips']);
+    assert.deepEqual([await objectCount(owner), (await store.workspace(owner.id, video)).generatedVideos?.length], [objectsBefore, clipsBefore]);
+  });
+
+  await t.test('the save refuses a joined video whose length isn\'t its clips\' added up, a clip the video doesn\'t use, and joined with frames', async () => {
+    const video = await client(owner).newVideo();
+    const [first, second] = [await saved(owner, video, clip), await saved(owner, video, clip)];
+    const objectsBefore = await objectCount(owner);
+    const refused = (code: string) => (error: unknown) => error instanceof UploadError && error.code === code;
+    // One clip's bytes, saved as the join of two: 4.04 s is not 8.08 s within a frame.
+    await assert.rejects(clips.save(owner.id, video, { bytes: clip, frames: [], joined: { clips: [first.id, second.id], frameMs: 1000 / 24 } }), refused('invalid_input'));
+    await assert.rejects(clips.save(owner.id, video, { bytes: clip, frames: [], joined: { clips: [first.id, randomUUID()], frameMs: 1000 / 24 } }), refused('not_found'));
+    await assert.rejects(clips.save(owner.id, video, { bytes: clip, frames: [first.id], joined: { clips: [first.id, second.id], frameMs: 1000 / 24 } }), refused('invalid_input'));
+    assert.equal(await objectCount(owner), objectsBefore);
+    assert.equal((await store.workspace(owner.id, video)).generatedVideos?.length, 2);
+  });
+
+  await t.test('a clip\'s bytes are read only while they are the ones saved', async () => {
+    const video = await client(owner).newVideo();
+    const version = await saved(owner, video, clip);
+    assert.equal((await clips.read(owner.id, version.id)).bytes.equals(clip), true);
+    await assert.rejects(clips.read(owner.id, randomUUID()), (error: unknown) => error instanceof UploadError && error.code === 'not_found');
+    await assert.rejects(clips.read(other.id, version.id), (error: unknown) => error instanceof UploadError && error.code === 'not_found');
+    // Bytes that no longer match what was checked and saved are refused, not read.
+    const { object_key } = (await pool.query<{ object_key: string }>("SELECT object_key FROM artifacts.generated_objects WHERE version_id=$1 AND content_type='video/mp4'", [version.id])).rows[0]!;
+    await objects.remove(object_key);
+    await objects.publish(object_key, small, 'video/mp4');
+    await assert.rejects(clips.read(owner.id, version.id), (error: unknown) => error instanceof UploadError && error.code === 'integration_failure');
+  });
+
+  await t.test('a clip of another size is refused, naming it', async () => {
+    const video = await client(owner).newVideo();
+    const [first, second] = [await saved(owner, video, clip), await saved(owner, video, small)];
+    const { result, lines } = await join(owner, video, { clips: [first.id, second.id] });
+    assert.deepEqual([result.made, result.reason, lines.at(-1)?.summary], [false, 'incompatible', 'Not joined: the clips don’t match']);
+    assert.match(result.message!, /clip 2 can't be joined to clip 1 \(672×384; clip 1 is 1344×768\)/);
+    assert.equal((await store.workspace(owner.id, video)).generatedVideos?.length, 2);
   });
 });

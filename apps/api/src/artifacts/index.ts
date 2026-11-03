@@ -2,7 +2,7 @@ export { createArtifactStore, type ArtifactStore } from './store.js';
 export { createUploadCoordinator, type UploadCoordinator } from './uploads/coordinator.js';
 export { UploadError } from './uploads/errors.js';
 export { createMediaVerifier } from './uploads/media-verifier.js';
-export { createMediaJoiner, type JoinedMedia, type MediaJoiner } from './uploads/media-joiner.js';
+export { createMediaJoiner, joinWhenFree, type JoinedMedia, type MediaJoiner } from './uploads/media-joiner.js';
 export type { MediaVerifier, VerifiedMedia } from './uploads/types.js';
 export { ArtifactError } from './errors.js';
 export { createArtifactWriters, type ArtifactSaveWriter } from './writers.js';
@@ -15,5 +15,5 @@ export { createAssistantReferences, maxSheetViewName, maxSheetViews, SheetSaveEr
 export { createGeneratedImages, type GeneratedImageInput, type GeneratedImageSave, type GeneratedImages, type StoredImage } from './generated-images.js';
 export { UseRoomError } from './use-room.js';
 export { createPanelImages, panelArtifactId, type PanelImageInput, type PanelImageSave, type PanelImages, type PanelTarget } from './panel-images.js';
-export { createGeneratedVideos, shotArtifactId, type GeneratedVideoInput, type GeneratedVideoSave, type GeneratedVideos, type WithinSave } from './generated-videos.js';
-export { usedImageVersions } from './workspace-images.js';
+export { createGeneratedVideos, joinableClips, shotArtifactId, type GeneratedVideoInput, type GeneratedVideoSave, type GeneratedVideos, type JoinedClips, type StoredVideo, type WithinSave } from './generated-videos.js';
+export { usedImageVersions, usedVideoVersions } from './workspace-images.js';
