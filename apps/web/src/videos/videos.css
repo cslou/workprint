@@ -6,6 +6,6 @@
 .wp-video-metadata .wp-button-quiet { display: block; width: 100%; min-height: 0; height: auto; padding: 0; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; font-weight: var(--font-weight-regular); line-height: var(--font-line-height-1-5); text-align: left; -webkit-font-smoothing: antialiased; }
 .wp-video-metadata .wp-button-quiet[data-hovered] { background: transparent; color: var(--color-text-primary); }
 .wp-video-thumbnail { display: block; width: var(--size-media-thumb-row); aspect-ratio: 16 / 9; object-fit: cover; border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-sm); }
-.wp-generated-video-poster { position: relative; margin-top: var(--space-6); padding: 0; overflow: hidden; background: var(--color-bg-sunken); cursor: pointer; }
-.wp-generated-video-poster img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.wp-generated-video-poster[data-focus-visible] { outline: var(--border-width-focus) solid var(--color-border-focus); outline-offset: var(--border-width-focus-offset); }
+.wp-video-poster { position: relative; margin-top: var(--space-6); padding: 0; overflow: hidden; background: var(--color-bg-sunken); cursor: pointer; }
+.wp-video-poster img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.wp-video-poster[data-focus-visible] { outline: var(--border-width-focus) solid var(--color-border-focus); outline-offset: var(--border-width-focus-offset); }

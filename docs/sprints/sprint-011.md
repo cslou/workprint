@@ -485,3 +485,11 @@ Sprint-specific completion items:
   - **Story 2:** the envelope cap is pre-existing and still open. Subjects and stopped videos have no hard cap of their own, so a very large read-workspace envelope could still pass 16 KiB. The truncation-wording P2 was fixed in #118.
   - **Story 6:** `lineVoice` and `deliveryLabel` spell out the delivery union instead of using `dialogueLineSchema`'s type; a new delivery would fail to compile, not misbehave. No test drives a panel description edit, which uses the same unchanged editor as the Shot intent edit.
 - **New Dependencies:** None.
+- **Lou's QA follow-up (2026-11-03):** Lou reported "it all works" and asked for five fixes, made in one PR into `sprint-011`:
+  - selecting a panel's image opens its viewer;
+  - the panel viewer shows the image (it read only a display composition's supplied images, which the app never sets);
+  - "View storyboard" became the detailed view, with each Shot's text and panel images, and the Storyboard tab the summary;
+  - a Shot video row shows its poster as the play button;
+  - a place's sheet views fill the frame instead of sitting on a plain page, which Meta drew as a framed picture on grey.
+
+  Two paid MiniMax reference-to-video tests on the QA host's images also passed, so Shot videos move from first and last frames to reference images in Sprint 012.
