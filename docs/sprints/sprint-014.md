@@ -148,19 +148,19 @@
 - **As** a filmmaker, **I want** each panel and Shot video to be told where everyone starts and ends, and where the previous Shot ended, **so that** the pictures follow the plan.
 - **Dependencies:** Story 2.
 - **Acceptance criteria:**
-  - [ ] The panel prompt's code-written preface (`application/panels.ts`) and `shotVideoPrompt` (`application/shots.ts`) add `Positions: starts <start>; ends <end>.` for a Shot with positions, and `Previous Shot ended: <end>.` when the Shot before it in story order has positions.
-  - [ ] The first Shot, a Shot without positions, and a Shot whose previous Shot has none get no line for what's missing.
-  - [ ] A video prompt over MiniMax's limit is still refused `too_long` before any job is saved; 300-character positions on an ordinary Shot fit.
-  - [ ] The system prompt is unchanged.
+  - [x] The panel prompt's code-written preface (built in `application/panel-inputs.ts`) and `shotVideoPrompt` (`application/shots.ts`) add `Positions: starts <start>; ends <end>.` for a Shot with positions, and `Previous Shot ended: <end>.` when the Shot before it in story order has positions and the two name a place in common, or neither names one. One helper builds both (`positionLines`, `application/shot-positions.ts`). (The place condition was added during the story, under Lou's delegation: Story 2's review found that after a cut to another place the previous end doesn't carry on.)
+  - [x] The first Shot, a Shot without positions, and a Shot whose previous Shot has none get no line for what's missing.
+  - [x] A video prompt over MiniMax's limit is still refused `too_long` before any job is saved; 300-character positions on an ordinary Shot fit.
+  - [x] The system prompt is unchanged.
 - **Functional verification:**
-  - [ ] Unit (`apps/api/test/unit/application/shots.test.ts` and `panel-inputs.test.ts` or the panel test that builds the preface): the exact lines for each case above; 300-character positions within the limit. Pass: exact text.
-  - [ ] Integration (`tool-activity.test.ts` generate-shot): the MiniMax fake receives the lines. Pass: as stated.
+  - [x] Unit (`shot-positions.test.ts`, new; `shots.test.ts`; `panel-inputs.test.ts`): the exact lines for each case above, including another place and story order; the lines' place in the video prompt and the panel preface; a job with 300-character positions is sent. Pass: 18/18 across the three files.
+  - [x] Integration (`tool-activity.test.ts` generate-shot): the MiniMax fake receives Shot 1's positions line, and Shot 2's lines with where Shot 1 ended. Pass: green.
 - **Regression verification:**
-  - [ ] `tool-activity.test.ts` generate blocks and `agent-loop.test.ts` ("the static prompt and tool list are byte-identical across turns"). Pass: green.
+  - [x] `tool-activity.test.ts` whole and `agent-loop.test.ts` ("the static prompt and tool list are byte-identical across turns"). Pass: 89/89. Unit tier 222/222; `pnpm check` green.
 - **Editorial/design verification:** spec §8.3 Videos and Storyboard's panel bullets name the lines.
 - **Manual-only behavior verification:** Lou's QA item 3.
 - **Planned commits:**
-  1. Feat(application): Put positions in panel and video prompts
+  1. Feat(application): Positions in Shot prompts
 - **Technical notes:** the previous Shot is the one before in the storyboard's story order.
 
 #### Story 4: A person changes a Shot's positions

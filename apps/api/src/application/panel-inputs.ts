@@ -1,5 +1,6 @@
 import { currentPanelImage, currentSheets, currentSubjects, currentSubjectSheets, shotRoles, storyboardNames } from '@workprint/contracts';
 import { usedImageVersions } from '../artifacts/index.js';
+import { positionLines } from './shot-positions.js';
 import type { OwnedWorkspace } from './workspace-reads.js';
 import { imageVersionNames } from './workspace-versions.js';
 
@@ -74,5 +75,7 @@ export function panelInputs(workspace: OwnedWorkspace, request: PanelRequest): P
   // Each label is the workspace's own name for the image, the one the agent picked it by.
   const name = imageVersionNames(workspace);
   const resolved = unique.map(input => input.label ? input : { ...input, label: name(input.versionId) ?? input.versionId });
-  return { kind: 'resolved', inputs: resolved, preface: resolved.map((input, position) => `Input ${position + 1}: ${input.label} — ${input.job}`).join('\n'), ...(size ? { size } : {}) };
+  // The preface labels each input, then says where the Shot starts and ends (`positionLines`).
+  const preface = [...resolved.map((input, position) => `Input ${position + 1}: ${input.label} — ${input.job}`), ...positionLines(workspace.storyboard.shots, shot)].join('\n');
+  return { kind: 'resolved', inputs: resolved, preface, ...(size ? { size } : {}) };
 }

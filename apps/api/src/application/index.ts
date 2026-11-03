@@ -68,5 +68,6 @@ export { makePanel, type MakePanelRequest, type PanelMakers, type PanelOutcome }
 export { createGeneratedImageSaver, createImageInputReader, metaImageFailure, requestOneImage, type OneImage, type GeneratedImageOutcome, type ImageFailure, type ImageInputsOutcome, type ReadImageInputs, type SaveGeneratedImage } from './generated-images.js';
 export { createJoins, joinLimits, type JoinCollaborators, type JoinOutcome, type JoinVideos } from './joins.js';
 export { createGeneratedVideoSaver, type GeneratedVideoOutcome, type SaveGeneratedVideo } from './generated-videos.js';
+export { positionLines } from './shot-positions.js';
 export { defaultShotDurationS, makeShot, shotEnding, shotReferences, shotVideoPrompt, type MakeShotRequest, type ShotReference, type ShotMakers, type ShotOutcome, type ShotRefusal } from './shots.js';
 export { createVideoJobs, videoJobTiming, type NewVideo, type VideoAbortReason, type VideoJobCollaborators, type VideoJobOutcome, type VideoJobs, type VideoJobTiming, type VideoProviderFailure, type VideoRunControl, type StoppedVideo, type StoppedVideosOutcome } from './video-jobs.js';

@@ -106,6 +106,9 @@ test('the prompt labels each image, then gives the action, camera note, dialogue
     '',
     'The action completes within the Shot, and it ends on a settled moment.',
   ].join('\n'));
+  // Position lines go after the camera note, before the dialogue.
+  assert.equal(shotVideoPrompt({ intent: 'Mara arrives.', cameraNote: 'Wide.' }, characters, 'Pan left.', [], ['Positions: starts a; ends b.', 'Previous Shot ended: c.']),
+    'Mara arrives.\n\nWide.\n\nPositions: starts a; ends b.\nPrevious Shot ended: c.\n\nNo one speaks.\n\nPan left.\n\nThe action completes within the Shot, and it ends on a settled moment.');
   assert.equal(shotVideoPrompt({ intent: 'Mara arrives.' }, characters, 'Pan left.', []), 'Mara arrives.\n\nNo one speaks.\n\nPan left.\n\nThe action completes within the Shot, and it ends on a settled moment.', 'no action: the intent, and no one speaks');
   const key = { id: 'the-key', kind: 'prop' as const, name: 'The key' }, keyed = names(shot(), 'the-key');
   const label = shotReferences(workspace([keyed], [mara, ben, key], [{ subjectId: 'the-key', views: ['k-1'], description: 'Brass.' }]), keyed);
@@ -131,6 +134,11 @@ test('the job is made from the references at 16:9 and the Shot\'s length, or 6 s
   const untimed = makers([shot()]);
   await makeShot(untimed.value, 'account', 'video', request, control);
   assert.deepEqual([untimed.started[0]?.durationS, untimed.started[0]?.referenceImageIds], [6, ['a1', 'b1']]);
+  // The job's prompt carries the Shot's positions and the previous Shot's end; 300-character positions still fit.
+  const long = { start: 's'.repeat(300), end: 'e'.repeat(300) };
+  const placed = makers([shot({ shotId: 's0', order: 0, positions: long }), shot({ order: 1, positions: long, action: 'Mara kneels.' })]);
+  assert.deepEqual(await makeShot(placed.value, 'account', 'video', request, control), { kind: 'no_room' });
+  assert.ok(placed.started[0]!.prompt.includes(`Mara kneels.\n\nPositions: starts ${long.start}; ends ${long.end}.\nPrevious Shot ended: ${long.end}.\n\nNo one speaks.`), placed.started[0]!.prompt);
 });
 
 test('every refusal comes before the job runner is asked', async () => {
