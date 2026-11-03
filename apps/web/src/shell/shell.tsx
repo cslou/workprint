@@ -108,7 +108,7 @@ function ScopedShell({ navigation, onAccountOpen, connection, session, conversat
   return <>
     <div className={`wp-shell${navigation ? ' wp-owned-shell' : ''}`}>
       <nav className="wp-sidebar" aria-label="Workprint">
-        <div className="wp-brand"><span className="wp-mark">a</span><span>Workprint</span></div>
+        <div className="wp-brand">Workprint</div>
         <div className="wp-nav-list">{nav()}<span className="wp-menu"><Button variant="secondary" onPress={() => { setSurface('navigation'); if (navigation && session) void navigation.list(); }}>Menu</Button></span></div>
         <div className="wp-recents" aria-busy={!!navigation?.recents.pending || sidebarPlaceholder.active}>{recent}</div><div className="wp-sidebar-spacer" />{account}
       </nav>

@@ -1,3 +1,5 @@
+/* The Workprint wordmark's face: Italiana (SIL OFL 1.1, fonts/Italiana-OFL.txt), served with the app. */
+@font-face { font-family: "Italiana"; font-style: normal; font-weight: 400; font-display: swap; src: url("./fonts/italiana-latin.woff2") format("woff2"); }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--color-bg-canvas); color: var(--color-text-primary); font: var(--font-weight-regular) var(--font-size-14)/var(--font-line-height-1-5) var(--font-family-sans); -webkit-font-smoothing: antialiased; }
 .wp-button, .wp-tab, .wp-input { font-family: var(--font-family-sans); }

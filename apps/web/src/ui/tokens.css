@@ -59,6 +59,7 @@
   --color-media-label: var(--color-alpha-cream-90);
   --font-family-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-family-display: Georgia, "Times New Roman", serif;
+  --font-family-brand: "Italiana", Georgia, serif;
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
