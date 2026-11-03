@@ -2,8 +2,9 @@
 // placeholder key and no network. `--live` makes ONE real, paid MiniMax-H3 768P 5 s prompt-only
 // generation (about $0.40), polls it, downloads the clip, probes and decodes it with the pinned
 // toolchain, and saves the sanitized shapes, the clip and its probe. `--references <png>…` (Sprint
-// 012) sends those 1 to 9 PNGs as reference images instead, at 16:9 for 6 s; dry, it checks the fake
-// got each one as a reference_image in order. Never run by a gate: only on request. Run through
+// 012) sends those 1 to 9 PNGs as reference images instead, at 16:9 for 6 s, or with no paths three
+// generated sample PNGs (1376x768, 1024x1024, 768x1376); dry, it checks the fake got each one as a
+// reference_image in order. Never run by a gate: only on request. Run through
 // `pnpm live:video [--live] [--references <png>…]`, which compiles the tests; only `--live` starts
 // the shared test stack, for the pinned toolchain.
 import assert from 'node:assert/strict';
@@ -30,6 +31,7 @@ const load = path => import(pathToFileURL(join(build, path)).href);
 const { createMiniMaxVideoClient, createSafeDownload, MiniMaxVideoError, miniMaxVideoBaseUrl } = await load('src/generation/index.js');
 const { createMediaSandbox } = await load('src/storage/index.js');
 const { miniMaxVideoFake } = await load('test/support/minimax-video-fake.js');
+const { testPng } = await load('test/support/meta-image-fake.js');
 const { testStack } = await load('test/support/test-stack.js');
 
 /** The key comes only from the root .env; it is never printed or put in process.env. */
@@ -59,13 +61,13 @@ const recordingFetch = async (url, init) => {
 };
 
 /** A PNG as a reference image: its data URL and the size from its header. */
-function pngReference(path) {
-  const bytes = readFileSync(path);
-  assert.ok(bytes.subarray(1, 4).toString('latin1') === 'PNG', `${path} is not a PNG`);
-  return { dataUrl: `data:image/png;base64,${bytes.toString('base64')}`, width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20), file: path, bytes: bytes.byteLength };
+function pngReference(bytes, file) {
+  assert.ok(bytes.subarray(1, 4).toString('latin1') === 'PNG', `${file} is not a PNG`);
+  return { dataUrl: `data:image/png;base64,${bytes.toString('base64')}`, width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20), file, bytes: bytes.byteLength };
 }
-const references = referencePaths?.map(pngReference);
-assert.ok(!referencePaths || references.length, '--references needs at least one PNG');
+const samples = [[1376, 768], [1024, 1024], [768, 1376]];
+const references = !referencePaths ? undefined : referencePaths.length ? referencePaths.map(path => pngReference(readFileSync(path), path))
+  : samples.map(([width, height], index) => pngReference(Buffer.from(testPng({ width, height, seed: 40 + index })), `sample ${width}x${height}`));
 const request = references
   ? { prompt: `${references.map((image, index) => `Image ${index + 1} is a reference for the subjects, setting and framing.`).join(' ')} A slow push-in as the scene settles. Natural colour, gentle camera movement.`,
     durationS: 6, ratio: '16:9', referenceImages: references.map(({ dataUrl, width, height }) => ({ dataUrl, width, height })) }

@@ -306,6 +306,13 @@ describe('assistant-made clips are checked with the MiniMax allowance and saved 
         const made = await saveClip(account, video, { bytes: clip, frames: references, jobId: job.id });
         assert.equal(made.kind, 'saved', JSON.stringify(made)); if (made.kind !== 'saved') return;
         assert.deepEqual((await store.version(account, made.versionId)).dependencies, references);
+        // A tenth image is more than MiniMax takes: nothing is saved.
+        const tenth = await saveImage(account, video, { bytes: testPng({ seed: 29 }), contentType: 'image/png', inputs: [] });
+        assert.equal(tenth.kind, 'saved'); if (tenth.kind !== 'saved') return;
+        const before = await counts(), next = await waiting(references);
+        assert.deepEqual(await saveClip(account, video, { bytes: clip, frames: [...references, tenth.versionId], jobId: next.id }), { kind: 'not_found' });
+        assert.deepEqual(await counts(), before);
+        assert.equal((await jobs.get(account, next.id)).status, 'running', 'its job is left to wait');
       });
 
       await t.test('the same clip as an upload is refused, and refused or failed saves store nothing', async () => {
