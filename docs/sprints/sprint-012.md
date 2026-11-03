@@ -7,7 +7,7 @@
 - A Shot has a second panel only when its picture changes a lot, for example when the camera moves from one part of the room to another.
 - A person sees and can change a Shot's length in "View storyboard".
 
-**Status:** 🟡 Planning
+**Status:** 🟡 Planned; Lou approved the plan on 2026-11-03. Not started.
 
 ---
 
@@ -143,7 +143,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: Pass 1 (3/5): re-save could reset a person's length; edit-bound refusal untested; spec notes missing. Pass 2 (4/5): the no-length board state, the read-workspace listing test, one test location.
   - Resolution: `durationS` is required in the tool and an agent save sets what it sends (the description says to keep a person's length); edit refusal tested in `storyboard-revisions.test.ts`; spec §8.3/§8.5 added; "Length · not set" and a read-workspace case added.
@@ -188,7 +188,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: Pass 1: untested reference checks, the 9-vs-10 cap, the frozen-inputs regression. Pass 2: one stale "2 to 10"; `references` named like a Shot's subject references.
   - Resolution: Per-reference, `validateVideoRequest`, duplicate and exclusivity cases added; cap is 9 everywhere with 10 refused; the freeze is asserted; fields renamed `referenceImages` / `referenceImageIds`.
@@ -235,7 +235,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: Pass 1 (P1): Shots with more than 2 panels; label length and `too_long`; dedupe and no-sheet cases; wording contradiction. Pass 2: many subjects could crowd out the panels; dialogue forms not written in full.
   - Resolution: First and last panels only, as today; descriptions cut to 300 characters with a `too_long` case; exact 9-image list and dedupe/no-sheet cases; names, never pronouns; panel slots kept first with a 9-subject case; all four dialogue forms written out.
@@ -302,7 +302,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: Pass 1: the paid call as a dependency; panel 1 first vs Lou's decision; no generate-image size test. Pass 2: `live:image` has no size option; one vs two calls.
   - Resolution: Panel 1 moves after the sheet views as a continuity input. Lou rescoped the story after review (2026-11-03): panels keep their shape, so the 16:9 panel size, its paid Meta check and `live:image --size` are dropped. A re-check of the rescoped story scored 4/5; its P2s (a leftover `live:image` completion check, a QA item for the second panel's picture, the editorial list) were fixed.
@@ -336,7 +336,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
   - [x] Story is small enough to review and merge independently
   - [x] Reviewed by sub-agent
   - [x] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
+  - [x] Ready for Lou
 - **Planning review:**
   - Findings: Pass 1: a scripted turn can't prove the pass condition; open test locations; manual steps not discrete. Pass 2: the tester's replies and stopping point.
   - Resolution: The condition is judged at Lou's QA; one integration case in `agent-loop.test.ts`; three pass/fail steps with the tester's replies and stop.
