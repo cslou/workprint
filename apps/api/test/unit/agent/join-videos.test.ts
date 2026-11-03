@@ -30,7 +30,7 @@ test('the input takes 2 to 20 clips, and the tool says what it joins', () => {
   assert.ok(!tool.inputSchema.safeParse({ clips: [a] }).success);
   assert.ok(!tool.inputSchema.safeParse({ clips: Array.from({ length: 21 }, () => a) }).success);
   assert.deepEqual(tool.inputSchema.parse({ clips: [a, b] }), { clips: [a, b], showInChat: false });
-  for (const rule of [/in the order given/, /original clips .* stay/, /same size, frame rate and encoding/, /at most 120 s/, /no paid call/, /chosen video, else its latest/, /showInChat/]) assert.match(tool.description, rule);
+  for (const rule of [/in the order given/, /original clips .* stay/, /same size, frame rate and encoding/, /at most 120 s/, /no paid call/, /chosen video, else its latest/, /state is Ready is that Shot's chosen video/, /showInChat/]) assert.match(tool.description, rule);
 });
 
 test('a join reports the new clip, and shows it only when asked', async () => {

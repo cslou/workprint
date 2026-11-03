@@ -98,6 +98,6 @@ export function createMediaJoiner(sandbox: MediaSandbox): MediaJoiner {
   };
 }
 
-/** A joiner that waits out another sandbox job's turn, as the media check does. */
+/** A joiner that waits out another sandbox job's turn, as the media check does. Each try runs to the sandbox job's own deadline. */
 export const joinWhenFree = (join: MediaJoiner, turn: Readonly<{ waitMs: number; retryMs: number }> = sandboxTurn): MediaJoiner =>
-  (clips, signal) => whenFree(attempt => join(clips, attempt), { ...turn, signal });
+  (clips, signal) => whenFree(() => join(clips, signal), { ...turn, signal });

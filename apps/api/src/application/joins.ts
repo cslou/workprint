@@ -1,9 +1,10 @@
+import { MAX_VIDEO_LENGTH_S } from '@workprint/contracts';
 import { ArtifactError, joinableClips, UploadError, UseRoomError, usedVideoVersions, type GeneratedVideoInput, type GeneratedVideoSave, type JoinedMedia, type StoredVideo } from '../artifacts/index.js';
 import { logFailure } from './failure-log.js';
 import type { SavedWorkReads } from './saved-reads.js';
 
 /** The clips one join takes, how long they may run together and how many bytes they may hold. */
-export const joinLimits = Object.freeze({ minClips: joinableClips.min, maxClips: joinableClips.max, maxLengthMs: 120_000, maxBytes: joinableClips.maxBytes });
+export const joinLimits = Object.freeze({ minClips: joinableClips.min, maxClips: joinableClips.max, maxLengthMs: MAX_VIDEO_LENGTH_S * 1000, maxBytes: joinableClips.maxBytes });
 
 /**
  * What a join did. `joined` saved a new draft clip. `invalid`: fewer than 2 clips or more than 20. `not_found`: a
