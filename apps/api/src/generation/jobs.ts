@@ -13,9 +13,13 @@ export type VideoJob = Readonly<{
   id: string; accountId: string; conversationId: string; purpose: 'video';
   /** Exact saved image versions sent as frames, in order. */
   inputs: readonly string[];
+  /** The storyboard Shot the job makes a video for, when it was started for one. */
+  target?: JobTarget;
   status: JobStatus; taskId?: string; failureReason?: JobFailure; resultVersionId?: string;
   submittedAt: Date; revision: number;
 }>;
+/** A storyboard Shot a video job is for: set when the job is saved, and never changed. */
+export type JobTarget = Readonly<{ shotId: string }>;
 export type JobPage = Readonly<{ jobs: readonly VideoJob[]; nextCursor: string | null }>;
 export type GenerationJobErrorCode = 'not_found' | 'stale' | 'invalid_input';
 
@@ -29,15 +33,16 @@ export const jobLifetimeDays = 7;
 
 type Row = {
   request_id: string; owner_id: string; conversation_id: string; purpose: 'video'; inputs: string[]; status: JobStatus;
-  task_id: string | null; failure_reason: JobFailure | null; result_version_id: string | null; submitted_at: Date; revision: number;
+  task_id: string | null; failure_reason: JobFailure | null; result_version_id: string | null; submitted_at: Date; revision: number; target: { shotId?: unknown } | null;
 };
-const columns = 'request_id,owner_id,conversation_id,purpose,inputs,status,task_id,failure_reason,result_version_id,submitted_at,revision';
+const columns = 'request_id,owner_id,conversation_id,purpose,inputs,status,task_id,failure_reason,result_version_id,submitted_at,revision,target';
 const id = (value: unknown): value is string => typeof value === 'string' && value.length >= 1 && value.length <= 200;
 const expired = `status IN ('running','interrupted') AND submitted_at < clock_timestamp() - interval '${jobLifetimeDays} days'`;
 
 function job(row: Row): VideoJob {
   return Object.freeze({
     id: row.request_id, accountId: row.owner_id, conversationId: row.conversation_id, purpose: row.purpose, inputs: Object.freeze([...row.inputs]),
+    ...(row.target && typeof row.target.shotId === 'string' ? { target: Object.freeze({ shotId: row.target.shotId }) } : {}),
     status: row.status, ...(row.task_id ? { taskId: row.task_id } : {}), ...(row.failure_reason ? { failureReason: row.failure_reason } : {}),
     ...(row.result_version_id ? { resultVersionId: row.result_version_id } : {}), submittedAt: row.submitted_at, revision: row.revision,
   });
@@ -71,14 +76,15 @@ export function createGenerationJobs(pool: Pool) {
   }
 
   return Object.freeze({
-    /** Saves a job as `submitting` before its paid create is sent. Only the prompt's digest is kept. */
-    async begin(account: string, conversation: string, input: { readonly prompt: string; readonly inputs: readonly string[] }): Promise<VideoJob> {
+    /** Saves a job as `submitting` before its paid create is sent, with the Shot it is for. Only the prompt's digest is kept. */
+    async begin(account: string, conversation: string, input: { readonly prompt: string; readonly inputs: readonly string[]; readonly target?: JobTarget | undefined }): Promise<VideoJob> {
       if (!id(account) || !id(conversation) || typeof input.prompt !== 'string' || !input.prompt) throw new GenerationJobError('invalid_input');
       if (input.inputs.length > 2 || !input.inputs.every(id) || new Set(input.inputs).size !== input.inputs.length) throw new GenerationJobError('invalid_input');
+      if (input.target !== undefined && !id(input.target.shotId)) throw new GenerationJobError('invalid_input');
       const digest = createHash('sha256').update(input.prompt).digest('hex');
       const saved = await pool.query<Row>(
-        `INSERT INTO generation.requests(owner_id,request_id,conversation_id,purpose,prompt_sha256,inputs,status) VALUES($1,$2,$3,'video',$4,$5,'submitting') RETURNING ${columns}`,
-        [account, randomUUID(), conversation, digest, [...input.inputs]]);
+        `INSERT INTO generation.requests(owner_id,request_id,conversation_id,purpose,prompt_sha256,inputs,status,target) VALUES($1,$2,$3,'video',$4,$5,'submitting',$6) RETURNING ${columns}`,
+        [account, randomUUID(), conversation, digest, [...input.inputs], input.target ? { shotId: input.target.shotId } : null]);
       return job(saved.rows[0]!);
     },
     /** MiniMax accepted the create: the job now waits on its task. */

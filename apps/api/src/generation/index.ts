@@ -5,4 +5,4 @@ export type { MiniMaxVideoClient, MiniMaxVideoClientOptions, MiniMaxVideoErrorCo
 export { createSafeDownload } from './safe-download.js';
 export type { AddressLookup, SafeDownload } from './safe-download.js';
 export { createGenerationJobs, GenerationJobError, jobLifetimeDays } from './jobs.js';
-export type { GenerationJobErrorCode, GenerationJobs, JobFailure, JobPage, JobStatus, VideoJob } from './jobs.js';
+export type { GenerationJobErrorCode, GenerationJobs, JobFailure, JobPage, JobStatus, JobTarget, VideoJob } from './jobs.js';
