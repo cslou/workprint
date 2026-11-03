@@ -369,13 +369,13 @@ This sprint has 6 stories: the storyboard save, its tool, panel inputs, generate
 - **As a** filmmaker, **I want** to see the storyboard's Shots with their text and panel images, and play each Shot's video, **so that** I can follow the work as the agent makes it.
 - **Dependencies:** Story 5
 - **Acceptance criteria:**
-  - [x] **Storyboard tab.** Each Shot shows its intent, framing, action, dialogue lines labelled by delivery ("Mara" for spoken, "Mara (off screen)", "Narration" for voice-over; a scene character's own voice-over reads "Mara (voice-over)", as the agent decides by the speaker it names, Lou 2026-11-03), camera note and subject names, and its panels with their current images ("Planned panel" placeholder before one exists, design.md Placeholders). No status pills on assistant work. The tab updates after each tool line without a reload.
+  - [x] **Storyboard tab.** Each Shot shows its intent, framing, action, dialogue lines labelled by delivery ("Mara" for spoken, "Mara (off screen)", "Narration" for voice-over; a scene character's own voice-over reads "Mara (voice-over)", as the agent decides by the speaker it names, Lou 2026-11-03), camera note and subject names, and its panels with their current images ("Planned panel" placeholder before one exists, design.md Placeholders). No status pills on assistant work. The tab updates after each tool line without a reload. *After Lou's QA (#130): the Shot's text and panel images are in "View storyboard", and the tab is the summary; see the QA follow-up below.*
   - [x] **Videos tab.** A Shot row shows its assistant draft videos and plays them in the existing viewer; Generated videos keeps clips with no Shot.
   - [x] **Assets.** Each subject entry adds the Shots that reference it, as in the demo ("Character · Shots 1 and 2").
   - [x] **Design guide.** design.md's Storyboard shots and Video rows sections describe the Shot fields and the absence of status on assistant drafts, and its Assets section adds the subject entry's Shot line.
 - **Functional verification:**
   - [x] Browser journey (`test/e2e/shots.spec.ts`): scripted turns save sheets, a storyboard with one two-panel Shot, both panels and the Shot video.
-    - The Storyboard tab shows the Shot's intent, framing, action, a dialogue line with its delivery ("Mara", "Narration"), the camera note and the subject names; both panel images have naturalWidth > 0; no `.wp-status`.
+    - The Storyboard tab shows the Shot's intent, framing, action, a dialogue line with its delivery ("Mara", "Narration"), the camera note and the subject names; both panel images have naturalWidth > 0; no `.wp-status`. *Since #130 the journey proves this text in "View storyboard" and proves the tab has none of it.*
     - The Videos tab's Shot row has no `.wp-status` and plays the video: `data-player-status` is playing or ended, or `currentTime > 0`, as Sprint 009's journeys check.
     - Assets shows no row for either panel image, and Mara's entry reads "Character · Shot 1".
     - After a reload the same holds.
@@ -496,3 +496,11 @@ Sprint-specific completion items:
   - a place's sheet views fill the frame instead of sitting on a plain page, which Meta drew as a framed picture on grey.
 
   Two paid MiniMax reference-to-video tests on the QA host's images also passed, so Shot videos move from first and last frames to reference images in Sprint 012.
+  - **Verification (#130):** the Story 6 journey (`shots.spec.ts`) was extended for each fix: a panel opens its image, a failed read shows its line, the board holds the Shot's text and images, the tab holds none of the text, and the Shot video plays from its poster. `generate-sheet.test.ts` pins each kind's framing line. `chat.spec.ts`'s poster and Assets cases, the unit tier and the standard push gate passed. #130's review scored 4/5. This PR's pre-merge gate, and the deep gate on #113 before `main`, cover the final combined head.
+  - **Lou's recheck (2026-11-03):** on the same QA host (server still at `1751b27`), with its web app rebuilt at `9356191`, Lou checked the panel viewer, the board, the summary tab and the Shot video poster, and reported "QA pass". The place framing change is server code, so it wasn't live there: it is unverified until the next QA build, and the unit test proves only the prompt.
+  - **Report-only conditions:** each Shot showing its fields and 1–2 panel images with no status pill, the Shot video playing in its row after a reload, and the recheck above rest on Lou's report alone. The QA database confirms only the panel inputs and the Shot video's dependency, listed in the QA line.
+- **Sprint PR review (#133, 2026-11-03):** all seven checks ran; mergeability 4/5, with P2s only. Fixed in one PR into `sprint-011`:
+  - `changedShots` (`artifacts/selection.ts`) now compares every Shot field, not only the intent and panels, so a storyboard version that changes a Shot's framing, action, dialogue, camera note or references journals that Shot's panel images and videos as affected (`test/unit/artifacts/selection.test.ts`).
+  - generate-panel takes only a shape a Shot video's frame can use (width ÷ height from 0.4 to 2.5), so panels can't be paid for and then refused as frames (`generate-panel.test.ts`).
+  - The spec's §8.3 Tabs line, design.md's Storyboard shots body, the Story 6 items above and this Final Review now describe the tab as the summary and record the #130 verification and Lou's recheck.
+  - Accepted: two commit subjects over 50 characters, `ccf5845` (53) and `48a7c87` (51).
