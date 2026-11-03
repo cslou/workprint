@@ -24,3 +24,15 @@ for (let y = 0; y < 240; y++) for (let x = 0; x < 240; x++) {
 ```sh
 ffmpeg -i live.mp4 -map 0 -c copy -frames:v 97 -t 4.04 -movflags use_metadata_tags -fflags +bitexact clip.mp4
 ```
+
+# Clips for joining
+
+Two clips derived from `minimax-clip.mp4` with the pinned toolchain (Sprint 013 Story 1), for the join tests:
+
+- `minimax-clip-silent.mp4` is its video only, by stream copy: the same 97 frames and codec configuration, with no audio, so it joins with `minimax-clip.mp4`.
+- `minimax-clip-small.mp4` is re-encoded at 672×384 with square pixels, OpenH264 (Constrained Baseline) and AAC, so it passes the upload rules but can't be joined with a 1344×768 clip.
+
+```sh
+ffmpeg -i minimax-clip.mp4 -map 0:v -c copy -movflags use_metadata_tags -fflags +bitexact minimax-clip-silent.mp4
+ffmpeg -i minimax-clip.mp4 -map 0:v -map 0:a -vf scale=672:384,setsar=1 -c:v libopenh264 -b:v 500k -c:a aac -movflags +faststart -fflags +bitexact minimax-clip-small.mp4
+```
