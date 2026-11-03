@@ -138,6 +138,8 @@ test('a video the agent makes is listed in Generated videos without a reload, pl
   await expect(panel.getByText('No videos yet.', { exact: true })).toHaveCount(0);
   // Seen, not chosen: the row has no status.
   await expect(clip.locator('.wp-status')).toHaveCount(0);
+  // Export doesn't exist yet (B-009), so the tab offers none.
+  await expect(panel.getByRole('button', { name: /^Export/ })).toHaveCount(0);
   expect(reads).toHaveLength(1);
 
   await clip.getByRole('button', { name: 'Play Video 1 · Version 1', exact: true }).click();

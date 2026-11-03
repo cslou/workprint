@@ -18,6 +18,8 @@
 
 ## Image-only upload restriction
 
+**Composer copy (Lou, 2026-11-04):** the composer no longer shows the "JPEG or PNG only · Up to 10 MiB · 4096 × 4096 pixels. Video uploads are temporarily unavailable." line, and the composer's attach button is the "+" alone, before and after the first message (its accessible name stays "Attach a file"). Only the question composer, not shown until Questions, keeps "+ Attach". A refused file still explains the limits in its upload status.
+
 **Provisionally approved by the orchestrator on 2026-10-31 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff.** Implements Lou’s temporary video-upload restriction with the existing composer, receipt, tokens and image-recovery states: uploads accept JPEG/PNG up to 10 MiB and 4096 × 4096 pixels and say that video uploads are temporarily unavailable. Video refusal offers “Choose an image” without replaying a transfer or claiming saved work was undone; saved images remain Draft, not approved references, and Send availability is unchanged. This supersedes the video-upload entry/success promises of [verified upload feedback](#verified-upload-feedback); existing owned-video presentation is not new upload authorization. [States](brand-book/screens/uploads.html).
 
 ## Verified upload feedback
@@ -64,9 +66,9 @@
 | --- | --- | --- |
 | Brand foundation | Deferred | Positioning/identity incomplete; Workprint name selected 2026-10-27, logo deferred |
 | Voice and tone | Partial | Wording rules from user-flows.md only; no voice guide |
-| Logo | Deferred | "Lets ignore the logo and name part first", 2026-10-02 |
+| Logo | Makeshift | The word "Workprint" in Italiana, Lou, 2026-11-04; a designed logo is still deferred |
 | Color | Approved | Light theme only |
-| Typography | Approved | System fonts; no files or licences |
+| Typography | Approved | System fonts, except the wordmark: Italiana, bundled under SIL OFL 1.1 (Lou, 2026-11-04) |
 | Spacing and layout | Approved | |
 | Shape and elevation | Approved | No z-index layers defined |
 | Iconography and imagery | Approved | No icon library chosen; example media not licensed |
@@ -106,7 +108,7 @@ What exists today, from the approved flows: the agent drafts and the person deci
 
 ## Logo
 
-**Section 04** · **Status:** Logo deferred. Workprint is the selected name; the existing "a" mark remains an illustrative placeholder, not an approved Workprint logo.
+**Section 04** · **Status:** Makeshift wordmark (Lou, 2026-11-04). The app's top left and the entry pages show only the word "Workprint" in Italiana (`--font-family-brand`, regular, 28px); the "a" mark is gone. A designed logo is still deferred.
 
 ## Color
 
@@ -187,12 +189,13 @@ Product code uses semantic tokens. Primitives exist only so semantic tokens can 
 
 ## Typography
 
-**Section 06** · **Status:** Approved — two system families, no font files; bold is always 600.
+**Section 06** · **Status:** Approved — two system families; the one font file is Italiana for the wordmark only (`--font-family-brand`, SIL OFL 1.1, Lou, 2026-11-04); bold is always 600.
 
 | Token | Value | Resolved | Was | Use |
 | --- | --- | --- | --- | --- |
 | `--font-family-sans` | `system-ui, -apple-system, "Segoe UI", Roboto, sans-serif` |  | `--font-sans` | All interface text. |
 | `--font-family-display` | `Georgia, "Times New Roman", serif` |  | `--font-display` | Display headings, dialogue, sheet titles. |
+| `--font-family-brand` | `"Italiana", Georgia, serif` |  |  | The Workprint wordmark only. Italiana (SIL OFL 1.1) is served with the app, not loaded from Google Fonts. |
 | `--font-weight-regular` | `400` |  | `--weight-regular` |  |
 | `--font-weight-medium` | `500` |  | `--weight-medium` |  |
 | `--font-weight-semibold` | `600` |  | `--weight-semibold` | All bold text. |
@@ -791,6 +794,8 @@ Categories, names and images come only from labelled read-only display facts key
 | Isolated confirmation 501 | `Confirming this upload is not available yet. No version was created.` |
 
 Attach lines use the same plain line beneath the tray as the approved Use-version feedback, but attaching a reference is not selection: no line says the selection changed. A selected local file shows no chip, filename, thumbnail, progress or attachment; the input is cleared after the attempt. Attaching sends each exact version with purpose `reference`; with no current conversation the tray stays disabled and no `useVersion` or `requestUpload` is sent. Real transfer, validation, partial-success recovery and confirmation remain P3-S3/S4, not this wiring milestone. The ignored `outputs/verification/sprint-003/design-proposals/story3/` previews are historical evidence only, never runtime or comparison dependencies.
+
+**Not shown for now (Lou, 2026-11-04):** the Videos tab no longer shows the Export card or Export history, because export doesn't exist yet (B-009). The consumers below stay specified for when it does.
 
 **Direct Export, history/status and download consumers — 003/Story 4.** **Approved by Lou on 2026-10-29 at the Phase 2 review.** The orchestrator had provisionally approved it earlier the same day under Lou's delegation. Reuse `demo-18.html#p-takes`'s direct Videos Export direction, `app-r11.css`'s item-card/neutral-status treatments and the shared 560px viewer dialog (342px wide at a 390px viewport). The populated history/detail layout structure, sectioning, wrapping, scrolling and shared loading pattern are approved with the binding substitutions below. Card: `Chosen source versions`, then `Export` and `Export history`. Creators never see opaque IDs, internal selection revisions, numeric source order or test-prerequisite lines. No Editor, scene playback, settings profile, fake record/progress, deletion or retry is authorized. Download is an exact output-version media-access consumer, not a generated URL or working export claim.
 
