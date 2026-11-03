@@ -4,6 +4,11 @@ Convention: `docs/conventions/backlog-management.md` (selected harness root; AGE
 
 ## Inbox
 
+### B-042 — Bring a removed subject's work back from the Library
+- Context: Sprint 010's sprint-PR review (2026-11-03) found that a subject removed from the script in one save and added back by name in a later save gets its old id, and with it the sheet and images still filed under that id (`apps/api/src/artifacts/script-subjects.ts`, the `same` lookup). This applies to a different kind with the same name too (a prop "Mara" after the character "Mara"). Lou (2026-11-03): whether a subject's work comes back is a Library feature, recorded here for now. The current behaviour stays until then.
+- Open decision: whether a re-added subject reclaims its old work automatically, starts fresh with its old work offered from the Library, or does either only for the same kind.
+- References: Sprint 010 Final Review (the re-added subject question); Sprint 011 Sprint-Wide Context, "Re-added subjects" (a Shot reference resolves again); spec §2 goal 3 and the `GET /library` read (reuse of saved and Library work).
+
 ### B-040 — Image version history is hard to find, and "Use this version" seems not to work
 - Context: Lou's Sprint 008 QA (2026-11-02, at `13a2144`). An edit with `revises` (PR #93) saves the image's next version and moves the video's use to it; the earlier version stays, unchanged, in that image's history. Lou couldn't see the history anywhere and suspects a bug, since "Use this version" didn't work either.
 - Problem:

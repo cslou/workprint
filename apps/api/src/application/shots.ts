@@ -1,4 +1,4 @@
-import { currentPanelImage, savedScriptContentSchema } from '@workprint/contracts';
+import { currentPanelImage, lineVoice, sceneCharacters } from '@workprint/contracts';
 import { maxVideoPromptCharacters } from '../generation/index.js';
 import type { VideoJobOutcome, VideoJobs, VideoRunControl } from './video-jobs.js';
 import type { OwnedWorkspace, ReadOwnedWorkspace } from './workspace-reads.js';
@@ -16,15 +16,15 @@ export type ShotOutcome = { kind: 'shot_refused'; reason: ShotRefusal } | VideoJ
 
 const byOrder = <T extends { order: number }>(items: readonly T[]) => [...items].sort((a, b) => a.order - b.order);
 
-/**
- * How a dialogue line is voiced: by its character on screen, off screen, or in voice-over when the character is in
- * the scene; any other voice-over is a narrator's.
- */
+/** A dialogue line as MiniMax voices it, by how it is heard (`lineVoice`). */
 function spoken(line: Line, sceneCharacters: ReadonlySet<string>): string {
   const character = line.character.trim(), text = line.text.trim();
-  if (line.delivery === 'off_screen') return `${character}, off screen, says: "${text}"`;
-  if (line.delivery === 'voice_over') return sceneCharacters.has(character) ? `${character}, in voice-over, says: "${text}"` : `Narrated in voice-over: "${text}"`;
-  return `${character} says: "${text}"`;
+  switch (lineVoice(line, sceneCharacters)) {
+    case 'off_screen': return `${character}, off screen, says: "${text}"`;
+    case 'voice_over': return `${character}, in voice-over, says: "${text}"`;
+    case 'narration': return `Narrated in voice-over: "${text}"`;
+    case 'on_screen': return `${character} says: "${text}"`;
+  }
 }
 
 /**
@@ -35,12 +35,6 @@ export function shotVideoPrompt(shot: Pick<Shot, 'action' | 'intent' | 'cameraNo
   const lines = (shot.dialogue ?? []).map(line => spoken(line, sceneCharacters));
   return [shot.action ?? shot.intent ?? '', shot.cameraNote ?? '', lines.length ? lines.join('\n') : 'No one speaks.', motion]
     .map(part => part.trim()).filter(Boolean).join('\n\n');
-}
-
-/** The characters of the script's scene, trimmed, as the script names them. */
-function sceneCharacters(workspace: OwnedWorkspace): Set<string> {
-  const content = workspace.script && 'content' in workspace.script.version ? savedScriptContentSchema.safeParse(workspace.script.version.content).data : undefined;
-  return new Set(content?.scenes.flatMap(scene => scene.characters.map(name => name.trim())) ?? []);
 }
 
 /**

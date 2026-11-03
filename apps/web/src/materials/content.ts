@@ -4,6 +4,13 @@ import type { MaterialPresentation } from './presentation.js';
 /** A subject's or sheet's kind as people read it; a sheet stores a place as `environment`. */
 export const kindLabel = { character: 'Character', place: 'Place', environment: 'Place', prop: 'Prop', style: 'Style' } as const;
 
+/** A subject's Shots as its entry lists them: "Shot 1", "Shots 1 and 2", "Shots 1, 2 and 3"; empty for none. */
+export function shotsLabel(numbers: readonly number[]): string {
+  if (!numbers.length) return '';
+  if (numbers.length === 1) return `Shot ${numbers[0]}`;
+  return `Shots ${numbers.slice(0, -1).join(', ')} and ${numbers.at(-1)}`;
+}
+
 /** Public validated content only; opaque fields and identifiers never supply display facts. */
 export function savedMaterialPresentation(version: Version): MaterialPresentation | null {
   if (version.kind === 'script') {

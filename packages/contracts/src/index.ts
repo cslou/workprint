@@ -9,6 +9,7 @@ export * from './response-limits.js';
 export * from './upload-limits.js';
 export * from './asset-labels.js';
 export * from './script-subjects.js';
+export * from './dialogue-voice.js';
 export * from './sheet-views.js';
 export * from './subject-groups.js';
 
