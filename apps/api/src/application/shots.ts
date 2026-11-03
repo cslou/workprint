@@ -1,5 +1,5 @@
 import { currentPanelImage, currentSubjects, currentSubjectSheets, lineVoice, sceneCharacters, type SubjectKind } from '@workprint/contracts';
-import { maxVideoPromptCharacters } from '../generation/index.js';
+import { maxReferenceImages, maxVideoPromptCharacters, videoImageFits } from '../generation/index.js';
 import type { VideoJobOutcome, VideoJobs, VideoRunControl } from './video-jobs.js';
 import type { OwnedWorkspace, ReadOwnedWorkspace } from './workspace-reads.js';
 
@@ -18,8 +18,6 @@ export type ShotOutcome = { kind: 'shot_refused'; reason: ShotRefusal } | VideoJ
 
 const byOrder = <T extends { order: number }>(items: readonly T[]) => [...items].sort((a, b) => a.order - b.order);
 
-/** MiniMax takes at most this many reference images for one video. */
-export const maxShotReferences = 9;
 /** A sheet description in an image's label is cut to this many characters, at a word. */
 export const maxLabelDescription = 300;
 /** The prompt's last line, so the Shot's motion finishes rather than being cut off. */
@@ -47,7 +45,10 @@ function cut(text: string): string {
  * The images a Shot's video is made from, by the one rule, or `needs_panels` when its first or last panel has no
  * image. Each subject the Shot names, in Shot order, gives its sheet's first view while room is kept for the panels;
  * then the first panel's current image, and the last panel's when the Shot has more than one; then each subject's
- * second view while room remains. At most 9 images, none twice; a subject with no sheet gives nothing.
+ * second view while room remains. At most 9 images, none twice; a subject with no sheet gives nothing. A panel's image
+ * is always sent as the panel, so a sheet view that is also a panel's image is sent once, with the panel's label. A
+ * sheet view MiniMax wouldn't take (its sides or shape, `videoImageFits`) is left out, so one odd view never stops the
+ * Shot; a panel is always sent, and MiniMax's checks refuse one it wouldn't take.
  */
 export function shotReferences(workspace: OwnedWorkspace, shot: Shot): { kind: 'picked'; references: ShotReference[] } | { kind: 'needs_panels' } {
   const panels = byOrder(shot.panels);
@@ -59,18 +60,22 @@ export function shotReferences(workspace: OwnedWorkspace, shot: Shot): { kind: '
     label: index === 0 ? 'the storyboard panel for this Shot. Frame the Shot like this panel.' : 'the Shot\'s last storyboard panel. End the Shot on this framing.' }));
 
   const kinds = new Map(currentSubjects(workspace).map(subject => [subject.id, subject.kind])), sheets = currentSubjectSheets(workspace);
+  const sizes = new Map(workspace.assets.flatMap(({ version }) => 'media' in version ? [[version.id, version.media] as const] : []));
+  const panelIds = new Set(panelImages.map(panel => panel.versionId));
+  // A view whose size the workspace doesn't list is sent, and the job's own read checks it.
+  const sendable = (versionId: string) => { const size = sizes.get(versionId); return !panelIds.has(versionId) && (!size || videoImageFits(size.width, size.height)); };
   const subjects = [...new Set((shot.references ?? []).map(reference => reference.subjectId))].flatMap(subjectId => {
     const sheet = sheets.get(subjectId), kind = kinds.get(subjectId);
     if (!sheet || !kind) return [];
     const description = cut(sheet.description);
-    return [{ views: sheet.views.map(view => view.versionId), label: `${sheet.subjectName}${description ? `, ${description}` : ''}. ${keeps[kind](sheet.subjectName)}` }];
+    return [{ views: sheet.views.map(view => view.versionId).filter(sendable), label: `${sheet.subjectName}${description ? `, ${description}` : ''}. ${keeps[kind](sheet.subjectName)}` }];
   });
 
   const picked: ShotReference[] = [];
   const add = (reference: ShotReference, limit: number) => { if (picked.length < limit && !picked.some(item => item.versionId === reference.versionId)) picked.push(reference); };
-  for (const subject of subjects) if (subject.views[0]) add({ versionId: subject.views[0], label: subject.label }, maxShotReferences - panelImages.length);
-  for (const panel of panelImages) add(panel, maxShotReferences);
-  for (const subject of subjects) if (subject.views[1]) add({ versionId: subject.views[1], label: subject.label }, maxShotReferences);
+  for (const subject of subjects) if (subject.views[0]) add({ versionId: subject.views[0], label: subject.label }, maxReferenceImages - panelImages.length);
+  for (const panel of panelImages) add(panel, maxReferenceImages);
+  for (const subject of subjects) if (subject.views[1]) add({ versionId: subject.views[1], label: subject.label }, maxReferenceImages);
   return { kind: 'picked', references: picked };
 }
 

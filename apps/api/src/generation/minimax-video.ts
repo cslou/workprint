@@ -18,6 +18,11 @@ export const videoDurations = { min: 4, max: 15 } as const;
 export const maxReferenceImages = 9;
 /** The width ÷ height MiniMax takes for a frame or reference image. */
 export const videoFrameRatio = { min: 0.4, max: 2.5 } as const;
+/** The shortest and longest side, in pixels, MiniMax takes for a frame or reference image. */
+const videoImageSides = { min: 256, max: 5760 } as const;
+/** Whether MiniMax takes an image of this size as a frame or reference image: its sides and its width ÷ height. */
+export const videoImageFits = (width: number, height: number) => Math.min(width, height) >= videoImageSides.min && Math.max(width, height) <= videoImageSides.max
+  && width / height >= videoFrameRatio.min && width / height <= videoFrameRatio.max;
 /** The largest clip worth downloading. */
 export const maxVideoDownloadBytes = 100 * 1024 * 1024;
 /** MiniMax takes a prompt of at most this many characters, trimmed. */
@@ -108,7 +113,7 @@ function checkFrame(frame: unknown, name: string): VideoFrame {
   if (typeof dataUrl !== 'string' || data === undefined) return invalid(name);
   if (Math.floor(data.length * 3 / 4) > maxFrameBytes) invalid(`${name}.size`);
   if (typeof width !== 'number' || typeof height !== 'number' || !Number.isInteger(width) || !Number.isInteger(height)
-    || Math.min(width, height) < 256 || Math.max(width, height) > 5760) return invalid(`${name}.dimensions`);
+    || Math.min(width, height) < videoImageSides.min || Math.max(width, height) > videoImageSides.max) return invalid(`${name}.dimensions`);
   if (width / height < videoFrameRatio.min || width / height > videoFrameRatio.max) invalid(`${name}.ratio`);
   return { dataUrl, width, height };
 }

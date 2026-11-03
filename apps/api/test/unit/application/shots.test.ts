@@ -65,6 +65,21 @@ test('no image is sent twice, a subject without a sheet adds nothing, and only t
   assert.equal(picked(shot({ panels: [panel('p1', 0, [image('a1')]), panel('p2', 1)] })), 'needs_panels');
 });
 
+test('a sheet view that is also a panel\'s image is sent as the panel, and a view MiniMax wouldn\'t take is left out', () => {
+  // Mara's first view is panel 1's image: it keeps the panel's framing label, and her next view takes its place.
+  const shared = names(shot({ panels: [panel('p1', 0, [image('mara-1')])] }), 'mara');
+  const reused = shotReferences(workspace([shared], undefined, [{ subjectId: 'mara', views: ['mara-1', 'mara-2', 'mara-3'] }]), shared);
+  assert.ok(reused.kind === 'picked');
+  assert.deepEqual(reused.references.map(reference => [reference.versionId, reference.label.split(',')[0]]), [['mara-2', 'Mara'], ['mara-1', 'the storyboard panel for this Shot. Frame the Shot like this panel.'], ['mara-3', 'Mara']]);
+  // A view too narrow (0.25) or too small (200 px) for MiniMax is skipped; one whose size isn't listed is sent.
+  const sized = (id: string, width: number, height: number) => ({ version: { ...image(id), media: { contentType: 'image/png', byteSize: 10, width, height } } });
+  const subject = names(shot({ panels: [panel('p1', 0, [image('a1')])] }), 'mara');
+  const space = workspace([subject], undefined, [{ subjectId: 'mara', views: ['tall', 'small', 'fits', 'unlisted'] }]);
+  const listed = { ...space, assets: [...space.assets, sized('tall', 300, 1200), sized('small', 200, 200), sized('fits', 1024, 1024)] } as unknown as OwnedWorkspace;
+  const result = shotReferences(listed, subject);
+  assert.deepEqual(result.kind === 'picked' && result.references.map(reference => reference.versionId), ['fits', 'a1', 'unlisted']);
+});
+
 test('the prompt labels each image, then gives the action, camera note, dialogue in MiniMax\'s form, motion and closing line', () => {
   const characters = new Set(['Mara', 'Ben']);
   const dialogue = [{ character: ' Mara ', text: 'You came.' }, { character: 'Ben', text: 'I did.', delivery: 'off_screen' as const },
@@ -102,8 +117,8 @@ test('a long sheet description is cut at a word within 300 characters', () => {
   const long = `${'word '.repeat(70)}end.`, subject = names(shot(), 'mara');
   const result = shotReferences(workspace([subject], undefined, [{ subjectId: 'mara', views: ['mara-1'], description: long }]), subject);
   assert.ok(result.kind === 'picked');
-  const description = result.references[0]!.label.slice('Mara, '.length, result.references[0]!.label.indexOf('. Keep'));
-  assert.ok(description.length <= 300 && description.endsWith('word') && !description.endsWith(' '), `${description.length}: ${description.slice(-20)}`);
+  // The last word that ends within 300 characters: 60 words of 4 letters and their spaces, 299 characters.
+  assert.equal(result.references[0]!.label, `Mara, ${'word '.repeat(60).trim()}. Keep Mara's face, hair, build and clothing as shown.`);
 });
 
 test('the job is made from the references at 16:9 and the Shot\'s length, or 6 s, and carries the Shot', async () => {
