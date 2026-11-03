@@ -260,15 +260,19 @@ Deprioritized: everything here waits until the Next items are done (Lou, 2026-11
   - Each Shot with dialogue gets one dialogue track made in those voices (`speech-2.8-hd`, about $0.006 a line), exactly the Shot's length with about 1 s of silence first, saved as the Shot's own work. It goes stale when a line or a voice changes.
   - generate-shot sends the track as `reference_audio` with timed lines (`At 00:01.000, Mara (S1) says: <d>…</d>`) and refuses a Shot with dialogue but no current track. New tools make a voice and a Shot's track; the track tool says how many seconds the speech needs and never changes a length a person set.
   - The system prompt's order becomes script → sheets and voices → storyboard → panels → dialogue tracks → Shot videos.
+  - Lou's decisions (2026-11-03):
+    - A narrator is a subject of its own kind, listed by the script when it has narration lines: a voice with no sheet. Assets shows it in its own "Narrator" group beside characters, places and props.
+    - A voice is not part of the sheet. It is its own version under the subject, shown beside the sheet in the subject's group, so changing a voice never makes a new sheet version and redoing a sheet view never touches the voice.
+    - People can hear the audio: each voice has a sample to play, with "Use this version", and each Shot's dialogue track plays in the Shot's row before its video is made.
   - Pass: two Shots with Mara's lines sound like the same voice, and in each her mouth moves in time with her own words. Lou judges it at QA. A changed line or voice makes the track stale, and generate-shot refuses it until it is remade.
 - Constraint: Needs an audio media type (file check, storage, player, one fixed format so joining still works). MiniMax takes at most 3 audio clips of 2–15 s, 15 s in total, and 12 files with the images, so the job input cap rises from 9 to 12.
-- Blocker: A paid test (about $1.92, four 6 s runs on QA Shot 1, on Lou's go) must show that H3's lips follow supplied speech on the hosted API before this is scheduled. It isn't documented, and outside reports conflict. Open decisions for Lou: a narrator's voice (no subject today); whether the speech call may be resent when its answer is lost; whether to swap our track into the clip; when to pay a designed voice's $3.
+- Blocker: A paid test (about $1.92, four 6 s runs on QA Shot 1, on Lou's go) must show that H3's lips follow supplied speech on the hosted API before this is scheduled. It isn't documented, and outside reports conflict. Open decisions for Lou: whether the speech call may be resent when its answer is lost; whether to swap our track into the clip; when to pay a designed voice's $3.
 - References: `docs/research/voices-and-speech-2026-11.md` and its folder of saved docs (private); MiniMax speech `/v1/t2a_v2`, voice design and pricing; MiniMax V2 video `reference_audio`; H3 prompt guides (`ref-en.txt` §2.4, §4.2); Sprint 012 Stories 1 and 3; B-020; B-045.
 
 ### B-045 — Narration and voice-over as their own track
 - Context: Research for Sprint 012 and B-044 (2026-11-03). A voice-over line in a Shot's prompt ("says in an off-screen voiceover … while her lips remain completely closed") is the only way to ask H3 for narration today, and it is made per Shot.
 - Problem: Narration made inside each Shot's clip can't run across Shots, change without remaking the clip, or keep one voice. Sending it as a Shot's audio could make mouths move.
-- Outcome: Narration and voice-over are made with MiniMax speech as their own track and laid over the joined video, re-encoding the audio once while the video is copied untouched. Pass: a narration line plays across two joined Shots in one voice, and no character's mouth moves with it.
+- Outcome: Narration and voice-over are made with MiniMax speech, in the narrator's or the character's voice from B-044 (a narrator is its own subject in Assets, Lou 2026-11-03), as their own track and laid over the joined video, re-encoding the audio once while the video is copied untouched. Pass: a narration line plays across two joined Shots in one voice, and no character's mouth moves with it.
 - References: B-020 (joining clips, Sprint 013); B-044 (voices); `docs/research/voices-and-speech-2026-11.md` (private); Sprint 012 Story 3 (the voice-over prompt form).
 
 ### B-037 — Delete saved work
