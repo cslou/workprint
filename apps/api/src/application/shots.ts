@@ -1,4 +1,4 @@
-import { currentPanelImage, savedScriptContentSchema } from '@workprint/contracts';
+import { currentPanelImage, sceneCharacters } from '@workprint/contracts';
 import { maxVideoPromptCharacters } from '../generation/index.js';
 import type { VideoJobOutcome, VideoJobs, VideoRunControl } from './video-jobs.js';
 import type { OwnedWorkspace, ReadOwnedWorkspace } from './workspace-reads.js';
@@ -35,12 +35,6 @@ export function shotVideoPrompt(shot: Pick<Shot, 'action' | 'intent' | 'cameraNo
   const lines = (shot.dialogue ?? []).map(line => spoken(line, sceneCharacters));
   return [shot.action ?? shot.intent ?? '', shot.cameraNote ?? '', lines.length ? lines.join('\n') : 'No one speaks.', motion]
     .map(part => part.trim()).filter(Boolean).join('\n\n');
-}
-
-/** The characters of the script's scene, trimmed, as the script names them. */
-function sceneCharacters(workspace: OwnedWorkspace): Set<string> {
-  const content = workspace.script && 'content' in workspace.script.version ? savedScriptContentSchema.safeParse(workspace.script.version.content).data : undefined;
-  return new Set(content?.scenes.flatMap(scene => scene.characters.map(name => name.trim())) ?? []);
 }
 
 /**

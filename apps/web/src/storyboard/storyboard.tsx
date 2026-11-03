@@ -12,6 +12,7 @@ import type { PlanningDraft, PlanningTarget } from './planning-editor.js';
 import type { SetStateAction } from 'react';
 import { orderedStoryboard } from '../workspace/projection.js';
 import type { StoryboardPrerequisites } from './presentation.js';
+import { PanelImage, ShotText } from './shot-details.js';
 import './storyboard.css';
 
 type Workspace = OperationResponse<'workspace'>;
@@ -57,8 +58,8 @@ function ScopedStoryboard({ connection, scope, workspace, prerequisites, onSaved
     </ViewerDialog>
     {rows.map(({ shot, number, panels }) => {
       const fact = facts?.shots?.find(value => value.shotId === shot.shotId);
-      return <details className="wp-storyboard-shot" key={shot.shotId} data-shot-id={shot.shotId} open><summary><span className="wp-shot-number">{number}</span><span className="wp-shot-title"><b>{shot.intent ?? `Shot ${number}`}</b><small>{fact?.duration ? `${fact.duration} · ` : ''}{panels.length} panel{panels.length === 1 ? '' : 's'}</small></span>{fact?.status && <span className={`wp-status wp-status-${fact.status.toLowerCase()}`}>{fact.status}</span>}<svg className="wp-storyboard-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></summary>
-        <div className="wp-storyboard-body">{fact?.camera && <p className="wp-storyboard-camera">{fact.camera}</p>}{panels.map(({ panel, number: panelNumber }) => <div className="wp-storyboard-panel" key={panel.panelId} data-panel-id={panel.panelId}><span className="wp-panel-number">{number}.{panelNumber}</span><p>{panel.description}</p><PanelVersions {...common} {...choices} shotId={shot.shotId} panel={panel} shotNumber={number} panelNumber={panelNumber} {...(facts ? { facts } : {})} /></div>)}</div>
+      return <details className="wp-storyboard-shot" key={shot.shotId} data-shot-id={shot.shotId} open><summary><span className="wp-shot-number">{number}</span><span className="wp-shot-title"><b>{shot.intent ?? `Shot ${number}`}</b><small>{shot.framing ? `${shot.framing} · ` : ''}{fact?.duration ? `${fact.duration} · ` : ''}{panels.length} panel{panels.length === 1 ? '' : 's'}</small></span>{fact?.status && <span className={`wp-status wp-status-${fact.status.toLowerCase()}`}>{fact.status}</span>}<svg className="wp-storyboard-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></summary>
+        <div className="wp-storyboard-body"><ShotText workspace={current} shot={shot} camera={fact?.camera} />{panels.map(({ panel, number: panelNumber }) => <div className="wp-storyboard-panel" key={panel.panelId} data-panel-id={panel.panelId}><PanelImage connection={connection} panel={panel} label={`Shot ${number} · Panel ${number}.${panelNumber}`} known={facts?.images} /><div className="wp-storyboard-panel-text"><span className="wp-panel-number">{number}.{panelNumber}</span><p>{panel.description}</p><PanelVersions {...common} {...choices} shotId={shot.shotId} panel={panel} shotNumber={number} panelNumber={panelNumber} {...(facts ? { facts } : {})} /></div></div>)}</div>
       </details>;
     })}
   </div>;

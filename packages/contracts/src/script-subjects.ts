@@ -47,8 +47,19 @@ export function scriptSubjects(script: ScriptLike): ScriptSubject[] {
   return subjects;
 }
 
+type WorkspaceScript = Readonly<{ script: Readonly<{ version: Readonly<{ kind: string; content?: unknown }> }> | null }>;
+const currentScript = (workspace: WorkspaceScript) => workspace.script && 'content' in workspace.script.version ? savedScriptContentSchema.safeParse(workspace.script.version.content).data : undefined;
+
 /** The subjects of the script a workspace uses, in Assets order; none when it has no script or it doesn't parse. */
-export function currentSubjects(workspace: Readonly<{ script: Readonly<{ version: Readonly<{ kind: string; content?: unknown }> }> | null }>): ScriptSubject[] {
-  const script = workspace.script && 'content' in workspace.script.version ? savedScriptContentSchema.safeParse(workspace.script.version.content) : null;
-  return script?.success ? scriptSubjects(script.data) : [];
+export function currentSubjects(workspace: WorkspaceScript): ScriptSubject[] {
+  const script = currentScript(workspace);
+  return script ? scriptSubjects(script) : [];
+}
+
+/**
+ * The characters the scenes of the script a workspace uses list, trimmed. A voice-over line by one of them is that
+ * character's own; any other voice-over is narration.
+ */
+export function sceneCharacters(workspace: WorkspaceScript): Set<string> {
+  return new Set(currentScript(workspace)?.scenes.flatMap(scene => scene.characters.map(name => name.trim())) ?? []);
 }
