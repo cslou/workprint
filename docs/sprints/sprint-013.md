@@ -147,7 +147,7 @@ This sprint has two stories, at Lou's request to keep it simple (2026-11-03). B-
     - `minimax-clip.mp4`, `minimax-clip.mp4`, `minimax-clip-silent.mp4` give 291 frames and 12.125 s of picture within one frame, with AAC audio within one frame of the picture, and the output passes `createMediaVerifier` as an assistant video;
     - two silent clips give a video with no audio stream;
     - `minimax-clip-small.mp4` second gives `incompatible` at clip 2, naming the size;
-    - 20 copies of `minimax-clip.mp4` (80.8 s) join within the job's 30 s deadline, with 1,940 frames;
+    - 20 copies of `minimax-clip.mp4` (80.8 s) join within the job's 30 s deadline, with 1,940 frames (through `joinWhenFree`, as the server joins, since the whole-sprint review);
     - a join while a `use` job runs is refused with `capacity`, and the `use` job still finishes;
     - an abort during the join rejects with `cancelled` and leaves no `workprint-media-*` container.
     - Pass: each case as stated.
@@ -191,7 +191,7 @@ This sprint has two stories, at Lou's request to keep it simple (2026-11-03). B-
   - [x] **Results.** A join returns `made: true` with the versionId, length in seconds and clip count; the done line reads "Joined 2 clips", and with `showInChat` the chat shows the video like a generated clip. Every refusal returns `made: false` with one line that says nothing was saved; an incompatible clip names the clip and the difference. A sandbox, storage or check failure, including a joined file over `MAX_UPLOAD_VIDEO_BYTES`, is `unavailable`, logged without bytes (accepted: at 120 s a join is about 12 MB). A server without storage or the media sandbox has no joins, and the tool says videos can't be joined on this server; a clip whose stored object is missing is not found. Stop ends the turn as other tools do, and nothing is stored.
   - [x] **The system prompt** gains a sixth step: "6. When the user asks, join the Shot videos in Shot order into one video (join-videos): each Shot's chosen video, else its latest. Joining is free and needs no yes." The tool description gives the same rule. The prompt stays static: the same bytes on every turn and every video.
 - **Functional verification:**
-  - [x] Unit (`apps/api/test/unit/application/joins.test.ts` and `apps/api/test/unit/agent/tools/join-videos.test.ts`, fake collaborators): the input schema refuses 1 and 21 clips; each refusal (not found, repeated, too long, incompatible, no room, unavailable) maps to its result and message, and the joiner is never called for an id refusal; an aborted signal stores nothing; a joiner busy once (`capacity`) still joins; `shownMedia` is the clip only with `showInChat`. Pass: each case as stated.
+  - [x] Unit (`apps/api/test/unit/application/joins.test.ts` and `apps/api/test/unit/agent/join-videos.test.ts`, fake collaborators; the capacity wait in `apps/api/test/unit/artifacts/uploads/media-joiner.test.ts`): the input schema refuses 1 and 21 clips; each refusal (not found, repeated, too long, incompatible, no room, unavailable) maps to its result and message, and the joiner is never called for an id refusal; an aborted signal stores nothing; a joiner busy once (`capacity`) still joins; `shownMedia` is the clip only with `showInChat`. Pass: each case as stated.
   - [x] Integration (`tool-activity.test.ts`, a join-videos block, real database, storage and sandbox):
     - a scripted model joins two saved clips; the stream shows "Joining clips…" then "Joined 2 clips"; the new version's dependencies are the two ids in order, it is listed under Generated videos as a draft at 8.083 s within one frame, and both originals are unchanged;
     - a foreign account's clip id ends "Couldn't join those clips" with no new version or stored object;
@@ -223,7 +223,7 @@ After all implementation stories are complete, perform this checklist before spr
 - [x] Run any planned cross-story checks not covered by that suite: a read-only review of spec §4's `storage` row, §8.3 and §10 against the code, then the Phase 3 table's 013 row, the reuse-map row for `assemble-video`, and the module map rows for `storage/media` and the agent tools.
 - [x] Record results and unresolved issues in a brief `## Final Review`.
 - [ ] **Lou's QA** (manual, because whether the live model follows the sixth step can't be scripted; on a QA host when he asks, which makes live Muse Spark calls on his go):
-  1. In a video whose Shots already have 16:9 videos (from Sprint 012's QA, or new Shot videos on his go), ask "join the Shots into one video". Pass: the agent calls join-videos with each Shot's chosen video (else its latest) in Shot order without asking for a yes, and the joined video plays as one in the chat and in Videos, each Shot's sound in step.
+  1. In a video whose Shots already have 16:9 videos (from Sprint 012's QA, or new Shot videos on his go), with at least one Shot whose chosen video is not its latest, ask "join the Shots into one video". Pass: the agent calls join-videos with each Shot's chosen video (else its latest) in Shot order without asking for a yes, and the joined video plays as one in the chat and in Videos, each Shot's sound in step.
   2. In a Sprint 011 video, ask to join its 3:2 Shot video after a 16:9 one (or two Shot videos of different sizes). Pass: refused, naming the clip and the size, and nothing is saved.
 
 For descriptive-only work, use editorial review and applicable existing checks. Preserve applicable design checks and approval gates. Failed, ambiguous, or unrun required checks remain non-pass.
@@ -262,6 +262,12 @@ For descriptive-only work, use editorial review and applicable existing checks. 
   - this doc no longer says sound never makes clips incompatible: two sound tracks, or clip 1's sound off the AAC list, are refused;
   - §8.3 names the "can't be joined on this server" and missing-object refusals and the length's rounding allowance; §10's 013 row gives the 100 MB limit;
   - Story 1's joiner result has `frames` and `lengthS`; Story 2's wait is `joinWhenFree` with the same `sandboxTurn` as the check, not one shared wait.
+- **Whole-sprint review (#146, `sprint-013` into `main`):** no P0 or P1. Its P2s were fixed in one PR into `sprint-013`:
+  - a join's try no longer gets the media check's 20 s limit, so it runs to the sandbox job's own 30 s deadline, and the 20-clip case runs through `joinWhenFree`;
+  - a built-in video this video uses as a reference is read under the built-in owner, as images are, so it can be joined;
+  - one `MAX_VIDEO_LENGTH_S` (contracts) for the video check and the join's 120 s;
+  - the join-videos description says a Shot video whose state is Ready is that Shot's chosen video, and QA step 1 includes a Shot whose chosen video is not its latest;
+  - tests: the joined sound and picture start together, and a clip whose stored object is gone is not found.
 - **Real clips (Story 1, one-off, not committed):** the joiner joined three independent 16:9 MiniMax clips from Sprints 009 and 012 (18.33 s, passes the video check) and refused Sprint 011's 3:2 Shot clip after a 16:9 one: `1152×768; clip 1 is 1344×768`.
 - **QA build for Lou:** not started. A QA host starts only when Lou asks, and it makes live Muse Spark calls; joining itself makes no paid call. Its pass items are in Sprint Completion above.
 - **Deviations, recorded in the story PRs:**
