@@ -236,4 +236,49 @@ test('the agent\'s storyboard shows each Shot\'s text and panel images as they a
   await holds();
   await page.reload();
   await holds();
+
+  // The panel's image is its current version: the agent's latest, until a person chooses one, which then stays.
+  type Read = { storyboard: { shots: { panels: { panelId: string; candidateImageVersions: { id: string; revision: number }[] }[] }[] } };
+  const version = async (revision: number) => (await backend.read<Read>(account!, `/v1/conversations/${videoId}/workspace`)).storyboard.shots[0]!.panels
+    .find(item => item.panelId === first!.panelId)!.candidateImageVersions.find(candidate => candidate.revision === revision)!.id;
+  const remake = async (revision: number, seed: number) => {
+    meta.script({ images: [testPng({ width: 512, height: 288, seed })] });
+    await turn({ name: 'generate-panel', args: { shot: shot!.shotId, panel: first!.panelId, prompt: 'Preserve her coat; warmer light.', images: [] } }, `Remake panel 1 (${revision})`, `Saved Shot 1 · Panel 1.1 · Version ${revision}`);
+  };
+  await remake(2, 13);
+  const v2 = await version(2);
+  await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
+  await expect(image(1)).toHaveAttribute('data-displayed-version-id', v2);
+  await row.getByRole('button', { name: 'View Panel 1.1 version 2', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Use this version', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('status')).toHaveText('This exact version is now used in this conversation.');
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await remake(3, 14);
+  const v3 = await version(3);
+  expect(v3).not.toBe(v2);
+  // The agent's version 3 is listed, but the person's version 2 is still the one shown, before and after a reload.
+  await expect(row.getByRole('button', { name: 'View Panel 1.1 version 3', exact: true })).toBeVisible();
+  await expect(image(1)).toHaveAttribute('data-displayed-version-id', v2);
+  await expect.poll(() => image(1).evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  await page.reload();
+  await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
+  await expect(image(1)).toHaveAttribute('data-displayed-version-id', v2);
+
+  // A person's planning edit still saves from the board, and the Shot keeps the agent's text.
+  await panel.getByRole('button', { name: 'View storyboard', exact: true }).click();
+  const board = page.getByRole('dialog');
+  await board.getByRole('button', { name: 'Edit Shot intent', exact: true }).click();
+  await board.getByRole('textbox', { name: 'Shot intent' }).fill('Mara finds the key at last.');
+  await board.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(board.getByRole('textbox', { name: 'Shot intent' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(board).toHaveCount(0);
+  await expect(row.locator('summary b')).toHaveText('Mara finds the key at last.');
+  await page.reload();
+  await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
+  await expect(row.locator('summary b')).toHaveText('Mara finds the key at last.');
+  await expect(row.locator('.wp-storyboard-action')).toHaveText('Mara lifts the key from the bench.');
+  await expect(row.locator('.wp-storyboard-dialogue li b')).toHaveText(['Mara', 'Narration']);
+  await expect(image(1)).toHaveAttribute('data-displayed-version-id', v2);
 });

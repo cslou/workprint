@@ -8,12 +8,12 @@ import { VersionReview } from '../versions/review.js';
 import { ReferenceSheet } from './sheet.js';
 import { MediaReceipt } from '../ui/media-receipt.js';
 import type { ScriptProps } from './script.js';
-import { kindLabel, savedMaterialPresentation } from './content.js';
+import { kindLabel, savedMaterialPresentation, shotsLabel } from './content.js';
 import type { MaterialPresentation } from './presentation.js';
 import { useOwnedImage } from '../api/use-owned-image.js';
 import { useNearViewport } from '../ui/use-near-viewport.js';
 import { useSavedMedia } from '../versions/use-saved-media.js';
-import { shotsLabel, subjectShotNumbers } from '../workspace/projection.js';
+import { subjectShotNumbers } from '../workspace/projection.js';
 import './assets.css';
 
 type Workspace = OperationResponse<'workspace'>;

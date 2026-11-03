@@ -2,7 +2,7 @@ import { currentPanelImage, currentSubjects, sceneCharacters, type OperationResp
 import type { BrowserClient } from '../api/client.js';
 import { useOwnedImage } from '../api/use-owned-image.js';
 import { useNearViewport } from '../ui/use-near-viewport.js';
-import { deliveryLabel } from '../workspace/projection.js';
+import { deliveryLabel } from './dialogue.js';
 
 type Workspace = OperationResponse<'workspace'>;
 type Shot = Workspace['storyboard']['shots'][number];
@@ -26,19 +26,17 @@ export function ShotText({ workspace, shot, camera }: { workspace: Workspace; sh
   </>;
 }
 
-/** A built-in composition's own picture of a version, which is shown instead of reading the version's media. */
-export type KnownImage = Readonly<{ versionId: string; revision: number; src: string }>;
-
 /**
  * A panel's current image (the version a person chose, else the assistant's current one), read once it is near view;
- * the hidden Storyboard panel reads nothing until it opens. Before any image exists it is a planned panel.
+ * the hidden Storyboard panel reads nothing until it opens. Before any image exists it is a planned panel, and an image
+ * that can't be read says so in its slot.
  */
-export function PanelImage({ connection, panel, label, known }: { connection: BrowserClient; panel: Panel; label: string; known?: readonly KnownImage[] | undefined }) {
+export function PanelImage({ connection, panel, label }: { connection: BrowserClient; panel: Panel; label: string }) {
   const [slot, near] = useNearViewport<HTMLSpanElement>();
   const current = currentPanelImage(panel);
-  const shown = current && known?.find(image => image.versionId === current.id && image.revision === current.revision);
-  const image = useOwnedImage(connection, near && !shown && current?.kind === 'image' ? current : null);
+  const image = useOwnedImage(connection, near && current?.kind === 'image' ? current : null);
   if (!current) return <span className="wp-panel-planned">Planned panel</span>;
-  if (shown) return <img className="wp-panel-image" src={shown.src} alt={label} />;
-  return image.phase === 'ready' && image.url ? <img className="wp-panel-image" src={image.url} alt={label} onError={image.fail} /> : <span ref={slot} className="wp-panel-image wp-panel-loading" aria-hidden="true" />;
+  if (image.phase === 'ready' && image.url) return <img className="wp-panel-image" src={image.url} alt={label} data-displayed-version-id={current.id} onError={image.fail} />;
+  if (image.phase === 'error' || image.phase === 'expired') return <span className="wp-panel-planned">This image couldn’t be shown</span>;
+  return <span ref={slot} className="wp-panel-image wp-panel-loading" aria-hidden="true" />;
 }
