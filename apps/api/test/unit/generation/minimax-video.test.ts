@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, beforeEach, test } from 'node:test';
-import { createMiniMaxVideoClient, createSafeDownload, MiniMaxVideoError, type MiniMaxVideoClientOptions, type MiniMaxVideoErrorCode, type VideoRequest } from '../../../src/generation/index.js';
+import { createMiniMaxVideoClient, createSafeDownload, MiniMaxVideoError, validateVideoRequest, type MiniMaxVideoClientOptions, type MiniMaxVideoErrorCode, type VideoRequest } from '../../../src/generation/index.js';
 import { privateAddress } from '../../../src/generation/safe-download.js';
 import { miniMaxVideoFake } from '../../support/minimax-video-fake.js';
 
@@ -50,6 +50,33 @@ test('requests outside MiniMax\'s limits are refused before anything is sent', a
     [{ firstFrame: null }, 'firstFrame'], [{ firstFrame: frame(), lastFrame: null }, 'lastFrame'],
   ];
   for (const [change, detail] of cases) await refusal(client().submit({ ...prompt, ...change } as VideoRequest), 'invalid_request', { detail });
+  assert.equal(fake.requests.length, 0);
+});
+
+test('a reference-image request sends the text, then each image as a reference in order, with the requested ratio', async () => {
+  const images = [frame(1376, 768, 'AAAA'), frame(1024, 1024, 'BBBB'), frame(768, 1376, 'CCCC')];
+  await client().submit({ prompt: 'Mara at the door', durationS: 8, ratio: '16:9', referenceImages: images });
+  assert.deepEqual(fake.requests[0]!.body, { model: 'MiniMax-H3', resolution: '768P', duration: 8, ratio: '16:9', content: [{ type: 'text', text: 'Mara at the door' },
+    ...['AAAA', 'BBBB', 'CCCC'].map(data => ({ type: 'image_url', image_url: { url: `data:image/png;base64,${data}` }, role: 'reference_image' }))] });
+  assert.doesNotThrow(() => validateVideoRequest({ prompt: 'Nine', durationS: 6, ratio: '16:9', referenceImages: Array.from({ length: 9 }, () => frame()) }));
+});
+
+test('reference images outside MiniMax\'s limits, or with frames, are refused before anything is sent, by create and by the check alone', async () => {
+  // Three references of about 16.5 MB each: each is under the image limit, and the body is over 64 MiB.
+  const large = frame(1376, 768, 'A'.repeat(22 * 1024 * 1024));
+  const cases: [Record<string, unknown>, string][] = [
+    [{ referenceImages: [frame()], firstFrame: frame() }, 'referenceImages'], [{ referenceImages: [frame()], firstFrame: frame(), lastFrame: frame() }, 'referenceImages'],
+    [{ referenceImages: Array.from({ length: 10 }, () => frame()) }, 'referenceImages'], [{ referenceImages: [] }, 'referenceImages'], [{ referenceImages: null }, 'referenceImages'],
+    [{ referenceImages: [frame(), frame(200, 200)] }, 'referenceImages.dimensions'], [{ referenceImages: [frame(2304, 768)] }, 'referenceImages.ratio'],
+    [{ referenceImages: [{ ...frame(), dataUrl: 'data:image/webp;base64,AAAA' }] }, 'referenceImages'],
+    [{ referenceImages: [frame()], ratio: undefined }, 'ratio'],
+    [{ referenceImages: [large, large, large] }, 'size'],
+  ];
+  for (const [change, detail] of cases) {
+    const request = { ...prompt, ...change } as VideoRequest;
+    await refusal(client().submit(request), 'invalid_request', { detail });
+    assert.throws(() => validateVideoRequest(request), (error: unknown) => error instanceof MiniMaxVideoError && error.code === 'invalid_request' && error.detail === detail, detail);
+  }
   assert.equal(fake.requests.length, 0);
 });
 

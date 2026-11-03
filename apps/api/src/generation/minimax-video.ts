@@ -14,7 +14,9 @@ export const miniMaxVideoResolution = '768P';
 export const videoRatios = ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'] as const;
 export type VideoRatio = (typeof videoRatios)[number];
 export const videoDurations = { min: 4, max: 15 } as const;
-/** The width ÷ height MiniMax takes for a frame image. */
+/** MiniMax takes at most this many reference images in one request. */
+export const maxReferenceImages = 9;
+/** The width ÷ height MiniMax takes for a frame or reference image. */
 export const videoFrameRatio = { min: 0.4, max: 2.5 } as const;
 /** The largest clip worth downloading. */
 export const maxVideoDownloadBytes = 100 * 1024 * 1024;
@@ -24,17 +26,22 @@ const maxFrameBytes = 30 * 1024 * 1024;
 const maxRequestBytes = 64 * 1024 * 1024;
 const maxResponseBytes = 1024 * 1024;
 
-/** A saved image sent as a frame: a data URL plus its saved size, which MiniMax limits. */
+/** A saved image sent as a frame or a reference image: a data URL plus its saved size, which MiniMax limits. */
 export interface VideoFrame { readonly dataUrl: string; readonly width: number; readonly height: number }
 export interface VideoRequest {
   readonly prompt: string;
   /** Whole seconds, 4–15. */
   readonly durationS: number;
-  /** Needed without frames; with frames MiniMax derives the shape (`adaptive`). */
+  /** Needed without frames, references included; with frames MiniMax derives the shape (`adaptive`). */
   readonly ratio?: VideoRatio;
   readonly firstFrame?: VideoFrame;
   /** Only with a first frame: last-frame-only input is not verified. */
   readonly lastFrame?: VideoFrame;
+  /**
+   * 1–9 images the video takes its subjects, setting and framing from, in this order (`reference_image`). Never with
+   * frames. (Not a Shot's `references`, which name script subjects.)
+   */
+  readonly referenceImages?: readonly VideoFrame[];
 }
 export type VideoTask =
   | { readonly status: 'queued' | 'running' | 'cancelled' }
@@ -112,14 +119,20 @@ function requestBody(request: VideoRequest): string {
   if (request.prompt.trim().length > maxVideoPromptCharacters) invalid('prompt.length');
   if (!Number.isInteger(request.durationS) || request.durationS < videoDurations.min || request.durationS > videoDurations.max) invalid('durationS');
   if (request.lastFrame !== undefined && request.firstFrame === undefined) invalid('lastFrame');
+  // Reference images and frames are two kinds of request; MiniMax takes one or the other.
+  const references = request.referenceImages;
+  if (references !== undefined && (!Array.isArray(references) || !references.length || references.length > maxReferenceImages
+    || request.firstFrame !== undefined || request.lastFrame !== undefined)) invalid('referenceImages');
   const frames: VideoFrame[] = [];
   if (request.firstFrame !== undefined) frames.push(checkFrame(request.firstFrame, 'firstFrame'));
   if (request.lastFrame !== undefined) frames.push(checkFrame(request.lastFrame, 'lastFrame'));
+  const images = (references ?? []).map(image => checkFrame(image, 'referenceImages'));
   if (!frames.length && !videoRatios.includes(request.ratio as VideoRatio)) invalid('ratio');
   const body = JSON.stringify({
     model: miniMaxVideoModel,
     content: [{ type: 'text', text: request.prompt.trim() },
-      ...frames.map((frame, index) => ({ type: 'image_url', image_url: { url: frame.dataUrl }, role: index === 0 ? 'first_frame' : 'last_frame' }))],
+      ...frames.map((frame, index) => ({ type: 'image_url', image_url: { url: frame.dataUrl }, role: index === 0 ? 'first_frame' : 'last_frame' })),
+      ...images.map(image => ({ type: 'image_url', image_url: { url: image.dataUrl }, role: 'reference_image' }))],
     resolution: miniMaxVideoResolution, duration: request.durationS, ratio: frames.length ? 'adaptive' : request.ratio,
   });
   if (Buffer.byteLength(body) > maxRequestBytes) invalid('size');
