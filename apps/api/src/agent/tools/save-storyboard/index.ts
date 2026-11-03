@@ -62,7 +62,7 @@ const shot = z.strictObject({
   cameraNote: z.string().max(2000).default('').describe('How the camera frames or moves.'),
   references: z.array(reference).max(10).default([]).describe('The subjects whose sheets this Shot uses, each once.'),
   durationS: shotDurationSchema.describe(`How long the Shot runs, in whole seconds, ${shotDurations.min} to ${shotDurations.max}; its video is made at this length.`),
-  panels: z.array(panel).min(1).max(2).describe('1 panel, or 2 when the action or camera changes without a cut.'),
+  panels: z.array(panel).min(1).max(2).describe('1 key panel, or 2 only when the picture changes a lot within the Shot.'),
 });
 
 /** Saves the video's storyboard from its current script as a new draft version, for the run's own account and video. */
@@ -73,7 +73,8 @@ export const saveStoryboardTool = defineTool({
     'Pass base: the storyboard\'s versionId from read-workspace, or empty when the video has no storyboard yet. Send every Shot in full each time: a Shot left out is dropped, so read the storyboard in full (read-workspace with its versionId) before changing it. If a save is refused, follow the result message.',
     'Read the whole script first. Use as few Shots as tell it clearly; each Shot is one uninterrupted camera view.',
     'Give each Shot its intent, framing, action, the script\'s dialogue spoken in it with each line\'s delivery, and a camera note. Context goes in action, never in dialogue.',
-    'A Shot has 1 panel, or 2 when the action or camera changes without a cut; its video is made from its sheets and its first and last panels, which set the framing.',
+    'A Shot has one key panel. Add a second only when the picture changes a lot within the Shot, for example when the camera moves from one part of the room to another, or from wide to close. Never add one for a small change of pose or expression.',
+    'A Shot\'s video is made from its sheets and its first and last panels, which set the framing.',
     'Name each Shot\'s sheets in references: a subject the script lists, with one role and one job each.',
     `Give each Shot its length in durationS, ${shotDurations.min} to ${shotDurations.max} seconds: about 2.5 spoken words per second of its dialogue, plus the time its action needs, with a beat of silence at each end, rounded up to a whole second.`,
     'read-workspace shows each Shot\'s current length, and the user can change it. A save sets the length you send, so send back the length a Shot already has unless the user asks you to change it.',
