@@ -1,4 +1,4 @@
-import { PanelRoomError, UploadError, type PanelImageInput, type PanelImageSave, type PanelTarget } from '../artifacts/index.js';
+import { UploadError, UseRoomError, type PanelImageInput, type PanelImageSave, type PanelTarget } from '../artifacts/index.js';
 import { logFailure } from './failure-log.js';
 
 /** What saving a panel image did. `gone`: its panel left the storyboard, so it was saved as a plain draft image. */
@@ -31,7 +31,7 @@ export function createAssistantPanelImages(capability: Capability): AssistantPan
         const { version, gone } = await capability.save(accountId, videoId, input, signal);
         return { kind: 'saved', versionId: version.id, gone };
       } catch (error) {
-        if (error instanceof PanelRoomError) return { kind: 'no_room' };
+        if (error instanceof UseRoomError) return { kind: 'no_room' };
         if (error instanceof UploadError && (error.code === 'invalid_input' || error.code === 'unsupported')) return { kind: 'refused' };
         if (error instanceof UploadError && error.code === 'not_found') return { kind: 'not_found' };
         logFailure('Panel image save failed', error);

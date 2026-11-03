@@ -270,7 +270,7 @@ describe('assistant-made clips are checked with the MiniMax allowance and saved 
 
       const job = await waiting([frame.versionId]);
       const saved = await saveClip(account, video, { bytes: clip, frames: [frame.versionId], jobId: job.id });
-      assert.deepEqual(saved, { kind: 'saved', versionId: (saved as { versionId: string }).versionId, width: GENERATED_CLIP.width, height: GENERATED_CLIP.height, durationMs: GENERATED_CLIP.durationMs });
+      assert.deepEqual(saved, { kind: 'saved', versionId: (saved as { versionId: string }).versionId, width: GENERATED_CLIP.width, height: GENERATED_CLIP.height, durationMs: GENERATED_CLIP.durationMs, gone: false });
       if (saved.kind !== 'saved') return;
       assert.equal(effects.checks, 2, 'a busy checker is waited out, then the clip is checked once');
       assert.ok(effects.verifyMs[0]! < 6000, `the clip verified in ${effects.verifyMs[0]} ms`);
