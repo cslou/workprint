@@ -76,7 +76,7 @@ export const saveStoryboardTool = defineTool({
     'A Shot has one key panel. Add a second only when the picture changes a lot within the Shot, for example when the camera moves from one part of the room to another, or from wide to close. Never add one for a small change of pose or expression.',
     'A Shot\'s video is made from its sheets and its first and last panels, which set the framing.',
     'Name each Shot\'s sheets in references: a subject the script lists, with one role and one job each.',
-    `Give each Shot its length in durationS, ${shotDurations.min} to ${shotDurations.max} seconds: about 2.5 spoken words per second of its dialogue, plus the time its action needs, with a beat of silence at each end, rounded up to a whole second.`,
+    `Give each Shot its length in durationS, ${shotDurations.min} to ${shotDurations.max} seconds: about 2.5 spoken words per second of its dialogue, plus the time its action needs, with a beat of silence at each end, rounded up to a whole second. When the user asks for a total length, make the Shots' lengths add up to about that total, each still ${shotDurations.min} to ${shotDurations.max} seconds.`,
     'read-workspace shows each Shot\'s current length, and the user can change it. A save sets the length you send, so send back the length a Shot already has unless the user asks you to change it.',
     'Keep each Shot\'s shotId and each panel\'s panelId from read-workspace so their images and videos stay; leave them empty for new ones.',
     'Show the user the Shot plan before making panels.',
