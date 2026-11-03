@@ -1,5 +1,6 @@
 import { currentPanelImage, currentSubjects, currentSubjectSheets, lineVoice, sceneCharacters, type SubjectKind } from '@workprint/contracts';
 import { maxReferenceImages, maxVideoPromptCharacters, videoImageFits } from '../generation/index.js';
+import { positionLines } from './shot-positions.js';
 import type { VideoJobOutcome, VideoJobs, VideoRunControl } from './video-jobs.js';
 import type { OwnedWorkspace, ReadOwnedWorkspace } from './workspace-reads.js';
 
@@ -95,10 +96,11 @@ function spoken(line: Line, sceneCharacters: ReadonlySet<string>, speaker: strin
 
 /**
  * The MiniMax prompt for a Shot: a line per image it is made from ("Image N: …", in the order they are sent), its
- * action (or its intent when it has none) and camera note, then its dialogue in MiniMax's form, or "No one speaks.",
- * then the model's motion prompt and the closing line. Context is never voiced: it stays in the action.
+ * action (or its intent when it has none), camera note and position lines (`positionLines`), then its dialogue in
+ * MiniMax's form, or "No one speaks.", then the model's motion prompt and the closing line. Context is never voiced:
+ * it stays in the action.
  */
-export function shotVideoPrompt(shot: Pick<Shot, 'action' | 'intent' | 'cameraNote' | 'dialogue'>, sceneCharacters: ReadonlySet<string>, motion: string, references: readonly ShotReference[]): string {
+export function shotVideoPrompt(shot: Pick<Shot, 'action' | 'intent' | 'cameraNote' | 'dialogue'>, sceneCharacters: ReadonlySet<string>, motion: string, references: readonly ShotReference[], positions: readonly string[] = []): string {
   const speakers = new Map<string, string>();
   const lines = (shot.dialogue ?? []).map(line => {
     const key = line.character.trim();
@@ -106,7 +108,7 @@ export function shotVideoPrompt(shot: Pick<Shot, 'action' | 'intent' | 'cameraNo
     return spoken(line, sceneCharacters, speakers.get(key)!);
   });
   const labels = references.map((reference, index) => `Image ${index + 1}: ${reference.label}`).join('\n');
-  return [labels, shot.action ?? shot.intent ?? '', shot.cameraNote ?? '', lines.length ? lines.join('\n') : 'No one speaks.', motion, shotEnding]
+  return [labels, shot.action ?? shot.intent ?? '', shot.cameraNote ?? '', positions.join('\n'), lines.length ? lines.join('\n') : 'No one speaks.', motion, shotEnding]
     .map(part => part.trim()).filter(Boolean).join('\n\n');
 }
 
@@ -126,7 +128,7 @@ export async function makeShot(makers: ShotMakers, accountId: string, videoId: s
   if (!shot) return refused('not_found');
   const picked = shotReferences(read.workspace, shot);
   if (picked.kind === 'needs_panels') return refused('needs_panels');
-  const prompt = shotVideoPrompt(shot, sceneCharacters(read.workspace), request.prompt, picked.references);
+  const prompt = shotVideoPrompt(shot, sceneCharacters(read.workspace), request.prompt, picked.references, positionLines(read.workspace.storyboard.shots, shot));
   if (prompt.length > maxVideoPromptCharacters) return refused('too_long');
   return videos.start(accountId, videoId, {
     prompt, durationS: shot.durationS ?? defaultShotDurationS, ratio: '16:9', referenceImageIds: picked.references.map(reference => reference.versionId), target: { shotId: shot.shotId },

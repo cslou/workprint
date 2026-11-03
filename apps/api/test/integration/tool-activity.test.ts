@@ -765,9 +765,10 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
     'SELECT use_id,version_id,state FROM artifacts.conversation_uses WHERE conversation_id=$1 AND binding=$2::jsonb ORDER BY created_at,use_id', [video, { purpose: 'shot_video', shotId }])).rows;
   const useCount = async (video: string) => (await pool.query<{ count: number }>('SELECT count(*)::int AS count FROM artifacts.conversation_uses WHERE conversation_id=$1', [video])).rows[0]!.count;
   const targetOf = async (jobId: string) => (await pool.query<{ target: unknown }>('SELECT target FROM generation.requests WHERE request_id=$1', [jobId])).rows[0]?.target;
-  const opening = { intent: 'Mara arrives.', action: 'Mara turns to the door.', cameraNote: 'Low angle, locked off.',
+  // Neither Shot names a place (the script lists none), so Shot 2 is told where Shot 1 ended.
+  const opening = { intent: 'Mara arrives.', action: 'Mara turns to the door.', cameraNote: 'Low angle, locked off.', positions: { start: 'Mara at the desk, frame left.', end: 'Mara at the door, frame right, facing it.' },
     dialogue: [{ character: 'Mara', text: 'You came.' }, { character: 'Narrator', text: 'Years passed.', delivery: 'voice_over' as const }, { character: 'Mara', text: 'I knew you would.', delivery: 'voice_over' as const }] };
-  const openingText = 'Mara turns to the door.\n\nLow angle, locked off.\n\nMara (S1) says: <d>[English] You came.</d>\n'
+  const openingText = 'Mara turns to the door.\n\nLow angle, locked off.\n\nPositions: starts Mara at the desk, frame left; ends Mara at the door, frame right, facing it.\n\nMara (S1) says: <d>[English] You came.</d>\n'
     + 'A narrator (S2) says in an off-screen voiceover: <d>[English] Years passed.</d> while every character on screen keeps their lips closed.\n'
     + 'Mara (S1) says in an off-screen voiceover: <d>[English] I knew you would.</d> while Mara\'s lips remain completely closed.';
   const firstPanel = 'the storyboard panel for this Shot. Frame the Shot like this panel.', lastPanel = 'the Shot\'s last storyboard panel. End the Shot on this framing.';
@@ -783,7 +784,7 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
     assert.equal((await saveScript(owner.id, video, { baseVersionId: null, content, subjects: [{ id: '', kind: 'character', name: 'Mara' }] })).kind, 'saved');
     const board = await saveBoard(owner.id, video, { baseVersionId: null, shots: [
       { shotId: '', ...opening, panels: [{ panelId: '', description: 'Mara at the desk.' }, { panelId: '', description: 'Mara at the door.' }] },
-      { shotId: '', intent: 'The lights go out.', durationS: 4, panels: [{ panelId: '', description: 'Darkness.' }] },
+      { shotId: '', intent: 'The lights go out.', durationS: 4, positions: { start: 'Mara at the door, frame right.', end: 'Darkness.' }, panels: [{ panelId: '', description: 'Darkness.' }] },
     ] });
     assert.ok(board.kind === 'saved', JSON.stringify(board));
     const [first, last] = (await store.workspace(owner.id, video)).storyboard.shots;
@@ -849,7 +850,7 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
     minimax.reset();
     const lone = await shoot(owner, p.video, { shot: p.closing, prompt: 'The room goes dark.' });
     assert.ok(lone.result.made, JSON.stringify(lone.result));
-    assert.deepEqual(createBody().content, [{ type: 'text', text: shotText([firstPanel], 'The lights go out.\n\nNo one speaks.', 'The room goes dark.') }, referenceOf(pngs[2]!)]);
+    assert.deepEqual(createBody().content, [{ type: 'text', text: shotText([firstPanel], 'The lights go out.\n\nPositions: starts Mara at the door, frame right; ends Darkness.\nPrevious Shot ended: Mara at the door, frame right, facing it.\n\nNo one speaks.', 'The room goes dark.') }, referenceOf(pngs[2]!)]);
     assert.equal((minimax.requests[0]!.body as { duration: number }).duration, 4);
     assert.equal(lone.summary, 'Saved Shot 2 · Video · Version 1');
   });

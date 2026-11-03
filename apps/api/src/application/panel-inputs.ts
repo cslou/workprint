@@ -1,5 +1,6 @@
 import { currentPanelImage, currentSheets, currentSubjects, currentSubjectSheets, shotRoles, storyboardNames } from '@workprint/contracts';
 import { usedImageVersions } from '../artifacts/index.js';
+import { positionLines } from './shot-positions.js';
 import type { OwnedWorkspace } from './workspace-reads.js';
 import { imageVersionNames } from './workspace-versions.js';
 
@@ -7,6 +8,8 @@ import { imageVersionNames } from './workspace-versions.js';
 export const maxPanelInputs = 10;
 /** The job of a later panel's last input, the Shot's first panel: continuity only, never its framing. */
 export const continuityJob = 'match the setting, people and light; not its camera or framing';
+/** Which moment of a Shot with positions its panel shows: the first panel frames the start, a later one the end. */
+export const panelMoments = { start: 'This panel shows the Shot as it starts.', end: 'This panel shows the Shot as it ends.' } as const;
 /** The job of a picked image that isn't a view of one of the Shot's sheets. */
 export const otherImageJob = 'as the prompt describes';
 
@@ -74,5 +77,8 @@ export function panelInputs(workspace: OwnedWorkspace, request: PanelRequest): P
   // Each label is the workspace's own name for the image, the one the agent picked it by.
   const name = imageVersionNames(workspace);
   const resolved = unique.map(input => input.label ? input : { ...input, label: name(input.versionId) ?? input.versionId });
-  return { kind: 'resolved', inputs: resolved, preface: resolved.map((input, position) => `Input ${position + 1}: ${input.label} — ${input.job}`).join('\n'), ...(size ? { size } : {}) };
+  // The preface labels each input, then says where the Shot starts and ends (`positionLines`) and which moment this panel shows.
+  const moment = shot.positions ? [index === 0 ? panelMoments.start : panelMoments.end] : [];
+  const preface = [...resolved.map((input, position) => `Input ${position + 1}: ${input.label} — ${input.job}`), ...positionLines(workspace.storyboard.shots, shot), ...moment].join('\n');
+  return { kind: 'resolved', inputs: resolved, preface, ...(size ? { size } : {}) };
 }
