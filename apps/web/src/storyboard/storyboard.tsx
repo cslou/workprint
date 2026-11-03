@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import type { OperationResponse, Version } from '@workprint/contracts';
+import type { ReactElement } from 'react';
+import { Button as AriaButton } from 'react-aria-components';
+import { currentPanelImage, type OperationResponse, type Version } from '@workprint/contracts';
 import type { BrowserClient } from '../api/client.js';
+import { useOwnedImage } from '../api/use-owned-image.js';
 import type { ReadScope } from '../api/use-scoped-read.js';
 import { Button } from '../ui/controls.js';
 import { ViewerDialog } from '../ui/overlays.js';
@@ -53,13 +56,14 @@ function ScopedStoryboard({ connection, scope, workspace, prerequisites, onSaved
       <div className="wp-storyboard-board">{rows.map(({ shot, number, panels }) => <section className="wp-board-shot" key={shot.shotId} data-shot-id={shot.shotId}>
         <header><span className="wp-shot-number">{number}</span><b>{shot.intent ?? `Shot ${number}`}</b></header>
         <PlanningEditor {...common} target={{ kind: 'shot', shotId: shot.shotId }} draft={draftFor({ kind: 'shot', shotId: shot.shotId })} onEdited={edited} />
-        <div className="wp-board-grid">{panels.map(({ panel, number: panelNumber }) => <section className="wp-board-panel" key={panel.panelId}><b>{number}.{panelNumber}</b><PlanningEditor {...common} target={{ kind: 'panel', shotId: shot.shotId, panelId: panel.panelId }} draft={draftFor({ kind: 'panel', shotId: shot.shotId, panelId: panel.panelId })} onEdited={edited} /><PanelVersions {...common} {...choices} shotId={shot.shotId} panel={panel} shotNumber={number} panelNumber={panelNumber} {...(facts ? { facts } : {})} /></section>)}</div>
+        <div className="wp-board-text"><ShotText workspace={current} shot={shot} camera={facts?.shots?.find(value => value.shotId === shot.shotId)?.camera} /></div>
+        <div className="wp-board-grid">{panels.map(({ panel, number: panelNumber }) => <section className="wp-board-panel" key={panel.panelId} data-panel-id={panel.panelId}><PanelThumbnail {...common} {...choices} shotId={shot.shotId} panel={panel} shotNumber={number} panelNumber={panelNumber} {...(facts ? { facts } : {})} /><b>{number}.{panelNumber}</b><PlanningEditor {...common} target={{ kind: 'panel', shotId: shot.shotId, panelId: panel.panelId }} draft={draftFor({ kind: 'panel', shotId: shot.shotId, panelId: panel.panelId })} onEdited={edited} /><PanelVersions {...common} {...choices} shotId={shot.shotId} panel={panel} shotNumber={number} panelNumber={panelNumber} {...(facts ? { facts } : {})} /></section>)}</div>
       </section>)}</div>
     </ViewerDialog>
     {rows.map(({ shot, number, panels }) => {
       const fact = facts?.shots?.find(value => value.shotId === shot.shotId);
       return <details className="wp-storyboard-shot" key={shot.shotId} data-shot-id={shot.shotId} open><summary><span className="wp-shot-number">{number}</span><span className="wp-shot-title"><b>{shot.intent ?? `Shot ${number}`}</b><small>{shot.framing ? `${shot.framing} · ` : ''}{fact?.duration ? `${fact.duration} · ` : ''}{panels.length} panel{panels.length === 1 ? '' : 's'}</small></span>{fact?.status && <span className={`wp-status wp-status-${fact.status.toLowerCase()}`}>{fact.status}</span>}<svg className="wp-storyboard-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></summary>
-        <div className="wp-storyboard-body"><ShotText workspace={current} shot={shot} camera={fact?.camera} />{panels.map(({ panel, number: panelNumber }) => <div className="wp-storyboard-panel" key={panel.panelId} data-panel-id={panel.panelId}><PanelImage connection={connection} panel={panel} label={`Shot ${number} · Panel ${number}.${panelNumber}`} /><div className="wp-storyboard-panel-text"><span className="wp-panel-number">{number}.{panelNumber}</span><p>{panel.description}</p><PanelVersions {...common} {...choices} shotId={shot.shotId} panel={panel} shotNumber={number} panelNumber={panelNumber} {...(facts ? { facts } : {})} /></div></div>)}</div>
+        <div className="wp-storyboard-body">{panels.map(({ panel, number: panelNumber }) => <div className="wp-storyboard-panel" key={panel.panelId} data-panel-id={panel.panelId}><PanelThumbnail {...common} {...choices} shotId={shot.shotId} panel={panel} shotNumber={number} panelNumber={panelNumber} {...(facts ? { facts } : {})} /><div className="wp-storyboard-panel-text"><span className="wp-panel-number">{number}.{panelNumber}</span><PanelVersions {...common} {...choices} shotId={shot.shotId} panel={panel} shotNumber={number} panelNumber={panelNumber} {...(facts ? { facts } : {})} /></div></div>)}</div>
       </details>;
     })}
   </div>;
@@ -67,20 +71,40 @@ function ScopedStoryboard({ connection, scope, workspace, prerequisites, onSaved
 type PanelProps = Pick<StoryboardProps, 'connection' | 'scope' | 'workspace'> & { shotId: string; panel: Workspace['storyboard']['shots'][number]['panels'][number]; shotNumber: number; panelNumber: number; facts?: StoryboardPrerequisites; uses: ReadonlyMap<string, PanelChoice>; onUsed(panelId: string, choice: PanelChoice, version: Version): void };
 /** A Panel-image approval leaves the selection revision unchanged, so a local acknowledgement applies only while the projection it was made against is current. */
 type PanelChoice = { basis: string; value: OperationResponse<'useVersion'> };
-function PanelVersions({ connection, scope, workspace, shotId, panel, shotNumber, panelNumber, facts, uses, onUsed }: PanelProps) {
-  const used = uses.get(panel.panelId), basis = JSON.stringify([workspace.selectionRevision, panel.approvedImageVersionId]);
-  const selected = used && (used.value.selectionRevision > workspace.selectionRevision || (used.value.selectionRevision === workspace.selectionRevision && used.basis === basis)) ? used.value : null;
+function PanelVersions(props: PanelProps) {
+  const { panel, shotNumber, panelNumber } = props;
   const versions = panel.candidateImageVersions;
   if (new Set(versions.map(version => version.id)).size !== versions.length) return null;
-  return <div className="wp-panel-versions">{versions.filter(version => version.kind === 'image').map(version => <ViewerDialog key={version.id} trigger={<Button variant="quiet" aria-label={`View Panel ${shotNumber}.${panelNumber} version ${version.revision}`}>Version {version.revision}</Button>} title={`Panel ${shotNumber}.${panelNumber} · Version ${version.revision}`} size="wide">
+  return <div className="wp-panel-versions">{versions.filter(version => version.kind === 'image').map(version => <PanelViewer key={version.id} {...props} version={version} trigger={<Button variant="quiet" aria-label={`View Panel ${shotNumber}.${panelNumber} version ${version.revision}`}>Version {version.revision}</Button>} />)}</div>;
+}
+/** A panel's current image, or its planned slot; once an image exists, selecting it opens that version's viewer. */
+function PanelThumbnail(props: PanelProps) {
+  const { connection, panel, shotNumber, panelNumber } = props;
+  const label = `Shot ${shotNumber} · Panel ${shotNumber}.${panelNumber}`;
+  const image = <PanelImage connection={connection} panel={panel} label={label} />;
+  const current = currentPanelImage(panel);
+  if (current?.kind !== 'image') return image;
+  return <PanelViewer {...props} version={current} trigger={<AriaButton className="wp-panel-open" aria-label={`Open ${label}`}>{image}</AriaButton>} />;
+}
+/** One panel image version's viewer: the image, its caption, and choosing it for the panel. */
+function PanelViewer({ connection, scope, workspace, shotId, panel, shotNumber, panelNumber, facts, uses, onUsed, version, trigger }: PanelProps & { version: Version; trigger: ReactElement }) {
+  const used = uses.get(panel.panelId), basis = JSON.stringify([workspace.selectionRevision, panel.approvedImageVersionId]);
+  const selected = used && (used.value.selectionRevision > workspace.selectionRevision || (used.value.selectionRevision === workspace.selectionRevision && used.basis === basis)) ? used.value : null;
+  return <ViewerDialog trigger={trigger} title={`Panel ${shotNumber}.${panelNumber} · Version ${version.revision}`} size="wide">
     <PanelVersion connection={connection} scope={scope} version={version} caption={`Shot ${shotNumber} · Panel ${shotNumber}.${panelNumber} · Version ${version.revision}`} {...(facts ? { facts } : {})} />
     <VersionUse connection={connection} scope={scope} version={version} binding={{ purpose: 'panel_image', shotId, panelId: panel.panelId }} currentUse={selected?.use ?? null} selectedVersionId={selected?.use.versionId ?? panel.approvedImageVersionId} selectionRevision={selected?.selectionRevision ?? workspace.selectionRevision} presentation="viewer" onUsed={value => onUsed(panel.panelId, { basis, value }, version)} />
-  </ViewerDialog>)}</div>;
+  </ViewerDialog>;
 }
+/** The viewed version's image: a display composition's supplied image, else the owned image read through the shared copy. */
 function PanelVersion({ connection, scope, version, caption, facts }: { connection: BrowserClient; scope: ReadScope | null; version: Version; caption: string; facts?: StoryboardPrerequisites }) {
   const read = useExactVersion(connection.kind === 'configured' ? connection.client : null, scope, version.id);
   const observed = read.kind === 'settled' && read.result.ok ? read.result.value : null;
   const visible = observed && observed.id === version.id && observed.kind === version.kind && observed.artifactId === version.artifactId && observed.revision === version.revision ? observed : version;
-  const image = facts?.images?.find(value => value.versionId === visible.id && value.revision === visible.revision);
-  return <div className="wp-panel-version" data-displayed-version-id={visible.id}>{image && <img src={image.src} alt={image.alt} />}<p>{caption}</p></div>;
+  const supplied = facts?.images?.find(value => value.versionId === visible.id && value.revision === visible.revision);
+  const owned = useOwnedImage(connection, !supplied && visible.kind === 'image' ? visible : null);
+  const shown = supplied ? <img src={supplied.src} alt={supplied.alt} />
+    : owned.phase === 'ready' && owned.url ? <img src={owned.url} alt={caption} onError={owned.fail} />
+    : owned.phase === 'error' || owned.phase === 'expired' ? <span className="wp-panel-version-slot">This image couldn’t be shown</span>
+    : <span className="wp-panel-version-slot wp-panel-loading" aria-hidden="true" />;
+  return <div className="wp-panel-version" data-displayed-version-id={visible.id}>{shown}<p>{caption}</p></div>;
 }

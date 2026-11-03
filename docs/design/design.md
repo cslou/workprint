@@ -576,9 +576,9 @@ The Script tab has three sections: **What happens**, **Shots** and **Look**.
   - then the panels (`.sb-panel`): a 120px 16:9 image, the number "2.1" with a time, and a 13px caption. Dialogue in captions is set in the display font.
 - **The agent's storyboard** (Sprint 011, `.wp-storyboard-shot`). A Shot saved by the agent has no status pill and no time, since nothing approves or times it yet:
   - **Header:** the number badge, the intent, and a 12px summary of its framing and panel count ("medium · 2 panels").
-  - **Body**, in order, each line only when the Shot has it: the action in 13px; the dialogue, one line each, with the speaker in 600 and the words in the display font; the camera note in 12px `--color-text-subtle`; the subjects it names, joined by " · ", in 12px `--color-text-subtle`.
-  - **Dialogue speaker:** "Mara" for a spoken line, "Mara (off screen)" for one heard off screen, "Mara (voice-over)" for a scene character's voice-over, and "Narration" for any other voice-over. The agent decides which by the speaker it names (Lou, 2026-11-03).
-  - **Panels:** each panel's current image (the version a person chose, else the agent's latest) as the 120px 16:9 image, read once near view. Before one exists, the [Planned panel](#placeholders) placeholder; an image that can't be read shows "This image couldn’t be shown" in that dashed slot. The version links under the caption stay.
+  - **Body:** the panels only. The tab is the summary; the Shot's text is in the [board](#storyboard-board) (Lou's Sprint 011 QA, 2026-11-03).
+  - **Dialogue speaker** (in the board): "Mara" for a spoken line, "Mara (off screen)" for one heard off screen, "Mara (voice-over)" for a scene character's voice-over, and "Narration" for any other voice-over. The agent decides which by the speaker it names (Lou, 2026-11-03).
+  - **Panels:** each panel's current image (the version a person chose, else the agent's latest) as the 120px 16:9 image, read once near view, then its number and its version links. Before one exists, the [Planned panel](#placeholders) placeholder; an image that can't be read shows "This image couldn’t be shown" in that dashed slot. Selecting the image opens the panel viewer on that version: the image at its own shape, its caption and "Use this version". A version link opens the same viewer on its version.
 - **Flags:**
   - `.sb-flag`: a note from the agent about a difference, in `--color-text-link` on `--color-bg-selected`;
   - `.sb-changed`: an edit that has not been regenerated yet. That shot's images dim to 45%.
@@ -592,13 +592,14 @@ The Script tab has three sections: **What happens**, **Shots** and **Look**.
 - **Camera pills live here.** A changed value marks its shot changed and shows **Regenerate** for that shot only.
 - **Edits are saved at once** and handed to the agent on its next turn (D-54).
 - **At ≤ `--breakpoint-sm`**, the grid is 2 columns.
+- **The agent's storyboard** (Sprint 011 QA follow-up): the board is the detailed view. Each Shot has its header and the Shot intent editor, then, each line only when the Shot has it, the action in 13px; the dialogue, one line each, with the speaker in 600 and the words in the display font; the camera note in 12px `--color-text-subtle`; and the subjects it names, joined by " · ", in 12px `--color-text-subtle`. Each panel tile shows its current image full width (selecting it opens the panel viewer), its number, the panel description editor and its version links.
 
 ### Video rows
 
 `.take-item`: one row per shot in the Videos tab.
 
 - **Layout:** a 96px 16:9 thumbnail with a play overlay, then a number badge with the shot name, then a 12px line ("Version 2 · New · 5.1 s · from 2.1 and 2.2"), then a status pill (Chosen or Draft).
-- **The agent's Shot videos** (Sprint 011): the row lists each version the agent made for the Shot, and plays it in the single-clip [viewer](#viewer) from its version link. A draft has no status pill; only a person's choice shows **Chosen**. A clip finished after its Shot left the storyboard is saved as a Generated video instead. A saved Shot clip isn't listed once its Shot leaves the storyboard; it stays in history.
+- **The agent's Shot videos** (Sprint 011): the row lists each version the agent made for the Shot. Its poster, read once near view, is the 96px thumbnail with the play overlay and plays it in the single-clip [viewer](#viewer); under it a 12px line reads "Version 1 · 0:07", adding "The poster couldn’t be shown" when the poster can't be read. A draft has no status pill; only a person's choice shows **Chosen**. A clip finished after its Shot left the storyboard is saved as a Generated video instead. A saved Shot clip isn't listed once its Shot leaves the storyboard; it stays in history.
 - **Version history:** "Version history · N earlier" is a closed disclosure inside the row. Each earlier version has a 72px thumbnail, its length and a "Use this version" pill.
 - **Above the rows:** during version comparison, **Play all · 0:13** opens the [scene player](#scene-player). Once a current scene edit exists, the [Scene edit card](#scene-edit-card) replaces that entry action. Its list is headed **Shots**; do not repeat the aggregate count.
 - **Wording:** on screen it is always "video" and "version", never "take" (D-68).

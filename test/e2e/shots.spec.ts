@@ -1,4 +1,5 @@
 import { test, expect, loadSupport, makeVideo, signIn } from './fixtures.js';
+import type { Locator } from '@playwright/test';
 import type * as ShotWork from '../../apps/api/test/support/shot-choice-work.js';
 import type * as MetaImages from '../../apps/api/test/support/meta-image-fake.js';
 
@@ -154,7 +155,7 @@ test('a video the agent makes is listed in Generated videos without a reload, pl
   expect(await clip.evaluate((row, other) => !!(row.compareDocumentPosition(other!) & Node.DOCUMENT_POSITION_FOLLOWING), await card.elementHandle())).toBe(true);
 });
 
-test('the agent\'s storyboard shows each Shot\'s text and panel images as they are made, and its Shot video plays in Videos', async ({ page, backend }) => {
+test('the agent\'s storyboard shows each Shot\'s panel images as they are made, its board shows the Shot\'s text, a panel opens its image, and its Shot video plays from its poster', async ({ page, backend }) => {
   test.slow();
   const { provider, meta, minimax } = backend;
   provider.reset(); meta.reset(); minimax.reset();
@@ -199,18 +200,41 @@ test('the agent\'s storyboard shows each Shot\'s text and panel images as they a
   await turn({ name: 'generate-panel', args: { shot: shot!.shotId, panel: second!.panelId, prompt: 'Change only her hands.', images: [] } }, 'Make panel 2', 'Saved Shot 1 · Panel 1.2 · Version 1');
   await turn({ name: 'generate-shot', args: { shot: shot!.shotId, prompt: 'She lifts the key into the light.' } }, 'Make the Shot', 'Saved Shot 1 · Video · Version 1');
 
+  const shown = (locator: Locator) => expect.poll(() => locator.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  // The board is the detailed view: each Shot's text and its panel images.
+  const boardHolds = async (intent: string) => {
+    await panel.getByRole('button', { name: 'View storyboard', exact: true }).click();
+    const board = page.getByRole('dialog');
+    const section = board.locator(`.wp-board-shot[data-shot-id="${shot!.shotId}"]`);
+    await expect(section.locator('header b')).toHaveText(intent);
+    await expect(section.locator('.wp-storyboard-action')).toHaveText('Mara lifts the key from the bench.');
+    await expect(section.locator('.wp-storyboard-dialogue li b')).toHaveText(['Mara', 'Narration']);
+    await expect(section.locator('.wp-storyboard-dialogue li q')).toHaveText(['There you are.', 'She had looked for years.']);
+    await expect(section.locator('.wp-storyboard-camera')).toHaveText('A slow push-in.');
+    await expect(section.locator('.wp-storyboard-subjects')).toHaveText('Mara · The Gallery');
+    for (const n of [1, 2]) await shown(section.getByRole('img', { name: `Shot 1 · Panel 1.${n}`, exact: true }));
+    await board.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(board).toHaveCount(0);
+  };
+
   const holds = async () => {
     await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
+    // The tab is the summary: the intent, framing, panel count and panel images, without the Shot's text.
     await expect(row.locator('summary')).toContainText('Mara finds the key.');
     await expect(row.locator('summary small')).toHaveText('medium · 2 panels');
-    await expect(row.locator('.wp-storyboard-action')).toHaveText('Mara lifts the key from the bench.');
-    await expect(row.locator('.wp-storyboard-dialogue li b')).toHaveText(['Mara', 'Narration']);
-    await expect(row.locator('.wp-storyboard-dialogue li q')).toHaveText(['There you are.', 'She had looked for years.']);
-    await expect(row.locator('.wp-storyboard-camera')).toHaveText('A slow push-in.');
-    await expect(row.locator('.wp-storyboard-subjects')).toHaveText('Mara · The Gallery');
-    for (const n of [1, 2]) await expect.poll(() => image(n).evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+    await expect(row.locator('.wp-storyboard-action, .wp-storyboard-dialogue, .wp-storyboard-camera')).toHaveCount(0);
+    for (const n of [1, 2]) await shown(image(n));
     await expect(row.getByText('Planned panel', { exact: true })).toHaveCount(0);
     await expect(panel.locator('.wp-status')).toHaveCount(0);
+    // Selecting a panel's image opens its current version, with that image shown.
+    const current = await image(1).getAttribute('data-displayed-version-id');
+    await row.getByRole('button', { name: 'Open Shot 1 · Panel 1.1', exact: true }).click();
+    const viewer = page.getByRole('dialog');
+    await expect(viewer.locator('.wp-panel-version')).toHaveAttribute('data-displayed-version-id', current!);
+    await shown(viewer.locator('.wp-panel-version img'));
+    await viewer.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(viewer).toHaveCount(0);
+    await boardHolds('Mara finds the key.');
 
     // The Shot row has the assistant's draft, with no status, and it plays; it isn't a Generated video.
     await page.getByRole('tab', { name: 'Videos', exact: true }).click();
@@ -218,6 +242,9 @@ test('the agent\'s storyboard shows each Shot\'s text and panel images as they a
     await expect(video).toHaveCount(1);
     await expect(panel.locator('.wp-video-row[data-version-id]')).toHaveCount(0);
     await expect(video.locator('.wp-status')).toHaveCount(0);
+    // Its poster is the play button, and the row says which version it is.
+    await shown(video.locator('.wp-video-poster img'));
+    await expect(video.locator('.wp-video-metadata')).toHaveText(/^Version 1 · \d+:\d{2}$/);
     await video.getByRole('button', { name: 'View Shot 1 version 1', exact: true }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog.locator('.wp-clip-surface[data-ready="true"]')).toHaveCount(1);
@@ -250,6 +277,8 @@ test('the agent\'s storyboard shows each Shot\'s text and panel images as they a
   await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
   await expect(image(1)).toHaveAttribute('data-displayed-version-id', v2);
   await row.getByRole('button', { name: 'View Panel 1.1 version 2', exact: true }).click();
+  await expect(page.getByRole('dialog').locator('.wp-panel-version')).toHaveAttribute('data-displayed-version-id', v2);
+  await shown(page.getByRole('dialog').locator('.wp-panel-version img'));
   await page.getByRole('dialog').getByRole('button', { name: 'Use this version', exact: true }).click();
   await expect(page.getByRole('dialog').getByRole('status')).toHaveText('This exact version is now used in this conversation.');
   await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
@@ -278,7 +307,6 @@ test('the agent\'s storyboard shows each Shot\'s text and panel images as they a
   await page.reload();
   await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
   await expect(row.locator('summary b')).toHaveText('Mara finds the key at last.');
-  await expect(row.locator('.wp-storyboard-action')).toHaveText('Mara lifts the key from the bench.');
-  await expect(row.locator('.wp-storyboard-dialogue li b')).toHaveText(['Mara', 'Narration']);
   await expect(image(1)).toHaveAttribute('data-displayed-version-id', v2);
+  await boardHolds('Mara finds the key at last.');
 });
