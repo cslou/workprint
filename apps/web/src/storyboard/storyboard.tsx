@@ -17,6 +17,7 @@ import { orderedStoryboard } from '../workspace/projection.js';
 import type { StoryboardPrerequisites } from './presentation.js';
 import { PanelImage, ShotText } from './shot-details.js';
 import { ShotLength } from './shot-length.js';
+import { ShotPositions } from './shot-positions.js';
 import './storyboard.css';
 
 type Workspace = OperationResponse<'workspace'>;
@@ -58,6 +59,7 @@ function ScopedStoryboard({ connection, scope, workspace, prerequisites, onSaved
         <header><span className="wp-shot-number">{number}</span><b>{shot.intent ?? `Shot ${number}`}</b></header>
         <PlanningEditor {...common} target={{ kind: 'shot', shotId: shot.shotId }} draft={draftFor({ kind: 'shot', shotId: shot.shotId })} onEdited={edited} />
         <ShotLength connection={connection} scope={scope} workspace={current} shotId={shot.shotId} onEdited={edited} />
+        <ShotPositions connection={connection} scope={scope} workspace={current} shotId={shot.shotId} onEdited={edited} />
         <div className="wp-board-text"><ShotText workspace={current} shot={shot} camera={facts?.shots?.find(value => value.shotId === shot.shotId)?.camera} /></div>
         <div className="wp-board-grid">{panels.map(({ panel, number: panelNumber }) => <section className="wp-board-panel" key={panel.panelId} data-panel-id={panel.panelId}><PanelThumbnail {...common} {...choices} shotId={shot.shotId} panel={panel} shotNumber={number} panelNumber={panelNumber} {...(facts ? { facts } : {})} /><b>{number}.{panelNumber}</b><PlanningEditor {...common} target={{ kind: 'panel', shotId: shot.shotId, panelId: panel.panelId }} draft={draftFor({ kind: 'panel', shotId: shot.shotId, panelId: panel.panelId })} onEdited={edited} /><PanelVersions {...common} {...choices} shotId={shot.shotId} panel={panel} shotNumber={number} panelNumber={panelNumber} {...(facts ? { facts } : {})} /></section>)}</div>
       </section>)}</div>
