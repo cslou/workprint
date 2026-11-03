@@ -571,9 +571,7 @@ The Script tab has three sections: **What happens**, **Shots** and **Look**.
 `details.sb-shot`: one group per shot, open by default.
 
 - **Header:** a 22px number badge, the shot name, a 12px summary ("Close-up · 5 s · 2 panels"), a status pill and a chevron.
-- **Body:**
-  - the camera as text, with an **Edit** link that opens that shot in the board;
-  - then the panels (`.sb-panel`): a 120px 16:9 image, the number "2.1" with a time, and a 13px caption. Dialogue in captions is set in the display font.
+- **Body:** the panels (`.sb-panel`): a 120px 16:9 image and the number "2.1" with a time. Selecting an image opens its viewer. The tab is the summary for every storyboard: the camera text, the captions (dialogue set in the display font) and the edits are in the [board](#storyboard-board) (Lou's Sprint 011 QA, 2026-11-03).
 - **The agent's storyboard** (Sprint 011, `.wp-storyboard-shot`). A Shot saved by the agent has no status pill and no time, since nothing approves or times it yet:
   - **Header:** the number badge, the intent, and a 12px summary of its framing and panel count ("medium · 2 panels").
   - **Body:** the panels only. The tab is the summary; the Shot's text is in the [board](#storyboard-board) (Lou's Sprint 011 QA, 2026-11-03).
