@@ -37,14 +37,14 @@ function refused(outcome: Exclude<PanelOutcome, { kind: 'saved' }>): GeneratePan
   }
 }
 
-// A panel becomes a Shot video's frame, so its shape stays strictly inside MiniMax's frame ratio: Meta keeps the
+// A panel becomes a Shot video's reference image, so its shape stays strictly inside MiniMax's image ratio: Meta keeps the
 // shape it is asked for but picks the pixels, and rounding at an exact limit could tip it over. Checked on every
 // call, though a later panel's size is ignored. "auto" leaves the shape to Meta.
 const panelSize = imageSize.refine(value => {
   if (value === 'auto') return true;
   const [width, height] = value.split('x').map(Number) as [number, number];
   return width / height > videoFrameRatio.min && width / height < videoFrameRatio.max;
-}, `A panel's shape must be "auto" or WxH with width ÷ height above ${videoFrameRatio.min} and below ${videoFrameRatio.max}, so it can be a Shot video's frame`);
+}, `A panel's shape must be "auto" or WxH with width ÷ height above ${videoFrameRatio.min} and below ${videoFrameRatio.max}, so it can be a Shot video's reference image`);
 
 /** Makes one panel's image with Meta from the Shot's sheets and saves it as the next version of that panel's image. */
 export const generatePanelTool = defineTool({
