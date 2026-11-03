@@ -12,10 +12,10 @@ Convention: `docs/conventions/backlog-management.md` (selected harness root; AGE
   - Run ffmpeg inside the existing bounded media sandbox, and verify the output like any other video.
 - References: `~/projects/animation-studio/.pi/skills/assemble-video/SKILL.md` (stream-copy joining with compatibility checks) and `.pi/lib/ffmpeg.mjs`; `apps/api/src/storage/media/sandbox.ts` (the existing ffmpeg sandbox); B-019.
 - Constraint: Its own sprint (013), after reference sheets (010), the storyboard (011) and reference-to-video Shots (012) (Lou, 2026-11-03). It joins the generated and Shot videos.
-- Work: [Sprint 013](sprints/sprint-013.md) Stories 1–2 (#143, #144). Lou approved the plan (2026-11-03, "go ahead"): the picture is stream-copied and never re-encoded, and the sound is re-encoded once, in step with each clip's picture, because every MiniMax clip's AAC starts with a priming packet that a copied join would turn into drift. The 120 s limit is to revisit later (Lou: "we can deal with the limit later"). Lou's QA is still open.
+- Work: [Sprint 013](sprints/sprint-013.md) Stories 1–2 (#143, #144). Lou approved the plan (2026-11-03, "go ahead"): the picture is stream-copied and never re-encoded, and the sound is re-encoded once, in step with each clip's picture, because every MiniMax clip's AAC starts with a priming packet that a copied join would turn into drift. The 120 s limit is to revisit later (Lou: "we can deal with the limit later"). Lou's QA passed on 2026-11-04.
 - Closed: 2026-11-04
 - Resolution: Done
-- Evidence: Sprint 013 merged into `main` by [PR #146](https://github.com/cslou/workprint/pull/146) at `8a56128` after Lou's QA passed (2026-11-04): the agent joined each Shot's chosen video, else its latest, in Shot order without a yes, the joined video played as one with each Shot's sound in step, and clips of another size were refused, naming the clip. The whole-sprint review's fixes are in #147; the deep main pre-merge passed at `423b3b8`.
+- Evidence: Sprint 013 merged into `main` by [PR #146](https://github.com/cslou/workprint/pull/146) at `8a56128` after Lou's QA passed (2026-11-04, per his report, "ok all pass"): the agent joined each Shot's chosen video, else its latest, in Shot order without a yes, the joined video played as one with each Shot's sound in step, and clips of another size were refused, naming the clip. The whole-sprint review's fixes are in #147; the deep main pre-merge passed at `423b3b8`.
 
 ### B-043 — Shot videos from reference images
 - Context: Lou's QA of Sprint 011 (2026-11-03). Shot videos are made from the first and last panels as MiniMax `first_frame` / `last_frame` (`apps/api/src/application/shots.ts`). Lou worried that frames are too strict, and frames force the panel's 3:2 shape. Two paid MiniMax-H3 reference-to-video (`reference_image`) runs on the QA images kept the subjects, followed the panel's framing and came out 16:9. Lou: "I would say this test passes."
@@ -25,7 +25,7 @@ Convention: `docs/conventions/backlog-management.md` (selected harness root; AGE
 - Work: [Sprint 012](sprints/sprint-012.md) Stories 1–4.
 - Closed: 2026-11-04
 - Resolution: Done
-- Evidence: Sprint 012 merged into `main` by [PR #141](https://github.com/cslou/workprint/pull/141) at `6410c63`; Lou's QA (2026-11-04, on the `423b3b8` host) passed: each Shot had a length he could change, a second panel only for a real change of picture, and Shot videos at 16:9 and the Shot's length that kept the sheets' subjects.
+- Evidence: Sprint 012 merged into `main` by [PR #141](https://github.com/cslou/workprint/pull/141) at `6410c63`; Lou's QA (2026-11-04, on the `423b3b8` host) passed (per his report, "ok all pass"): each Shot had a length he could change, a second panel only for a real change of picture, and Shot videos at 16:9 and the Shot's length that kept the sheets' subjects.
 
 ### B-041 — System prompt for the production workflow
 - Context: Lou, 2026-11-03, while planning Sprints 010 and 011. Schedule right after Sprint 011.
@@ -35,7 +35,7 @@ Convention: `docs/conventions/backlog-management.md` (selected harness root; AGE
 - Work: [Sprint 012](sprints/sprint-012.md) Story 5.
 - Closed: 2026-11-04
 - Resolution: Done
-- Evidence: Sprint 012 merged into `main` by [PR #141](https://github.com/cslou/workprint/pull/141) at `6410c63`; Lou's QA (2026-11-04, on the `423b3b8` host) passed the pass condition: a fresh conversation followed the steps in order and asked before paid steps.
+- Evidence: Sprint 012 merged into `main` by [PR #141](https://github.com/cslou/workprint/pull/141) at `6410c63`; Lou's QA (2026-11-04, on the `423b3b8` host) passed the pass condition (per his report, "ok all pass"): a fresh conversation followed the steps in order and asked before paid steps.
 
 ### B-015 — Agent tool: generate images with Meta Muse Image
 - Problem: The product cannot create images; users can only upload them (Sprint 005).
