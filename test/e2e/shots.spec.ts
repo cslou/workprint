@@ -190,6 +190,7 @@ test('the agent\'s storyboard shows each Shot\'s panel images as they are made, 
   const storyboard = { base: '', shots: [{ intent: 'Mara finds the key.', durationS: 6, framing: 'medium', action: 'Mara lifts the key from the bench.',
     dialogue: [{ character: 'Mara', text: 'There you are.' }, { character: 'Narrator', text: 'She had looked for years.', delivery: 'voice_over' }],
     cameraNote: 'A slow push-in.', references: [{ subjectId: 'mara', role: 'identity', purpose: 'Her face.' }, { subjectId: 'the-gallery', role: 'environment', purpose: 'The room.' }],
+    positions: { start: 'Mara kneels at the bench, frame right, facing frame left.', end: 'Mara stands, holding the key up, frame right.' },
     panels: [{ description: 'Mara reaches for the key.' }, { description: 'Mara holds the key up.' }] }] };
   await turn({ name: 'save-storyboard', args: storyboard }, 'Plan the storyboard', 'Saved Storyboard · Version 1');
   const videoId = new URL(page.url()).searchParams.get('conversation')!;

@@ -22,6 +22,14 @@ export const shotReferenceSchema = z.strictObject({ subjectId: z.string().max(20
 export const shotDurations = { min: 4, max: 15 } as const;
 export const shotDurationSchema = z.number().int().min(shotDurations.min).max(shotDurations.max);
 
+/** Each of a Shot's positions is at most this many characters. */
+export const shotPositionLength = 300;
+/**
+ * Where people and key objects are in the frame at a Shot's start and at its end, and which way they move, in
+ * frame-left / frame-right terms with the camera's side: what lets one Shot's picture follow the last.
+ */
+export const shotPositionsSchema = z.strictObject({ start: bounded(shotPositionLength), end: bounded(shotPositionLength) });
+
 /**
  * The optional Shot fields an assistant storyboard fills (additive to schema version 1), shared by saved content and
  * the workspace projection so a workspace holding an agent storyboard still parses.
@@ -34,4 +42,6 @@ export const shotFields = {
   references: z.array(shotReferenceSchema).max(10).refine(items => new Set(items.map(item => item.subjectId)).size === items.length, 'Each subject is referenced once per Shot').optional(),
   /** The Shot's length: the agent sets it, a person can change it, and its video is made at it. */
   durationS: shotDurationSchema.optional(),
+  /** Where the Shot starts and ends: the agent sets them on every save; an earlier storyboard's Shots have none. */
+  positions: shotPositionsSchema.optional(),
 };

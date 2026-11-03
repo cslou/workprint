@@ -5,7 +5,7 @@ import { logFailure } from './failure-log.js';
 export type AssistantStoryboardOutcome =
   | { kind: 'saved'; versionId: string; revision: number }
   | { kind: 'no_script' } | { kind: 'stale' } | { kind: 'not_found' }
-  | { kind: 'not_in_script'; field: string } | { kind: 'role'; field: string } | { kind: 'invalid'; field: string }
+  | { kind: 'not_in_script'; field: string } | { kind: 'role'; field: string } | { kind: 'no_place'; field: string } | { kind: 'invalid'; field: string }
   | { kind: 'no_room' } | { kind: 'unavailable' };
 /** Account and video come from trusted server context (an admitted native run), never from model arguments. */
 export type SaveAssistantStoryboard = (accountId: string, videoId: string, input: AssistantStoryboardInput) => Promise<AssistantStoryboardOutcome>;
