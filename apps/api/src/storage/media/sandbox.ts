@@ -55,7 +55,10 @@ export async function createMediaSandbox(options: { toolchainDirectory: string; 
     const live = () => { if (job.closed || job.controller.signal.aborted) throw new MediaProcessError(job.reason); if (Date.now() >= job.end) { job.reason = 'deadline'; job.controller.abort(); throw new MediaProcessError('deadline'); } };
     const cli = async (args: string[]) => {
       live(); const pending = runMediaChild(docker, args, { timeoutMs: Math.max(1, job.end - Date.now()), signal: job.controller.signal }); job.running.add(pending);
-      try { return (await pending).stdout; } finally { job.running.delete(pending); }
+      // The job's own deadline aborts a docker command in flight; that is the deadline, not a Stop.
+      try { return (await pending).stdout; }
+      catch (error) { throw job.reason === 'deadline' && error instanceof MediaProcessError && error.code === 'cancelled' ? new MediaProcessError('deadline') : error; }
+      finally { job.running.delete(pending); }
     };
     let result!: T, failure: unknown, callbackFailure: unknown;
     try {

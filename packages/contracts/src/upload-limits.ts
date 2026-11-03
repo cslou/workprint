@@ -1,4 +1,4 @@
-/** Byte admission limits only; technical success never grants approval or selection. */
+/** Admission limits (bytes, and a video's audio rates) only; technical success never grants approval or selection. */
 export const MAX_UPLOAD_IMAGE_BYTES = 10 * 1024 * 1024;
 export const MAX_UPLOAD_VIDEO_BYTES = 100 * 1024 * 1024;
 /** The AAC-LC sample rates a video's audio may use, for uploads, assistant clips and joined videos alike. */

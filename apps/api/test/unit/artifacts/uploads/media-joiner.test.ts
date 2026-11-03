@@ -22,9 +22,11 @@ test('MiniMax-shaped clips join, with clip 1\'s sound and every clip\'s frames a
   assert.equal(silent.kind === 'compatible' && silent.plan.audio, null);
   const mono = joinCheck([clip({}, { sample_rate: '48000', channels: 1 }), clip()]);
   assert.deepEqual(mono.kind === 'compatible' && mono.plan.audio, { rate: 48000, channels: 1 });
-  // Clip 1's sound is passed on as probed; the join itself refuses a rate or channel count it can't use.
-  const odd = joinCheck([clip({}, { sample_rate: '96000', channels: 6 }), clip()]);
-  assert.deepEqual(odd.kind === 'compatible' && odd.plan.audio, { rate: 96000, channels: 6 });
+  // Clip 1's sound sets the joined track, so a rate or channel count AAC-LC can't carry names clip 1.
+  assert.deepEqual(joinCheck([clip({}, { sample_rate: '96000', channels: 2 }), clip()]), { kind: 'incompatible', clip: 1, difference: 'its sound (96000 Hz, 2 channels) can\'t be joined' });
+  assert.deepEqual(joinCheck([clip({}, { sample_rate: '48000', channels: 6 }), clip()]), { kind: 'incompatible', clip: 1, difference: 'its sound (48000 Hz, 6 channels) can\'t be joined' });
+  // A later clip's sound is resampled to clip 1's, so its own rate never refuses it.
+  assert.equal(joinCheck([clip(), clip({}, { sample_rate: '96000', channels: 6 })]).kind, 'compatible');
 });
 
 test('the first clip that differs is named, with what a person can see first', () => {

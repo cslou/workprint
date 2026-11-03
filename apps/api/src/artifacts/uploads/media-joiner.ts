@@ -1,3 +1,4 @@
+import { VIDEO_AUDIO_RATES } from '@workprint/contracts';
 import { z } from 'zod';
 import { MediaProcessError, type MediaJoinPlan, type MediaSandbox } from '../../storage/index.js';
 import { UploadError } from './errors.js';
@@ -34,8 +35,8 @@ function fps(rate: string | undefined): string {
  * Whether the clips can be joined by copying their picture: each has one H.264 4:2:0 video stream first and at most
  * one audio stream after it (the concat demuxer pairs streams by position), and every clip's video matches clip 1's size, frame rate, profile, level, time base and codec
  * configuration. The difference names what a person can see first (size, then frame rate), else "its encoding".
- * The joined audio takes clip 1's rate and channels as probed (the join refuses ones it can't use), or 32 kHz stereo
- * when clip 1 has none.
+ * The joined audio takes clip 1's rate and channels as probed, or 32 kHz stereo when clip 1 has none; clip 1 is refused
+ * when its sound is at a rate or channel count the joined AAC track can't use.
  */
 export function joinCheck(probes: readonly JoinProbe[]): JoinCheck {
   const clips = [];
@@ -49,7 +50,9 @@ export function joinCheck(probes: readonly JoinProbe[]): JoinCheck {
     const video = videos[0]!, lengthS = positive(video.duration), frames = positive(video.nb_frames);
     if (video.codec_name !== 'h264' || video.pix_fmt !== 'yuv420p' || !video.width || !video.height || !video.extradata_hash) return refuse('isn\'t H.264 video');
     if (!lengthS || !frames || !Number.isInteger(frames)) return refuse('has no measurable length');
-    clips.push({ video, audio: audios[0], lengthS, frames });
+    const sound = audios[0];
+    if (!index && sound && (!VIDEO_AUDIO_RATES.includes(Number(sound.sample_rate)) || (sound.channels !== 1 && sound.channels !== 2))) return refuse(`its sound (${sound.sample_rate ?? 'unknown'} Hz, ${sound.channels ?? 'unknown'} channels) can't be joined`);
+    clips.push({ video, audio: sound, lengthS, frames });
     const first = clips[0]!.video;
     if (video.width !== first.width || video.height !== first.height) return refuse(`${video.width}×${video.height}; clip 1 is ${first.width}×${first.height}`);
     if (video.r_frame_rate !== first.r_frame_rate) return refuse(`${fps(video.r_frame_rate)}; clip 1 is ${fps(first.r_frame_rate)}`);
