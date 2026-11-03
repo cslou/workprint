@@ -1,10 +1,14 @@
 import { ArtifactError, UploadError, usedImageVersions, type GeneratedImageInput, type GeneratedImageSave, type StoredImage } from '../artifacts/index.js';
+import { MetaImageError, type ImageResult, type MetaImageClient } from '../generation/index.js';
 import { logFailure } from './failure-log.js';
 import type { SavedWorkReads } from './saved-reads.js';
 
-/** What saving an assistant-made image did. `refused` means the bytes didn't pass the media checks. */
+/**
+ * What saving an assistant-made image did. `refused` means the bytes didn't pass the media checks. `subjectLeft`
+ * means the subject asked for left the script while the image was made, so it was saved unfiled.
+ */
 export type GeneratedImageOutcome =
-  | { kind: 'saved'; versionId: string; width: number; height: number }
+  | { kind: 'saved'; versionId: string; width: number; height: number; subjectLeft: boolean }
   | { kind: 'refused' } | { kind: 'not_found' } | { kind: 'unavailable' };
 /** Account and video come from trusted server context (an admitted native run), never from model arguments. */
 export type SaveGeneratedImage = (accountId: string, videoId: string, input: GeneratedImageInput, signal?: AbortSignal) => Promise<GeneratedImageOutcome>;
@@ -13,13 +17,50 @@ export type SaveGeneratedImage = (accountId: string, videoId: string, input: Gen
 export type ImageInputsOutcome = { kind: 'read'; images: { versionId: string; dataUrl: string; width: number; height: number }[] } | { kind: 'not_found' } | { kind: 'unavailable' };
 export type ReadImageInputs = (accountId: string, videoId: string, versionIds: readonly string[]) => Promise<ImageInputsOutcome>;
 
+/** Why an assistant image wasn't made or kept: Meta refused or failed it, or its save did. `param` is the field Meta found invalid. */
+export type ImageFailure = Readonly<{ reason: 'content_policy' | 'invalid' | 'unavailable' | 'checks' | 'not_saved'; param?: string }>;
+
+/** Meta's error as an image failure. Stop is not a failure: callers handle `aborted` first. */
+export function metaImageFailure(error: unknown): ImageFailure {
+  if (!(error instanceof MetaImageError)) throw error;
+  if (error.code === 'content_policy') return { reason: 'content_policy' };
+  if (error.code === 'invalid_request') return { reason: 'invalid', ...(error.param ? { param: error.param } : {}) };
+  return { reason: 'unavailable' };
+}
+
+/** One image Meta made, or why it made none. */
+export type OneImage = { kind: 'made'; image: ImageResult['images'][number] } | { kind: 'failed'; failure: ImageFailure };
+
+/**
+ * One image from Meta with the options every assistant-made sheet view and panel uses: an edit of `inputs`, in order,
+ * or a generation from the prompt alone. Stop throws from the signal, also when it fires as the response arrives.
+ */
+export async function requestOneImage(images: Pick<MetaImageClient, 'generate' | 'edit'>, request: Readonly<{ prompt: string; size: string; inputs: readonly Readonly<{ dataUrl: string }>[] }>, signal: AbortSignal): Promise<OneImage> {
+  const meta = { prompt: request.prompt, n: 1, size: request.size, outputFormat: 'png' as const, reasoningStrength: 'high' as const, tools: { imageSearch: true, webSearch: true, shell: true } };
+  let result: ImageResult;
+  try {
+    result = request.inputs.length ? await images.edit({ ...meta, images: request.inputs.map(input => ({ dataUrl: input.dataUrl })) }, signal) : await images.generate(meta, signal);
+  } catch (error) {
+    // Stop: the run's own handling ends the line as incomplete.
+    if (error instanceof MetaImageError && error.code === 'aborted') signal.throwIfAborted();
+    return { kind: 'failed', failure: metaImageFailure(error) };
+  }
+  // Nothing from a response is kept after Stop.
+  signal.throwIfAborted();
+  const image = result.images[0];
+  return image ? { kind: 'made', image } : { kind: 'failed', failure: { reason: 'unavailable' } };
+}
+
+/** A save that didn't keep the image: its bytes failed the checks, or it couldn't be stored. */
+export const saveFailure = (outcome: Exclude<GeneratedImageOutcome, { kind: 'saved' }>): ImageFailure => ({ reason: outcome.kind === 'refused' ? 'checks' : 'not_saved' });
+
 
 /** In-process image saves for agent tools, over the assistant-only image capability. */
 export function createGeneratedImageSaver(save: (account: string, conversation: string, input: GeneratedImageInput, signal?: AbortSignal) => Promise<GeneratedImageSave>): SaveGeneratedImage {
   return async (accountId, videoId, input, signal) => {
     try {
-      const { version } = await save(accountId, videoId, input, signal);
-      return { kind: 'saved', versionId: version.id, width: version.media.width, height: version.media.height };
+      const { version, subjectLeft } = await save(accountId, videoId, input, signal);
+      return { kind: 'saved', versionId: version.id, width: version.media.width, height: version.media.height, subjectLeft };
     } catch (error) {
       if (error instanceof UploadError && (error.code === 'invalid_input' || error.code === 'unsupported')) return { kind: 'refused' };
       if (error instanceof UploadError && error.code === 'not_found') return { kind: 'not_found' };

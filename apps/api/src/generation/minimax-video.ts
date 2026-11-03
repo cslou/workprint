@@ -14,9 +14,12 @@ export const miniMaxVideoResolution = '768P';
 export const videoRatios = ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'] as const;
 export type VideoRatio = (typeof videoRatios)[number];
 export const videoDurations = { min: 4, max: 15 } as const;
+/** The width ÷ height MiniMax takes for a frame image. */
+export const videoFrameRatio = { min: 0.4, max: 2.5 } as const;
 /** The largest clip worth downloading. */
 export const maxVideoDownloadBytes = 100 * 1024 * 1024;
-const maxPromptCharacters = 7000;
+/** MiniMax takes a prompt of at most this many characters, trimmed. */
+export const maxVideoPromptCharacters = 7000;
 const maxFrameBytes = 30 * 1024 * 1024;
 const maxRequestBytes = 64 * 1024 * 1024;
 const maxResponseBytes = 1024 * 1024;
@@ -99,14 +102,14 @@ function checkFrame(frame: unknown, name: string): VideoFrame {
   if (Math.floor(data.length * 3 / 4) > maxFrameBytes) invalid(`${name}.size`);
   if (typeof width !== 'number' || typeof height !== 'number' || !Number.isInteger(width) || !Number.isInteger(height)
     || Math.min(width, height) < 256 || Math.max(width, height) > 5760) return invalid(`${name}.dimensions`);
-  if (width / height < 0.4 || width / height > 2.5) invalid(`${name}.ratio`);
+  if (width / height < videoFrameRatio.min || width / height > videoFrameRatio.max) invalid(`${name}.ratio`);
   return { dataUrl, width, height };
 }
 
 /** Checks the request against MiniMax's documented limits and builds MiniMax's body. */
 function requestBody(request: VideoRequest): string {
   if (typeof request.prompt !== 'string' || !request.prompt.trim()) invalid('prompt');
-  if (request.prompt.trim().length > maxPromptCharacters) invalid('prompt.length');
+  if (request.prompt.trim().length > maxVideoPromptCharacters) invalid('prompt.length');
   if (!Number.isInteger(request.durationS) || request.durationS < videoDurations.min || request.durationS > videoDurations.max) invalid('durationS');
   if (request.lastFrame !== undefined && request.firstFrame === undefined) invalid('lastFrame');
   const frames: VideoFrame[] = [];

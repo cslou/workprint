@@ -144,7 +144,7 @@ describe('assistant-made images are checked, saved privately as the video\'s dra
 
       const made = testPng({ seed: 5 });
       const saved = await save(account, video, { bytes: made, contentType: 'image/png', inputs: [] });
-      assert.deepEqual(saved, { kind: 'saved', versionId: (saved as { versionId: string }).versionId, width: 64, height: 48 });
+      assert.deepEqual(saved, { kind: 'saved', versionId: (saved as { versionId: string }).versionId, width: 64, height: 48, subjectLeft: false });
       if (saved.kind !== 'saved') return;
       assert.equal(effects.checks, 2, 'a busy checker is waited out, then the image is checked once');
       const row = (await pool.query('SELECT v.created_by,v.provenance,v.revision,g.sha256,g.byte_size::int AS byte_size,u.state,u.purpose FROM artifacts.versions v JOIN artifacts.generated_objects g ON g.version_id=v.version_id JOIN artifacts.conversation_uses u ON u.version_id=v.version_id WHERE v.version_id=$1', [saved.versionId])).rows;
@@ -270,7 +270,7 @@ describe('assistant-made clips are checked with the MiniMax allowance and saved 
 
       const job = await waiting([frame.versionId]);
       const saved = await saveClip(account, video, { bytes: clip, frames: [frame.versionId], jobId: job.id });
-      assert.deepEqual(saved, { kind: 'saved', versionId: (saved as { versionId: string }).versionId, width: GENERATED_CLIP.width, height: GENERATED_CLIP.height, durationMs: GENERATED_CLIP.durationMs });
+      assert.deepEqual(saved, { kind: 'saved', versionId: (saved as { versionId: string }).versionId, width: GENERATED_CLIP.width, height: GENERATED_CLIP.height, durationMs: GENERATED_CLIP.durationMs, gone: false });
       if (saved.kind !== 'saved') return;
       assert.equal(effects.checks, 2, 'a busy checker is waited out, then the clip is checked once');
       assert.ok(effects.verifyMs[0]! < 6000, `the clip verified in ${effects.verifyMs[0]} ms`);
@@ -296,10 +296,19 @@ describe('assistant-made clips are checked with the MiniMax allowance and saved 
 
       await t.test('the same clip as an upload is refused, and refused or failed saves store nothing', async () => {
         await assert.rejects(verify({ kind: 'video', bytes: clip, contentType: 'video/mp4', signal: AbortSignal.timeout(20000) }), { code: 'unsupported' }, 'uploads keep every rule');
+        // Another account's image, saved before the counts are taken.
+        const foreignVideo = (await createNativeConversation(native, 'clip-other')).id;
+        const foreign = await createGeneratedImageSaver(createGeneratedImages(pool, check, { storage, verifyMedia: verify }).save)('clip-other', foreignVideo, { bytes: testPng({ seed: 10 }), contentType: 'image/png', inputs: [] });
+        assert.equal(foreign.kind, 'saved'); if (foreign.kind !== 'saved') return;
         const before = await counts(), published = effects.published.length, other = await waiting([frame.versionId]);
         assert.deepEqual(await saveClip('clip-other', video, { bytes: clip, frames: [frame.versionId], jobId: other.id }), { kind: 'not_found' }, 'another account');
         assert.deepEqual(await saveClip(account, otherVideo, { bytes: clip, frames: [frame.versionId], jobId: other.id }), { kind: 'not_found' }, 'a frame another video uses');
         assert.deepEqual(await saveClip(account, video, { bytes: clip, frames: [randomUUID()], jobId: other.id }), { kind: 'not_found' });
+        // A Shot's frames are checked only as the account's own images: another account's image, a clip and an
+        // unknown id are not found.
+        for (const id of [foreign.versionId, saved.versionId, randomUUID()]) {
+          assert.deepEqual(await saveClip(account, video, { bytes: clip, frames: [id], jobId: other.id, target: { shotId: 'shot-1' } }), { kind: 'not_found' }, id);
+        }
         assert.equal(effects.published.length, published, 'nothing is stored');
         assert.equal((await jobs.get(account, other.id)).status, 'running', 'the job still waits');
         // A second success for a finished job, a job of another video, or frames that aren't the job's own roll

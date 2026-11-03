@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { ReadImageInputs, ReadOwnedWorkspace, SaveAssistantScript, SaveGeneratedImage, VideoJobs } from '../../application/index.js';
+import type { AssistantPanelImages, AssistantSheets, ReadImageInputs, ReadOwnedWorkspace, SaveAssistantScript, SaveAssistantStoryboard, SaveGeneratedImage, VideoJobs } from '../../application/index.js';
 import type { MetaImageClient } from '../../generation/index.js';
 
 /** Trusted scope from the admitted native run, never from model arguments. */
@@ -10,8 +10,12 @@ export interface ToolScope {
 
 /** Application functions that tools may call, the Meta image client and the video jobs. Supplied once by composition. */
 export type AgentCollaborators = Readonly<{
-  readWorkspace: ReadOwnedWorkspace; saveScript: SaveAssistantScript;
+  readWorkspace: ReadOwnedWorkspace; saveScript: SaveAssistantScript; saveStoryboard: SaveAssistantStoryboard;
   readImageInputs: ReadImageInputs; saveGeneratedImage: SaveGeneratedImage;
+  /** Saves a script subject's sheet and reads the video's use room. */
+  sheets: AssistantSheets;
+  /** Saves a panel's image as the next version of that panel's own image; absent, like `images`, where images can't be saved. */
+  panelImages?: AssistantPanelImages;
   /** Absent when images can't be saved (no storage or media checker) or a test composes no Meta fake; the tool then refuses before any call. */
   images?: Pick<MetaImageClient, 'generate' | 'edit'>;
   /** Absent without storage, the media checker or a MiniMax key (or a test's MiniMax fake); the tool then refuses before any call. */

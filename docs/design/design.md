@@ -533,6 +533,8 @@ The temporary aggregation reference uses native checkbox/label sections so its r
 
 **Images and videos show no status pill** (Lou, Sprint 008 QA, 2026-11-02): in Assets rows, the upload receipt and the media viewer. Every saved image is a draft and nothing approves one yet, so the pill told the person nothing. Media gets a status again when images can be approved or chosen.
 
+**Sheets show no status pill either** (Lou, Sprint 010, 2026-11-03): no Draft or Ready on a sheet's row in Assets or on the opened [reference sheet](#reference-sheet), and no approval step before a sheet is used. Sheets get a status when they can be approved. Assets shows no pill at all: a subject with nothing made yet reads Empty as plain text.
+
 ### Chips and pills
 
 - **Chip** (`.chip`): 28px high, 12px text, `--color-border-strong`, `--radius-pill`, with a × remove button. Chip types:
@@ -545,11 +547,15 @@ The temporary aggregation reference uses native checkbox/label sections so its r
 
 ### Item rows
 
-`.need` and `a.need.asset`: one row per character, place or prop in the Assets tab.
+The Assets tab lists the video's subjects, as the script names them (Sprint 010). Each subject is a group:
 
-- **Layout:** a 56px key image, then the name in 600 with an 12px type and source line ("Character sheet · in your Library"), then a [status pill](#status-pills).
-- **Shape:** `--color-bg-canvas`, `--color-border-default`, `--radius-md`, 10px 12px padding.
-- **Hover:** `--color-border-strong`. Clicking the row opens the [reference sheet](#reference-sheet).
+- **Subject entry** (`.wp-subject-entry`): the name in 600 and a 12px kind line, "Character", "Place" or "Prop", as in the demo's subject rows (`demo-03.html`). When storyboard Shots reference the subject, the kind line adds them in storyboard order: "Character · Shot 1", "Place · Shots 1 and 2" (Sprint 011). A subject with nothing to show reads "Empty" in plain 12px `--color-text-subtle` text at the right, with no pill (the demo's row without its status pill).
+- **Order:** characters, then places, then props, each in script order. Within a subject, its sheet rows come first, then its other image rows.
+- **Other:** a last group headed "Other", only when it holds something. It holds images filed under no subject or under one since removed from the script, uploads, uploaded videos, and sheets for a subject the script doesn't list.
+- **Sheet row** (`.wp-asset-row`): the sheet's first view as the key image, the name "Mara · Version 1", and a 12px line such as "Character sheet · 3 views". Each sheet is listed once, under its subject. Clicking the row opens the [reference sheet](#reference-sheet).
+- **Image row:** the 56px key image, the name ("Image 4 · Version 1"), and its size. An image in a sheet has no row of its own while its current version is one of the sheet's views. Clicking it opens the media viewer with its version history.
+- **Rows:** a 56px key image, then the name and the 12px line; `--color-bg-canvas`, `--color-border-default`, `--radius-md`, 10px 12px padding; hover `--color-border-strong`. No status pill (see above).
+- **Empty tab:** with no script and nothing saved, the tab keeps its empty text.
 
 ### Script
 
@@ -565,9 +571,12 @@ The Script tab has three sections: **What happens**, **Shots** and **Look**.
 `details.sb-shot`: one group per shot, open by default.
 
 - **Header:** a 22px number badge, the shot name, a 12px summary ("Close-up · 5 s · 2 panels"), a status pill and a chevron.
-- **Body:**
-  - the camera as text, with an **Edit** link that opens that shot in the board;
-  - then the panels (`.sb-panel`): a 120px 16:9 image, the number "2.1" with a time, and a 13px caption. Dialogue in captions is set in the display font.
+- **Body:** the panels (`.sb-panel`): a 120px 16:9 image and the number "2.1" with a time. Selecting an image opens its viewer. The tab is the summary for every storyboard: the camera text, the captions (dialogue set in the display font) and the edits are in the [board](#storyboard-board) (Lou's Sprint 011 QA, 2026-11-03).
+- **The agent's storyboard** (Sprint 011, `.wp-storyboard-shot`). A Shot saved by the agent has no status pill and no time, since nothing approves or times it yet:
+  - **Header:** the number badge, the intent, and a 12px summary of its framing and panel count ("medium · 2 panels").
+  - **Body:** the panels only. The tab is the summary; the Shot's text is in the [board](#storyboard-board) (Lou's Sprint 011 QA, 2026-11-03).
+  - **Dialogue speaker** (in the board): "Mara" for a spoken line, "Mara (off screen)" for one heard off screen, "Mara (voice-over)" for a scene character's voice-over, and "Narration" for any other voice-over. The agent decides which by the speaker it names (Lou, 2026-11-03).
+  - **Panels:** each panel's current image (the version a person chose, else the agent's latest) as the 120px 16:9 image, read once near view, then its number and its version links. Before one exists, the [Planned panel](#placeholders) placeholder; an image that can't be read shows "This image couldn’t be shown" in that dashed slot. Selecting the image opens the panel viewer on that version: the image at its own shape, its caption and "Use this version". A version link opens the same viewer on its version.
 - **Flags:**
   - `.sb-flag`: a note from the agent about a difference, in `--color-text-link` on `--color-bg-selected`;
   - `.sb-changed`: an edit that has not been regenerated yet. That shot's images dim to 45%.
@@ -581,12 +590,14 @@ The Script tab has three sections: **What happens**, **Shots** and **Look**.
 - **Camera pills live here.** A changed value marks its shot changed and shows **Regenerate** for that shot only.
 - **Edits are saved at once** and handed to the agent on its next turn (D-54).
 - **At ≤ `--breakpoint-sm`**, the grid is 2 columns.
+- **The agent's storyboard** (Sprint 011 QA follow-up): the board is the detailed view. Each Shot has its header and the Shot intent editor, then, each line only when the Shot has it, the action in 13px; the dialogue, one line each, with the speaker in 600 and the words in the display font; the camera note in 12px `--color-text-subtle`; and the subjects it names, joined by " · ", in 12px `--color-text-subtle`. Each panel tile shows its current image full width (selecting it opens the panel viewer), its number, the panel description editor and its version links.
 
 ### Video rows
 
 `.take-item`: one row per shot in the Videos tab.
 
 - **Layout:** a 96px 16:9 thumbnail with a play overlay, then a number badge with the shot name, then a 12px line ("Version 2 · New · 5.1 s · from 2.1 and 2.2"), then a status pill (Chosen or Draft).
+- **The agent's Shot videos** (Sprint 011): the row lists each version the agent made for the Shot. Its poster, read once near view, is the 96px thumbnail with the play overlay and plays it in the single-clip [viewer](#viewer); under it a 12px line reads "Version 1 · 0:07", adding "The poster couldn’t be shown" when the poster can't be read. A draft has no status pill; only a person's choice shows **Chosen**. A clip finished after its Shot left the storyboard is saved as a Generated video instead. A saved Shot clip isn't listed once its Shot leaves the storyboard; it stays in history.
 - **Version history:** "Version history · N earlier" is a closed disclosure inside the row. Each earlier version has a 72px thumbnail, its length and a "Use this version" pill.
 - **Above the rows:** during version comparison, **Play all · 0:13** opens the [scene player](#scene-player). Once a current scene edit exists, the [Scene edit card](#scene-edit-card) replaces that entry action. Its list is headed **Shots**; do not repeat the aggregate count.
 - **Wording:** on screen it is always "video" and "version", never "take" (D-68).
@@ -803,16 +814,17 @@ The ignored `outputs/verification/sprint-003/design-proposals/story4/` previews 
 
 ### Phase 3 saved-work reads
 
-**Provisionally approved by the orchestrator on 2026-10-29 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff.** Fourteen states reuse the approved Script sections, reference rows and sheets, Version/Use history rows, Library fallback tiles and shared buttons, with no token changes. Version history: a secondary `Load earlier versions` after the loaded rows loads only when activated and appends; loading keeps the rows, disables the button and adds `Loading earlier versions…`; failure keeps the rows, restores the button and adds `Earlier versions could not be loaded. The versions already shown are unchanged.`; the button is removed only when there is no next page, and only then does the summary show `Version history · N earlier`. The initial read shows `Loading version history…`, or on failure the button `Load version history` with `Version history could not be loaded.` An earlier version shows `Viewing version N` with a quiet `Back to current version`, read-only with no edit pencil; viewing or returning approves or selects nothing. Library pagination: a secondary `Load more`, with `Loading more Library items…` and `More Library items could not be loaded. The items already shown are unchanged.`, sits inside the scrolling grid directly after the last row of tiles, left-aligned, not in a fixed band above the unchanged selection tray; no Examples switch or Draft/Ready pills on Library tiles. An empty Library reads `Nothing saved yet` / `Your saved work will appear here.` A reference without an image keeps its Asset row with a dashed `No image` thumbnail and is never hidden; its Ready pill comes from the exact conversation use, not Library membership, and its sheet says `No images are supplied.`, with section text only from validated exact-version content. Enter/Space activates the pagination buttons, loading is announced politely and repeat activation is disabled; when the last page arrives, focus moves to the first newly added control before the button is removed, otherwise focus stays on the button, with no unexpected scroll jumps. Account, conversation, resource or filter changes discard loaded pages and late responses, with no replayed action.
+**Provisionally approved by the orchestrator on 2026-10-29 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff.** Fourteen states reuse the approved Script sections, reference rows and sheets, Version/Use history rows, Library fallback tiles and shared buttons, with no token changes. Version history: a secondary `Load earlier versions` after the loaded rows loads only when activated and appends; loading keeps the rows, disables the button and adds `Loading earlier versions…`; failure keeps the rows, restores the button and adds `Earlier versions could not be loaded. The versions already shown are unchanged.`; the button is removed only when there is no next page, and only then does the summary show `Version history · N earlier`. The initial read shows `Loading version history…`, or on failure the button `Load version history` with `Version history could not be loaded.` An earlier version shows `Viewing version N` with a quiet `Back to current version`, read-only with no edit pencil; viewing or returning approves or selects nothing. Library pagination: a secondary `Load more`, with `Loading more Library items…` and `More Library items could not be loaded. The items already shown are unchanged.`, sits inside the scrolling grid directly after the last row of tiles, left-aligned, not in a fixed band above the unchanged selection tray; no Examples switch or Draft/Ready pills on Library tiles. An empty Library reads `Nothing saved yet` / `Your saved work will appear here.` A reference without an image keeps its Asset row with a dashed `No image` thumbnail and is never hidden; its sheet shows section text only from validated exact-version content. (Sprint 010 replaced this state's Ready pill and its `No images are supplied.` line: sheets show no status, and a sheet with no images shows no Views section; see [Status pills](#status-pills).) Enter/Space activates the pagination buttons, loading is announced politely and repeat activation is disabled; when the last page arrives, focus moves to the first newly added control before the button is removed, otherwise focus stays on the button, with no unexpected scroll jumps. Account, conversation, resource or filter changes discard loaded pages and late responses, with no replayed action.
 
 ### Reference sheet
 
 `.livesheet`: a character or place sheet drawn from its structured record. The images are separate files; a PNG or PDF is only an export.
 
 - **Page:** `--color-bg-paper`, 24px 28px padding.
-- **Header:** an uppercase kicker, the name in `typography.display-xl`, a summary and a status pill.
-- **Sections:** a 3-column grid of sections, each with a `typography.display-sm` heading and figures with 12px captions.
-- **Missing images:** dashed 130 × 96 slots.
+- **Header:** an uppercase kicker with the kind ("Character", "Place" or "Prop"), the name in `typography.display-xl` and the description. No status pill.
+- **Sections:** a 3-column grid of sections, each with a `typography.display-sm` heading: Identity holds the continuity notes, then Views, full width.
+- **Views:** the sheet's images laid out together, each captioned with its view in 12px, read only once near view. Selecting one opens the media viewer on that exact version. There is no stitched image and no view count.
+- **An image that can't be shown:** a dashed 4:3 slot reading "This image couldn’t be shown", in its place only; the other views still show.
 
 ### Placeholders
 

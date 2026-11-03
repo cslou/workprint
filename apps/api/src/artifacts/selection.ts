@@ -23,13 +23,14 @@ export function shotSequence(plan: Plan): readonly string[] {
 export function shotOrderChanged(before: Plan, after: Plan): boolean {
   return canonicalJson(shotSequence(before)) !== canonicalJson(shotSequence(after));
 }
-/** Shots whose plan changed. Every Panel of a changed Shot is revalidated, including siblings. */
+/** Shots whose plan changed: any Shot field (intent, framing, action, dialogue, camera note, references) or Panel,
+ * but not its place in the order. Every Panel of a changed Shot is revalidated, including siblings. */
 export function changedShots(before: Plan, after: Plan): ReadonlySet<string> {
   const previous = new Map((before?.shots ?? []).map(shot => [shot.shotId, shot]));
   const changed = new Set<string>();
   for (const shot of after?.shots ?? []) {
     const old = previous.get(shot.shotId);
-    const plan = (value: typeof shot) => canonicalJson({ intent: value.intent, panels: [...value.panels].sort((a, b) => a.order - b.order) });
+    const plan = (value: typeof shot) => canonicalJson({ ...value, order: undefined, panels: [...value.panels].sort((a, b) => a.order - b.order) });
     if (!old || plan(old) !== plan(shot)) changed.add(shot.shotId);
   }
   for (const shotId of previous.keys()) if (!after?.shots.some(shot => shot.shotId === shotId)) changed.add(shotId);
@@ -50,10 +51,16 @@ export async function upstreamAffected(client: Query, account: string, conversat
     JOIN artifacts.version_dependencies d ON d.owner_id=u.version_owner_id AND d.version_id=u.version_id
     JOIN artifacts.versions v ON v.owner_id=u.version_owner_id AND v.version_id=u.version_id
     WHERE u.owner_id=$1 AND u.conversation_id=$2 AND d.dependency_id=$3`, [account, conversation, upstream])).rows;
+  // A superseded sheet also reaches every Shot that names its subject: those Shots' panels were made from it.
+  const subject = dependents.some(row => row.purpose === 'storyboard')
+    ? (await client.query<{ subject: string | null }>("SELECT content->'subject'->>'id' AS subject FROM artifacts.versions WHERE version_id=$1 AND kind='reference'", [upstream])).rows[0]?.subject ?? null : null;
   const shots = new Set<string>();
   for (const row of dependents) {
     const plan = row.purpose === 'storyboard' ? savedStoryboardContentSchema.safeParse(row.content).data : undefined;
-    for (const shot of plan?.shots ?? []) if (plan!.sourceScriptVersionId === upstream || shot.panels.some(panel => panel.references.includes(upstream))) shots.add(shot.shotId);
+    for (const shot of plan?.shots ?? []) {
+      if (plan!.sourceScriptVersionId === upstream || shot.panels.some(panel => panel.references.includes(upstream))
+        || (subject !== null && shot.references?.some(reference => reference.subjectId === subject))) shots.add(shot.shotId);
+    }
   }
   return [...new Set([...dependents.map(row => row.version_id), ...await affectedVersions(client, account, conversation, shots)])].sort();
 }

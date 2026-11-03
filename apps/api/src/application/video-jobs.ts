@@ -1,5 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises';
-import { GenerationJobError, MiniMaxVideoError, validateVideoRequest, type GenerationJobs, type JobFailure, type MiniMaxVideoClient, type MiniMaxVideoErrorCode, type VideoFrame, type VideoRatio, type VideoRequest } from '../generation/index.js';
+import { GenerationJobError, MiniMaxVideoError, validateVideoRequest, type GenerationJobs, type JobFailure, type JobTarget, type MiniMaxVideoClient, type MiniMaxVideoErrorCode, type VideoFrame, type VideoRatio, type VideoRequest } from '../generation/index.js';
 import { logFailure } from './failure-log.js';
 import type { ReadImageInputs } from './generated-images.js';
 import type { SaveGeneratedVideo } from './generated-videos.js';
@@ -7,20 +7,25 @@ import type { SaveGeneratedVideo } from './generated-videos.js';
 /** Why the caller's signal fired: Stop and the turn deadline interrupt a job; a shutdown leaves it running. */
 export type VideoAbortReason = 'stop' | 'deadline' | 'shutdown';
 export type VideoRunControl = Readonly<{ signal: AbortSignal; abortReason: () => VideoAbortReason | undefined }>;
-/** A new video. `firstFrame` and `lastFrame` are image version ids this video uses. */
-export type NewVideo = Readonly<{ prompt: string; durationS: number; ratio: VideoRatio; firstFrame?: string; lastFrame?: string }>;
+/** A new video. `firstFrame` and `lastFrame` are image version ids this video uses. `target`: the Shot it is made for. */
+export type NewVideo = Readonly<{ prompt: string; durationS: number; ratio: VideoRatio; firstFrame?: string; lastFrame?: string; target?: JobTarget }>;
 /** Why MiniMax didn't make the video: a refused create (its client code), or its own failed or cancelled task. */
 export type VideoProviderFailure = Exclude<MiniMaxVideoErrorCode, 'aborted'> | 'task_failed' | 'task_cancelled';
 
 export type VideoJobOutcome =
-  | { kind: 'saved'; jobId: string; versionId: string; width: number; height: number; durationMs: number }
-  /** Stop, the turn or poll deadline, or a download or save that was unavailable after MiniMax finished: resumable. */
-  | { kind: 'interrupted'; jobId: string; cause?: 'frame_unused' }
+  /** `gone`: the job's Shot left the storyboard, so its clip was saved as a generated video. */
+  | { kind: 'saved'; jobId: string; versionId: string; width: number; height: number; durationMs: number; gone: boolean }
+  /**
+   * Stop, the turn or poll deadline, or a download or save that was unavailable after MiniMax finished: resumable.
+   * `no_room`: a Shot's clip was made, but the video had no use left for it.
+   */
+  | { kind: 'interrupted'; jobId: string; cause?: 'frame_unused' | 'no_room' }
   /** The server is shutting down: the job stays `running` for the next start to mark interrupted. */
   | { kind: 'shutdown'; jobId: string }
   | { kind: 'failed'; jobId: string; reason: JobFailure; provider?: VideoProviderFailure }
   /** Nothing was saved or sent. `not_started`: the caller's signal fired before the create, so none is paid for. */
-  | { kind: 'input_not_found' } | { kind: 'invalid'; detail?: string } | { kind: 'not_started' }
+  /** `no_room`: a Shot's video would need a new use, and the video has none left. */
+  | { kind: 'input_not_found' } | { kind: 'invalid'; detail?: string } | { kind: 'not_started' } | { kind: 'no_room' }
   /** Resume refusals: an unknown job, one still being made, one already saved, one that failed. */
   | { kind: 'not_found' } | { kind: 'busy'; jobId: string } | { kind: 'already_saved'; jobId: string; versionId: string } | { kind: 'not_resumable'; jobId: string; reason: JobFailure }
   /** Saved work couldn't be reached. `created`: the create was already sent, so the task may be waiting at MiniMax. */
@@ -39,6 +44,8 @@ export const stoppedVideosLimit = 5;
 export type VideoJobCollaborators = Readonly<{
   jobs: Jobs; client: Pick<MiniMaxVideoClient, 'submit' | 'query' | 'download'>;
   readImageInputs: ReadImageInputs; saveVideo: SaveGeneratedVideo; timing?: VideoJobTiming;
+  /** Whether a Shot's next video can be kept: it moves a draft use, or the video has room for a new one. */
+  shotRoom: (accountId: string, videoId: string, shotId: string) => Promise<boolean>;
 }>;
 
 /** Where a create MiniMax refused leaves its job. A create whose outcome is unknown is never sent again. */
@@ -55,7 +62,7 @@ function createFailure(error: MiniMaxVideoError): { reason: JobFailure; provider
  * Account and video come from trusted server context (an admitted native run), never from model arguments.
  */
 export function createVideoJobs(collaborators: VideoJobCollaborators) {
-  const { jobs, client, readImageInputs, saveVideo } = collaborators;
+  const { jobs, client, readImageInputs, saveVideo, shotRoom } = collaborators;
   const timing = collaborators.timing ?? videoJobTiming;
 
   /** The caller's signal fired: interrupt the job, unless the server is shutting down. */
@@ -70,8 +77,8 @@ export function createVideoJobs(collaborators: VideoJobCollaborators) {
     return { kind: 'failed', jobId, reason: 'check_refused' };
   }
 
-  /** Polls a running job's task, then downloads, checks and saves its clip. `frames` are the job's saved inputs. */
-  async function wait(account: string, video: string, jobId: string, taskId: string, frames: readonly string[], control: VideoRunControl): Promise<VideoJobOutcome> {
+  /** Polls a running job's task, then downloads, checks and saves its clip. `frames` and `target` are the job's own. */
+  async function wait(account: string, video: string, jobId: string, taskId: string, { frames, target }: Readonly<{ frames: readonly string[]; target?: JobTarget | undefined }>, control: VideoRunControl): Promise<VideoJobOutcome> {
     const { signal } = control;
     const deadline = AbortSignal.timeout(timing.pollDeadlineMs);
     const polling = AbortSignal.any([signal, deadline]);
@@ -105,13 +112,15 @@ export function createVideoJobs(collaborators: VideoJobCollaborators) {
     }
     // Nothing is saved from a download that finished after Stop.
     if (signal.aborted) return stopped(account, jobId, control);
-    const saved = await saveVideo(account, video, { bytes, frames, jobId }, signal);
-    if (saved.kind === 'saved') return { kind: 'saved', jobId, versionId: saved.versionId, width: saved.width, height: saved.height, durationMs: saved.durationMs };
+    const saved = await saveVideo(account, video, { bytes, frames, jobId, ...(target ? { target } : {}) }, signal);
+    if (saved.kind === 'saved') return { kind: 'saved', jobId, versionId: saved.versionId, width: saved.width, height: saved.height, durationMs: saved.durationMs, gone: saved.gone };
     if (signal.aborted) return stopped(account, jobId, control);
     if (saved.kind === 'refused') return refused(account, jobId);
     // Unavailable, or a frame this video no longer uses (the user can use it again): the job stays resumable.
     // A job with no frames has none to restore, so its not-found reads as a plain stop.
+    // A Shot's clip with no use left for it waits with its job until there is room.
     await jobs.interrupted(account, jobId);
+    if (saved.kind === 'no_room') return { kind: 'interrupted', jobId, cause: 'no_room' };
     return saved.kind === 'not_found' && frames.length ? { kind: 'interrupted', jobId, cause: 'frame_unused' } : { kind: 'interrupted', jobId };
   }
 
@@ -147,9 +156,11 @@ export function createVideoJobs(collaborators: VideoJobCollaborators) {
         if (error instanceof MiniMaxVideoError) return { kind: 'invalid', ...(error.detail ? { detail: error.detail } : {}) };
         throw error;
       }
+      // A Shot's video that would need a use the video doesn't have is never paid for.
+      if (input.target && !await shotRoom(account, video, input.target.shotId)) return { kind: 'no_room' };
       // Once the caller's signal fired, nothing new is paid for.
       if (control.signal.aborted) return { kind: 'not_started' };
-      const job = await jobs.begin(account, video, { prompt: request.prompt, inputs: ids });
+      const job = await jobs.begin(account, video, { prompt: request.prompt, inputs: ids, target: input.target });
       let taskId: string;
       // The create is never cut off by Stop: it ends with a task id or an unknown outcome within its own timeout.
       sent();
@@ -160,7 +171,7 @@ export function createVideoJobs(collaborators: VideoJobCollaborators) {
         return { kind: 'failed', jobId: job.id, ...failure };
       }
       await jobs.started(account, job.id, taskId);
-      return wait(account, video, job.id, taskId, ids, control);
+      return wait(account, video, job.id, taskId, { frames: ids, target: input.target }, control);
     }),
 
     /** Waits on an interrupted job's same task again; nothing is created. Other states refuse. */
@@ -186,7 +197,8 @@ export function createVideoJobs(collaborators: VideoJobCollaborators) {
         if (now.status === 'succeeded' && now.resultVersionId) return { kind: 'already_saved', jobId, versionId: now.resultVersionId };
         return { kind: 'busy', jobId };
       }
-      return wait(account, video, jobId, job.taskId, resumed.inputs, control);
+      // A resumed Shot job still saves its clip to its Shot.
+      return wait(account, video, jobId, job.taskId, { frames: resumed.inputs, target: resumed.target }, control);
     }, true),
 
     /**

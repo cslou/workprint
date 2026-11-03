@@ -2,9 +2,16 @@ import { z } from 'zod';
 import { contentSchema, exportSchema, generationRequestSchema, generationStatusSchema, idSchema, intendedUseSchema, kindSchema, proposalSchema, questionSchema, revisionSchema, storyboardEditSchema, useBindingSchema, useSchema, versionSchema, workspaceSchema } from './models.js';
 export * from './models.js';
 export * from './saved-content.js';
+export * from './shot-fields.js';
+export * from './panel-image.js';
+export * from './storyboard-names.js';
 export * from './response-limits.js';
 export * from './upload-limits.js';
 export * from './asset-labels.js';
+export * from './script-subjects.js';
+export * from './dialogue-voice.js';
+export * from './sheet-views.js';
+export * from './subject-groups.js';
 
 export const errorCodeSchema = z.enum(['unauthenticated', 'forbidden', 'not_found', 'invalid_input', 'stale_revision', 'superseded', 'unsupported', 'not_implemented', 'integration_failure', 'busy']);
 export const errorEnvelopeSchema = z.strictObject({ error: z.strictObject({ code: errorCodeSchema, message: z.string().min(1), details: z.strictObject({ issues: z.array(z.strictObject({ path: z.array(z.union([z.string(), z.number()])), message: z.string() })).optional(), ids: z.array(idSchema).optional() }).optional() }) });

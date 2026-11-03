@@ -670,3 +670,112 @@ test('an edit of one image is its next version: Assets keeps one row, with the e
   await expect(dialog.getByText('Viewing version 1', { exact: true })).toBeVisible();
   await expect(dialog.getByText('Image saved · Version 1', { exact: true })).toBeVisible();
 });
+
+test('Assets lists each script subject with its sheet and images, Other last, with no status; the sheet shows its views', async ({ page, backend }) => {
+  test.slow();
+  const [account] = await backend.accounts(1);
+  const { provider, meta } = backend;
+  meta.reset();
+  const panel = page.getByRole('tabpanel');
+  const turn = async (call: { name: string; args: Record<string, unknown> }, ask: string, done: string) => {
+    provider.script({ toolCalls: [call] }, { text: [`${ask} done.`] });
+    await message(page).fill(ask);
+    await message(page).press('Enter');
+    const reply = live(page).getByRole('listitem', { name: 'Assistant message' }).last();
+    await expect(reply.getByText(done, { exact: true })).toBeVisible({ timeout: 45_000 });
+    await expect(reply.getByText(`${ask} done.`, { exact: true })).toBeVisible();
+    return reply;
+  };
+  await signIn(page, account!);
+  // With no script and nothing saved, the tab keeps its empty text.
+  await page.getByRole('tab', { name: 'Assets', exact: true }).click();
+  await expect(panel).toHaveText('Characters, places and props will appear here.');
+  const script = { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'The Gallery', time: 'night' }, characters: ['Mara'], script: [{ action: 'Mara finds the key.' }] }] };
+  await turn({ name: 'update-script', args: { baseVersionId: null, script, subjects: [{ id: '', kind: 'character', name: 'Mara' }, { id: '', kind: 'place', name: 'The Gallery' }, { id: '', kind: 'prop', name: 'The key' }] } }, 'Write the script', 'Saved version 1');
+  const subjects = panel.locator('.wp-subject');
+  // Subjects appear once the script is saved, in kind order, each still empty.
+  await expect(subjects).toHaveCount(3);
+  await expect(subjects.locator('.wp-subject-entry')).toHaveText([/^Mara\s*Character\s*Empty$/, /^The Gallery\s*Place\s*Empty$/, /^The key\s*Prop\s*Empty$/]);
+
+  const views = ['Full-body front', 'Three-quarter', 'Face close-up'];
+  const sheetLine = await turn({ name: 'generate-sheet', args: { subject: 'mara', description: 'A courier in a long grey coat.', continuityNotes: ['Keep the grey coat.'], views: views.map(view => ({ view, prompt: `${view}, standing still` })) } }, 'Make Mara\'s sheet', 'Saved Mara · Version 1');
+  // The images under the line are named by subject and view.
+  for (const view of views) await expect(sheetLine.locator(`img[alt="Mara · ${view}"]`)).toBeVisible();
+  await turn({ name: 'generate-image', args: { prompt: 'Mara on a bench', subject: 'mara' } }, 'Make one of Mara', 'Saved Image 4 · Version 1');
+  await turn({ name: 'generate-image', args: { prompt: 'An empty bench' } }, 'Make a bench', 'Saved Image 5 · Version 1');
+
+  const mara = panel.getByRole('region', { name: 'Mara', exact: true });
+  const holds = async () => {
+    await expect(subjects).toHaveCount(4);
+    await expect(subjects.locator('.wp-subject-entry b')).toHaveText(['Mara', 'The Gallery', 'The key', 'Other']);
+    // Mara has her sheet and one image; the sheet's views have no rows of their own, and nothing shows a status.
+    await expect(mara.locator('.wp-asset-row')).toHaveCount(2);
+    await expect(mara.locator('.wp-asset-row').first()).toHaveAccessibleName(/^Mara · Version 1/);
+    await expect(mara.locator('.wp-asset-row small').first()).toHaveText('Character sheet · 3 views');
+    await expect(mara.locator('.wp-asset-row').last()).toHaveAccessibleName(/^Image 4 · Version 1/);
+    await expect(panel.locator('.wp-status')).toHaveCount(0);
+    for (const name of ['The Gallery', 'The key']) await expect(panel.getByRole('region', { name, exact: true }).locator('.wp-subject-empty')).toHaveText('Empty');
+    await expect(mara.locator('.wp-subject-empty')).toHaveCount(0);
+    await expect(panel.getByRole('region', { name: 'Other', exact: true }).locator('.wp-asset-row')).toHaveAccessibleName(/^Image 5 · Version 1/);
+    // The open sheet shows its three images, captioned by view, with no status and no view count.
+    await mara.locator('.wp-asset-row').first().click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.locator('figcaption')).toHaveText(views);
+    for (const view of views) await expect.poll(() => dialog.getByRole('img', { name: `Mara · ${view}`, exact: true }).evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+    await expect(dialog.locator('.wp-status')).toHaveCount(0);
+    await expect(dialog.getByText('Missing views')).toHaveCount(0);
+    await expect(dialog.locator('.wp-sheet-kicker')).toHaveText('Character');
+    // Selecting a view opens the image viewer on that exact version.
+    const close = dialog.locator('figure').filter({ hasText: 'Face close-up' });
+    const id = await close.getAttribute('data-view-version-id');
+    await close.getByRole('button', { name: 'Open Mara · Face close-up', exact: true }).click();
+    await expect(page.locator(`.wp-upload-media[data-media-version-id="${id}"]`)).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(1);
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  };
+  await holds();
+
+  await page.reload();
+  await page.getByRole('tab', { name: 'Assets', exact: true }).click();
+  for (const view of views) await expect(saved(page).locator(`img[alt="Mara · ${view}"]`)).toBeVisible();
+  await holds();
+
+  // An edit of a view is its image's next version: that version gets a row under Mara, and the sheet keeps the old one.
+  const sheetOf = async () => (await backend.read<{ assets: { version: { kind: string; content?: { references: { versionId: string; view: string }[] } } }[] }>(account!, `/v1/conversations/${videoId(page)}/workspace`))
+    .assets.find(asset => asset.version.kind === 'reference')!.version.content!.references;
+  const front = (await sheetOf()).find(reference => reference.view === 'Full-body front')!.versionId;
+  await turn({ name: 'generate-image', args: { prompt: 'The same, at dusk', inputImages: [front], revises: front } }, 'Make the front view dusk', 'Saved Image 1 · Version 2');
+  await expect(mara.locator('.wp-asset-row')).toHaveCount(3);
+  await expect(mara.locator('.wp-asset-row').nth(1)).toHaveAccessibleName(/^Image 1 · Version 2/);
+  await mara.locator('.wp-asset-row').first().click();
+  // The old version is read on its own, since the workspace no longer holds it.
+  await expect(page.getByRole('dialog').locator(`figure[data-view-version-id="${front}"]`)).toHaveCount(1);
+  await expect.poll(() => page.getByRole('dialog').getByRole('img', { name: 'Mara · Full-body front', exact: true }).evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+
+  // One image that can't be read says so in its own slot; the other views still show.
+  const refused = (await sheetOf()).find(reference => reference.view === 'Three-quarter')!.versionId;
+  await page.route(`**/v1/versions/${refused}/media`, route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'integration_failure', message: 'Media unavailable' } }) }));
+  await page.reload();
+  await page.getByRole('tab', { name: 'Assets', exact: true }).click();
+  await mara.locator('.wp-asset-row').first().click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.locator('figure').filter({ hasText: 'Three-quarter' })).toContainText('This image couldn’t be shown');
+  for (const view of ['Full-body front', 'Face close-up']) await expect.poll(() => dialog.getByRole('img', { name: `Mara · ${view}`, exact: true }).evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  await expect(dialog.getByText('This image couldn’t be shown')).toHaveCount(1);
+
+  // A person still edits the sheet's description there: it saves as the sheet's next version, kept after a reload.
+  await dialog.getByRole('button', { name: 'Edit Description', exact: true }).click();
+  await dialog.getByRole('textbox', { name: 'Description' }).fill('A courier in a long blue coat.');
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(dialog.getByRole('textbox', { name: 'Description' })).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.reload();
+  await page.getByRole('tab', { name: 'Assets', exact: true }).click();
+  await expect(mara.locator('.wp-asset-row').first()).toHaveAccessibleName(/^Mara · Version 2/);
+  await mara.locator('.wp-asset-row').first().click();
+  await expect(page.getByRole('dialog')).toContainText('A courier in a long blue coat.');
+  await expect(page.getByRole('dialog').locator('figcaption')).toHaveText(views);
+});

@@ -1,42 +1,30 @@
 import { z } from 'zod';
+import { currentSubjects } from '@workprint/contracts';
+import { metaImageFailure, optionalId } from '../../../application/index.js';
 import { MetaImageError, type ImageResult } from '../../../generation/index.js';
 import { defineTool, type ToolContext } from '../define.js';
 import { workspaceItem } from '../../workspace-entries.js';
+import { imageFailure, imageSize } from '../image-shared.js';
 
 /** One saved image, named as read-workspace names it; the name is left out when the workspace can't be read. */
 type SavedImage = { versionId: string; label?: string; width: number; height: number };
-type Reason = 'content_policy' | 'input_not_found' | 'unavailable' | 'unsaveable' | 'checks' | 'not_saved' | 'invalid';
+type Reason = 'content_policy' | 'input_not_found' | 'subject_not_in_script' | 'unavailable' | 'unsaveable' | 'checks' | 'not_saved' | 'invalid';
+/** `note` says the subject left the script while the image was made, so it was saved under Other. */
 export type GenerateImageResult =
-  | { made: true; images: SavedImage[]; failed: number; showInChat: boolean }
+  | { made: true; images: SavedImage[]; failed: number; showInChat: boolean; note?: string }
   | { made: false; reason: Reason; message: string };
 
-const maxRatio = 16;
-/** "auto", or "WxH" within Meta's ratio limit. The long side is guidance, not a rule: Meta picks the pixels. */
-const size = z.string().regex(/^(auto|\d{2,5}x\d{2,5})$/).refine(value => {
-  if (value === 'auto') return true;
-  const [width, height] = value.split('x').map(Number) as [number, number];
-  return width > 0 && height > 0 && Math.max(width, height) / Math.min(width, height) <= maxRatio;
-}, 'The shape must be "auto" or WxH with a ratio of 16 or less');
-
-const summaries: Readonly<Record<Reason, string>> = {
-  content_policy: 'Not made: the request was refused',
-  input_not_found: 'Not made: an input image wasn’t found',
-  unavailable: 'Not made: Meta is unavailable',
-  unsaveable: 'Not made: images can’t be saved on this server',
-  checks: 'Not saved: the image didn’t pass checks',
-  not_saved: 'Not saved: the image couldn’t be stored',
-  invalid: 'Not made: the request wasn’t valid',
+const inputNotFound = {
+  summary: 'Not made: an input image wasn’t found',
+  message: 'Not made: an input image is not one this video uses. Call read-workspace and pass only image versionIds it lists.',
 };
-const messages: Readonly<Record<Exclude<Reason, 'invalid'>, string>> = {
-  content_policy: 'Not made: Meta refused this request under its content policy. Rephrase the prompt without the refused content, or ask the user how to change it.',
-  input_not_found: 'Not made: an input image is not one this video uses. Call read-workspace and pass only image versionIds it lists.',
-  unavailable: 'Not made: Meta image generation is unavailable right now. Tell the user; do not retry more than once in this turn.',
-  unsaveable: 'Not made: this server cannot save images, so nothing was sent to Meta. Tell the user; do not retry.',
-  checks: 'Not saved: the image Meta returned did not pass the media checks. Tell the user; you may try once more with a different size.',
-  not_saved: 'Not saved: Meta made the image but saving is unavailable right now. Tell the user and do not retry in this turn.',
+const subjectNotInScript = {
+  summary: 'Not made: that subject isn’t in the script',
+  message: 'Not made: that subject isn’t in the script; add it to the script first. Pass a subject id read-workspace lists, or leave subject empty.',
 };
-const refusal = (reason: Reason, param?: string): GenerateImageResult => ({ made: false, reason,
-  message: reason === 'invalid' ? `Not made: Meta found the request invalid${param ? ` (${param})` : ''}. Fix that field and try once more.` : messages[reason] });
+const subjectLeft = 'Saved under Other: that subject is no longer in the script.';
+const line = (reason: Reason, param?: string) => reason === 'input_not_found' ? inputNotFound : reason === 'subject_not_in_script' ? subjectNotInScript : imageFailure({ reason, param });
+const refusal = (reason: Reason, param?: string): GenerateImageResult => ({ made: false, reason, message: line(reason, param).message });
 
 /** Names each saved image as read-workspace does, so the model and the user see the same name. */
 async function labelled(context: ToolContext, saved: Omit<SavedImage, 'label'>[]): Promise<SavedImage[]> {
@@ -60,26 +48,28 @@ export const generateImageTool = defineTool({
     'size sets the shape, not exact pixels: "auto", or WxH such as 1536x1024. Keep the long side at 2048 or less.',
     'For variations of one prompt, make one call with count; make separate calls only for different prompts.',
     'When the user asks to change one existing image, set revises to its versionId (also one of inputImages) and count to 1: the result becomes that image\'s next version. Variations and new images leave revises empty.',
+    'Set subject to the id, from read-workspace, of the script subject the image shows, so it is filed under that subject; leave it empty for an image of nothing in particular.',
     'Set showInChat to true when the user asked for an image directly, so it is shown in the chat.',
   ].join(' '),
   inputSchema: z.strictObject({
     prompt: z.string().min(1).max(32000).refine(text => text.trim().length > 0, 'The prompt is empty').describe('The compact image prompt.'),
     inputImages: z.array(z.string().min(1).max(200)).max(10).default([]).describe('Image versionIds from read-workspace to edit or build on; empty to generate from the prompt alone.'),
     count: z.number().int().min(1).max(10).default(1).describe('How many images to make, 1 to 10.'),
-    size: size.default('auto').describe('"auto" or WxH, which sets the shape, not exact pixels. Keep the long side at 2048 or less.'),
+    size: imageSize.default('auto').describe('"auto" or WxH, which sets the shape, not exact pixels. Keep the long side at 2048 or less.'),
     reasoning: z.enum(['high', 'low']).default('high').describe('How much Meta reasons about the prompt first.'),
     imageSearch: z.boolean().default(true).describe('Let Meta search for reference images.'),
     webSearch: z.boolean().default(true).describe('Let Meta search the web.'),
     shell: z.boolean().default(true).describe('Let Meta use its code tool.'),
     showInChat: z.boolean().default(false).describe('True when the user asked for an image directly, to show it in the chat.'),
     revises: z.string().max(200).default('').describe('The versionId of the one image this call changes, also listed in inputImages; empty for a new image.'),
+    subject: z.string().max(200).default('').describe('The id of the script subject the image shows, from read-workspace; empty for none. An edit with it empty keeps its image\'s subject.'),
   }),
   phrase: 'Making an image…',
   phraseFor: input => input.count > 1 ? `Making ${input.count} images…` : 'Making an image…',
   // A refusal still finishes the line. Mastra hands back an input validation failure as `{ error: true }`.
   doneSummary: (result: GenerateImageResult | { error: true }) => {
-    if ('error' in result) return summaries.invalid;
-    if (!result.made) return summaries[result.reason];
+    if ('error' in result) return line('invalid').summary;
+    if (!result.made) return line(result.reason).summary;
     const total = result.images.length + result.failed;
     if (result.failed) return `Saved ${result.images.length} of ${total} images`;
     const [only] = result.images;
@@ -97,6 +87,13 @@ export const generateImageTool = defineTool({
     const inputImages = [...new Set(input.inputImages)];
     // Only one image made from that very image can be its next version; anything else is a new image.
     const revises = input.count === 1 && inputImages.includes(input.revises) ? input.revises : undefined;
+    // A subject not in the script is refused before any paid call: a new subject goes into the script first.
+    const subject = optionalId(input.subject) || undefined;
+    if (subject) {
+      const read = await collaborators.readWorkspace(scope.accountId, scope.videoId);
+      if (read.kind !== 'found') return refusal('unavailable');
+      if (!currentSubjects(read.workspace).some(candidate => candidate.id === subject)) return refusal('subject_not_in_script');
+    }
     if (inputImages.length) {
       const read = await collaborators.readImageInputs(scope.accountId, scope.videoId, inputImages);
       if (read.kind === 'not_found') return refusal('input_not_found');
@@ -115,25 +112,27 @@ export const generateImageTool = defineTool({
       if (!(error instanceof MetaImageError)) throw error;
       // Stop: the run's own handling ends the line as incomplete.
       if (error.code === 'aborted') signal.throwIfAborted();
-      if (error.code === 'content_policy') return refusal('content_policy');
-      if (error.code === 'invalid_request') return refusal('invalid', error.param);
-      return refusal('unavailable');
+      const failure = metaImageFailure(error);
+      return refusal(failure.reason, failure.param);
     }
     // One at a time in Meta's order, so names follow that order and the media checker isn't contended.
     const saved: Omit<SavedImage, 'label'>[] = [];
-    let refused = 0, unsaved = 0;
+    let refused = 0, unsaved = 0, left = false;
     // Never more than asked for, even if Meta returns more.
     for (const image of result.images.slice(0, input.count)) {
       // Nothing from a response is saved after Stop; images saved before it stay.
       signal.throwIfAborted();
-      const outcome = await collaborators.saveGeneratedImage(scope.accountId, scope.videoId, { bytes: image.bytes, contentType: image.contentType, inputs: inputs.map(item => item.versionId), ...(revises ? { revises } : {}) }, signal);
+      const outcome = await collaborators.saveGeneratedImage(scope.accountId, scope.videoId, { bytes: image.bytes, contentType: image.contentType, inputs: inputs.map(item => item.versionId), ...(revises ? { revises } : {}), ...(subject ? { subject } : {}) }, signal);
       signal.throwIfAborted();
-      if (outcome.kind === 'saved') saved.push({ versionId: outcome.versionId, width: outcome.width, height: outcome.height });
+      if (outcome.kind === 'saved') {
+        saved.push({ versionId: outcome.versionId, width: outcome.width, height: outcome.height });
+        left ||= outcome.subjectLeft;
+      }
       else if (outcome.kind === 'refused') refused++;
       else unsaved++;
     }
     const failed = refused + unsaved;
     if (!saved.length) return refusal(unsaved ? 'not_saved' : 'checks');
-    return { made: true, images: await labelled(context, saved), failed, showInChat: input.showInChat };
+    return { made: true, images: await labelled(context, saved), failed, showInChat: input.showInChat, ...(left ? { note: subjectLeft } : {}) };
   },
 });

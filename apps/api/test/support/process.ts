@@ -38,7 +38,10 @@ export async function start(command: string, args: string[], options: { cwd: str
     stopped = true;
     const signal = (value: NodeJS.Signals) => {
       try { process.kill(-child.pid!, value); } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+        // ESRCH: the group is gone. macOS gives EPERM for a group whose last members are exiting (zombies); every
+        // member is this user's, so there is nothing left to signal, and `exited` still settles.
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code !== 'ESRCH' && code !== 'EPERM') throw error;
       }
     };
     signal('SIGTERM');

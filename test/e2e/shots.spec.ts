@@ -1,5 +1,7 @@
 import { test, expect, loadSupport, makeVideo, signIn } from './fixtures.js';
+import type { Locator } from '@playwright/test';
 import type * as ShotWork from '../../apps/api/test/support/shot-choice-work.js';
+import type * as MetaImages from '../../apps/api/test/support/meta-image-fake.js';
 
 test('a Shot video choice survives reload and can be changed to another exact version', async ({ page, backend }) => {
   const { prepareShotChoiceWork } = await loadSupport<typeof ShotWork>('shot-choice-work');
@@ -151,4 +153,175 @@ test('a video the agent makes is listed in Generated videos without a reload, pl
   const card = page.locator('.wp-request-card').filter({ hasText: 'Video request' });
   await expect(card).toHaveCount(1);
   expect(await clip.evaluate((row, other) => !!(row.compareDocumentPosition(other!) & Node.DOCUMENT_POSITION_FOLLOWING), await card.elementHandle())).toBe(true);
+});
+
+test('the agent\'s storyboard shows each Shot\'s panel images as they are made, its board shows the Shot\'s text, a panel opens its image, and its Shot video plays from its poster', async ({ page, backend }) => {
+  test.slow();
+  const { provider, meta, minimax } = backend;
+  provider.reset(); meta.reset(); minimax.reset();
+  const [account] = await backend.accounts(1);
+  const box = page.getByRole('textbox', { name: 'Message' });
+  const turn = async (call: { name: string; args: Record<string, unknown> }, ask: string, done: string) => {
+    provider.script({ toolCalls: [call] }, { text: [`${ask} done.`] });
+    await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeVisible();
+    await box.fill(ask);
+    await box.press('Enter');
+    const reply = page.getByRole('list', { name: 'New messages' }).getByRole('listitem', { name: 'Assistant message' }).last();
+    await expect(reply.getByText(done, { exact: true })).toBeVisible({ timeout: 60_000 });
+    await expect(reply.getByText(`${ask} done.`, { exact: true })).toBeVisible();
+  };
+  await signIn(page, account!);
+  const script = { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'The Gallery', time: 'night' }, characters: ['Mara'], script: [{ action: 'Mara finds the key.' }] }] };
+  await turn({ name: 'update-script', args: { baseVersionId: null, script, subjects: [{ id: '', kind: 'character', name: 'Mara' }, { id: '', kind: 'place', name: 'The Gallery' }] } }, 'Write the script', 'Saved version 1');
+  const views = ['Full-body front', 'Three-quarter', 'Face close-up'];
+  await turn({ name: 'generate-sheet', args: { subject: 'mara', description: 'A courier in a long grey coat.', continuityNotes: ['Keep the grey coat.'], views: views.map(view => ({ view, prompt: `${view}, standing still` })) } }, 'Make Mara\'s sheet', 'Saved Mara · Version 1');
+  const storyboard = { base: '', shots: [{ intent: 'Mara finds the key.', framing: 'medium', action: 'Mara lifts the key from the bench.',
+    dialogue: [{ character: 'Mara', text: 'There you are.' }, { character: 'Narrator', text: 'She had looked for years.', delivery: 'voice_over' }],
+    cameraNote: 'A slow push-in.', references: [{ subjectId: 'mara', role: 'identity', purpose: 'Her face.' }, { subjectId: 'the-gallery', role: 'environment', purpose: 'The room.' }],
+    panels: [{ description: 'Mara reaches for the key.' }, { description: 'Mara holds the key up.' }] }] };
+  await turn({ name: 'save-storyboard', args: storyboard }, 'Plan the storyboard', 'Saved Storyboard · Version 1');
+  const videoId = new URL(page.url()).searchParams.get('conversation')!;
+  const { storyboard: { shots: [shot] } } = await backend.read<{ storyboard: { shots: { shotId: string; panels: { panelId: string; order: number }[] }[] } }>(account!, `/v1/conversations/${videoId}/workspace`);
+  const [first, second] = [...shot!.panels].sort((a, b) => a.order - b.order);
+  // MiniMax takes frames of 256 pixels or more on their short side, so the panels are video-sized.
+  const { testPng } = await loadSupport<typeof MetaImages>('meta-image-fake');
+  meta.script({ images: [testPng({ width: 512, height: 288, seed: 11 })] }, { images: [testPng({ width: 512, height: 288, seed: 12 })] });
+
+  const panel = page.getByRole('tabpanel');
+  const row = panel.locator(`.wp-storyboard-shot[data-shot-id="${shot!.shotId}"]`);
+  const image = (n: number) => row.getByRole('img', { name: `Shot 1 · Panel 1.${n}`, exact: true });
+  await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
+  // Before any panel is made, both are planned.
+  await expect(row.getByText('Planned panel', { exact: true })).toHaveCount(2);
+  // Each panel's image appears after its tool line, without a reload.
+  await turn({ name: 'generate-panel', args: { shot: shot!.shotId, panel: first!.panelId, prompt: 'Preserve her coat.', images: [] } }, 'Make panel 1', 'Saved Shot 1 · Panel 1.1 · Version 1');
+  await expect(row.getByText('Planned panel', { exact: true })).toHaveCount(1);
+  await expect.poll(() => image(1).evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  await turn({ name: 'generate-panel', args: { shot: shot!.shotId, panel: second!.panelId, prompt: 'Change only her hands.', images: [] } }, 'Make panel 2', 'Saved Shot 1 · Panel 1.2 · Version 1');
+  await turn({ name: 'generate-shot', args: { shot: shot!.shotId, prompt: 'She lifts the key into the light.' } }, 'Make the Shot', 'Saved Shot 1 · Video · Version 1');
+
+  const shown = (locator: Locator) => expect.poll(() => locator.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  // Selecting a panel's image opens the viewer on its current version, with that image shown, and closes back to `inside`.
+  const opens = async (inside: Locator, expected: string) => {
+    await inside.getByRole('button', { name: 'Open Shot 1 · Panel 1.1', exact: true }).click();
+    const viewer = page.getByRole('dialog', { name: /^Panel 1\.1 · Version / });
+    await expect(viewer.locator('.wp-panel-version')).toHaveAttribute('data-displayed-version-id', expected);
+    await shown(viewer.locator('.wp-panel-version img'));
+    await viewer.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(viewer).toHaveCount(0);
+  };
+  // The board is the detailed view: each Shot's text and its panel images; a board panel opens the same viewer.
+  const boardHolds = async (intent: string) => {
+    await panel.getByRole('button', { name: 'View storyboard', exact: true }).click();
+    const board = page.getByRole('dialog');
+    const section = board.locator(`.wp-board-shot[data-shot-id="${shot!.shotId}"]`);
+    await expect(section.locator('header b')).toHaveText(intent);
+    await expect(section.locator('.wp-storyboard-action')).toHaveText('Mara lifts the key from the bench.');
+    await expect(section.locator('.wp-storyboard-dialogue li b')).toHaveText(['Mara', 'Narration']);
+    await expect(section.locator('.wp-storyboard-dialogue li q')).toHaveText(['There you are.', 'She had looked for years.']);
+    await expect(section.locator('.wp-storyboard-camera')).toHaveText('A slow push-in.');
+    await expect(section.locator('.wp-storyboard-subjects')).toHaveText('Mara · The Gallery');
+    for (const n of [1, 2]) await shown(section.getByRole('img', { name: `Shot 1 · Panel 1.${n}`, exact: true }));
+    await opens(section, (await image(1).getAttribute('data-displayed-version-id'))!);
+    await expect(board).toBeVisible();
+    await board.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(board).toHaveCount(0);
+  };
+
+  const holds = async () => {
+    await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
+    // The tab is the summary: the intent, framing, panel count and panel images, without the Shot's text.
+    await expect(row.locator('summary')).toContainText('Mara finds the key.');
+    await expect(row.locator('summary small')).toHaveText('medium · 2 panels');
+    await expect(row.locator('.wp-storyboard-action, .wp-storyboard-dialogue, .wp-storyboard-camera')).toHaveCount(0);
+    for (const n of [1, 2]) await shown(image(n));
+    await expect(row.getByText('Planned panel', { exact: true })).toHaveCount(0);
+    await expect(panel.locator('.wp-status')).toHaveCount(0);
+    await opens(row, (await image(1).getAttribute('data-displayed-version-id'))!);
+    await boardHolds('Mara finds the key.');
+
+    // The Shot row has the assistant's draft, with no status, and it plays; it isn't a Generated video.
+    await page.getByRole('tab', { name: 'Videos', exact: true }).click();
+    const video = panel.locator(`.wp-video-row[data-shot-id="${shot!.shotId}"]`);
+    await expect(video).toHaveCount(1);
+    await expect(panel.locator('.wp-video-row[data-version-id]')).toHaveCount(0);
+    await expect(video.locator('.wp-status')).toHaveCount(0);
+    // Its poster is the play button, and the row says which version it is.
+    await shown(video.locator('.wp-video-poster img'));
+    await expect(video.locator('.wp-video-metadata')).toHaveText(/^Version 1 · \d+:\d{2}$/);
+    await video.getByRole('button', { name: 'View Shot 1 version 1', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.locator('.wp-clip-surface[data-ready="true"]')).toHaveCount(1);
+    await dialog.getByRole('button', { name: 'Play', exact: true }).click();
+    await expect.poll(async () => ['playing', 'ended'].includes(await dialog.locator('.wp-clip-surface').getAttribute('data-player-status') ?? '')
+      || await dialog.locator('.wp-clip-media').evaluate(node => (node as HTMLVideoElement).currentTime > 0), { timeout: 10_000 }).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+
+    // Assets names each subject's Shots and has no row for a panel image.
+    await page.getByRole('tab', { name: 'Assets', exact: true }).click();
+    await expect(panel.locator('.wp-subject-entry')).toHaveText([/^Mara\s*Character · Shot 1$/, /^The Gallery\s*Place · Shot 1\s*Empty$/]);
+    await expect(panel.getByRole('region', { name: 'Mara', exact: true }).locator('.wp-asset-row')).toHaveCount(1);
+    await expect(panel.getByRole('region', { name: 'Other', exact: true })).toHaveCount(0);
+  };
+  await holds();
+  await page.reload();
+  await holds();
+
+  // The panel's image is its current version: the agent's latest, until a person chooses one, which then stays.
+  type Read = { storyboard: { shots: { panels: { panelId: string; candidateImageVersions: { id: string; revision: number }[] }[] }[] } };
+  const version = async (revision: number) => (await backend.read<Read>(account!, `/v1/conversations/${videoId}/workspace`)).storyboard.shots[0]!.panels
+    .find(item => item.panelId === first!.panelId)!.candidateImageVersions.find(candidate => candidate.revision === revision)!.id;
+  const remake = async (revision: number, seed: number) => {
+    meta.script({ images: [testPng({ width: 512, height: 288, seed })] });
+    await turn({ name: 'generate-panel', args: { shot: shot!.shotId, panel: first!.panelId, prompt: 'Preserve her coat; warmer light.', images: [] } }, `Remake panel 1 (${revision})`, `Saved Shot 1 · Panel 1.1 · Version ${revision}`);
+  };
+  await remake(2, 13);
+  const v2 = await version(2);
+  await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
+  await expect(image(1)).toHaveAttribute('data-displayed-version-id', v2);
+  await row.getByRole('button', { name: 'View Panel 1.1 version 2', exact: true }).click();
+  await expect(page.getByRole('dialog').locator('.wp-panel-version')).toHaveAttribute('data-displayed-version-id', v2);
+  await shown(page.getByRole('dialog').locator('.wp-panel-version img'));
+  await page.getByRole('dialog').getByRole('button', { name: 'Use this version', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('status')).toHaveText('This exact version is now used in this conversation.');
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await remake(3, 14);
+  const v3 = await version(3);
+  expect(v3).not.toBe(v2);
+  // The agent's version 3 is listed, but the person's version 2 is still the one shown, before and after a reload.
+  await expect(row.getByRole('button', { name: 'View Panel 1.1 version 3', exact: true })).toBeVisible();
+  await expect(image(1)).toHaveAttribute('data-displayed-version-id', v2);
+  await expect.poll(() => image(1).evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  // The panel's image opens the person's version 2, not the agent's newer version 3.
+  await opens(row, v2);
+  // After a reload (the chat already read version 3 once), a version whose image can't be read says so in the viewer,
+  // and can still be chosen.
+  await page.route(`**/v1/versions/${v3}/media`, route => route.fulfill({ status: 503, body: '' }));
+  await page.reload();
+  await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
+  await expect(image(1)).toHaveAttribute('data-displayed-version-id', v2);
+  await opens(row, v2);
+  await row.getByRole('button', { name: 'View Panel 1.1 version 3', exact: true }).click();
+  await expect(page.getByRole('dialog').locator('.wp-panel-version')).toContainText('This image couldn’t be shown');
+  await expect(page.getByRole('dialog').getByRole('button', { name: 'Use this version', exact: true })).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+  await page.unroute(`**/v1/versions/${v3}/media`);
+
+  // A person's planning edit still saves from the board, and the Shot keeps the agent's text.
+  await panel.getByRole('button', { name: 'View storyboard', exact: true }).click();
+  const board = page.getByRole('dialog');
+  await board.getByRole('button', { name: 'Edit Shot intent', exact: true }).click();
+  await board.getByRole('textbox', { name: 'Shot intent' }).fill('Mara finds the key at last.');
+  await board.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(board.getByRole('textbox', { name: 'Shot intent' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(board).toHaveCount(0);
+  await expect(row.locator('summary b')).toHaveText('Mara finds the key at last.');
+  await page.reload();
+  await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
+  await expect(row.locator('summary b')).toHaveText('Mara finds the key at last.');
+  await expect(image(1)).toHaveAttribute('data-displayed-version-id', v2);
+  await boardHolds('Mara finds the key at last.');
 });

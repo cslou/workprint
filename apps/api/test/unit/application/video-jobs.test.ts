@@ -20,8 +20,8 @@ function memoryJobs() {
   };
   return {
     rows,
-    begin: async (accountId: string, conversationId: string, input: { prompt: string; inputs: readonly string[] }) => {
-      const job: VideoJob = { id: randomUUID(), accountId, conversationId, purpose: 'video', inputs: [...input.inputs], status: 'submitting', submittedAt: new Date(), revision: 1 };
+    begin: async (accountId: string, conversationId: string, input: { prompt: string; inputs: readonly string[]; target?: { shotId: string } | undefined }) => {
+      const job: VideoJob = { id: randomUUID(), accountId, conversationId, purpose: 'video', inputs: [...input.inputs], ...(input.target ? { target: input.target } : {}), status: 'submitting', submittedAt: new Date(), revision: 1 };
       rows.set(job.id, job);
       return job;
     },
@@ -37,8 +37,8 @@ function memoryJobs() {
   };
 }
 
-function harness(options: { frames?: ImageInputsOutcome; submit?: () => Promise<{ taskId: string }>; tasks?: (() => Promise<VideoTask>)[]; download?: () => Promise<Uint8Array>; save?: GeneratedVideoOutcome['kind'] } = {}) {
-  const jobs = memoryJobs(), calls = { submits: 0, queries: 0, downloads: 0, saves: 0 };
+function harness(options: { frames?: ImageInputsOutcome; submit?: () => Promise<{ taskId: string }>; tasks?: (() => Promise<VideoTask>)[]; download?: () => Promise<Uint8Array>; save?: GeneratedVideoOutcome['kind']; room?: boolean } = {}) {
+  const jobs = memoryJobs(), calls = { submits: 0, queries: 0, downloads: 0, saves: 0, targets: [] as unknown[] };
   const runner = createVideoJobs({
     jobs,
     client: {
@@ -47,12 +47,13 @@ function harness(options: { frames?: ImageInputsOutcome; submit?: () => Promise<
       download: async () => { calls.downloads++; return options.download ? options.download() : new Uint8Array([1]); },
     },
     readImageInputs: async () => options.frames ?? { kind: 'not_found' },
-    saveVideo: async () => {
-      calls.saves++;
+    saveVideo: async (_account, _video, saved) => {
+      calls.saves++; calls.targets.push(saved.target);
       const kind = options.save ?? 'saved';
-      return kind === 'saved' ? { kind, versionId: randomUUID(), width: 1344, height: 768, durationMs: 4042 } : { kind };
+      return kind === 'saved' ? { kind, versionId: randomUUID(), width: 1344, height: 768, durationMs: 4042, gone: false } : { kind };
     },
     timing: { pollIntervalMs: 1, pollDeadlineMs: 2000 },
+    shotRoom: async () => options.room ?? true,
   });
   return { runner, jobs, calls };
 }
@@ -199,4 +200,21 @@ test('stopped asks for this video\'s interrupted jobs, at most five, and gives e
   assert.deepEqual(asked, [[account, video, { limit: 5, status: 'interrupted' }]]);
   jobs.list = async () => { throw new Error('storage down'); };
   assert.deepEqual(await runner.stopped(account, video), { kind: 'unavailable' });
+});
+
+test('a Shot\'s job is refused before it is saved when the Shot has no room, and carries its Shot to the save and a resume', async () => {
+  const shot = { shotId: 'shot-1' }, frames: ImageInputsOutcome = { kind: 'read', images: [frame()] };
+  const full = harness({ frames, room: false });
+  assert.deepEqual(await full.runner.start(account, video, { ...input, firstFrame: randomUUID(), target: shot }, control()), { kind: 'no_room' });
+  assert.deepEqual([full.calls.submits, full.jobs.rows.size], [0, 0]);
+  const plain = harness({ room: false });
+  assert.equal((await plain.runner.start(account, video, input, control())).kind, 'saved', 'a plain job never asks for a Shot\'s room');
+
+  const raced = harness({ frames, save: 'no_room' });
+  const waiting = await raced.runner.start(account, video, { ...input, firstFrame: randomUUID(), target: shot }, control());
+  assert.ok(waiting.kind === 'interrupted' && waiting.cause === 'no_room', JSON.stringify(waiting));
+  assert.deepEqual([[...raced.jobs.rows.values()][0]!.target, raced.calls.targets], [shot, [shot]]);
+  const resumed = await raced.runner.resume(account, video, waiting.jobId, control());
+  assert.ok(resumed.kind === 'interrupted' && resumed.cause === 'no_room');
+  assert.deepEqual([raced.calls.submits, raced.calls.targets], [1, [shot, shot]], 'a resume saves to the same Shot with no second create');
 });

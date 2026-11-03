@@ -2,14 +2,15 @@ import { test, expect, loadSupport, signIn } from './fixtures.js';
 import type * as ManualWork from '../../apps/api/test/support/manual-saved-work.js';
 
 test('a Script edit saves, survives reload and appears in history; a lost save response retries into one version', async ({ page, backend }) => {
-  const { prepareManualSavedWork } = await loadSupport<typeof ManualWork>('manual-saved-work');
+  const { prepareManualSavedWork, manualScriptSubjects } = await loadSupport<typeof ManualWork>('manual-saved-work');
   const accounts = await backend.accounts(2);
-  const saved = await prepareManualSavedWork(backend.setup(accounts));
+  const saved = await prepareManualSavedWork(backend.setup(accounts), { subjects: true });
   await signIn(page, accounts[0]!, `/app?conversation=${saved.conversationId}`);
   const panel = page.getByRole('tabpanel');
   const editor = page.getByRole('textbox', { name: 'What happens' });
   const savePath = `/v1/conversations/${saved.conversationId}/versions`;
-  const history = async () => (await backend.read<{ items: { revision: number }[] }>(accounts[0]!, `/v1/artifacts/${saved.script.artifactId}/versions`)).items.map(version => version.revision);
+  const versions = async () => (await backend.read<{ items: { revision: number; content: { subjects?: unknown } }[] }>(accounts[0]!, `/v1/artifacts/${saved.script.artifactId}/versions`)).items;
+  const history = async () => (await versions()).map(version => version.revision);
 
   await expect(panel).toContainText('Ada waits beside the station clock.');
   const edited = 'Ada pauses beneath the station clock, then turns toward the platform.';
@@ -24,6 +25,8 @@ test('a Script edit saves, survives reload and appears in history; a lost save r
   await page.locator('.wp-version-history summary').click();
   await expect(page.getByRole('button', { name: 'View version 1', exact: true })).toBeVisible();
   expect(await history()).toEqual([2, 1]);
+  // A person's edit keeps the script's subjects as they were.
+  expect((await versions())[0]!.content.subjects).toEqual(manualScriptSubjects);
 
   // The backend commits; only the response is lost on the way back to the browser.
   const lost = 'A save whose response is lost after commit.';

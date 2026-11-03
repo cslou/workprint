@@ -4,6 +4,11 @@ Convention: `docs/conventions/backlog-management.md` (selected harness root; AGE
 
 ## Inbox
 
+### B-042 — Bring a removed subject's work back from the Library
+- Context: Sprint 010's sprint-PR review (2026-11-03) found that a subject removed from the script in one save and added back by name in a later save gets its old id, and with it the sheet and images still filed under that id (`apps/api/src/artifacts/script-subjects.ts`, the `same` lookup). This applies to a different kind with the same name too (a prop "Mara" after the character "Mara"). Lou (2026-11-03): whether a subject's work comes back is a Library feature, recorded here for now. The current behaviour stays until then.
+- Open decision: whether a re-added subject reclaims its old work automatically, starts fresh with its old work offered from the Library, or does either only for the same kind.
+- References: Sprint 010 Final Review (the re-added subject question); Sprint 011 Sprint-Wide Context, "Re-added subjects" (a Shot reference resolves again); spec §2 goal 3 and the `GET /library` read (reuse of saved and Library work).
+
 ### B-040 — Image version history is hard to find, and "Use this version" seems not to work
 - Context: Lou's Sprint 008 QA (2026-11-02, at `13a2144`). An edit with `revises` (PR #93) saves the image's next version and moves the video's use to it; the earlier version stays, unchanged, in that image's history. Lou couldn't see the history anywhere and suspects a bug, since "Use this version" didn't work either.
 - Problem:
@@ -14,6 +19,12 @@ Convention: `docs/conventions/backlog-management.md` (selected harness root; AGE
 - References: PR #93 (`apps/web/src/materials/assets.tsx` wraps the image viewer in history; `apps/api/src/artifacts/generated-images.ts` makes an approved image's edit a new image); PR #91 body, Pending (the approval and refresh P2s from its re-review); `apps/web/src/versions/review.tsx` (the closed Version history disclosure); `apps/web/src/conversation/shown-images.tsx` (the chat viewer, with no history); `apps/web/src/shell/workspace-tabs.tsx` (no `onUsed` for Assets); spec §8.3 Images and SC2 (why an approval is never replaced); B-036 (edits are not journaled).
 
 ## Next
+### B-041 — System prompt for the production workflow
+- Context: Lou, 2026-11-03, while planning Sprints 010 and 011. Schedule right after Sprint 011.
+- Problem: The system prompt is three static lines (`apps/api/src/agent/mastra/native-turns.ts:23`). Each tool explains itself, but nothing tells the agent the agreed workflow or how its pieces fit together.
+- Outcome: The system prompt covers the workflow (script, then reference sheets, then the storyboard, then panels, then Shot videos), how sheets feed panels and panels and Shot text feed videos, and to show the person each step before the next paid one. It stays static so provider prefix caching holds. Pass: a fresh conversation asked to make a short video follows the steps in order and asks before paid steps.
+- References: Sprints 010 and 011; `~/projects/animation-studio/.pi/skills/create-storyboard/SKILL.md`; the Muse Spark notes.
+
 
 MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority order. B-021 to B-025 were added the same day from the former Sprint 006/007 plans and the gaps they exposed, placed where their dependencies need them. B-034 was added the same day from Lou's Sprint 006 decision that the agent names the video, and is ranked second because the new Sprint 006 includes it. In this file, "former Sprint 006/007" means the deleted plans at `eb98e49`; plain "Sprint 006" means the current [Sprint 006 plan](sprints/sprint-006.md). Sprint allocation is in spec §10 [Phase 3 sprint packaging](specs/implementation-spec-001.md#phase-3-sprint-packaging). Spec story IDs (P3-S*, P4-S*) and the "reduced-delivery amendment" or "Submission and recovery contract" cited below refer to text removed from the spec on 2026-11-01; read it with `git show eb98e49:docs/specs/implementation-spec-001.md`. The same applies to the former Sprint 006/007 plans, `git show eb98e49:docs/sprints/sprint-006.md` (and `sprint-007.md`). Each tool lives in its own directory under the agent module and calls application functions in process, never application HTTP routes (implementation spec §10). Assistant saves and generations never count as human approval (AGENTS.md).
 
@@ -109,13 +120,14 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
 - Work: [Sprint 007](sprints/sprint-007.md) Story 3 (PR #81) for the Script tab. The other tabs re-read the same way; their own saving tools come with B-015 to B-020. Remaining: re-reads wait while any editor is open, in any tab. Scope that wait to the tab being edited when other tabs gain saving tools.
 
 ### B-017 — Agent creates reference sheets
-- Context: Lou will supply the reference-sheet details and templates later (2026-11-01). Keep this as a placeholder until then; it does not block B-012 to B-016.
+- Context: Planned as [Sprint 010](sprints/sprint-010.md) (Lou, 2026-11-03): light sheets of at most 5 one-view images, for the subjects the script lists (characters, places, props), shown in Assets by subject with no status, made and revised by one generate-sheet tool; images from chosen sheet views come with Sprint 011's panels.
 - Problem: The Assets tab can show reference sheets (`apps/web/src/materials/sheet.tsx`), but only manual saves create them. The agent cannot create a character, place or prop reference.
 - Outcome: The agent creates a reference sheet for a subject: a saved reference version with its description, continuity notes and images generated through B-015. The sheet appears in Assets. Pass: the user asks for a reference sheet, and a saved sheet with images shows in Assets.
 - Constraint: Built as tools that the agent loop calls (Lou, 2026-11-01). Converting them to workflows can be decided later.
 - References: `~/projects/animation-studio/.pi/skills/create-storyboard/references/reference-package-schema.md` and `generate-image/references/prompt-preparation.md`, until Lou's sources arrive.
 
 ### B-018 — Agent makes the storyboard from the script
+- Context: Planned as [Sprint 011](sprints/sprint-011.md) (Lou, 2026-11-03), with separate `save-storyboard`, `generate-panel` and `generate-shot` tools; at most 2 panels per Shot.
 - Problem: Storyboard reads and manual edits exist (`apps/api/src/artifacts/storyboard.ts`, `apps/web/src/storyboard/`), but the agent cannot plan shots or make panels.
 - Outcome: The agent plans shots from the current script version, then creates each panel's image through B-015 using the selected reference sheets. It saves a storyboard version linked to that script and those references. Pass: the Storyboard tab shows the planned shots with generated panel images.
 - Constraint:
@@ -134,7 +146,7 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
   - Stream-copy joining needs matching codec, resolution and frame rate, so incompatible clips fail with a clear message rather than being re-encoded in the MVP.
   - Run ffmpeg inside the existing bounded media sandbox, and verify the output like any other video.
 - References: `~/projects/animation-studio/.pi/skills/assemble-video/SKILL.md` (stream-copy joining with compatibility checks) and `.pi/lib/ffmpeg.mjs`; `apps/api/src/storage/media/sandbox.ts` (the existing ffmpeg sandbox); B-019.
-- Constraint: Its own sprint (010), after video (Lou, 2026-11-02). It joins the generated videos from Sprint 009.
+- Constraint: Its own sprint (012), after reference sheets (010) and the storyboard (011) (Lou, 2026-11-03). It joins the generated and Shot videos.
 
 Moved after video (Lou, 2026-11-02): AskUserQuestion (B-014) and image options (B-016) wait until video generation (B-025, B-019, B-020) is done. Until then the agent asks in plain chat text.
 

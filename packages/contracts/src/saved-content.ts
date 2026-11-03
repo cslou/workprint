@@ -1,10 +1,11 @@
 import { z } from 'zod';
 import { idSchema } from './models.js';
+import { dialogueLineSchema, shotFields } from './shot-fields.js';
 
 const text = z.string().max(20000).refine(value => value.trim().length > 0, 'Text is required');
 const names = z.array(text).max(100);
 const unique = (values: readonly (string | number)[]) => new Set(values).size === values.length;
-const dialogue = z.strictObject({ character: text, text, delivery: z.enum(['voice_over', 'off_screen']).optional() });
+const dialogue = dialogueLineSchema;
 const scene = z.strictObject({
   heading: z.strictObject({ setting: text, location: text, time: text }),
   characters: names,
@@ -19,13 +20,37 @@ const scene = z.strictObject({
   });
 });
 
+const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export const subjectKinds = ['character', 'place', 'prop'] as const;
+/** The trimmed, case-folded form two subject names are compared in. */
+export const subjectNameKey = (name: string) => name.trim().toLowerCase();
+/** One character, place or prop the script names; its id is server-made and kept across script versions. */
+export const scriptSubjectSchema = z.strictObject({
+  id: z.string().max(200).regex(slug),
+  kind: z.enum(subjectKinds),
+  name: z.string().max(80).refine(value => value.trim().length > 0, 'Name is required'),
+});
+/** A script without its subjects: the assistant writes this, and the server keeps the subjects' ids. */
+export const scriptBodySchema = z.strictObject({ schemaVersion: z.literal(1), scenes: z.array(scene).min(1).max(1) });
+/** Whether the character subjects are exactly the scenes' characters (trimmed): the one rule the save and the schema share. */
+export function characterSubjectsMatch(subjects: readonly Readonly<{ kind: string; name: string }>[], scenes: readonly Readonly<{ characters: readonly string[] }>[]): boolean {
+  const characters = new Set(scenes.flatMap(item => item.characters.map(name => name.trim())));
+  const named = subjects.filter(subject => subject.kind === 'character').map(subject => subject.name.trim());
+  return named.length === characters.size && named.every(name => characters.has(name));
+}
 /** Structural hosted content only: validation never grants human approval. */
-export const savedScriptContentSchema = z.strictObject({ schemaVersion: z.literal(1), scenes: z.array(scene).min(1).max(1) });
+export const savedScriptContentSchema = scriptBodySchema.extend({ subjects: z.array(scriptSubjectSchema).max(50).optional() }).superRefine((value, context) => {
+  if (!value.subjects) return;
+  if (!unique(value.subjects.map(subject => subject.id))) context.addIssue({ code: 'custom', message: 'Subject ids must be distinct', path: ['subjects'] });
+  if (!unique(value.subjects.map(subject => subjectNameKey(subject.name)))) context.addIssue({ code: 'custom', message: 'Subject names must be distinct', path: ['subjects'] });
+  // The character subjects are the scene's characters: the two never disagree.
+  if (!characterSubjectsMatch(value.subjects, value.scenes)) context.addIssue({ code: 'custom', message: 'Character subjects must be the scene\'s characters', path: ['subjects'] });
+});
 const referenceImage = z.strictObject({ versionId: idSchema, view: text, notes: names });
 export const savedReferenceContentSchema = z.strictObject({
   schemaVersion: z.literal(1),
   subject: z.strictObject({
-    id: z.string().max(200).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+    id: z.string().max(200).regex(slug),
     kind: z.enum(['character', 'environment', 'prop', 'style']),
     name: text, description: text, continuityNotes: names.min(1),
   }),
@@ -33,7 +58,7 @@ export const savedReferenceContentSchema = z.strictObject({
   references: z.array(referenceImage).max(100).refine(items => unique(items.map(item => item.versionId)), 'Reference versions must be distinct'),
 });
 const panel = z.strictObject({ panelId: idSchema, order: z.number().int().nonnegative(), description: text, references: z.array(idSchema).max(100).refine(unique, 'Reference versions must be distinct') });
-const shot = z.strictObject({ shotId: idSchema, order: z.number().int().nonnegative(), intent: text, panels: z.array(panel).min(1).max(100) });
+const shot = z.strictObject({ shotId: idSchema, order: z.number().int().nonnegative(), intent: text, ...shotFields, panels: z.array(panel).min(1).max(100) });
 export const savedStoryboardContentSchema = z.strictObject({ schemaVersion: z.literal(1), sourceScriptVersionId: idSchema, shots: z.array(shot).min(1).max(100) }).superRefine((value, context) => {
   const ids = value.shots.map(item => item.shotId);
   const panelIds = value.shots.flatMap(item => item.panels.map(panel => panel.panelId));
