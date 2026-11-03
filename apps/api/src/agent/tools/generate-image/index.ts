@@ -44,7 +44,7 @@ export const generateImageTool = defineTool({
     'Before calling, write a short brief for yourself: the purpose (portrait, character, prop, environment or storyboard panel), the medium, the subject and the one moment the still must show, its framing, and what each input image is for.',
     'Show one visible moment, not a sequence of actions. Settle gaze, which way people and objects face, contact and grip, and how many of each object there are.',
     'Write a compact prompt from the blocks that apply, and leave out the rest: intent and constraints; what each input image is for; composition and visible state; what to preserve and what to change, when editing; one quality focus; relevant appearance; what to avoid.',
-    'Then critique and simplify it: remove details the user did not ask for, repetition and contradictions, but keep every requirement. Do not invent story facts or force a style such as photorealism. Ask the user first only if a missing choice would change the image materially.',
+    'Then critique and simplify it: remove details the user did not ask for, repetition and contradictions, but keep every requirement. Do not invent story facts or force a style such as photorealism. If a missing choice would change the image materially, include that question when you ask the user to make it.',
     'size sets the shape, not exact pixels: "auto", or WxH such as 1536x1024. Keep the long side at 2048 or less.',
     'For variations of one prompt, make one call with count; make separate calls only for different prompts.',
     'When the user asks to change one existing image, set revises to its versionId (also one of inputImages) and count to 1: the result becomes that image\'s next version. Variations and new images leave revises empty.',
