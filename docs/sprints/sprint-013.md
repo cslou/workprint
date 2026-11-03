@@ -249,8 +249,8 @@ For descriptive-only work, use editorial review and applicable existing checks. 
 
 ## Final Review
 
-- **Outcome:** the goal is met in the scripted build. Every story's ACs and verification items are met, with the deviations below. Lou's live QA is still open (Sprint Completion above). Each story merged into `sprint-013` after an independent review of its final head scored at least 4/5 with no open P0 or P1:
-  - Story 1, #143 (join clips in the media sandbox): 4/5 (P2s only), then two review-fix rounds, the last 4/5.
+- **Outcome:** the goal is met in the scripted build. Every story's ACs and verification items are met, with the deviations below. Lou's live QA is still open (Sprint Completion above). Each story merged into `sprint-013` after independent reviews that scored at least 4/5 with no open P0 or P1:
+  - Story 1, #143 (join clips in the media sandbox): 4/5 (P2s only), then two review-fix rounds. The last regression scans read `cf955f0...cdf055e`; its one P2, found there, was fixed in `ec720d4` (the joiner also turns the join's `invalid_input` into `UploadError`, one line and a unit case), and the 4/5 meta-review scored with that commit described but no scan reading its diff. Recorded here as a gap in the final-head rule; the deep gate ran over it.
   - Story 2, #144 (the join-videos tool): one P1, then 4/5. The P1 was that the joined save's refusals were never tested against the real save; the tool-activity block now calls it directly.
 - **Combined-branch verification:** the deep gate (`.checks/regression.sh --tier=deep`, 515 s, run `.checks/.logs/run-ashjkstf`) passed at `ec0b4ba`, the `sprint-013` head after Story 2.
   - Results: unit 298/298, tooling 6/6, integration 206/206, browser 34/34.
@@ -277,4 +277,8 @@ For descriptive-only work, use editorial review and applicable existing checks. 
     - the save re-checks the clips before its transaction, as frames are, not inside it as planned;
     - clips over 100 MB together are refused as too large before any bytes are read (review);
     - the image and video reads share one checked read, and the sandbox wait lives in `artifacts` (`joinWhenFree`, `sandboxTurn`).
-- **Unresolved, for later:** the 120 s limit (Lou: "we can deal with the limit later"); a joined-plus-target save has no test of its own (the same refusal as joined-plus-frames).
+- **Unresolved, for later:**
+  - the 120 s limit (Lou: "we can deal with the limit later");
+  - a joined-plus-target save has no test of its own (the same refusal as joined-plus-frames);
+  - the 2 moderate audit advisories, B-004 and B-008.
+- **New Dependencies:** None.
