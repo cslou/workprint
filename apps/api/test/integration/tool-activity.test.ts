@@ -3,10 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { setTimeout as wait } from 'node:timers/promises';
 import { Pool } from 'pg';
-import { createArtifactStore, createArtifactWriters, createAssistantScripts, createVersionUses } from '../../src/artifacts/index.js';
-import { createAssistantScriptSaver } from '../../src/application/index.js';
+import { createArtifactStore, createArtifactWriters, createAssistantReferences, createAssistantScripts, createAssistantStoryboards, createGeneratedImages, createVersionUses, panelArtifactId } from '../../src/artifacts/index.js';
+import { createAssistantScriptSaver, createAssistantSheets, createAssistantStoryboardSaver } from '../../src/application/index.js';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
 import { createGenerationJobs } from '../../src/generation/index.js';
+import { createPrivateObjectStorage } from '../../src/storage/index.js';
 import { accountBrowserFixture } from '../support/account-browser-fixture.js';
 import { chatComposition } from '../support/chat-composition.js';
 import { metaImageFake, testPng, type FakeImageStep } from '../support/meta-image-fake.js';
@@ -1079,4 +1080,203 @@ test('save-storyboard saves the Shot plan from the current script, and read-work
   // A stale base gets its line, and nothing is saved.
   const stale = await turn<Saved>(video, 'save-storyboard', { base: first.result.versionId, shots });
   assert.deepEqual([stale.result.saved, stale.lines.at(-1)?.[2]], [false, 'Not saved: the storyboard changed since you read it']);
+});
+
+type PanelResult = { made: true; versionId: string; label?: string; gone: boolean } | { made: false; reason: string; summary: string; message: string };
+
+// generate-panel through real turns: the fake Meta answers, and storage and the real decode check save each panel image.
+test('generate-panel makes a panel\'s image from the Shot\'s sheets and saves it as the next version of that panel\'s own image', { timeout: 600000 }, async t => {
+  const provider = await scriptedProvider(); t.after(provider.close);
+  const meta = await metaImageFake(); t.after(meta.close);
+  const { storage, media } = testStack();
+  const fixture = await accountBrowserFixture({ artifacts: true, storage, media: media.toolchain, composition: chatComposition(provider, {}, { url: meta.url }) });
+  const pool = new Pool({ connectionString: fixture.servingUrl, max: 4 }), setup = new Pool({ connectionString: fixture.setupUrl, max: 1 });
+  t.after(async () => { await pool.end(); await setup.end(); await fixture.close(); });
+  const check = createOwnedConversationCheck(fixture.native), store = createArtifactStore(pool, check), uses = createVersionUses(pool, check);
+  const saveScript = createAssistantScriptSaver(createAssistantScripts(pool, check).save);
+  const sheets = createAssistantSheets(createAssistantReferences(pool, check));
+  const saveBoard = createAssistantStoryboardSaver(createAssistantStoryboards(pool, check).save);
+  const objects = createPrivateObjectStorage(storage); t.after(() => objects.close());
+  // Reads only: the media checker is never called.
+  const stored = createGeneratedImages(pool, check, { storage: objects, verifyMedia: async () => { throw new Error('Not used for reads'); } });
+  const [owner, other] = [await fixture.auth.createAccount(), await fixture.auth.createAccount()];
+  const clients = new Map(await Promise.all([owner, other].map(async user => [user.id, nativeTurnClient(fixture.apiOrigin, await fixture.accessToken(user), user.id)] as const)));
+  const client = (user: { id: string }) => clients.get(user.id)!;
+  const dataUrl = async (versionId: string) => `data:image/png;base64,${(await stored.read(owner.id, versionId)).bytes.toString('base64')}`;
+
+  /** Starts a turn in which the model calls generate-panel with `args`; the fake Meta answers `steps` first. */
+  const running = (user: { id: string }, video: string, args: Record<string, unknown>, steps: FakeImageStep[] = []) => {
+    provider.reset(); meta.reset(); meta.script(...steps);
+    provider.script({ toolCalls: [{ name: 'generate-panel', args }] }, { text: ['Done'] });
+    return client(user).turn(video, 'Make the panel', 60000);
+  };
+  /** One completed generate-panel turn: what the tool gave the model, its done line and the media under it. */
+  const panel = async (user: { id: string }, video: string, args: Record<string, unknown>, steps: FakeImageStep[] = []) => {
+    const turn = await running(user, video, args, steps);
+    assert.ok(completed(turn), JSON.stringify(turn.terminal));
+    const content = (provider.requests[1]!.body as { messages: { role: string; content: unknown }[] }).messages.findLast(message => message.role === 'tool')?.content;
+    assert.ok(content !== undefined, 'tool result sent to the model');
+    assert.ok(!JSON.stringify(provider.requests).includes('iVBORw0KGgo'), 'no image bytes reach the model');
+    const line = turn.chunks.filter(chunk => chunk.type === 'tool-activity' && chunk.payload?.tool === 'generate-panel').at(-1)?.payload;
+    return { result: (typeof content === 'string' ? JSON.parse(content) : content) as PanelResult, summary: line?.summary, media: line?.media };
+  };
+  const binding = (target: { shotId: string; panelId: string }) => ({ purpose: 'panel_image', ...target });
+  const panelUses = async (video: string, target: { shotId: string; panelId: string }) => (await pool.query<{ use_id: string; version_id: string; state: string }>(
+    'SELECT use_id,version_id,state FROM artifacts.conversation_uses WHERE conversation_id=$1 AND binding=$2::jsonb ORDER BY created_at,use_id', [video, binding(target)])).rows;
+  const referenceUses = async (versionId: string) => (await pool.query<{ count: number }>("SELECT count(*)::int AS count FROM artifacts.conversation_uses WHERE version_id=$1 AND purpose='reference'", [versionId])).rows[0]!.count;
+  const useCount = async (video: string) => (await pool.query<{ count: number }>('SELECT count(*)::int AS count FROM artifacts.conversation_uses WHERE conversation_id=$1', [video])).rows[0]!.count;
+  const choose = (video: string, versionId: string, target: { shotId: string; panelId: string }) => uses.useVersion(owner.id, video, { operationId: randomUUID(), versionId, purpose: 'panel_image', ...target });
+
+  /** A video whose script names Mara and the Gallery, with their sheets and a storyboard: a two-panel Shot naming both, and a one-panel Shot. */
+  const prepared = async () => {
+    const video = await client(owner).newVideo();
+    const content = { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'The Gallery', time: 'night' }, characters: ['Mara'], script: [{ action: 'Mara waits.' }] }] };
+    assert.equal((await saveScript(owner.id, video, { baseVersionId: null, content, subjects: [{ id: '', kind: 'character', name: 'Mara' }, { id: '', kind: 'place', name: 'The Gallery' }] })).kind, 'saved');
+    provider.reset(); meta.reset();
+    provider.script({ toolCalls: [{ name: 'generate-image', args: { prompt: 'Mara and the Gallery', count: 3 } }] }, { text: ['Done'] });
+    assert.ok(completed(await client(owner).turn(video, 'Make the views')));
+    const [m1, m2, g1] = (await store.workspace(owner.id, video)).assets.map(asset => asset.version.id) as [string, string, string];
+    for (const [subjectId, views] of [['mara', [{ view: 'Full-body front', versionId: m1, notes: [] }, { view: 'Face close-up', versionId: m2, notes: [] }]], ['the-gallery', [{ view: 'Wide master', versionId: g1, notes: [] }]]] as const) {
+      const saved = await sheets.save(owner.id, video, { subjectId, description: 'Drawn.', continuityNotes: ['Keep it.'], views, baseVersionId: null });
+      assert.equal(saved.kind, 'saved', JSON.stringify(saved));
+    }
+    const board = await saveBoard(owner.id, video, { baseVersionId: null, shots: [
+      { shotId: '', intent: 'Mara arrives.', references: [{ subjectId: 'mara', role: 'identity', purpose: 'Her face.' }, { subjectId: 'the-gallery', role: 'environment', purpose: 'The room.' }],
+        panels: [{ panelId: '', description: 'Mara in the doorway.' }, { panelId: '', description: 'Mara at the desk.' }] },
+      { shotId: '', intent: 'The lights go out.', panels: [{ panelId: '', description: 'Darkness.' }] },
+    ] });
+    assert.ok(board.kind === 'saved', JSON.stringify(board));
+    const [opening, closing] = (await store.workspace(owner.id, video)).storyboard.shots;
+    const target = (shot: typeof opening, index = 0) => ({ shotId: shot!.shotId, panelId: shot!.panels[index]!.panelId });
+    return { video, board: board.versionId, m1, m2, g1, first: target(opening), second: target(opening, 1), lone: target(closing) };
+  };
+  const args = (target: { shotId: string; panelId: string }, extra: Record<string, unknown> = {}) => ({ shot: target.shotId, panel: target.panelId, prompt: 'Preserve the room. Change only: Mara steps in.', ...extra });
+
+  await t.test('panel 1 sends the picked views with their preface; panel 2 sends panel 1\'s image first at its size; each is its panel\'s own image', async () => {
+    const p = await prepared();
+    const one = await panel(owner, p.video, args(p.first, { images: [p.g1, p.m2], size: '1536x1024' }), [{ images: [testPng({ width: 96, height: 54, seed: 77 })] }]);
+    assert.ok(one.result.made, JSON.stringify(one.result));
+    assert.equal(meta.requests.length, 1); assert.equal(meta.requests[0]!.path, '/v1/images/edits');
+    const body = meta.requests[0]!.body;
+    assert.equal(body.prompt, 'Input 1: Mara · Face close-up — Her face.\nInput 2: The Gallery · Wide master — The room.\n\nPreserve the room. Change only: Mara steps in.');
+    assert.deepEqual([body.n, body.size], [1, '1536x1024']);
+    assert.deepEqual(body.images, [{ image_url: await dataUrl(p.m2) }, { image_url: await dataUrl(p.g1) }]);
+    const v1 = await store.version(owner.id, one.result.versionId);
+    assert.deepEqual([v1.artifactId, v1.revision, v1.createdBy, v1.dependencies], [panelArtifactId(p.video, p.first), 1, 'assistant', [p.m2, p.g1]]);
+    assert.deepEqual((await panelUses(p.video, p.first)).map(row => [row.version_id, row.state]), [[v1.id, 'draft']]);
+    assert.equal(await referenceUses(v1.id), 0, 'a panel image never appears in Assets');
+    assert.deepEqual([one.summary, one.media], ['Saved Shot 1 · Panel 1.1 · Version 1', [{ kind: 'image', versionId: v1.id }]]);
+
+    const two = await panel(owner, p.video, args(p.second, { images: [p.m1], size: '1024x1024' }));
+    assert.ok(two.result.made, JSON.stringify(two.result));
+    assert.deepEqual([meta.requests[0]!.body.size, meta.requests[0]!.body.images], ['96x54', [{ image_url: await dataUrl(v1.id) }, { image_url: await dataUrl(p.m1) }]]);
+    assert.match(String(meta.requests[0]!.body.prompt), /^Input 1: Shot 1 · Panel 1\.1 — keep camera, setting and staging\nInput 2: Mara · Full-body front — Her face\.\n\n/);
+    const second = await store.version(owner.id, two.result.versionId);
+    assert.deepEqual([second.artifactId, second.revision, two.summary], [panelArtifactId(p.video, p.second), 1, 'Saved Shot 1 · Panel 1.2 · Version 1']);
+
+    // A second call on panel 1 is version 2 of the same image, and moves the same draft use.
+    const before = await panelUses(p.video, p.first);
+    const again = await panel(owner, p.video, args(p.first, { images: [p.m2] }));
+    assert.ok(again.result.made);
+    assert.deepEqual(meta.requests[0]!.body.images, [{ image_url: await dataUrl(p.m2) }], 'with one chosen view, only that view is sent');
+    const v2 = await store.version(owner.id, again.result.versionId);
+    assert.deepEqual([v2.artifactId, v2.revision, again.summary], [v1.artifactId, 2, 'Saved Shot 1 · Panel 1.1 · Version 2']);
+    assert.deepEqual((await panelUses(p.video, p.first)).map(row => [row.use_id, row.version_id, row.state]), [[before[0]!.use_id, v2.id, 'draft']]);
+
+    // An image the video doesn't use is refused, and nothing is sent.
+    const stray = await panel(owner, p.video, args(p.first, { images: [randomUUID()] }));
+    assert.deepEqual([stray.result.made, stray.summary, meta.requests.length], [false, 'Not made: an input image wasn’t found', 0]);
+  });
+
+  await t.test('a person\'s choices stay: a view Used on the panel is never versioned, and a chosen version stays chosen', async () => {
+    const p = await prepared();
+    await choose(p.video, p.m1, p.first);
+    const one = await panel(owner, p.video, args(p.first, { images: [p.m2] }));
+    assert.ok(one.result.made, JSON.stringify(one.result));
+    const v1 = await store.version(owner.id, one.result.versionId), mara = await store.version(owner.id, p.m1);
+    assert.deepEqual([v1.artifactId, v1.revision], [panelArtifactId(p.video, p.first), 1]);
+    assert.equal((await pool.query('SELECT 1 FROM artifacts.versions WHERE artifact_id=$1', [mara.artifactId])).rowCount, 1, 'Mara\'s image has no new version');
+    const states = async () => (await panelUses(p.video, p.first)).map(row => [row.version_id, row.state]);
+    assert.deepEqual(await states(), [[p.m1, 'approved'], [v1.id, 'draft']]);
+    // The person chooses version 1; the assistant's version 2 gets a new draft use and version 1 stays chosen.
+    await choose(p.video, v1.id, p.first);
+    const two = await panel(owner, p.video, args(p.first, { images: [p.m2] }));
+    assert.ok(two.result.made);
+    assert.deepEqual(await states(), [[p.m1, 'draft'], [v1.id, 'approved'], [two.result.versionId, 'draft']]);
+    // The person chooses version 2; version 3 gets a new draft use, and version 2 stays chosen.
+    await choose(p.video, two.result.versionId, p.first);
+    const three = await panel(owner, p.video, args(p.first, { images: [p.m2] }));
+    assert.ok(three.result.made);
+    assert.equal((await store.version(owner.id, three.result.versionId)).revision, 3);
+    assert.deepEqual(await states(), [[p.m1, 'draft'], [v1.id, 'draft'], [two.result.versionId, 'approved'], [three.result.versionId, 'draft']]);
+    const shown = (await store.workspace(owner.id, p.video)).storyboard.shots[0]!.panels[0]!;
+    assert.equal(shown.approvedImageVersionId, two.result.versionId);
+  });
+
+  await t.test('another video\'s panel is not found, and a later panel before the first is refused; Meta gets no request', async () => {
+    const p = await prepared();
+    const foreign = await client(other).newVideo();
+    const away = await panel(other, foreign, args(p.first));
+    assert.deepEqual([away.result.made, away.summary, meta.requests.length], [false, 'Not made: that panel wasn’t found', 0]);
+    const early = await panel(owner, p.video, args(p.second));
+    assert.deepEqual([early.result.made, early.summary, meta.requests.length], [false, 'Not made: make the first panel first', 0]);
+  });
+
+  await t.test('a panel dropped by a storyboard save while Meta works is saved as a plain draft image', async () => {
+    const p = await prepared();
+    const held = released();
+    const turn = running(owner, p.video, args(p.lone), [{ hold: held.promise }]);
+    await until(async () => meta.requests.length, count => count === 1, 'the held Meta request');
+    const [opening] = (await store.workspace(owner.id, p.video)).storyboard.shots;
+    const dropped = await saveBoard(owner.id, p.video, { baseVersionId: p.board, shots: [{ shotId: opening!.shotId, intent: opening!.intent ?? '', references: opening!.references ?? [], panels: opening!.panels.map(item => ({ panelId: item.panelId, description: item.description })) }] });
+    assert.equal(dropped.kind, 'saved', JSON.stringify(dropped));
+    held.release();
+    const observed = await turn;
+    assert.ok(completed(observed), JSON.stringify(observed.terminal));
+    const line = observed.chunks.filter(chunk => chunk.type === 'tool-activity' && chunk.payload?.tool === 'generate-panel').at(-1)?.payload;
+    assert.equal(line?.summary, 'Saved Image 4 · Version 1 (its panel is gone)');
+    const assets = (await store.workspace(owner.id, p.video)).assets;
+    const kept = assets.at(-1)!;
+    assert.deepEqual([kept.version.kind, kept.state, kept.version.createdBy], ['image', 'Draft', 'assistant']);
+    assert.deepEqual(await panelUses(p.video, p.lone), []);
+  });
+
+  await t.test('the use cap: a new use is refused before Meta, a draft is still moved, and a use taken while Meta works keeps nothing', async () => {
+    const p = await prepared();
+    // Panel 1 has a draft; panel 2's latest version a person chose.
+    assert.ok((await panel(owner, p.video, args(p.first))).result.made);
+    const chosen = await panel(owner, p.video, args(p.second));
+    assert.ok(chosen.result.made);
+    await choose(p.video, chosen.result.versionId, p.second);
+    // Each filler is a person's use of Mara's image on a panel no storyboard has: it counts, and nothing shows it.
+    const fillers: string[] = [];
+    const fill = async (count: number) => {
+      for (let index = 0; index < count; index++) {
+        const id = randomUUID(); fillers.push(id);
+        await pool.query("INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state) VALUES($1,$2,$3,$4,$5,'panel_image','approved')", [owner.id, p.video, id, p.m1, { purpose: 'panel_image', shotId: randomUUID(), panelId: randomUUID() }]);
+      }
+    };
+    await fill(100 - await useCount(p.video));
+    for (const target of [p.lone, p.second]) {
+      const refused = await panel(owner, p.video, args(target));
+      assert.deepEqual([refused.result.made, refused.summary, meta.requests.length], [false, 'Not made: this video has too many saved items', 0]);
+    }
+    const moved = await panel(owner, p.video, args(p.first));
+    assert.ok(moved.result.made, JSON.stringify(moved.result));
+    assert.deepEqual([(await store.version(owner.id, moved.result.versionId)).revision, await useCount(p.video)], [2, 100]);
+
+    // With room for one use, the last is taken while Meta holds the request: the image is made but not kept.
+    await setup.query('DELETE FROM artifacts.conversation_uses WHERE use_id=$1', [fillers.pop()]);
+    const held = released();
+    const turn = running(owner, p.video, args(p.lone), [{ hold: held.promise }]);
+    await until(async () => meta.requests.length, count => count === 1, 'the held Meta request');
+    await fill(1);
+    held.release();
+    const observed = await turn;
+    assert.ok(completed(observed), JSON.stringify(observed.terminal));
+    const line = observed.chunks.filter(chunk => chunk.type === 'tool-activity' && chunk.payload?.tool === 'generate-panel').at(-1)?.payload;
+    assert.equal(line?.summary, 'Not saved: this video has too many saved items');
+    assert.equal((await pool.query('SELECT 1 FROM artifacts.versions WHERE artifact_id=$1', [panelArtifactId(p.video, p.lone)])).rowCount, 0);
+    assert.deepEqual([await useCount(p.video), await panelUses(p.video, p.lone)], [100, []]);
+  });
 });

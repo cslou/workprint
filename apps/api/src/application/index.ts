@@ -63,6 +63,7 @@ export { makeSheet, sheetViewCap, sheetViewNameCap, sheetViewPrompt, type SheetM
 export { optionalId } from './optional-id.js';
 export { imageVersionNames, workspaceVersions, type WorkspaceVersion } from './workspace-versions.js';
 export { anchorJob, maxPanelInputs, otherImageJob, panelInputs, type PanelInput, type PanelInputs, type PanelRequest } from './panel-inputs.js';
+export { createAssistantPanelImages, makePanel, type AssistantPanelImages, type MakePanelRequest, type PanelMakers, type PanelOutcome, type PanelSaveOutcome } from './panels.js';
 export { createGeneratedImageSaver, createImageInputReader, metaImageFailure, type GeneratedImageOutcome, type ImageFailure, type ImageInputsOutcome, type ReadImageInputs, type SaveGeneratedImage } from './generated-images.js';
 export { createGeneratedVideoSaver, type GeneratedVideoOutcome, type SaveGeneratedVideo } from './generated-videos.js';
 export { createVideoJobs, videoJobTiming, type NewVideo, type VideoAbortReason, type VideoJobCollaborators, type VideoJobOutcome, type VideoJobs, type VideoJobTiming, type VideoProviderFailure, type VideoRunControl, type StoppedVideo, type StoppedVideosOutcome } from './video-jobs.js';

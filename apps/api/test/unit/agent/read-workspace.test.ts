@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import type { OwnedWorkspace, StoppedVideosOutcome } from '../../../src/application/index.js';
 import { productionTools, type AgentCollaborators } from '../../../src/agent/index.js';
 import { listingBounds, listWorkspace, workspaceItem } from '../../../src/agent/workspace-entries.js';
+import { unusedPanelImages } from '../../support/unused-panel-images.js';
 import { unusedSheets } from '../../support/unused-sheets.js';
 
 type Version = OwnedWorkspace['assets'][number]['version'];
@@ -66,7 +67,7 @@ test('the listing gives the video\'s stopped jobs with their resume ids, only wh
   const run = (stopped?: StoppedVideosOutcome) => {
     const collaborators: AgentCollaborators = {
       readWorkspace: async () => ({ kind: 'found', workspace: workspace([image('i1')]) }),
-      saveScript: async () => ({ kind: 'unavailable' }), saveStoryboard: async () => ({ kind: 'unavailable' }), sheets: unusedSheets, readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }),
+      saveScript: async () => ({ kind: 'unavailable' }), saveStoryboard: async () => ({ kind: 'unavailable' }), sheets: unusedSheets, panelImages: unusedPanelImages, readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }),
       ...(stopped ? { videos: { start: async () => ({ kind: 'not_found' }), resume: async () => ({ kind: 'not_found' }), stopped: async (account: string, video: string) => { asked.push([account, video]); return stopped; } } } : {}),
     };
     const signal = new AbortController().signal;
@@ -87,7 +88,7 @@ test('the listing gives the script\'s subjects with their ids, and 50 subjects w
   const subjects = names.map((name, index) => ({ id: `${'s'.repeat(80)}-${index}`, kind: index === 0 ? 'character' as const : 'prop' as const, name }));
   const script: Version = { ...base('s'), kind: 'script', content: { schemaVersion: 1, subjects, scenes: [{ heading: { setting: 'INT.', location: 'Station', time: 'Night' }, characters: [names[0]!], script: [{ action: 'Ada waits.' }] }] } };
   const space = workspace(Array.from({ length: 40 }, (_, index) => reference(`r${index}`, `N${index}`, 'é'.repeat(400))), { script: work(script, 'script') });
-  const collaborators: AgentCollaborators = { readWorkspace: async () => ({ kind: 'found', workspace: space }), saveScript: async () => ({ kind: 'unavailable' }), saveStoryboard: async () => ({ kind: 'unavailable' }), readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }), sheets: unusedSheets };
+  const collaborators: AgentCollaborators = { readWorkspace: async () => ({ kind: 'found', workspace: space }), saveScript: async () => ({ kind: 'unavailable' }), saveStoryboard: async () => ({ kind: 'unavailable' }), readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }), sheets: unusedSheets, panelImages: unusedPanelImages };
   const signal = new AbortController().signal;
   const listed = await tool.execute({}, { scope: { accountId: 'a', videoId: 'v' }, collaborators, signal, abortReason: () => undefined }) as { subjects: unknown[]; items: { name: string }[]; truncated: boolean };
   assert.deepEqual(listed.subjects, subjects);
@@ -103,7 +104,7 @@ const sheetVersion = (id: string, subject: string, views: [string, string][]): V
 const readTool = productionTools.find(candidate => candidate.id === 'read-workspace')!;
 const reading = (space: OwnedWorkspace, readView: AgentCollaborators['sheets']['readView']) => {
   const collaborators: AgentCollaborators = { readWorkspace: async () => ({ kind: 'found', workspace: space }), saveScript: async () => ({ kind: 'unavailable' }), saveStoryboard: async () => ({ kind: 'unavailable' }), readImageInputs: async () => ({ kind: 'not_found' }),
-    saveGeneratedImage: async () => ({ kind: 'unavailable' }), sheets: { ...unusedSheets, readView } };
+    saveGeneratedImage: async () => ({ kind: 'unavailable' }), sheets: { ...unusedSheets, readView }, panelImages: unusedPanelImages };
   const signal = new AbortController().signal;
   return (input: Record<string, unknown>) => readTool.execute(input, { scope: { accountId: 'a', videoId: 'v' }, collaborators, signal, abortReason: () => undefined }) as Promise<Record<string, unknown>>;
 };
@@ -230,7 +231,7 @@ test('beside subjects with sheets and stopped videos, a 100-Shot storyboard step
     panels: [{ panelId: `${'p'.repeat(30)}-${index}`, order: 0, description: 'd'.repeat(200), references: [], candidateImageVersions: [], approvedImageVersionId: null }], chosenVideoVersionId: null }));
   const views = sheets.flatMap((_, index) => [image(`v${index}a`), image(`v${index}b`)]);
   const space = workspace([...views, ...sheets, ...Array.from({ length: 20 }, (_, index) => image(`i${index}`))], { script: work(subjectScript(subjects), 'script'), storyboard: { work: work(boardVersion(shots), 'storyboard'), shots } } as Partial<OwnedWorkspace>);
-  const collaborators: AgentCollaborators = { readWorkspace: async () => ({ kind: 'found', workspace: space }), saveScript: async () => ({ kind: 'unavailable' }), saveStoryboard: async () => ({ kind: 'unavailable' }), readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }), sheets: unusedSheets,
+  const collaborators: AgentCollaborators = { readWorkspace: async () => ({ kind: 'found', workspace: space }), saveScript: async () => ({ kind: 'unavailable' }), saveStoryboard: async () => ({ kind: 'unavailable' }), readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }), sheets: unusedSheets, panelImages: unusedPanelImages,
     videos: { start: async () => ({ kind: 'not_found' }), resume: async () => ({ kind: 'not_found' }), stopped: async () => ({ kind: 'read', jobs: Array.from({ length: 10 }, (_, index) => ({ jobId: `job-${index}`, frames: [`i${index}`], submittedAt: new Date('2026-11-03T16:34:37Z') })) }) } };
   const listed = await readTool.execute({}, { scope: { accountId: 'a', videoId: 'v' }, collaborators, signal: new AbortController().signal, abortReason: () => undefined }) as { subjects: unknown[]; stoppedVideos: unknown[]; storyboard: { detail: string; truncated: boolean; shots: unknown[] }; items: unknown[] };
   assert.equal(listed.subjects.length, 30); assert.equal(listed.stoppedVideos.length, 10);

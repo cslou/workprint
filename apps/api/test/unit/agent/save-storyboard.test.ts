@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { productionTools, projectToolActivity, type AgentCollaborators } from '../../../src/agent/index.js';
 import type { AssistantStoryboardOutcome } from '../../../src/application/index.js';
 import type { AssistantStoryboardInput } from '../../../src/artifacts/index.js';
+import { unusedPanelImages } from '../../support/unused-panel-images.js';
 import { unusedSheets } from '../../support/unused-sheets.js';
 
 const tool = productionTools.find(candidate => candidate.id === 'save-storyboard')!;
@@ -12,7 +13,7 @@ const shot = (extra: Record<string, unknown> = {}) => ({ intent: 'Mara arrives.'
 /** One save-storyboard call against a save that answers `outcome`; returns the result, its line and what the save received. */
 async function call(args: Record<string, unknown>, outcome: AssistantStoryboardOutcome = { kind: 'saved', versionId: 'board-v1', revision: 1 }) {
   const received: AssistantStoryboardInput[] = [];
-  const collaborators: AgentCollaborators = { readWorkspace: async () => ({ kind: 'not_found' }), saveScript: async () => ({ kind: 'unavailable' }), readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }), sheets: unusedSheets,
+  const collaborators: AgentCollaborators = { readWorkspace: async () => ({ kind: 'not_found' }), saveScript: async () => ({ kind: 'unavailable' }), readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }), sheets: unusedSheets, panelImages: unusedPanelImages,
     saveStoryboard: async (_account, _video, input) => { received.push(input); return outcome; } };
   const parsed = tool.inputSchema.safeParse(args);
   if (!parsed.success) return { parsed: false as const, received };

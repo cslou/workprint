@@ -3,8 +3,8 @@ import { registerApiRoute, type ApiRoute } from '@mastra/core/server';
 import { PostgresStore } from '@mastra/pg';
 import { Pool } from 'pg';
 import { createOwnedConversationCheck, bindNativeTurns, productionTools, turnLimits, type AgentCollaborators, type AgentTool, type NativeTurnModel, type TurnLimits } from '../agent/index.js';
-import { createApplication, createAssistantScriptSaver, createAssistantSheets, createAssistantStoryboardSaver, createGeneratedImageSaver, createGeneratedVideoSaver, createImageInputReader, createVideoJobs, createWorkspaceReader, type VideoJobTiming, withSavedWork, withManualSaves, withVersionUses, withGenerationRequests, withStoryboardEdits, withUploads } from '../application/index.js';
-import { createArtifactStore, createArtifactWriters, createAssistantReferences, createAssistantScripts, createAssistantStoryboards, createGeneratedImages, createGeneratedVideos, createVersionUses, createStoryboardEdits, createMediaVerifier, createUploadCoordinator } from '../artifacts/index.js';
+import { createApplication, createAssistantPanelImages, createAssistantScriptSaver, createAssistantSheets, createAssistantStoryboardSaver, createGeneratedImageSaver, createGeneratedVideoSaver, createImageInputReader, createVideoJobs, createWorkspaceReader, type VideoJobTiming, withSavedWork, withManualSaves, withVersionUses, withGenerationRequests, withStoryboardEdits, withUploads } from '../application/index.js';
+import { createArtifactStore, createArtifactWriters, createAssistantReferences, createAssistantScripts, createAssistantStoryboards, createGeneratedImages, createGeneratedVideos, createPanelImages, createVersionUses, createStoryboardEdits, createMediaVerifier, createUploadCoordinator } from '../artifacts/index.js';
 import { configuredMediaSandbox, configuredObjectStorage } from '../storage/index.js';
 import { assertRestrictedRole } from '../db/index.js';
 import { createGenerationJobs, type MetaImageClient, type MiniMaxVideoClient } from '../generation/index.js';
@@ -133,6 +133,7 @@ export async function createBackend(routes: ApiRoute[] = [], turns?: TurnComposi
       saveStoryboard: createAssistantStoryboardSaver(createAssistantStoryboards(pool, application.checkOwnedConversation).save),
       readImageInputs, saveGeneratedImage: createGeneratedImageSaver(generated.save),
       sheets: createAssistantSheets(createAssistantReferences(pool, application.checkOwnedConversation)),
+      panelImages: createAssistantPanelImages(createPanelImages(pool, application.checkOwnedConversation, { storage: objects, verifyMedia })),
       // Images and videos are made only where they can be saved: without storage and the checker, no paid call is made.
       ...(turns.images && objects && verifyMedia ? { images: turns.images } : {}),
       ...(turns.videos && objects && verifyMedia ? { videos: createVideoJobs({
