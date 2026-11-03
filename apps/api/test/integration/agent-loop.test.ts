@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { accountBrowserFixture } from '../support/account-browser-fixture.js';
+import { systemPrompt } from '../../src/agent/index.js';
 import { placeholderMetaKey } from '../support/environment.js';
 import { chatComposition } from '../support/chat-composition.js';
 import { completed, nativeTurnClient, type TurnChunk } from '../support/native-turn-client.js';
@@ -45,6 +46,16 @@ test('the Muse Spark agent loop runs tools, enforces its limits and fails withou
     assert.equal(first!.messages[0]!.role, 'system');
     assert.equal(JSON.stringify(first!.messages[0]), JSON.stringify(second!.messages[0]));
     assert.equal(JSON.stringify(first!.tools), JSON.stringify(second!.tools));
+  });
+
+  await t.test('the workflow prompt is the first message, unchanged, on two fresh videos and on a second turn', async () => {
+    const video = await newVideo();
+    provider.script({ text: ['One'] }, { text: ['Two'] }, { text: ['Three'] });
+    assert.ok(completed(await turn(video, 'First')));
+    assert.ok(completed(await turn(await newVideo(), 'Another video')));
+    assert.ok(completed(await turn(video, 'Second turn')));
+    assert.equal(bodies().length, 3);
+    for (const body of bodies()) assert.deepEqual(body.messages[0], { role: 'system', content: systemPrompt });
   });
 
   await t.test('a tool call runs and its result reaches the next step', async () => {
