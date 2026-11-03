@@ -44,13 +44,23 @@ const keepLines: Readonly<Record<ScriptSubject['kind'], string>> = {
   prop: 'Keep the same object as the input image: the same design, shape and materials.',
 };
 
+/**
+ * How a made view is framed, by kind. A person or object stands alone on a plain background; a place is the place
+ * itself, since a plain background around a place makes Meta draw it as a picture mounted on a page.
+ */
+const framingLines: Readonly<Record<ScriptSubject['kind'], string>> = {
+  character: 'Show this single view only, on a plain neutral background with even light, with no text, labels, borders or other views.',
+  place: 'Show this single view only, with the place itself filling the whole frame, and no text, labels, borders, background page or other views.',
+  prop: 'Show this single view only, on a plain neutral background with even light, with no text, labels, borders or other views.',
+};
+
 /** The fixed sheet-view frame of every made view's prompt. */
 function sheetViewFrame(subject: ScriptSubject, view: string, description: string, notes: readonly string[]) {
   return [
     `One reference view of ${subject.name}, a ${subject.kind}, for a reference sheet: ${view}.`,
     description.trim(),
     notes.length ? `Keep consistent: ${notes.map(note => note.trim()).join('; ')}.` : '',
-    'Show this single view only, on a plain neutral background with even light, with no text, labels, borders or other views.',
+    framingLines[subject.kind],
   ].filter(Boolean).join(' ');
 }
 
