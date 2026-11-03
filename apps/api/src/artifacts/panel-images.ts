@@ -1,13 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
-import { idSchema, type Version } from '@workprint/contracts';
-import { transaction } from '../db/index.js';
-import { withStoredObjects } from './generated-media.js';
-import { assertMadeImage, assertReadableImages, checkImage, publishImage, type GeneratedImageCollaborators } from './generated-images.js';
+import type { Version } from '@workprint/contracts';
+import { assistantImageKeeper, publishImage, requireOwnedConversation, type GeneratedImageCollaborators } from './generated-images.js';
 import { hasTarget, usedPlan } from './panel-targets.js';
-import { lockPublicationOwner } from './publication.js';
-import { createArtifactStore } from './store.js';
-import { UploadError, uploadError } from './uploads/errors.js';
+import { uploadError } from './uploads/errors.js';
 import type { OwnedCheck } from './uploads/types.js';
 import { useRoom } from './use-room.js';
 
@@ -47,35 +43,20 @@ async function movableUse(client: Query, account: string, conversation: string, 
  * generate-image's are, with a draft `panel_image` use and never a `reference` one. An assistant use never approves.
  */
 export function createPanelImages(pool: Pool, checkOwnedConversation: OwnedCheck, collaborators: GeneratedImageCollaborators) {
-  const capacityWaitMs = collaborators.capacityWaitMs ?? 30_000, capacityRetryMs = collaborators.capacityRetryMs ?? 250;
-  const reads = createArtifactStore(pool, checkOwnedConversation);
-  const owned = async (account: string, conversation: string) => {
-    if (!idSchema.safeParse(account).success || !idSchema.safeParse(conversation).success) throw new UploadError('invalid_input');
-    const outcome = await checkOwnedConversation(account, conversation);
-    if (outcome.kind !== 'owned') throw new UploadError(outcome.kind === 'not_found' ? 'not_found' : 'integration_failure');
-  };
+  const keep = assistantImageKeeper(pool, checkOwnedConversation, collaborators);
 
   return Object.freeze({
     /** Whether the panel's next image can be kept: it moves a draft use, or the video has room for a new one. */
     async hasRoom(account: string, conversation: string, target: PanelTarget): Promise<boolean> {
       try {
-        await owned(account, conversation);
+        await requireOwnedConversation(checkOwnedConversation, account, conversation);
         return Boolean(await movableUse(pool, account, conversation, target, false)) || await useRoom(pool, account, conversation) > 0;
       } catch (error) { throw uploadError(error); }
     },
 
     async save(account: string, conversation: string, input: PanelImageInput, signal?: AbortSignal): Promise<PanelImageSave> {
       try {
-        assertMadeImage(input);
-        const { storage, verifyMedia } = collaborators;
-        if (!storage || !verifyMedia) throw new UploadError('not_implemented', 'Private storage or media checks are not available');
-        await owned(account, conversation);
-        await assertReadableImages(reads, account, input.inputs);
-        const image = await checkImage({ verifyMedia, waitMs: capacityWaitMs, retryMs: capacityRetryMs, signal }, input);
-        // A stopped run stores nothing after its check.
-        signal?.throwIfAborted();
-        return await withStoredObjects(storage, [{ key: image.key, bytes: image.bytes, contentType: image.contentType }], () => transaction(pool, async client => {
-          await lockPublicationOwner(client, account);
+        return await keep(account, conversation, input, async (client, image) => {
           const room = async () => { if (await useRoom(client, account, conversation) === 0) throw new PanelRoomError(); };
           // The panel must still be in the storyboard the video uses. If it left while the image was made, the paid
           // image is kept as a plain draft image instead.
@@ -95,7 +76,7 @@ export function createPanelImages(pool: Pool, checkOwnedConversation: OwnedCheck
           if (moved) await client.query("UPDATE artifacts.conversation_uses SET version_id=$1 WHERE owner_id=$2 AND use_id=$3", [version.id, account, moved]);
           else await client.query("INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state) VALUES($1,$2,$3,$4,$5,'panel_image','draft')", [account, conversation, randomUUID(), version.id, panelBinding(input)]);
           return { version, gone: false };
-        }), 'Panel image');
+        }, { signal, label: 'Panel image' });
       } catch (error) {
         if (error instanceof AggregateError || error instanceof PanelRoomError) throw error;
         throw uploadError(error);

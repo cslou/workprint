@@ -36,22 +36,22 @@ type Reads = ReturnType<typeof createArtifactStore>;
 
 /** An assistant-made image whose bytes passed the media checks, with the private key it is stored under. */
 export type CheckedImage = Readonly<{ bytes: Buffer; contentType: string; media: ImageMedia; key: string; sha256: string }>;
-export type ImageChecks = Readonly<{ verifyMedia: MediaVerifier; waitMs: number; retryMs: number; signal?: AbortSignal | undefined }>;
+type ImageChecks = Readonly<{ verifyMedia: MediaVerifier; waitMs: number; retryMs: number; signal?: AbortSignal | undefined }>;
 
 /** The ids of a made image's inputs, and its bytes, before anything else is checked. */
-export function assertMadeImage(input: Readonly<{ bytes: Uint8Array; inputs: readonly string[] }>): void {
+function assertMadeImage(input: Readonly<{ bytes: Uint8Array; inputs: readonly string[] }>): void {
   // Inputs that aren't distinct ids can't name saved images.
   if (!inputsSchema.safeParse(input.inputs).success) throw new UploadError('not_found');
   if (!(input.bytes instanceof Uint8Array) || !input.bytes.byteLength || input.bytes.byteLength > MAX_UPLOAD_IMAGE_BYTES) throw new UploadError('unsupported');
 }
 
 /** Each input must be an image this account can read, before anything is stored. */
-export async function assertReadableImages(reads: Reads, account: string, inputs: readonly string[]): Promise<void> {
+async function assertReadableImages(reads: Reads, account: string, inputs: readonly string[]): Promise<void> {
   for (const id of inputs) if ((await reads.version(account, id)).kind !== 'image') throw new UploadError('not_found');
 }
 
 /** Checks assistant-made bytes as strictly as an upload, waiting out a busy checker, and gives them a private key. */
-export async function checkImage(checks: ImageChecks, input: Readonly<{ bytes: Uint8Array; contentType: string }>): Promise<CheckedImage> {
+async function checkImage(checks: ImageChecks, input: Readonly<{ bytes: Uint8Array; contentType: string }>): Promise<CheckedImage> {
   const bytes = Buffer.from(input.bytes);
   const verified = await verifyWhenFree(checks.verifyMedia, { kind: 'image', bytes, contentType: input.contentType, origin: 'assistant' }, { waitMs: checks.waitMs, retryMs: checks.retryMs, signal: checks.signal });
   const media = measuredMedia({ kind: 'image', contentType: input.contentType, byteSize: bytes.length }, verified);
@@ -60,7 +60,7 @@ export async function checkImage(checks: ImageChecks, input: Readonly<{ bytes: U
 }
 
 /** Records a stored image's object on its new version, inside the save's transaction. */
-export async function recordImageObject(client: PoolClient, account: string, versionId: string, image: CheckedImage): Promise<void> {
+async function recordImageObject(client: PoolClient, account: string, versionId: string, image: CheckedImage): Promise<void> {
   await client.query('INSERT INTO artifacts.generated_objects(owner_id,object_key,version_id,sha256,byte_size,content_type) VALUES($1,$2,$3,$4,$5,$6)', [account, image.key, versionId, image.sha256, image.bytes.length, image.contentType]);
   await client.query('INSERT INTO artifacts.media_objects(owner_id,version_id,generated_key,sha256) VALUES($1,$2,$3,$4)', [account, versionId, image.key, image.sha256]);
 }
@@ -74,6 +74,41 @@ export async function publishImage(client: PoolClient, account: string, conversa
   return version;
 }
 
+/** The run's own account and video, as ids, owned: a foreign or unknown video is `not_found`. */
+export async function requireOwnedConversation(checkOwnedConversation: OwnedCheck, account: string, conversation: string): Promise<void> {
+  if (!idSchema.safeParse(account).success || !idSchema.safeParse(conversation).success) throw new UploadError('invalid_input');
+  const owned = await checkOwnedConversation(account, conversation);
+  if (owned.kind !== 'owned') throw new UploadError(owned.kind === 'not_found' ? 'not_found' : 'integration_failure');
+}
+
+/** Keeps an assistant-made image: `within` runs inside its save's transaction, after the owner lock, with the checked image. */
+export type KeepImage = <T>(account: string, conversation: string, input: Readonly<{ bytes: Uint8Array; contentType: string; inputs: readonly string[] }>,
+  within: (client: PoolClient, image: CheckedImage) => Promise<T>, options: Readonly<{ signal?: AbortSignal | undefined; label: string }>) => Promise<T>;
+
+/**
+ * The one way the assistant's images are kept. The account and video are checked, each input must be an image the
+ * account can read, and the bytes are checked as strictly as an upload, all before anything is stored; a stopped run
+ * stores nothing after its check. The object is stored, then `within` saves it; if that throws, the object is removed.
+ */
+export function assistantImageKeeper(pool: Pool, checkOwnedConversation: OwnedCheck, collaborators: GeneratedImageCollaborators): KeepImage {
+  const capacityWaitMs = collaborators.capacityWaitMs ?? 30_000, capacityRetryMs = collaborators.capacityRetryMs ?? 250;
+  const reads = createArtifactStore(pool, checkOwnedConversation);
+  return async (account, conversation, input, within, { signal, label }) => {
+    if (!idSchema.safeParse(account).success || !idSchema.safeParse(conversation).success) throw new UploadError('invalid_input');
+    assertMadeImage(input);
+    const { storage, verifyMedia } = collaborators;
+    if (!storage || !verifyMedia) throw new UploadError('not_implemented', 'Private storage or media checks are not available');
+    await requireOwnedConversation(checkOwnedConversation, account, conversation);
+    await assertReadableImages(reads, account, input.inputs);
+    const image = await checkImage({ verifyMedia, waitMs: capacityWaitMs, retryMs: capacityRetryMs, signal }, input);
+    signal?.throwIfAborted();
+    return withStoredObjects(storage, [{ key: image.key, bytes: image.bytes, contentType: image.contentType }], () => transaction(pool, async client => {
+      await lockPublicationOwner(client, account);
+      return within(client, image);
+    }), label);
+  };
+}
+
 /**
  * The assistant's image capability: it checks assistant-made bytes as strictly as uploads, stores them privately
  * and saves them as the video's draft images. Saved images, uploaded or made, can be read back as exact bytes.
@@ -83,24 +118,12 @@ export function createGeneratedImages(pool: Pool, checkOwnedConversation: OwnedC
     if (!collaborators.storage || !collaborators.verifyMedia) throw new UploadError('not_implemented', 'Private storage or media checks are not available');
     return { storage: collaborators.storage, verifyMedia: collaborators.verifyMedia };
   };
-  const capacityWaitMs = collaborators.capacityWaitMs ?? 30_000, capacityRetryMs = collaborators.capacityRetryMs ?? 250;
-  const reads = createArtifactStore(pool, checkOwnedConversation);
-
+  const reads = createArtifactStore(pool, checkOwnedConversation), keep = assistantImageKeeper(pool, checkOwnedConversation, collaborators);
 
   return Object.freeze({
     async save(account: string, conversation: string, input: GeneratedImageInput, signal?: AbortSignal): Promise<GeneratedImageSave> {
       try {
-        if (!idSchema.safeParse(account).success || !idSchema.safeParse(conversation).success) throw new UploadError('invalid_input');
-        assertMadeImage(input);
-        const { storage, verifyMedia } = required();
-        const owned = await checkOwnedConversation(account, conversation);
-        if (owned.kind !== 'owned') throw new UploadError(owned.kind === 'not_found' ? 'not_found' : 'integration_failure');
-        await assertReadableImages(reads, account, input.inputs);
-        const image = await checkImage({ verifyMedia, waitMs: capacityWaitMs, retryMs: capacityRetryMs, signal }, input);
-        // A stopped run stores nothing after its check.
-        signal?.throwIfAborted();
-        return await withStoredObjects(storage, [{ key: image.key, bytes: image.bytes, contentType: image.contentType }], () => transaction(pool, async client => {
-            await lockPublicationOwner(client, account);
+        return await keep(account, conversation, input, async (client, image) => {
             // An edit of one of this video's own images is that image's next version, in the same place in the video.
             // A built-in image, or one the video doesn't use as an image, can't be revised: the edit is a new image.
             // So is an approved one: a person's approval is never replaced by an assistant draft.
@@ -124,7 +147,7 @@ export function createGeneratedImages(pool: Pool, checkOwnedConversation: OwnedC
             else if (revised) await client.query("UPDATE artifacts.conversation_uses SET version_id=$1,state='draft',subject_id=$4 WHERE owner_id=$2 AND use_id=$3", [version.id, account, use.id, filed]);
             else await client.query("INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state,subject_id) VALUES($1,$2,$3,$4,$5,'reference','draft',$6)", [account, conversation, use.id, version.id, binding, filed ?? null]);
             return { version, use, subjectLeft: filed === null };
-          }), 'Generated image');
+          }, { signal, label: 'Generated image' });
       } catch (error) {
         if (error instanceof AggregateError) throw error;
         throw uploadError(error);

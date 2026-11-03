@@ -1237,7 +1237,10 @@ test('generate-panel makes a panel\'s image from the Shot\'s sheets and saves it
     assert.equal(line?.summary, 'Saved Image 4 · Version 1 (its panel is gone)');
     const assets = (await store.workspace(owner.id, p.video)).assets;
     const kept = assets.at(-1)!;
-    assert.deepEqual([kept.version.kind, kept.state, kept.version.createdBy], ['image', 'Draft', 'assistant']);
+    assert.deepEqual([kept.version.kind, kept.state, kept.version.createdBy, kept.version.revision], ['image', 'Draft', 'assistant', 1]);
+    // It is its own new image, not a version of the panel's image, and it holds no panel use.
+    assert.notEqual(kept.version.artifactId, panelArtifactId(p.video, p.lone));
+    assert.equal((await pool.query('SELECT 1 FROM artifacts.versions WHERE artifact_id=$1', [panelArtifactId(p.video, p.lone)])).rowCount, 0);
     assert.deepEqual(await panelUses(p.video, p.lone), []);
   });
 

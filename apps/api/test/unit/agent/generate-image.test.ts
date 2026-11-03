@@ -4,7 +4,6 @@ import { test } from 'node:test';
 import { productionTools, projectToolActivity, type AgentCollaborators, type ToolContext } from '../../../src/agent/index.js';
 import type { GeneratedImageOutcome, OwnedWorkspace } from '../../../src/application/index.js';
 import { MetaImageError, type ImageResult } from '../../../src/generation/index.js';
-import { unusedPanelImages } from '../../support/unused-panel-images.js';
 import { unusedSheets } from '../../support/unused-sheets.js';
 
 const tool = productionTools.find(candidate => candidate.id === 'generate-image')!;
@@ -18,7 +17,7 @@ function harness(meta: () => Promise<ImageResult>, outcomes: (GeneratedImageOutc
   const saved: string[] = [], calls = { meta: 0, saves: 0 };
   const collaborators: AgentCollaborators = {
     readWorkspace: async () => ({ kind: 'found', workspace: workspace(saved) }),
-    saveScript: async () => ({ kind: 'unavailable' }), saveStoryboard: async () => ({ kind: 'unavailable' }), sheets: unusedSheets, panelImages: unusedPanelImages,
+    saveScript: async () => ({ kind: 'unavailable' }), saveStoryboard: async () => ({ kind: 'unavailable' }), sheets: unusedSheets,
     readImageInputs: async () => ({ kind: 'not_found' }),
     saveGeneratedImage: async () => {
       options.onSave?.(calls.saves);
@@ -95,7 +94,7 @@ test('an input named twice is read once, and with no way to save nothing is sent
   const reading: AgentCollaborators = { ...collaborators, readImageInputs: async (_account, _video, ids) => { read.push([...ids]); return { kind: 'read', images: ids.map(versionId => ({ versionId, dataUrl: 'data:image/png;base64,AA==', width: 64, height: 48 })) }; } };
   assert.equal((await run(reading, { inputImages: [id, id] }) as { made: boolean }).made, true);
   assert.deepEqual(read, [[id]]);
-  const unsaveable: AgentCollaborators = { readWorkspace: reading.readWorkspace, saveScript: reading.saveScript, saveStoryboard: reading.saveStoryboard, readImageInputs: reading.readImageInputs, saveGeneratedImage: reading.saveGeneratedImage, sheets: unusedSheets, panelImages: unusedPanelImages };
+  const unsaveable: AgentCollaborators = { readWorkspace: reading.readWorkspace, saveScript: reading.saveScript, saveStoryboard: reading.saveStoryboard, readImageInputs: reading.readImageInputs, saveGeneratedImage: reading.saveGeneratedImage, sheets: unusedSheets };
   const result = await run(unsaveable, { inputImages: [id] }) as { made: false; message: string };
   assert.equal(line({}, result)?.summary, 'Not made: images can’t be saved on this server'); assert.match(result.message, /nothing was sent to Meta/);
   assert.equal(calls.meta, 1, 'only the first call reached Meta'); assert.equal(read.length, 1, 'no input is read without a way to save');

@@ -32,7 +32,7 @@ function workspace(options: { listed?: typeof subjects; first?: ReturnType<typeo
   } as unknown as OwnedWorkspace;
 }
 
-type Options = { space?: OwnedWorkspace; room?: 'room' | 'no_room' | 'unavailable'; save?: PanelSaveOutcome; meta?: () => Promise<ImageResult>; noClient?: boolean; unreadable?: boolean };
+type Options = { space?: OwnedWorkspace; room?: 'room' | 'no_room' | 'unavailable'; save?: PanelSaveOutcome; meta?: () => Promise<ImageResult>; noClient?: boolean; noPanels?: boolean; unreadable?: boolean };
 /** Fake collaborators over one video; the calls each one got are recorded. */
 function harness(options: Options = {}) {
   const calls = { generate: [] as Record<string, unknown>[], edit: [] as Record<string, unknown>[], reads: [] as string[][], saves: [] as unknown[] };
@@ -42,10 +42,10 @@ function harness(options: Options = {}) {
     readWorkspace: async () => options.unreadable ? { kind: 'unavailable' } : { kind: 'found', workspace: space },
     saveScript: async () => ({ kind: 'unavailable' }), saveStoryboard: async () => ({ kind: 'unavailable' }), sheets: unusedSheets, saveGeneratedImage: async () => ({ kind: 'unavailable' }),
     readImageInputs: async (_account, _video, ids) => { calls.reads.push([...ids]); return { kind: 'read', images: ids.map(versionId => ({ versionId, dataUrl: `data:image/png;base64,${versionId}`, width: 64, height: 48 })) }; },
-    panelImages: {
-      hasRoom: async () => ({ kind: options.room ?? 'room' }),
-      save: async (_account, _video, input) => { calls.saves.push({ ...input, bytes: undefined }); return options.save ?? { kind: 'saved', versionId: madeId, gone: false }; },
-    },
+    ...(options.noPanels ? {} : { panelImages: {
+      hasRoom: async () => ({ kind: options.room ?? 'room' as const }),
+      save: async (_account: string, _video: string, input: Record<string, unknown>) => { calls.saves.push({ ...input, bytes: undefined }); return options.save ?? { kind: 'saved', versionId: madeId, gone: false }; },
+    } satisfies AgentCollaborators['panelImages'] }),
     ...(options.noClient ? {} : { images: {
       generate: async request => { calls.generate.push(request as unknown as Record<string, unknown>); return answer(); },
       edit: async request => { calls.edit.push(request as unknown as Record<string, unknown>); return answer(); },
@@ -95,6 +95,7 @@ test('the saved line names the panel; a panel that left the storyboard says so',
 test('every refusal before a paid call has its line, and Meta gets no request', async () => {
   const cases: [Options, Record<string, unknown>, string, string][] = [
     [{ noClient: true }, {}, 'unsaveable', 'Not made: images can’t be saved on this server'],
+    [{ noPanels: true }, {}, 'unsaveable', 'Not made: images can’t be saved on this server'],
     [{}, { shot: 's9' }, 'not_found', 'Not made: that panel wasn’t found'],
     [{}, { panel: 'p9' }, 'not_found', 'Not made: that panel wasn’t found'],
     [{ space: workspace({ listed: subjects.filter(subject => subject.id !== 'mara') }) }, {}, 'subject_gone', 'Not made: Mara left the script; update the storyboard'],

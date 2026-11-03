@@ -133,8 +133,8 @@ export async function createBackend(routes: ApiRoute[] = [], turns?: TurnComposi
       saveStoryboard: createAssistantStoryboardSaver(createAssistantStoryboards(pool, application.checkOwnedConversation).save),
       readImageInputs, saveGeneratedImage: createGeneratedImageSaver(generated.save),
       sheets: createAssistantSheets(createAssistantReferences(pool, application.checkOwnedConversation)),
-      panelImages: createAssistantPanelImages(createPanelImages(pool, application.checkOwnedConversation, { storage: objects, verifyMedia })),
       // Images and videos are made only where they can be saved: without storage and the checker, no paid call is made.
+      ...(objects && verifyMedia ? { panelImages: createAssistantPanelImages(createPanelImages(pool, application.checkOwnedConversation, { storage: objects, verifyMedia })) } : {}),
       ...(turns.images && objects && verifyMedia ? { images: turns.images } : {}),
       ...(turns.videos && objects && verifyMedia ? { videos: createVideoJobs({
         jobs, client: turns.videos, readImageInputs, saveVideo: createGeneratedVideoSaver(clips.save, jobs), ...(turns.videoTiming ? { timing: turns.videoTiming } : {}),

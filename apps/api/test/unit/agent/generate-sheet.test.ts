@@ -5,7 +5,6 @@ import { z } from 'zod';
 import { productionTools, projectToolActivity, type AgentCollaborators, type ToolContext } from '../../../src/agent/index.js';
 import { sheetViewPrompt, type AssistantSheetOutcome, type OwnedWorkspace } from '../../../src/application/index.js';
 import { MetaImageError, type ImageResult } from '../../../src/generation/index.js';
-import { unusedPanelImages } from '../../support/unused-panel-images.js';
 
 const tool = productionTools.find(candidate => candidate.id === 'generate-sheet')!;
 const png = { bytes: new Uint8Array([137, 80, 78, 71]), contentType: 'image/png' as const };
@@ -32,7 +31,7 @@ function harness(options: Options = {}) {
   const meta = options.meta ?? (async () => ({ images: [png], requestId: null, usage: null }));
   const collaborators: AgentCollaborators = {
     readWorkspace: async () => options.unreadable ? { kind: 'unavailable' } : { kind: 'found', workspace: workspace(images, options.sheets ?? [], options.script ?? true) },
-    saveScript: async () => ({ kind: 'unavailable' }), saveStoryboard: async () => ({ kind: 'unavailable' }), panelImages: unusedPanelImages,
+    saveScript: async () => ({ kind: 'unavailable' }), saveStoryboard: async () => ({ kind: 'unavailable' }),
     readImageInputs: async (_account, _video, ids) => { calls.edits.push(...ids); return ids.every(id => images.includes(id) || options.sheets?.some(sheet => sheet.views.includes(id))) ? { kind: 'read', images: ids.map(versionId => ({ versionId, dataUrl: 'data:image/png;base64,AA==', width: 64, height: 48 })) } : { kind: 'not_found' }; },
     saveGeneratedImage: async (_account, _video, image) => {
       const kind = failing.shift();
