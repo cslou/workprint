@@ -18,7 +18,7 @@
 ### Project Context
 - **Repo:** `/Users/lou/projects/workprint`.
   - Branch `sprint-014` was cut from `main` at `8a56128` (Sprint 013, #146) and holds this plan. Story branches come from `sprint-014`, and the sprint PR targets `main`.
-  - Story 3's work is already committed on `feat/ui-wordmark` (`b558a85`, cut from `main` at `8a56128`); its PR targets `sprint-014`.
+  - Story 1's work is already committed on `feat/ui-wordmark` (`b558a85`, cut from `main` at `8a56128`); its PR targets `sprint-014`.
   - PR #148 (docs only, into `main`) records Lou's QA of Sprints 012 and 013 and archives B-020, B-041 and B-043.
 - **Tech stack:** as Sprint 013. Muse Spark 1.3 chat through Mastra's model router (`apps/api/src/agent/mastra/model.ts`); Meta `muse-image-1.0` panels; MiniMax-H3 reference-to-video Shots; the media sandbox.
 - **Current state:**
@@ -41,7 +41,7 @@
     - the logo is the word "Workprint" in Italiana; remove the upload limits line, "Attach photos" and the Export card;
     - the default model becomes Muse Wonder.
   - **Research (an X search Lou ran, 2026-11-04):** people keeping multi-shot AI video consistent state screen geography in plain words ("frame left", "toward frame right", which side the camera is on), name the camera as shot size, angle and one movement, and always give the location reference. The prompts already label each image's job.
-  - **No paid calls in tests.** The Meta and MiniMax fakes record what they receive. Paid calls happen only at Lou's QA, and Story 4's live check, on his go.
+  - **No paid calls in tests.** The Meta and MiniMax fakes record what they receive. Paid calls happen only at Lou's QA, and Story 5's live check, on his go.
 - **Non-goals:**
   - the previous video's last frame or the previous Shot's panel as an input;
   - making Shots in order (the system prompt is unchanged);
@@ -50,7 +50,7 @@
   - a designed logo, a model picker, or removing the export module itself (only its card is hidden).
 
 ### Affected Flows
-- **Existing flows affected:** spec §8.3 Storyboard (save-storyboard, "View storyboard" editing), panels and Shot videos (their prompts); the shell, entry pages, composer and Videos tab (Story 3); every chat turn and video title (Story 4).
+- **Existing flows affected:** spec §8.3 Storyboard (save-storyboard, "View storyboard" editing), panels and Shot videos (their prompts); the shell, entry pages, composer and Videos tab (Story 1); every chat turn and video title (Story 5).
 - **New flows introduced:** None. Positions are a new Shot field inside the existing storyboard flows.
 
 ### Verification Strategy
@@ -60,47 +60,14 @@
 
 ### Tests requiring extra consideration
 - `shots.spec.ts` (about 1.5 min) for editing positions; it already covers editing a Shot's length.
-- Story 4's live chat check makes paid Muse Wonder calls, run once on Lou's go.
+- Story 5's live chat check makes paid Muse Wonder calls, run once on Lou's go.
 
 ### Stories
 **Constraints:** Target 5-8 stories per sprint. Each story should be small enough to review, verify, and merge independently. Split stories that combine unrelated outcomes or cannot be verified with a clear functional/regression verification plan.
 
-#### Story 1: The storyboard plans Shots that match
-- **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
-  - [ ] Follows sprint template
-  - [ ] Acceptance criteria are specific and testable
-  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
-  - [ ] Story is small enough to review and merge independently
-  - [ ] Reviewed by sub-agent
-  - [ ] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
-- **Planning review:**
-  - Findings: *(pending)*
-  - Resolution: *(pending)*
-- **As a** filmmaker, **I want** the storyboard to cut only where the camera changes and to say where everyone is, **so that** my Shots match across the cuts.
-- **Dependencies:** None.
-- **Acceptance criteria:**
-  - [ ] **Positions.** `shotFields` gains an optional `positions` (start and end, each a short text): where people and key objects are in the frame and which way they move, in frame-left / frame-right terms, and the camera's side. save-storyboard requires it for every Shot, and read-workspace lists it. Optional in saved content, so earlier storyboards still read.
-  - [ ] **A place in every Shot.** A save in which a Shot names no subject with the environment role is refused, naming the Shot ("Shot 3 names no place"), and nothing is saved.
-  - [ ] **When to cut.** save-storyboard's description says: a new Shot only when the camera set-up changes (a new angle or shot size) or time or place jumps; continuous action in one space stays in one Shot, up to 15 s; each Shot's start positions follow the previous Shot's end; every Shot names its place, even a close-up.
-  - [ ] **The camera note** is described as shot size, angle and at most one movement, for example "Medium, from her left, camera slowly follows her".
-  - [ ] **The prompts carry positions.** The panel prompt's code-written preface and `shotVideoPrompt` add this Shot's positions, and the previous Shot's end as "Previous Shot ended: …" when there is one. A Shot without positions (an earlier storyboard) gets neither line.
-  - [ ] The system prompt is unchanged (it stays byte-identical across turns).
-- **Functional verification:**
-  - [ ] Unit (`apps/api/test/unit/agent/save-storyboard.test.ts`): a Shot without positions or without an environment subject is refused with its message; the description's rules. Pass: each case as stated.
-  - [ ] Unit (`apps/api/test/unit/application/shots.test.ts` and `panel-inputs.test.ts`): the video prompt and the panel preface carry this Shot's positions and the previous Shot's end; the first Shot and a Shot without positions carry no "Previous Shot" line. Pass: exact text.
-  - [ ] Integration (`tool-activity.test.ts`, real turns): a save whose Shot names no place ends with the refusal and no new version; a save with positions lists them in the next read-workspace. Pass: as stated.
-- **Regression verification:**
-  - [ ] `tool-activity.test.ts` storyboard and generate blocks, `storyboard-revisions.test.ts`, `shot-video-choice.test.ts` and `agent-loop.test.ts`, whole. Pass: all green; earlier storyboards without positions still read, make panels and make Shot videos.
-- **Editorial/design verification:** spec §8.3 Storyboard and §10's save-storyboard guidance name positions and the cutting rule.
-- **Manual-only behavior verification:** N/A here; Lou's QA under Sprint Completion.
-- **Planned commits:**
-  1. Feat(contracts): Add a Shot's positions
-  2. Feat(agent): Cut by camera set-up and name the place
-  3. Feat(application): Put positions in panel and video prompts
-- **Technical notes:** the place refusal goes in the storyboard save's existing refusals (`StoryboardSaveError` reasons in `artifacts/assistant-storyboards.ts`), not in the tool, so every save path gets it. A model sends non-null values for nullable arguments (Muse Spark), so `positions` is a required object of two required strings in the tool's schema.
+**Order:** Story 1 is already built and merges into `sprint-014` first, so Stories 2–5 branch after it and its `shots.spec.ts` and `design.md` edits. Stories 2, 3 and 4 then go in order. Story 5 comes after Story 2 (its live check uses the new save-storyboard schema) and before Lou's QA, so the QA judges Muse Wonder.
 
-#### Story 2: A person changes a Shot's positions
+#### Story 1: A makeshift wordmark and a tidier composer and Videos tab
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
   - [ ] Follows sprint template
   - [ ] Acceptance criteria are specific and testable
@@ -110,57 +77,29 @@
   - [ ] Review findings addressed or explicitly recorded
   - [ ] Ready for Lou
 - **Planning review:**
-  - Findings: *(pending)*
-  - Resolution: *(pending)*
-- **As a** filmmaker, **I want** to see and correct where people start and end in each Shot, **so that** I can fix a mismatch before paying for panels and videos.
-- **Dependencies:** Story 1.
-- **Acceptance criteria:**
-  - [ ] "View storyboard" shows each Shot's start and end positions, and the tab's summary row does not.
-  - [ ] A person edits them the way a Shot's length is edited: a storyboard edit of that Shot's positions alone (`storyboardEditSchema`, `editedPlan`), saved as the next storyboard version; an unchanged edit just closes; an empty start or end is refused with a plain line.
-  - [ ] The next panel and Shot video use the edited positions.
-- **Functional verification:**
-  - [ ] Unit (`apps/web/test/unit/storyboard/storyboard-edit.test.ts`) and integration (`storyboard-revisions.test.ts`): the edit body carries only that Shot's positions; empty text is refused. Pass: as stated.
-  - [ ] E2E (`shots.spec.ts` journey): edit Shot 1's end position, reload, and see it; the next generate-shot's MiniMax request (fake) carries it. Pass: as stated.
-- **Regression verification:**
-  - [ ] `shots.spec.ts` whole (the length edit and intent edit still work) and `storyboard-revisions.test.ts`. Pass: all green.
-- **Editorial/design verification:** design.md's Storyboard section names the positions editor beside the length.
-- **Manual-only behavior verification:** N/A.
-- **Planned commits:**
-  1. Feat(artifacts): Edit a Shot's positions
-  2. Feat(web): Show and edit positions in the board
-- **Technical notes:** copy `shot-length.tsx`'s editor and its `PlanningEditor` target.
-
-#### Story 3: A makeshift wordmark and a tidier composer and Videos tab
-- **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
-  - [ ] Follows sprint template
-  - [ ] Acceptance criteria are specific and testable
-  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
-  - [ ] Story is small enough to review and merge independently
-  - [ ] Reviewed by sub-agent
-  - [ ] Review findings addressed or explicitly recorded
-  - [ ] Ready for Lou
-- **Planning review:**
-  - Findings: *(pending)*
-  - Resolution: *(pending)*
+  - Findings: P2s: no check of the accessible name, the docked label or the licence; the manual look had no pass condition.
+  - Resolution: the accessible name is what the e2e finds the button by; a `chat.spec.ts` case checks the docked "+ Attach"; the licence is kept in the repo beside the font (it isn't a served file); the look is Sprint Completion's QA item 4.
 - **As** Lou, **I want** the app to show its name as a simple wordmark and to drop text and controls that promise nothing, **so that** it looks finished enough to show.
-- **Dependencies:** None. Implemented on `feat/ui-wordmark` (`b558a85`).
+- **Dependencies:** None. Built on `feat/ui-wordmark` (`b558a85`, from `main` at `8a56128`).
 - **Acceptance criteria:**
-  - [x] The sidebar's top left and the entry pages show the word "Workprint" in Italiana (`--font-family-brand`, regular, 28px); the "a" mark is gone. The font file (`apps/web/src/ui/fonts/italiana-latin.woff2`, Latin subset) and its SIL OFL licence are served with the app, not loaded from Google Fonts.
+  - [x] The sidebar's top left and the entry pages show the word "Workprint" in Italiana (`--font-family-brand`, regular, 28px); the "a" mark is gone. The font file (`apps/web/src/ui/fonts/italiana-latin.woff2`, Latin subset) is bundled and served with the app, not loaded from Google Fonts; its SIL OFL licence is kept beside it in the repo.
   - [x] The composer no longer shows "JPEG or PNG only · Up to 10 MiB · 4096 × 4096 pixels. Video uploads are temporarily unavailable."; a refused file still explains the limits in its upload status.
   - [x] The opening composer's attach button is "+" alone, with the accessible name "Attach a file"; the docked composer keeps "+ Attach".
   - [x] The Videos tab shows no Export or Export history (B-009); the export module itself stays.
 - **Functional verification:**
-  - [x] E2E `auth.spec.ts` (sign-in test): the entry link and the sidebar wordmark use Italiana and the face is loaded; the attach button reads "+"; no limits line. `shots.spec.ts` (Generated videos test): no Export button. Pass: 2/2; both fail on the code before the change (checked by stashing it).
+  - [x] E2E `auth.spec.ts` (sign-in test): the entry link and the sidebar wordmark use Italiana and the face is loaded; the button found by the accessible name "Attach a file" reads "+"; no limits line. `shots.spec.ts` (Generated videos test): no Export button. Pass: 2/2; both fail on the code before the change (checked by stashing it).
+  - [ ] E2E `chat.spec.ts`: after the first message, the docked composer's attach button reads "+ Attach". Pass: as stated.
 - **Regression verification:**
   - [x] `pnpm check`. Pass: green.
   - [ ] `chat.spec.ts` and `uploads.spec.ts` whole (uploads still refuse and explain an unsupported file). Pass: all green.
 - **Editorial/design verification:** design.md: the brand font token, the Logo section ("Makeshift"), the composer copy under the image-only restriction, and the Export consumers marked not shown for now.
-- **Manual-only behavior verification:** Lou looks at the wordmark at QA.
+- **Manual-only behavior verification:** Sprint Completion's QA item 4.
 - **Planned commits:**
   1. Feat(web): Italiana wordmark, simpler composer
+  2. Test(web): The docked composer keeps Attach
 - **Technical notes:** Italiana has one weight (400); a bolder weight would be synthesised, so the wordmark stays regular.
 
-#### Story 4: Muse Wonder is the default chat model
+#### Story 2: Every Shot names its place and its positions
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
   - [ ] Follows sprint template
   - [ ] Acceptance criteria are specific and testable
@@ -170,21 +109,114 @@
   - [ ] Review findings addressed or explicitly recorded
   - [ ] Ready for Lou
 - **Planning review:**
-  - Findings: *(pending)*
-  - Resolution: *(pending)*
-- **As** Lou, **I want** the agent to run on Muse Wonder, **so that** the workflow gets the stronger model.
-- **Dependencies:** None (before Lou's QA, so the QA judges Wonder).
+  - Findings: P1: the place rule's save paths weren't stated, so a person's length edit on an earlier storyboard, or a script with no place, could be refused. P2s: no length bound; keyword tests of the description prove nothing; three deliverables in one story.
+  - Resolution: the place rule applies only to the agent's save-storyboard, and only when the script lists a place; a person's edits are never refused for it (regression case added). `start` and `end` are at most 300 characters. The description's rules are editorial, judged at Lou's QA. The prompt work is now Story 3.
+- **As** a filmmaker, **I want** the storyboard to cut only where the camera changes, name every Shot's place and say where everyone starts and ends, **so that** my Shots can match across the cuts.
+- **Dependencies:** Story 1 merged.
 - **Acceptance criteria:**
-  - [ ] **Live check first, on Lou's go:** `scripts/live/chat.mjs` with `meta/muse-wonder-1.0` streams a reply, calls a tool and reads its result, and makes a title. The response shapes are saved as a fixture beside `muse-spark-live-shapes.json`, with any differences from Muse Spark (reasoning options, nullable arguments) recorded.
-  - [ ] `assistantModels` gains `meta/muse-wonder-1.0`, with its own title options; `DEFAULT_ASSISTANT_MODEL=meta/muse-wonder-1.0` starts the server, and an unlisted model is still refused.
-  - [ ] `.env.example` and the QA host use `meta/muse-wonder-1.0`. Lou sets `DEFAULT_ASSISTANT_MODEL=meta/muse-wonder-1.0` in the root `.env` himself.
-  - [ ] Muse Spark 1.3 stays allowed, so switching back is a one-line `.env` change.
+  - [ ] **Positions.** `shotFields` gains an optional `positions: { start, end }`, each 1–300 characters: where people and key objects are in the frame and which way they move, in frame-left / frame-right terms, and the camera's side. save-storyboard requires it for every Shot (a required object of two required strings), and read-workspace lists it. Saved content without it still reads.
+  - [ ] **A place in every Shot.** When the script lists at least one place subject, an agent save in which a Shot names no subject with the environment role is refused with "Not saved: Shot N names no place. Add the place it happens in to its references." and nothing is saved. A script with no place subject is unaffected.
+  - [ ] **Person edits are never refused for the place rule**: a length, intent or positions edit of an earlier Shot with no place still saves.
+  - [ ] **When to cut.** save-storyboard's description says: a new Shot only when the camera set-up changes (a new angle or shot size) or time or place jumps; continuous action in one space stays in one Shot, up to 15 s; each Shot's start follows the previous Shot's end; every Shot names its place, even a close-up; the camera note is shot size, angle and at most one movement, for example "Medium, from her left, camera slowly follows her".
 - **Functional verification:**
-  - [ ] Unit (`config.security.test.ts`, `video-title.test.ts`): Wonder is accepted with its title options; an unlisted id is refused. Pass: as stated.
-  - [ ] The live check above, once. Pass: reply, tool call and title as stated.
+  - [ ] Unit (`apps/api/test/unit/agent/save-storyboard.test.ts`): a Shot without positions, or with an empty or 301-character start, is refused by the schema; the place refusal's message. Pass: each case as stated.
+  - [ ] Integration (`tool-activity.test.ts`, real turns): a save whose Shot names no place (the script lists the gallery) ends with the refusal and no new version; a save with positions lists them in the next read-workspace; a script with no place saves. Pass: as stated.
+  - [ ] Integration (`storyboard-revisions.test.ts`): a person's length edit of an earlier storyboard whose Shot names no place saves. Pass: a new version.
 - **Regression verification:**
-  - [ ] `agent-loop.test.ts` and the chat e2e (scripted provider) unchanged. Pass: green.
-- **Editorial/design verification:** spec §4 or §10's model line and the README name Muse Wonder as the default.
+  - [ ] `tool-activity.test.ts` storyboard block and `storyboard-revisions.test.ts` whole. Pass: green.
+- **Editorial/design verification:** the cutting and camera rules are prose for the model, checked by reading the description and judged at Lou's QA items 1–2, not by keyword tests. Spec §8.3 Storyboard and §10's save-storyboard guidance name positions, the place rule and the cutting rule.
+- **Manual-only behavior verification:** Lou's QA items 1–2.
+- **Planned commits:**
+  1. Feat(contracts): Add a Shot's start and end positions
+  2. Feat(agent): Cut by camera set-up and name the place
+- **Technical notes:** the place refusal is a new `StoryboardSaveError` reason in `artifacts/assistant-storyboards.ts`, the agent's save path, not `editedPlan`. Muse Spark sends non-null values for nullable arguments, so `positions` is required in the tool's schema, not nullable.
+
+#### Story 3: Panel and video prompts carry the positions
+- **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
+  - [ ] Follows sprint template
+  - [ ] Acceptance criteria are specific and testable
+  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
+  - [ ] Story is small enough to review and merge independently
+  - [ ] Reviewed by sub-agent
+  - [ ] Review findings addressed or explicitly recorded
+  - [ ] Ready for Lou
+- **Planning review:**
+  - Findings: P2s: only one line format was fixed; a Shot whose previous Shot has no positions wasn't covered; the system prompt's check wasn't named; no check at the longest positions.
+  - Resolution: both formats are given; that case is covered; `agent-loop.test.ts`'s byte-identical test is named; a unit case at 300-character positions.
+- **As** a filmmaker, **I want** each panel and Shot video to be told where everyone starts and ends, and where the previous Shot ended, **so that** the pictures follow the plan.
+- **Dependencies:** Story 2.
+- **Acceptance criteria:**
+  - [ ] The panel prompt's code-written preface (`application/panels.ts`) and `shotVideoPrompt` (`application/shots.ts`) add `Positions: starts <start>; ends <end>.` for a Shot with positions, and `Previous Shot ended: <end>.` when the Shot before it in story order has positions.
+  - [ ] The first Shot, a Shot without positions, and a Shot whose previous Shot has none get no line for what's missing.
+  - [ ] A video prompt over MiniMax's limit is still refused `too_long` before any job is saved; 300-character positions on an ordinary Shot fit.
+  - [ ] The system prompt is unchanged.
+- **Functional verification:**
+  - [ ] Unit (`apps/api/test/unit/application/shots.test.ts` and `panel-inputs.test.ts` or the panel test that builds the preface): the exact lines for each case above; 300-character positions within the limit. Pass: exact text.
+  - [ ] Integration (`tool-activity.test.ts` generate-panel and generate-shot): the Meta and MiniMax fakes receive the lines. Pass: as stated.
+- **Regression verification:**
+  - [ ] `tool-activity.test.ts` generate blocks, `shot-video-choice.test.ts`, and `agent-loop.test.ts` ("the static prompt and tool list are byte-identical across turns"). Pass: green.
+- **Editorial/design verification:** spec §8.3 Videos and Storyboard's panel bullets name the lines.
+- **Manual-only behavior verification:** Lou's QA item 3.
+- **Planned commits:**
+  1. Feat(application): Put positions in panel and video prompts
+- **Technical notes:** the previous Shot is the one before in the storyboard's story order.
+
+#### Story 4: A person changes a Shot's positions
+- **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
+  - [ ] Follows sprint template
+  - [ ] Acceptance criteria are specific and testable
+  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
+  - [ ] Story is small enough to review and merge independently
+  - [ ] Reviewed by sub-agent
+  - [ ] Review findings addressed or explicitly recorded
+  - [ ] Ready for Lou
+- **Planning review:**
+  - Findings: P2s: no state for a Shot without positions or text for the refusal; the unchanged edit and the next panel weren't verified; the place rule could refuse a person's edit.
+  - Resolution: "Positions · not set" and both fields required; the refusal text is given; unit and e2e cases added; Story 2 keeps person edits out of the place rule.
+- **As** a filmmaker, **I want** to see and correct where people start and end in each Shot, **so that** I can fix a mismatch before paying for panels and videos.
+- **Dependencies:** Story 3.
+- **Acceptance criteria:**
+  - [ ] "View storyboard" shows each Shot's positions as "Starts: … / Ends: …", or "Positions · not set" for an earlier Shot without them; the tab's summary row doesn't show them.
+  - [ ] A person edits them the way a Shot's length is edited: a storyboard edit of that Shot's positions alone (`storyboardEditSchema`, `editedPlan`), saved as the next storyboard version. Both fields are needed, including when adding positions to an earlier Shot; an empty one is refused with "Write where the Shot starts and where it ends." An unchanged edit just closes.
+  - [ ] The next panel and Shot video use the edited positions.
+- **Functional verification:**
+  - [ ] Unit (`apps/web/test/unit/storyboard/storyboard-edit.test.ts`): the edit body carries only that Shot's positions; an empty field is refused with its text; an unchanged edit sends nothing. Pass: as stated.
+  - [ ] Integration (`storyboard-revisions.test.ts`): a positions edit saves the next version and changes nothing else. Pass: as stated.
+  - [ ] E2E (`shots.spec.ts` journey): edit Shot 1's end, reload and see it; the next generate-panel's Meta request and generate-shot's MiniMax request (fakes) carry it. Pass: as stated.
+- **Regression verification:**
+  - [ ] `shots.spec.ts` whole (the length and intent edits still work). Pass: green.
+- **Editorial/design verification:** design.md's Storyboard section names the positions editor beside the length.
+- **Manual-only behavior verification:** Lou's QA item 2.
+- **Planned commits:**
+  1. Feat(artifacts): Edit a Shot's positions
+  2. Feat(web): Show and edit positions in the board
+- **Technical notes:** copy `shot-length.tsx`'s editor and `lengthText`'s "not set" pattern (`storyboard-edit.ts:44`).
+
+#### Story 5: Muse Wonder is the default chat model
+- **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
+  - [ ] Follows sprint template
+  - [ ] Acceptance criteria are specific and testable
+  - [ ] Executable changes have concrete functional and relevant regression verification with pass/fail conditions; descriptive-only scope records N/A with rationale and editorial evidence
+  - [ ] Story is small enough to review and merge independently
+  - [ ] Reviewed by sub-agent
+  - [ ] Review findings addressed or explicitly recorded
+  - [ ] Ready for Lou
+- **Planning review:**
+  - Findings: P2s: no failure path; the live check's tool wasn't named; server start, Spark staying allowed and the QA host weren't checked; the spec locations were vague.
+  - Resolution: a failure path; the live check calls save-storyboard (nested `positions`) and read-workspace; config unit cases; the QA host script and the exact spec lines are named.
+- **As** Lou, **I want** the agent to run on Muse Wonder, **so that** the workflow gets the stronger model.
+- **Dependencies:** Story 2 (the live check uses its save-storyboard schema).
+- **Acceptance criteria:**
+  - [ ] **Live check first, on Lou's go:** `scripts/live/chat.mjs` with `meta/muse-wonder-1.0` streams a reply, calls read-workspace and save-storyboard (a required nested `positions` object) and reads their results, and makes a title. The response shapes are saved as a fixture beside `muse-spark-live-shapes.json`, with any differences from Muse Spark (reasoning options, nullable or nested arguments) recorded.
+  - [ ] `assistantModels` gains `meta/muse-wonder-1.0` with its own title options. There is no code default: the server still takes the model only from `DEFAULT_ASSISTANT_MODEL`. Both ids start it; an unlisted one is refused; Muse Spark's title options are unchanged.
+  - [ ] `.env.example` and the Sprint 014 QA host script (`outputs/qa/sprint-014/<sha>/host.mjs`, its `DEFAULT_ASSISTANT_MODEL`) use `meta/muse-wonder-1.0`. Lou sets it in the root `.env` himself.
+  - [ ] **If the live check fails:** the differences are recorded, Muse Spark stays the default, Story 5 is closed as deferred in `## Final Review`, and Lou's QA runs on Spark.
+- **Functional verification:**
+  - [ ] Unit (`config.security.test.ts`, `video-title.test.ts`): both ids accepted, each with its title options; an unlisted id refused. Pass: as stated.
+  - [ ] The live check above, once. Pass: reply, both tool calls and title as stated.
+- **Regression verification:**
+  - [ ] `agent-loop.test.ts` and the chat e2e (scripted provider). Pass: green.
+- **Editorial/design verification:** spec §10 MVP plan → Decisions → Models, §8.1 Chat's "sent as one Muse Spark turn", and the README's model line name Muse Wonder as the default.
 - **Manual-only behavior verification:** the live check is a paid call and needs Lou's go.
 - **Planned commits:**
   1. Feat(agent): Qualify Muse Wonder as a chat model
@@ -197,12 +229,12 @@ After all implementation stories are complete, perform this checklist before spr
 
 - [ ] Confirm all stories met their acceptance criteria using recorded implementation and verification evidence.
 - [ ] Run the applicable regression suite on the combined sprint branch (`.checks/regression.sh --tier=deep`).
-- [ ] Run any planned cross-story checks not covered by that suite: spec §8.3 and §10, design.md and this doc against the code.
+- [ ] Run any planned cross-story checks not covered by that suite: spec §8.3 and §10, design.md and this doc against the code; and spec §10's Phase 3 packaging table and its Agent tool guidance line ("until B-014 lands (Sprint 014)") renumbered to match this sprint and Lou's decision on Questions.
 - [ ] **Lou's QA** (manual; on a QA host when he asks; live Muse Wonder, Meta and MiniMax calls on his go). In a fresh video, ask "make a 20-second video of Mara finding a key in a gallery" and say yes to each step. Pass:
   1. the storyboard keeps continuous action in one Shot and cuts only where the camera changes;
   2. every Shot names the gallery and shows start and end positions, which he can change in "View storyboard";
   3. the Shot videos, joined, match across the cuts: Mara on the same side, the same room, the key where it was;
-  4. the wordmark, composer and Videos tab look as Story 3 says.
+  4. the Italiana wordmark is at the sidebar's top left and on the entry pages with no "a" mark, and the composer and Videos tab look as Story 1 says.
 - [ ] Record results and unresolved issues in a brief `## Final Review`.
 
 For descriptive-only work, use editorial review and applicable existing checks. Preserve applicable design checks and approval gates. Failed, ambiguous, or unrun required checks remain non-pass.
