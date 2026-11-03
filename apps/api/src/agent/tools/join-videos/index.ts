@@ -39,7 +39,7 @@ export const joinVideosTool = defineTool({
     'Join saved video clips, in the order given, into one new draft video of this video. The original clips and their versions stay as they are. Saving is never approval.',
     `clips are ${joinLimits.minClips} to ${joinLimits.maxClips} video versionIds from read-workspace, each once. Together they may run at most ${maxS} s.`,
     'The clips must have matching video: the same size, frame rate and encoding. Otherwise nothing is joined and the result says which clip differs and how.',
-    'To join the Shot videos, pass them in Shot order: each Shot\'s chosen video, else its latest.',
+    'To join the Shot videos, pass them in Shot order: each Shot\'s chosen video, else its latest. A Shot video whose state is Ready is that Shot\'s chosen video.',
     'Joining makes no paid call and needs no yes.',
     'Set showInChat to true when the user asked for the joined video directly, so it is shown in the chat.',
   ].join(' '),

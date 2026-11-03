@@ -9,7 +9,7 @@ import { digest, readCheckedMedia, requireOwnedConversation, requireUseRoom, wit
 import { hasTarget, usedPlan } from './panel-targets.js';
 import { usedImageVersions, usedVideoVersions } from './workspace-images.js';
 import { lockPublicationOwner, publishVersion } from './publication.js';
-import { createArtifactStore } from './store.js';
+import { BUILT_IN_OWNER, createArtifactStore } from './store.js';
 import { UploadError, uploadError } from './uploads/errors.js';
 import { measuredMedia, sandboxTurn, verifyWhenFree } from './uploads/media-verifier.js';
 import type { MediaVerifier, OwnedCheck } from './uploads/types.js';
@@ -149,7 +149,7 @@ export function createGeneratedVideos(pool: Pool, checkOwnedConversation: OwnedC
         if (!storage) throw new UploadError('not_implemented', 'Private storage is not available');
         const version = await reads.version(account, versionId);
         if (version.kind !== 'video') throw new UploadError('not_found');
-        return { versionId, bytes: await readCheckedMedia(pool, storage, version, account, MAX_UPLOAD_VIDEO_BYTES), durationMs: version.media.durationMs ?? 0 };
+        return { versionId, bytes: await readCheckedMedia(pool, storage, version, version.builtIn ? BUILT_IN_OWNER : account, MAX_UPLOAD_VIDEO_BYTES), durationMs: version.media.durationMs ?? 0 };
       } catch (error) { throw uploadError(error); }
     },
   });

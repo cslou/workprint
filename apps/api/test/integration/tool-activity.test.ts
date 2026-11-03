@@ -7,12 +7,14 @@ import { Pool } from 'pg';
 import { createArtifactStore, createArtifactWriters, createAssistantReferences, createAssistantScripts, createAssistantStoryboards, createGeneratedImages, createGeneratedVideos, createMediaVerifier, createStoryboardEdits, UploadError, createVersionUses, panelArtifactId, shotArtifactId } from '../../src/artifacts/index.js';
 import { createAssistantScriptSaver, createAssistantSheets, createAssistantStoryboardSaver, shotEnding } from '../../src/application/index.js';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
+import { BUILT_IN_OWNER } from '../../src/artifacts/store.js';
 import { createGenerationJobs } from '../../src/generation/index.js';
 import { createMediaSandbox, createPrivateObjectStorage } from '../../src/storage/index.js';
 import { accountBrowserFixture } from '../support/account-browser-fixture.js';
 import { chatComposition } from '../support/chat-composition.js';
 import { metaImageFake, testPng, type FakeImageStep } from '../support/meta-image-fake.js';
 import { generatedClip, miniMaxVideoFake } from '../support/minimax-video-fake.js';
+import { createNativeConversation } from '../support/native-conversations.js';
 import { completed, nativeTurnClient, type ObservedTurn } from '../support/native-turn-client.js';
 import { scriptedProvider } from '../support/scripted-provider.js';
 import { testStack } from '../support/test-stack.js';
@@ -1639,6 +1641,20 @@ test('join-videos joins saved clips in order into a new draft clip of the video,
     await objects.remove(object_key);
     await objects.publish(object_key, small, 'video/mp4');
     await assert.rejects(clips.read(owner.id, version.id), (error: unknown) => error instanceof UploadError && error.code === 'integration_failure');
+    // Bytes that are gone are not found.
+    await objects.remove(object_key);
+    await assert.rejects(clips.read(owner.id, version.id), (error: unknown) => error instanceof UploadError && error.code === 'not_found');
+  });
+
+  await t.test('a built-in clip this video uses as a reference joins', async () => {
+    const video = await client(owner).newVideo(), origin = (await createNativeConversation(fixture.native, BUILT_IN_OWNER)).id;
+    const shared = await saved({ id: BUILT_IN_OWNER }, origin, clip), mine = await saved(owner, video, clip);
+    const sealer = new Pool({ connectionString: fixture.setupUrl, max: 1 });
+    try { await sealer.query('UPDATE artifacts.artifacts SET built_in=true WHERE owner_id=$1 AND artifact_id=$2', [BUILT_IN_OWNER, shared.artifactId]); } finally { await sealer.end(); }
+    await createVersionUses(pool, check).useVersion(owner.id, video, { operationId: randomUUID(), versionId: shared.id, purpose: 'reference', role: 'shared-clip' });
+    const { result } = await join(owner, video, { clips: [shared.id, mine.id] });
+    assert.ok(result.made, JSON.stringify(result));
+    assert.deepEqual((await store.version(owner.id, result.video!.versionId)).dependencies, [shared.id, mine.id]);
   });
 
   await t.test('a clip of another size is refused, naming it', async () => {

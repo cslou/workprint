@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
-import { createMediaJoiner, createMediaVerifier, type JoinedMedia } from '../../src/artifacts/index.js';
+import { createMediaJoiner, createMediaVerifier, joinWhenFree, type JoinedMedia } from '../../src/artifacts/index.js';
 import { createMediaSandbox, MediaProcessError } from '../../src/storage/index.js';
 import { runMediaChild } from '../../src/storage/media/child.js';
 import { MEDIA_JOIN_OUTPUT_BYTES } from '../../src/storage/media/join.js';
@@ -22,7 +22,7 @@ test('the media sandbox joins clips by copying their picture and remaking their 
   /** The joined video as the ordinary video check and a probe see it. */
   const measure = async (bytes: Buffer) => {
     const checked = await verify({ kind: 'video', bytes, contentType: 'video/mp4', origin: 'assistant', signal: AbortSignal.timeout(20000) });
-    const probe = JSON.parse((await sandbox.use(bytes, session => session.probe())).toString()) as { streams: { codec_type: string; codec_name: string; duration: string; nb_frames: string }[] };
+    const probe = JSON.parse((await sandbox.use(bytes, session => session.probe())).toString()) as { streams: { codec_type: string; codec_name: string; duration: string; nb_frames: string; start_time: string }[] };
     return { checked, video: probe.streams.find(stream => stream.codec_type === 'video')!, audio: probe.streams.find(stream => stream.codec_type === 'audio') };
   };
 
@@ -36,6 +36,8 @@ test('the media sandbox joins clips by copying their picture and remaking their 
     assert.equal(checked.hasAudio, true);
     assert.equal(audio?.codec_name, 'aac');
     assert.ok(Math.abs(Number(audio.duration) - Number(video.duration)) <= frame, `${audio.duration} vs ${video.duration}`);
+    // Sound and picture start together, so the sound stays in step with every clip.
+    assert.ok(Math.abs(Number(video.start_time)) <= frame && Math.abs(Number(audio.start_time)) <= frame, `${video.start_time}, ${audio.start_time}`);
   });
 
   await t.test('clips without sound make a video without sound', async () => {
@@ -48,8 +50,8 @@ test('the media sandbox joins clips by copying their picture and remaking their 
     assert.deepEqual(await join([clip, small]), { kind: 'incompatible', clip: 2, difference: '672×384; clip 1 is 1344×768' });
   });
 
-  await t.test('twenty clips join within one job\'s deadline', async () => {
-    const result = joined(await join(Array.from({ length: 20 }, () => clip)));
+  await t.test('twenty clips join within one job\'s deadline, waiting their turn as the server does', async () => {
+    const result = joined(await joinWhenFree(join)(Array.from({ length: 20 }, () => clip)));
     assert.equal(result.frames, 1940);
     assert.ok(Math.abs(result.lengthS - 80.833333) <= frame);
   });

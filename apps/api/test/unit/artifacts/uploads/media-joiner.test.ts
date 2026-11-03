@@ -74,4 +74,10 @@ test('a joiner waits out another job\'s turn, within its wait', async () => {
   // Still busy at the end of the wait: the capacity error is the result.
   const busy = joinWhenFree(async () => { throw new MediaProcessError('capacity'); }, { waitMs: 5, retryMs: 1 });
   await assert.rejects(busy([new Uint8Array([1]), new Uint8Array([2])]), (error: unknown) => error instanceof MediaProcessError && error.code === 'capacity');
+  // Each try gets the caller's own signal, with no shorter limit added: the sandbox job keeps its own deadline.
+  const seen: (AbortSignal | undefined)[] = [], stop = new AbortController();
+  const plain = joinWhenFree(async (_clips, signal) => { seen.push(signal); return { kind: 'incompatible', clip: 2, difference: 'x' }; }, { waitMs: 5, retryMs: 1 });
+  await plain([new Uint8Array([1]), new Uint8Array([2])], stop.signal);
+  await plain([new Uint8Array([1]), new Uint8Array([2])]);
+  assert.deepEqual(seen, [stop.signal, undefined]);
 });

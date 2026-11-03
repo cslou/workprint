@@ -19,13 +19,12 @@ export type WhenFreeOptions = Readonly<{ waitMs: number; retryMs: number; signal
 /** How long a sandbox job waits for its turn, and how often it tries again. */
 export const sandboxTurn = Object.freeze({ waitMs: 30_000, retryMs: 250 });
 
-/** The media sandbox runs one job at a time: another job's turn is waited out, within `waitMs`. Each try has its own limit. */
-export async function whenFree<T>(job: (signal: AbortSignal) => Promise<T>, options: WhenFreeOptions): Promise<T> {
+/** The media sandbox runs one job at a time: another job's turn is waited out, within `waitMs`. The job keeps its own deadline. */
+export async function whenFree<T>(job: () => Promise<T>, options: WhenFreeOptions): Promise<T> {
   const deadline = Date.now() + options.waitMs;
   for (;;) {
     try {
-      const attempt = AbortSignal.timeout(20_000);
-      return await job(options.signal ? AbortSignal.any([options.signal, attempt]) : attempt);
+      return await job();
     } catch (error) {
       if (!busy(error) || Date.now() + options.retryMs > deadline || options.signal?.aborted) throw error;
       await new Promise(resolve => setTimeout(resolve, options.retryMs));
@@ -33,9 +32,12 @@ export async function whenFree<T>(job: (signal: AbortSignal) => Promise<T>, opti
   }
 }
 
-/** A media check that waits its turn, as `whenFree` does. */
+/** A media check that waits its turn, as `whenFree` does. Each try has its own 20 s limit. */
 export const verifyWhenFree = (verifyMedia: MediaVerifier, input: Omit<Parameters<MediaVerifier>[0], 'signal'>, options: WhenFreeOptions): Promise<VerifiedMedia> =>
-  whenFree(signal => verifyMedia({ ...input, signal }), options);
+  whenFree(() => {
+    const attempt = AbortSignal.timeout(20_000);
+    return verifyMedia({ ...input, signal: options.signal ? AbortSignal.any([options.signal, attempt]) : attempt });
+  }, options);
 
 /** Trusted composition capability; actual immutable byte/decode proof, never caller authority. */
 export function createMediaVerifier(sandbox:MediaSandbox):MediaVerifier {
