@@ -252,17 +252,24 @@ After video generation (Lou, 2026-11-02, from Sprint 008 QA): B-038 and B-039 wa
 
 Deprioritized: everything here waits until the Next items are done (Lou, 2026-11-01). Nothing here is ranked.
 
-### B-044 — Lip sync and consistent voices
-- Context: Lou's QA of the reference-to-video test (2026-11-03): "audio is correct in general but does not match the face, but we will fix that later."
-- Problem: MiniMax-H3 always makes the sound itself, so the voice can change from Shot to Shot and the lips don't follow the line.
-- Outcome: A character keeps one voice across Shots, and their lips match their lines. Pass: two Shots with the same character's dialogue sound like the same person, with the mouth moving in time.
-- References: research (2026-11-03): MiniMax TTS can make each line in a chosen voice, sent as `reference_audio` with the Shot's video request; MiniMax V2 API reference (`reference_audio`); Sprint 012 writes dialogue in MiniMax's documented form only.
+### B-044 — Consistent voices and lip sync through MiniMax speech
+- Context: Lou's QA of the reference-to-video test (2026-11-03): "audio is correct in general but does not match the face, but we will fix that later." Lou wants it in a later sprint. Research the same day (`docs/research/voices-and-speech-2026-11.md`, private) proposes the design below.
+- Problem: MiniMax-H3 makes each Shot's sound itself, so a character's voice changes from Shot to Shot and the lips don't follow the line. Workprint has no voice asset, no audio media type and no speech client.
+- Outcome:
+  - Each speaking character has a voice under its subject, separate from its sheet: a saved, versioned asset with a sample clip, made by the agent as a draft and chosen by a person with "Use this version". MiniMax's voice id stays on the server. Preset or designed voices only, no cloning (account verification and consent).
+  - Each Shot with dialogue gets one dialogue track made in those voices (`speech-2.8-hd`, about $0.006 a line), exactly the Shot's length with about 1 s of silence first, saved as the Shot's own work. It goes stale when a line or a voice changes.
+  - generate-shot sends the track as `reference_audio` with timed lines (`At 00:01.000, Mara (S1) says: <d>…</d>`) and refuses a Shot with dialogue but no current track. New tools make a voice and a Shot's track; the track tool says how many seconds the speech needs and never changes a length a person set.
+  - The system prompt's order becomes script → sheets and voices → storyboard → panels → dialogue tracks → Shot videos.
+  - Pass: two Shots with Mara's lines sound like the same voice, and in each her mouth moves in time with her own words. Lou judges it at QA. A changed line or voice makes the track stale, and generate-shot refuses it until it is remade.
+- Constraint: Needs an audio media type (file check, storage, player, one fixed format so joining still works). MiniMax takes at most 3 audio clips of 2–15 s, 15 s in total, and 12 files with the images, so the job input cap rises from 9 to 12.
+- Blocker: A paid test (about $1.92, four 6 s runs on QA Shot 1, on Lou's go) must show that H3's lips follow supplied speech on the hosted API before this is scheduled. It isn't documented, and outside reports conflict. Open decisions for Lou: a narrator's voice (no subject today); whether the speech call may be resent when its answer is lost; whether to swap our track into the clip; when to pay a designed voice's $3.
+- References: `docs/research/voices-and-speech-2026-11.md` and its folder of saved docs (private); MiniMax speech `/v1/t2a_v2`, voice design and pricing; MiniMax V2 video `reference_audio`; H3 prompt guides (`ref-en.txt` §2.4, §4.2); Sprint 012 Stories 1 and 3; B-020; B-045.
 
 ### B-045 — Narration and voice-over as their own track
-- Context: Research for Sprint 012 (2026-11-03). A voice-over line in a Shot's prompt ("says in an off-screen voiceover … while her lips remain completely closed") is the only way to ask H3 for narration, and it is made per Shot.
-- Problem: Narration made inside each Shot's clip can't run across Shots, change without remaking the clip, or keep one voice.
-- Outcome: Narration and voice-over are made as their own audio track and laid over the joined video. Pass: a narration line plays across two joined Shots in one voice.
-- References: B-020 (joining clips, Sprint 013); B-044 (voices); Sprint 012 Story 3 (the voice-over prompt form).
+- Context: Research for Sprint 012 and B-044 (2026-11-03). A voice-over line in a Shot's prompt ("says in an off-screen voiceover … while her lips remain completely closed") is the only way to ask H3 for narration today, and it is made per Shot.
+- Problem: Narration made inside each Shot's clip can't run across Shots, change without remaking the clip, or keep one voice. Sending it as a Shot's audio could make mouths move.
+- Outcome: Narration and voice-over are made with MiniMax speech as their own track and laid over the joined video, re-encoding the audio once while the video is copied untouched. Pass: a narration line plays across two joined Shots in one voice, and no character's mouth moves with it.
+- References: B-020 (joining clips, Sprint 013); B-044 (voices); `docs/research/voices-and-speech-2026-11.md` (private); Sprint 012 Story 3 (the voice-over prompt form).
 
 ### B-037 — Delete saved work
 - Problem: Saved work is append-only. Images (uploaded or generated), scripts and videos can be versioned but never deleted, so a user can't remove an unwanted image from Assets or storage. Lou raised it while planning Sprint 008 (2026-11-02): "we probably need that in the future".
