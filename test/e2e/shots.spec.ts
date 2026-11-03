@@ -201,7 +201,16 @@ test('the agent\'s storyboard shows each Shot\'s panel images as they are made, 
   await turn({ name: 'generate-shot', args: { shot: shot!.shotId, prompt: 'She lifts the key into the light.' } }, 'Make the Shot', 'Saved Shot 1 · Video · Version 1');
 
   const shown = (locator: Locator) => expect.poll(() => locator.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
-  // The board is the detailed view: each Shot's text and its panel images.
+  // Selecting a panel's image opens the viewer on its current version, with that image shown, and closes back to `inside`.
+  const opens = async (inside: Locator, expected: string) => {
+    await inside.getByRole('button', { name: 'Open Shot 1 · Panel 1.1', exact: true }).click();
+    const viewer = page.getByRole('dialog', { name: /^Panel 1\.1 · Version / });
+    await expect(viewer.locator('.wp-panel-version')).toHaveAttribute('data-displayed-version-id', expected);
+    await shown(viewer.locator('.wp-panel-version img'));
+    await viewer.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(viewer).toHaveCount(0);
+  };
+  // The board is the detailed view: each Shot's text and its panel images; a board panel opens the same viewer.
   const boardHolds = async (intent: string) => {
     await panel.getByRole('button', { name: 'View storyboard', exact: true }).click();
     const board = page.getByRole('dialog');
@@ -213,6 +222,8 @@ test('the agent\'s storyboard shows each Shot\'s panel images as they are made, 
     await expect(section.locator('.wp-storyboard-camera')).toHaveText('A slow push-in.');
     await expect(section.locator('.wp-storyboard-subjects')).toHaveText('Mara · The Gallery');
     for (const n of [1, 2]) await shown(section.getByRole('img', { name: `Shot 1 · Panel 1.${n}`, exact: true }));
+    await opens(section, (await image(1).getAttribute('data-displayed-version-id'))!);
+    await expect(board).toBeVisible();
     await board.getByRole('button', { name: 'Close', exact: true }).click();
     await expect(board).toHaveCount(0);
   };
@@ -226,14 +237,7 @@ test('the agent\'s storyboard shows each Shot\'s panel images as they are made, 
     for (const n of [1, 2]) await shown(image(n));
     await expect(row.getByText('Planned panel', { exact: true })).toHaveCount(0);
     await expect(panel.locator('.wp-status')).toHaveCount(0);
-    // Selecting a panel's image opens its current version, with that image shown.
-    const current = await image(1).getAttribute('data-displayed-version-id');
-    await row.getByRole('button', { name: 'Open Shot 1 · Panel 1.1', exact: true }).click();
-    const viewer = page.getByRole('dialog');
-    await expect(viewer.locator('.wp-panel-version')).toHaveAttribute('data-displayed-version-id', current!);
-    await shown(viewer.locator('.wp-panel-version img'));
-    await viewer.getByRole('button', { name: 'Close', exact: true }).click();
-    await expect(viewer).toHaveCount(0);
+    await opens(row, (await image(1).getAttribute('data-displayed-version-id'))!);
     await boardHolds('Mara finds the key.');
 
     // The Shot row has the assistant's draft, with no status, and it plays; it isn't a Generated video.
@@ -290,9 +294,20 @@ test('the agent\'s storyboard shows each Shot\'s panel images as they are made, 
   await expect(row.getByRole('button', { name: 'View Panel 1.1 version 3', exact: true })).toBeVisible();
   await expect(image(1)).toHaveAttribute('data-displayed-version-id', v2);
   await expect.poll(() => image(1).evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  // The panel's image opens the person's version 2, not the agent's newer version 3.
+  await opens(row, v2);
+  // After a reload (the chat already read version 3 once), a version whose image can't be read says so in the viewer,
+  // and can still be chosen.
+  await page.route(`**/v1/versions/${v3}/media`, route => route.fulfill({ status: 503, body: '' }));
   await page.reload();
   await page.getByRole('tab', { name: 'Storyboard', exact: true }).click();
   await expect(image(1)).toHaveAttribute('data-displayed-version-id', v2);
+  await opens(row, v2);
+  await row.getByRole('button', { name: 'View Panel 1.1 version 3', exact: true }).click();
+  await expect(page.getByRole('dialog').locator('.wp-panel-version')).toContainText('This image couldn’t be shown');
+  await expect(page.getByRole('dialog').getByRole('button', { name: 'Use this version', exact: true })).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+  await page.unroute(`**/v1/versions/${v3}/media`);
 
   // A person's planning edit still saves from the board, and the Shot keeps the agent's text.
   await panel.getByRole('button', { name: 'View storyboard', exact: true }).click();

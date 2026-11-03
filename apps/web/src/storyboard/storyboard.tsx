@@ -84,7 +84,8 @@ function PanelThumbnail(props: PanelProps) {
   const image = <PanelImage connection={connection} panel={panel} label={label} />;
   const current = currentPanelImage(panel);
   if (current?.kind !== 'image') return image;
-  return <PanelViewer {...props} version={current} trigger={<AriaButton className="wp-panel-open" aria-label={`Open ${label}`}>{image}</AriaButton>} />;
+  // Keyed by the version it opens, so a newer current version closes an open viewer instead of swapping what it would approve.
+  return <PanelViewer key={current.id} {...props} version={current} trigger={<AriaButton className="wp-panel-open" aria-label={`Open ${label}`}>{image}</AriaButton>} />;
 }
 /** One panel image version's viewer: the image, its caption, and choosing it for the panel. */
 function PanelViewer({ connection, scope, workspace, shotId, panel, shotNumber, panelNumber, facts, uses, onUsed, version, trigger }: PanelProps & { version: Version; trigger: ReactElement }) {
