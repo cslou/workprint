@@ -61,5 +61,7 @@ test('the joiner returns no bytes when the output doesn\'t decode to every clip\
   assert.deepEqual(joined.kind === 'joined' && [joined.frames, joined.bytes.toString()], [194, 'mp4']);
   await assert.rejects(createMediaJoiner(sandbox(async () => ({ bytes: Buffer.from('mp4'), decode: decode(193) })))(clips), invalid);
   await assert.rejects(createMediaJoiner(sandbox(async () => { throw new MediaProcessError('failed'); }))(clips), invalid);
+  // A plan the join refuses, such as a clip whose probe claims more than an hour.
+  await assert.rejects(createMediaJoiner(sandbox(async () => { throw new MediaProcessError('invalid_input'); }))(clips), invalid);
   await assert.rejects(createMediaJoiner(sandbox(async () => { throw new MediaProcessError('deadline'); }))(clips), (error: unknown) => error instanceof MediaProcessError && error.code === 'deadline');
 });

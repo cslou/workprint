@@ -91,7 +91,7 @@ export function createMediaJoiner(sandbox: MediaSandbox): MediaJoiner {
         return { kind: 'joined', bytes, frames: check.frames, lengthS: check.lengthS };
       }, signal);
     } catch (error) {
-      if (error instanceof MediaProcessError && error.code === 'failed') throw new UploadError('invalid_input');
+      if (error instanceof MediaProcessError && (error.code === 'failed' || error.code === 'invalid_input')) throw new UploadError('invalid_input');
       throw error;
     }
   };
