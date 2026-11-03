@@ -52,7 +52,7 @@
     - **Sound is re-encoded once, in step.** Copying MiniMax's primed AAC would add 32 ms of drift at each join. So each clip's audio is padded or trimmed to exactly its picture length (silence for a clip without audio) and encoded once as AAC-LC at clip 1's sample rate and channels (32 kHz stereo when clip 1 has none). If no clip has audio, the joined video has none. Sound never makes clips incompatible.
     - **Check:** the joined file goes through the same video check as every saved clip (probe, full decode, poster), and its picture length must be the clips' lengths added up, within one frame. No frame-by-frame comparison.
     - **Limits:** 2 to 20 distinct clips, at most 120 s together (the video check's own limit; Lou: "we can deal with the limit later").
-    - **What can be joined:** video versions this video uses: generated clips, any version of a Shot video, and uploaded videos.
+    - **What can be joined:** video versions this video uses: generated clips, each Shot video version that still has a use (its chosen and its latest), and videos among its assets. Uploads are image-only today, so in practice these are generated clips and Shot videos (Story 2 finding).
     - **What a join saves:** one new draft generated clip (`purpose: 'video'`, made by the assistant), whose dependencies are the joined versions in order. It shows in Videos' Generated videos list and, with `showInChat`, in the chat. It is never approval, never changes a Shot's chosen video, and is not export (B-009).
     - **Free, no yes, no job record.** Joining makes no paid call. It runs inside the tool call, in seconds; Stop ends it and nothing is saved.
   - **Identity rule (spec §10 agent tool guidance):** every clip id comes from model arguments, so each must resolve, through an application function and an account- and video-scoped read, to an exact video version this video uses. A foreign, missing or non-video id is not-found and nothing is joined. Tests use a foreign account's clip id.
@@ -184,10 +184,10 @@ This sprint has two stories, at Lou's request to keep it simple (2026-11-03). B-
     - Input: `clips`, 2 to 20 versionIds in order, and `showInChat`.
     - Its description says it joins saved clips from read-workspace, in the order given, into a new draft video and keeps the originals; that the clips must have matching video (size, frame rate and encoding), otherwise it says which clip differs; that together they may run at most 120 s; that it makes no paid call; and to set `showInChat` when the user asked for it directly.
   - [ ] **Exact, owned clips.** `joinVideos` in `application/joins.ts` checks the ids before any bytes are read:
-    - each must be a video version this video uses (generated clip, any Shot video version, uploaded video); a foreign account's version, an image, or an unknown id is not found;
+    - each must be a video version this video uses (a generated clip, a Shot video version with a use, a video asset); a foreign account's version, an image, or an unknown id is not found;
     - a version named twice is refused; their saved lengths over 120 s are refused.
     - The join, like the check after it, waits its turn when the sandbox is busy (`capacity`), within the same wait as `verifyWhenFree`.
-  - [ ] **The save.** Each clip's stored bytes are read privately, joined (Story 1), and saved by `createGeneratedVideos().save`, which gains a `joined` input: the clip ids, checked again in its transaction as videos this video uses, become the new version's dependencies in order. The normal video check runs, and the saved length must be the clips' lengths added up within one frame. It is a draft generated clip; the originals' versions, uses and chosen Shot videos are unchanged. A video with no use room is refused.
+  - [ ] **The save.** Each clip's stored bytes are read privately, joined (Story 1), and saved by `createGeneratedVideos().save`, which gains a `joined` input: the clip ids, checked again in the save as videos this video uses, become the new version's dependencies in order. The normal video check runs, and the saved length must be the clips' lengths added up within one frame. It is a draft generated clip; the originals' versions, uses and chosen Shot videos are unchanged. A video with no use room is refused.
   - [ ] **Results.** A join returns `made: true` with the versionId, length in seconds and clip count; the done line reads "Joined 2 clips", and with `showInChat` the chat shows the video like a generated clip. Every refusal returns `made: false` with one line that says nothing was saved; an incompatible clip names the clip and the difference. A sandbox, storage or check failure, including a joined file over `MAX_UPLOAD_VIDEO_BYTES`, is `unavailable`, logged without bytes (accepted: at 120 s a join is about 12 MB). Stop ends the turn as other tools do, and nothing is stored.
   - [ ] **The system prompt** gains a sixth step: "6. When the user asks, join the Shot videos in Shot order into one video (join-videos): each Shot's chosen video, else its latest. Joining is free and needs no yes." The tool description gives the same rule. The prompt stays static: the same bytes on every turn and every video.
 - **Functional verification:**
@@ -198,7 +198,7 @@ This sprint has two stories, at Lou's request to keep it simple (2026-11-03). B-
     - a saved `minimax-clip-small.mp4` second is refused naming clip 2.
     - Pass: as stated.
   - [ ] Integration (`agent-loop.test.ts`): the system prompt is byte-identical on two fresh videos and a second turn, with the new step. Pass: green.
-  - [ ] E2E (`shots.spec.ts` journey, after "Saved Shot 1 · Video · Version 2"): the scripted model joins Shot 1's Version 1 and Version 2 with `showInChat`. The chat shows the joined video, Videos' Generated videos list has it at `0:08`, and its viewer plays (`currentTime` advances). Pass: as stated.
+  - [ ] E2E (`shots.spec.ts` journey, after "Saved Shot 1 · Video · Version 2"): the scripted model makes one generated clip, then joins Shot 1's video (Version 2; Version 1 has no use once Version 2 took its draft use) and that clip with `showInChat`. The chat shows the joined video, Videos' Generated videos list has it at `0:08`, and its viewer plays (`currentTime` advances). Pass: as stated.
 - **Regression verification:**
   - [ ] Generated and Shot clip saves: `image-upload.test.ts` (the assistant-made clips block), `generation-jobs.test.ts` and `shot-video-choice.test.ts`. Pass: green.
   - [ ] The other tools and the chat's clips: `tool-activity.test.ts` whole, `chat.spec.ts` video and poster tests, and `shots.spec.ts` whole. Pass: green.
@@ -224,7 +224,7 @@ After all implementation stories are complete, perform this checklist before spr
 - [ ] Record results and unresolved issues in a brief `## Final Review`.
 - [ ] **Lou's QA** (manual, because whether the live model follows the sixth step can't be scripted; on a QA host when he asks, which makes live Muse Spark calls on his go):
   1. In a video whose Shots already have 16:9 videos (from Sprint 012's QA, or new Shot videos on his go), ask "join the Shots into one video". Pass: the agent calls join-videos with each Shot's chosen video (else its latest) in Shot order without asking for a yes, and the joined video plays as one in the chat and in Videos, each Shot's sound in step.
-  2. Upload `apps/api/test/support/fixtures/minimax-clip-small.mp4` into that video (or use a Sprint 011 3:2 Shot video) and ask to join it after a 16:9 Shot video. Pass: refused, naming the clip and the size, and nothing is saved.
+  2. In a Sprint 011 video, ask to join its 3:2 Shot video after a 16:9 one (or two Shot videos of different sizes). Pass: refused, naming the clip and the size, and nothing is saved.
 
 For descriptive-only work, use editorial review and applicable existing checks. Preserve applicable design checks and approval gates. Failed, ambiguous, or unrun required checks remain non-pass.
 
