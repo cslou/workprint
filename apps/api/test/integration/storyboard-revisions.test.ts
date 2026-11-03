@@ -212,5 +212,28 @@ test('storyboard edits keep stable Shot and Panel identities and one forward-onl
       const affected = (await pool.query<{ affected_version_ids: string[] }>('SELECT affected_version_ids FROM artifacts.manual_changes WHERE version_id=$1', [redrawn.version.id])).rows[0]?.affected_version_ids;
       assert.deepEqual(affected, [edited.version.id, drawn.id].sort());
     });
+
+    await t.test('a person\'s length edit changes only that Shot\'s length; an out-of-range length saves nothing', async () => {
+      const video = (await createNativeConversation(setup, owner)).id;
+      const scene = { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'Station', time: 'morning' }, characters: ['Ada'], script: [{ action: 'Ada waits.' }] }], subjects: [{ id: 'ada', kind: 'character', name: 'Ada' }] };
+      const told = await store.insert({ accountId: owner, conversationId: video, kind: 'script', content: scene, createdBy: 'human', dependencies: [], use: { binding: { purpose: 'script' }, state: 'approved' } });
+      const fields = { framing: 'wide', action: 'Ada checks the clock.', cameraNote: 'Hold.', dialogue: [{ character: 'Ada', text: 'Late again.' }] };
+      const shotsOf = (durations: [number, number]) => [
+        { shotId: 'b1', order: 0, intent: 'Ada waits.', ...fields, durationS: durations[0], panels: [{ panelId: 'b1-p1', order: 0, description: 'Ada under the clock.', references: [] }] },
+        { shotId: 'b2', order: 1, intent: 'The train comes.', durationS: durations[1], panels: [{ panelId: 'b2-p1', order: 0, description: 'The train.', references: [] }] },
+      ];
+      const planned = await store.insert({ accountId: owner, conversationId: video, kind: 'storyboard', createdBy: 'assistant', dependencies: [told.id], use: { binding: { purpose: 'storyboard' }, state: 'draft' },
+        content: { schemaVersion: 1, sourceScriptVersionId: told.id, shots: shotsOf([6, 5]) } });
+      const body = (durationS: number) => [
+        { shotId: 'b1', order: 0, intent: 'Ada waits.', durationS, panels: [{ panelId: 'b1-p1', order: 0, references: [] }] },
+        { shotId: 'b2', order: 1, intent: 'The train comes.', panels: [{ panelId: 'b2-p1', order: 0, references: [] }] },
+      ];
+      const lengthened = await edits.editStoryboard(owner, video, { operationId: randomUUID(), baseVersionId: planned.id, shots: body(8) });
+      assert.ok('content' in lengthened.version);
+      assert.deepEqual((lengthened.version.content as { shots: unknown[] }).shots, shotsOf([8, 5]), 'only Shot b1\'s length changed; its action, dialogue and the other Shot are kept');
+      const before = await store.workspace(owner, video);
+      for (const durationS of [16, 3, 6.5]) await assert.rejects(edits.editStoryboard(owner, video, { operationId: randomUUID(), baseVersionId: lengthened.version.id, shots: body(durationS) }), { code: 'invalid_input' }, String(durationS));
+      assert.equal((await store.workspace(owner, video)).storyboard.work?.version.id, before.storyboard.work?.version.id, 'a refused length saves no version');
+    });
   } finally { await native.close(); if (!pool.ended) await pool.end(); await setup.close(); await db.close(); }
 });

@@ -22,11 +22,12 @@ function editedPlan(base: Plan, shots: Command['shots']): Plan {
   const next = shots.map(shot => {
     const old = previous.get(shot.shotId);
     if (!old || shot.panels.length !== old.panels.length || new Set(shot.panels.map(panel => panel.panelId)).size !== shot.panels.length) throw new ArtifactError('invalid_input');
-    // A person edits intent and panel text only; the assistant's Shot fields (framing, action, dialogue, camera note and
-    // subject references) are kept from the base unchanged.
+    // A person edits intent, length and panel text only; the assistant's other Shot fields (framing, action, dialogue,
+    // camera note and subject references) are kept from the base unchanged.
+    const durationS = shot.durationS ?? old.durationS;
     const { panels: oldPanels, ...fields } = old;
     const panels = new Map(oldPanels.map(panel => [panel.panelId, panel]));
-    return { ...fields, shotId: shot.shotId, order: shot.order, intent: shot.intent ?? old.intent, panels: shot.panels.map(panel => {
+    return { ...fields, shotId: shot.shotId, order: shot.order, intent: shot.intent ?? old.intent, ...(durationS !== undefined ? { durationS } : {}), panels: shot.panels.map(panel => {
       const current = panels.get(panel.panelId);
       if (!current) throw new ArtifactError('invalid_input');
       return { panelId: panel.panelId, order: panel.order, description: panel.description ?? current.description, references: [...panel.references] };

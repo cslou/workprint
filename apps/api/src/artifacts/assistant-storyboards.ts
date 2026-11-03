@@ -20,7 +20,7 @@ type Plan = z.infer<typeof savedStoryboardContentSchema>;
 export type AssistantPanelInput = Readonly<{ panelId: string; description: string }>;
 /** A Shot as the assistant sends it, in story order: an empty id is a new Shot; a kept id must be one in the base. */
 export type AssistantShotInput = Readonly<{
-  shotId: string; intent: string; framing?: string; action?: string; cameraNote?: string;
+  shotId: string; intent: string; framing?: string; action?: string; cameraNote?: string; durationS?: number;
   dialogue?: readonly z.infer<typeof dialogueLineSchema>[]; references?: readonly z.infer<typeof shotReferenceSchema>[];
   panels: readonly AssistantPanelInput[];
 }>;
@@ -83,6 +83,7 @@ function plannedShots(input: AssistantStoryboardInput, base: Plan | null, script
       ...(shot.framing !== undefined ? { framing: shot.framing } : {}), ...(shot.action !== undefined ? { action: shot.action } : {}),
       ...(shot.dialogue !== undefined ? { dialogue: [...shot.dialogue] } : {}), ...(shot.cameraNote !== undefined ? { cameraNote: shot.cameraNote } : {}),
       ...(shot.references !== undefined ? { references: [...shot.references] } : {}),
+      ...(shot.durationS !== undefined ? { durationS: shot.durationS } : {}),
       panels,
     };
   });

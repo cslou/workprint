@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { shotFields } from './shot-fields.js';
+import { shotDurationSchema, shotFields } from './shot-fields.js';
 
 export const idSchema = z.string().min(1).max(200);
 export const revisionSchema = z.number().int().nonnegative();
@@ -53,7 +53,7 @@ const shot = z.strictObject({ shotId: idSchema, order, intent: z.string().option
 // Additive: the clips the assistant made for this video, as its `video` uses. Absence means none were projected.
 const clip = z.strictObject({ version: versionSchema, use: clipUseSchema, state: z.literal('Draft') });
 export const workspaceSchema = z.strictObject({ script: work.nullable(), assets: z.array(work), generatedVideos: z.array(clip).optional(), storyboard: z.strictObject({ work: work.nullable(), shots: z.array(shot) }), videos: z.array(generationRequestSchema), pendingQuestion: questionSchema.nullable(), activeWork: z.array(z.strictObject({ type: z.enum(['generation', 'export']), id: idSchema, status: z.string().min(1) })), selectionRevision: revisionSchema });
-export const storyboardEditSchema = z.array(z.strictObject({ shotId: idSchema, order, intent: z.string().optional(), panels: z.array(z.strictObject({ panelId: idSchema, order, description: z.string().optional(), references: z.array(idSchema) })) }));
+export const storyboardEditSchema = z.array(z.strictObject({ shotId: idSchema, order, intent: z.string().optional(), durationS: shotDurationSchema.optional(), panels: z.array(z.strictObject({ panelId: idSchema, order, description: z.string().optional(), references: z.array(idSchema) })) }));
 export type Version = z.infer<typeof versionSchema>;
 export type Question = z.infer<typeof questionSchema>;
 export type Proposal = z.infer<typeof proposalSchema>;

@@ -81,7 +81,7 @@ export const subjectViewIds = (subjects: readonly WorkspaceSubject[]): ReadonlyS
  * reference purposes, and long text is clipped: item mode on the storyboard gives those.
  */
 export type ListedShot = {
-  shotId: string; intent?: string; framing?: string; references?: { subjectId: string; role: string }[];
+  shotId: string; intent?: string; framing?: string; durationS?: number; references?: { subjectId: string; role: string }[];
   panels?: { panelId: string; description: string; imageVersionId?: string }[];
 };
 /**
@@ -97,7 +97,7 @@ const byOrder = <T extends { order: number }>(items: readonly T[]) => [...items]
 
 /**
  * The video's storyboard within the listing's byte bound, beside the rest of `envelope` and a reserve for items: each
- * Shot with its id, intent, framing, subject references and panels (id, description and current image); when that
+ * Shot with its id, intent, framing, length, subject references and panels (id, description and current image); when that
  * doesn't fit, Shot ids and intents; then Shot ids; then the first Shot ids that fit. Undefined with no storyboard.
  */
 export function workspaceStoryboard(workspace: OwnedWorkspace, envelope: Readonly<Record<string, unknown>> = {}): WorkspaceStoryboard | undefined {
@@ -108,7 +108,7 @@ export function workspaceStoryboard(workspace: OwnedWorkspace, envelope: Readonl
   const shots = byOrder(workspace.storyboard.shots);
   const intent = (shot: typeof shots[number]) => shot.intent ? { intent: clip(shot.intent) } : {};
   const full: ListedShot[] = shots.map(shot => ({
-    shotId: shot.shotId, ...intent(shot), ...(shot.framing ? { framing: clip(shot.framing) } : {}),
+    shotId: shot.shotId, ...intent(shot), ...(shot.framing ? { framing: clip(shot.framing) } : {}), ...(shot.durationS !== undefined ? { durationS: shot.durationS } : {}),
     ...(shot.references?.length ? { references: shot.references.map(({ subjectId, role }) => ({ subjectId, role })) } : {}),
     panels: byOrder(shot.panels).map(panel => { const image = currentPanelImage(panel); return { panelId: panel.panelId, description: clip(panel.description), ...(image ? { imageVersionId: image.id } : {}) }; }),
   }));
