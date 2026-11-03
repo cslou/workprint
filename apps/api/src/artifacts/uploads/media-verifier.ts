@@ -16,6 +16,8 @@ export function measuredMedia(expected: Readonly<{ kind: 'image' | 'video'; cont
 const busy = (error: unknown) => error instanceof MediaProcessError && error.code === 'capacity';
 
 export type WhenFreeOptions = Readonly<{ waitMs: number; retryMs: number; signal?: AbortSignal | undefined }>;
+/** How long a sandbox job waits for its turn, and how often it tries again. */
+export const sandboxTurn = Object.freeze({ waitMs: 30_000, retryMs: 250 });
 
 /** The media sandbox runs one job at a time: another job's turn is waited out, within `waitMs`. Each try has its own limit. */
 export async function whenFree<T>(job: (signal: AbortSignal) => Promise<T>, options: WhenFreeOptions): Promise<T> {

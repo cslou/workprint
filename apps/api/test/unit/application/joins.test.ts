@@ -6,12 +6,12 @@ import { createJoins, type JoinCollaborators } from '../../../src/application/in
 import { MediaProcessError } from '../../../src/storage/index.js';
 
 const account = randomUUID(), video = randomUUID();
-const [a, b, c, shotClip] = [randomUUID(), randomUUID(), randomUUID(), randomUUID()];
-const clipVersion = (id: string, durationMs: number) => ({ id, kind: 'video', media: { contentType: 'video/mp4', byteSize: 10, width: 1344, height: 768, durationMs } });
+const [a, b, c, shotClip, big] = [randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID()];
+const clipVersion = (id: string, durationMs: number, byteSize = 10) => ({ id, kind: 'video', media: { contentType: 'video/mp4', byteSize, width: 1344, height: 768, durationMs } });
 /** A workspace with two generated clips, an uploaded video, an image and one Shot video version. */
 const workspace = {
   script: null, assets: [{ version: clipVersion(c, 70_000) }, { version: { id: randomUUID(), kind: 'image', media: { contentType: 'image/png', byteSize: 1, width: 1, height: 1 } } }],
-  generatedVideos: [{ version: clipVersion(a, 4042) }, { version: clipVersion(b, 4042) }],
+  generatedVideos: [{ version: clipVersion(a, 4042) }, { version: clipVersion(b, 4042) }, { version: clipVersion(big, 4042, 100 * 1024 * 1024) }],
   storyboard: { work: null, shots: [{ shotId: randomUUID(), panels: [], chosenVideoVersionId: null, candidateVideoVersions: [clipVersion(shotClip, 60_000)] }] },
   videos: [], pendingQuestion: null, activeWork: [], selectionRevision: '0',
 };
@@ -28,7 +28,7 @@ function harness(overrides: Partial<JoinCollaborators> = {}) {
       calls.save.push(input);
       return { version: { id: 'joined-version', kind: 'video', media: { contentType: 'video/mp4', byteSize: 6, width: 1344, height: 768, durationMs: 8083 } }, use: {}, gone: false } as never;
     },
-    capacityRetryMs: 1, capacityWaitMs: 1000, ...overrides,
+    ...overrides,
   };
   return { join: createJoins(collaborators), calls };
 }
@@ -44,7 +44,7 @@ test('clips this video uses are read in order, joined and saved with the clips a
 test('ids are checked before any bytes are read', async () => {
   for (const [clips, kind] of [
     [[a], 'invalid'], [Array.from({ length: 21 }, () => randomUUID()), 'invalid'], [[a, a], 'repeated'],
-    [[a, randomUUID()], 'not_found'], [[a, workspace.assets[1]!.version.id], 'not_found'], [[c, shotClip], 'too_long'],
+    [[a, randomUUID()], 'not_found'], [[a, workspace.assets[1]!.version.id], 'not_found'], [[c, shotClip], 'too_long'], [[a, big], 'too_large'],
   ] as const) {
     const { join, calls } = harness();
     const outcome = await join(account, video, clips);
@@ -64,14 +64,10 @@ test('an incompatible clip is named and nothing is saved', async () => {
   assert.equal(calls.save.length, 0);
 });
 
-test('a busy sandbox is waited out; no room, failures and Stop each map to their outcome', async () => {
-  let tries = 0;
-  const busy = harness({ join: async () => { tries += 1; if (tries === 1) throw new MediaProcessError('capacity'); return joined; } });
-  assert.equal((await busy.join(account, video, [a, b])).kind, 'joined');
-  assert.equal(tries, 2);
+test('no room, failures and Stop each map to their outcome', async () => {
   assert.equal((await harness({ save: async () => { throw new UseRoomError(); } }).join(account, video, [a, b])).kind, 'no_room');
   assert.equal((await harness({ save: async () => { throw new UploadError('not_found'); } }).join(account, video, [a, b])).kind, 'not_found');
-  for (const failure of [new UploadError('invalid_input'), new UploadError('unsupported'), new MediaProcessError('deadline'), new Error('storage')]) {
+  for (const failure of [new UploadError('invalid_input'), new UploadError('unsupported'), new MediaProcessError('capacity'), new MediaProcessError('deadline'), new Error('storage')]) {
     assert.equal((await harness({ join: async () => { throw failure; } }).join(account, video, [a, b])).kind, 'unavailable');
   }
   // Stop: the signal fired, so nothing more is read, joined or saved.

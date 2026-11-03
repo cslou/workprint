@@ -14,6 +14,7 @@ const messages: Readonly<Record<Exclude<Refusal, 'too_long' | 'incompatible'>, s
   invalid: `Not joined: pass ${joinLimits.minClips} to ${joinLimits.maxClips} clips. Nothing was saved.`,
   not_found: 'Not joined: a clip is not a video this video uses. Call read-workspace and pass only video versionIds it lists. Nothing was saved.',
   repeated: 'Not joined: a clip was named more than once. Pass each versionId once, in order. Nothing was saved.',
+  too_large: `Not joined: together the clips are over ${joinLimits.maxBytes / 1024 / 1024} MB, more than one join can take. Join fewer clips. Nothing was saved.`,
   no_room: 'Not joined: this video has too many saved items for another video. Tell the user; do not retry. Nothing was saved.',
   unavailable: 'Not joined: the clips could not be joined right now. Tell the user; do not retry in this turn. Nothing was saved.',
 };
@@ -24,6 +25,7 @@ const summaries: Readonly<Record<Exclude<Refusal, 'incompatible'> | 'error', str
   not_found: 'Couldn’t join those clips',
   repeated: 'Not joined: a clip was named twice',
   too_long: `Not joined: the clips run over ${maxS} s`,
+  too_large: 'Not joined: the clips are too large',
   no_room: 'Not joined: this video has too many saved items',
   unavailable: 'Not joined: joining is unavailable',
 };

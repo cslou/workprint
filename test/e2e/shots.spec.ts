@@ -365,7 +365,11 @@ test('the agent\'s storyboard shows each Shot\'s panel images as they are made, 
   const { storyboard: { shots: [made] }, generatedVideos } = await backend.read<{ storyboard: { shots: { candidateVideoVersions?: { id: string }[] }[] }; generatedVideos: { version: { id: string } }[] }>(account!, `/v1/conversations/${videoId}/workspace`);
   const clips = [...made!.candidateVideoVersions!.map(version => version.id), ...generatedVideos.map(item => item.version.id)];
   expect(clips).toHaveLength(2);
+  const shotVideos = async () => (await backend.read<{ storyboard: { shots: { chosenVideoVersionId: string | null; candidateVideoVersions?: { id: string }[] }[] } }>(account!, `/v1/conversations/${videoId}/workspace`)).storyboard.shots.map(item => [item.chosenVideoVersionId, item.candidateVideoVersions?.map(version => version.id)]);
+  const before = await shotVideos();
   await turn({ name: 'join-videos', args: { clips, showInChat: true } }, 'Join the Shot videos', 'Joined 2 clips');
+  // The Shot's own video, its use and its choice are unchanged.
+  expect(await shotVideos()).toEqual(before);
   const reply = page.getByRole('list', { name: 'New messages' }).getByRole('listitem', { name: 'Assistant message' }).last();
   await shown(reply.locator('img[alt="Video 2 · Version 1"]'));
   await page.getByRole('tab', { name: 'Videos', exact: true }).click();

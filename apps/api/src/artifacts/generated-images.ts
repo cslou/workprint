@@ -4,13 +4,12 @@ import { z } from 'zod';
 import { idSchema, MAX_UPLOAD_IMAGE_BYTES, useSchema, type Version } from '@workprint/contracts';
 import { transaction } from '../db/index.js';
 import type { PrivateObjectStorage } from '../storage/index.js';
-import { digest, requireOwnedConversation, requireUseRoom, withStoredObjects } from './generated-media.js';
-import { protectedMediaObjects } from './media-objects.js';
+import { digest, readCheckedMedia, requireOwnedConversation, requireUseRoom, withStoredObjects } from './generated-media.js';
 import { lockPublicationOwner, publishVersion } from './publication.js';
 import { scriptSubjectsNow } from './script-reads.js';
 import { BUILT_IN_OWNER, createArtifactStore } from './store.js';
 import { UploadError, uploadError } from './uploads/errors.js';
-import { measuredMedia, verifyWhenFree } from './uploads/media-verifier.js';
+import { measuredMedia, sandboxTurn, verifyWhenFree } from './uploads/media-verifier.js';
 import type { MediaVerifier, OwnedCheck } from './uploads/types.js';
 
 /**
@@ -84,7 +83,7 @@ export type KeepImage = <T>(account: string, conversation: string, input: Readon
  * stores nothing after its check. The object is stored, then `within` saves it; if that throws, the object is removed.
  */
 export function assistantImageKeeper(pool: Pool, checkOwnedConversation: OwnedCheck, collaborators: GeneratedImageCollaborators): KeepImage {
-  const capacityWaitMs = collaborators.capacityWaitMs ?? 30_000, capacityRetryMs = collaborators.capacityRetryMs ?? 250;
+  const capacityWaitMs = collaborators.capacityWaitMs ?? sandboxTurn.waitMs, capacityRetryMs = collaborators.capacityRetryMs ?? sandboxTurn.retryMs;
   const reads = createArtifactStore(pool, checkOwnedConversation);
   return async (account, conversation, input, within, { signal, label }) => {
     if (!idSchema.safeParse(account).success || !idSchema.safeParse(conversation).success) throw new UploadError('invalid_input');
@@ -153,12 +152,8 @@ export function createGeneratedImages(pool: Pool, checkOwnedConversation: OwnedC
         const { storage } = required();
         const version = await reads.version(account, versionId);
         if (version.kind !== 'image') throw new UploadError('not_found');
-        const [object] = await protectedMediaObjects(pool, [versionId], version.builtIn ? BUILT_IN_OWNER : account);
-        if (!object) throw new UploadError('not_found');
-        const stored = await storage.read(object.objectKey, Math.min(version.media.byteSize, MAX_UPLOAD_IMAGE_BYTES));
-        // The bytes must be the ones that were checked and saved, not whatever the object holds now.
-        if (stored.byteSize !== version.media.byteSize || digest(stored.bytes) !== object.sha256) throw new UploadError('integration_failure');
-        return { versionId, contentType: version.media.contentType, bytes: stored.bytes, width: version.media.width, height: version.media.height };
+        const bytes = await readCheckedMedia(pool, storage, version, version.builtIn ? BUILT_IN_OWNER : account, MAX_UPLOAD_IMAGE_BYTES);
+        return { versionId, contentType: version.media.contentType, bytes, width: version.media.width, height: version.media.height };
       } catch (error) { throw uploadError(error); }
     },
   });

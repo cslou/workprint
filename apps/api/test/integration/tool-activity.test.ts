@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { setTimeout as wait } from 'node:timers/promises';
 import { Pool } from 'pg';
-import { createArtifactStore, createArtifactWriters, createAssistantReferences, createAssistantScripts, createAssistantStoryboards, createGeneratedImages, createGeneratedVideos, createMediaVerifier, createStoryboardEdits, createVersionUses, panelArtifactId, shotArtifactId } from '../../src/artifacts/index.js';
+import { createArtifactStore, createArtifactWriters, createAssistantReferences, createAssistantScripts, createAssistantStoryboards, createGeneratedImages, createGeneratedVideos, createMediaVerifier, createStoryboardEdits, UploadError, createVersionUses, panelArtifactId, shotArtifactId } from '../../src/artifacts/index.js';
 import { createAssistantScriptSaver, createAssistantSheets, createAssistantStoryboardSaver, shotEnding } from '../../src/application/index.js';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
 import { createGenerationJobs } from '../../src/generation/index.js';
@@ -1613,6 +1613,32 @@ test('join-videos joins saved clips in order into a new draft clip of the video,
     const { result, lines } = await join(owner, video, { clips: [mine.id, theirs.id] });
     assert.deepEqual([result.made, result.reason, lines.at(-1)?.summary], [false, 'not_found', 'Couldn’t join those clips']);
     assert.deepEqual([await objectCount(owner), (await store.workspace(owner.id, video)).generatedVideos?.length], [objectsBefore, clipsBefore]);
+  });
+
+  await t.test('the save refuses a joined video whose length isn\'t its clips\' added up, a clip the video doesn\'t use, and joined with frames', async () => {
+    const video = await client(owner).newVideo();
+    const [first, second] = [await saved(owner, video, clip), await saved(owner, video, clip)];
+    const objectsBefore = await objectCount(owner);
+    const refused = (code: string) => (error: unknown) => error instanceof UploadError && error.code === code;
+    // One clip's bytes, saved as the join of two: 4.04 s is not 8.08 s within a frame.
+    await assert.rejects(clips.save(owner.id, video, { bytes: clip, frames: [], joined: { clips: [first.id, second.id], frameMs: 1000 / 24 } }), refused('invalid_input'));
+    await assert.rejects(clips.save(owner.id, video, { bytes: clip, frames: [], joined: { clips: [first.id, randomUUID()], frameMs: 1000 / 24 } }), refused('not_found'));
+    await assert.rejects(clips.save(owner.id, video, { bytes: clip, frames: [first.id], joined: { clips: [first.id, second.id], frameMs: 1000 / 24 } }), refused('invalid_input'));
+    assert.equal(await objectCount(owner), objectsBefore);
+    assert.equal((await store.workspace(owner.id, video)).generatedVideos?.length, 2);
+  });
+
+  await t.test('a clip\'s bytes are read only while they are the ones saved', async () => {
+    const video = await client(owner).newVideo();
+    const version = await saved(owner, video, clip);
+    assert.equal((await clips.read(owner.id, version.id)).bytes.equals(clip), true);
+    await assert.rejects(clips.read(owner.id, randomUUID()), (error: unknown) => error instanceof UploadError && error.code === 'not_found');
+    await assert.rejects(clips.read(other.id, version.id), (error: unknown) => error instanceof UploadError && error.code === 'not_found');
+    // Bytes that no longer match what was checked and saved are refused, not read.
+    const { object_key } = (await pool.query<{ object_key: string }>("SELECT object_key FROM artifacts.generated_objects WHERE version_id=$1 AND content_type='video/mp4'", [version.id])).rows[0]!;
+    await objects.remove(object_key);
+    await objects.publish(object_key, small, 'video/mp4');
+    await assert.rejects(clips.read(owner.id, version.id), (error: unknown) => error instanceof UploadError && error.code === 'integration_failure');
   });
 
   await t.test('a clip of another size is refused, naming it', async () => {

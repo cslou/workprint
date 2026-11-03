@@ -4,7 +4,7 @@ import { PostgresStore } from '@mastra/pg';
 import { Pool } from 'pg';
 import { createOwnedConversationCheck, bindNativeTurns, productionTools, turnLimits, type AgentCollaborators, type AgentTool, type NativeTurnModel, type TurnLimits } from '../agent/index.js';
 import { createApplication, createAssistantPanelImages, createJoins, createAssistantScriptSaver, createAssistantSheets, createAssistantStoryboardSaver, createGeneratedImageSaver, createGeneratedVideoSaver, createImageInputReader, createVideoJobs, createWorkspaceReader, type VideoJobTiming, withSavedWork, withManualSaves, withVersionUses, withGenerationRequests, withStoryboardEdits, withUploads } from '../application/index.js';
-import { createArtifactStore, createArtifactWriters, createAssistantReferences, createAssistantScripts, createAssistantStoryboards, createGeneratedImages, createGeneratedVideos, createPanelImages, createVersionUses, createStoryboardEdits, createMediaJoiner, createMediaVerifier, createUploadCoordinator } from '../artifacts/index.js';
+import { createArtifactStore, createArtifactWriters, createAssistantReferences, createAssistantScripts, createAssistantStoryboards, createGeneratedImages, createGeneratedVideos, createPanelImages, createVersionUses, createStoryboardEdits, createMediaJoiner, createMediaVerifier, joinWhenFree, createUploadCoordinator } from '../artifacts/index.js';
 import { configuredMediaSandbox, configuredObjectStorage } from '../storage/index.js';
 import { assertRestrictedRole } from '../db/index.js';
 import { createGenerationJobs, type MetaImageClient, type MiniMaxVideoClient } from '../generation/index.js';
@@ -140,7 +140,7 @@ export async function createBackend(routes: ApiRoute[] = [], turns?: TurnComposi
         jobs, client: turns.videos, readImageInputs, saveVideo: createGeneratedVideoSaver(clips.save, jobs), shotRoom: clips.hasShotRoom, ...(turns.videoTiming ? { timing: turns.videoTiming } : {}),
       }) } : {}),
       // Joining is free, but needs the sandbox to join and storage to read the clips and keep the result.
-      ...(objects && media && verifyMedia ? { joins: createJoins({ reads: savedWork, readClip: clips.read, join: createMediaJoiner(media), save: clips.save }) } : {}),
+      ...(objects && media && verifyMedia ? { joins: createJoins({ reads: savedWork, readClip: clips.read, join: joinWhenFree(createMediaJoiner(media)), save: clips.save }) } : {}),
     };
     bindNativeTurns(mastra, { model: turns.model, tools, limits: turns.limits ?? turnLimits, collaborators });
   }

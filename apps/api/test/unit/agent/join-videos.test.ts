@@ -50,6 +50,7 @@ test('every refusal says nothing was saved, with its own done line', async () =>
     [{ kind: 'not_found' }, 'Couldn’t join those clips', /read-workspace/],
     [{ kind: 'repeated' }, 'Not joined: a clip was named twice', /more than once/],
     [{ kind: 'too_long', lengthMs: 130_000 }, 'Not joined: the clips run over 120 s', /130 s, over the 120 s limit/],
+    [{ kind: 'too_large' }, 'Not joined: the clips are too large', /over 100 MB, more than one join can take/],
     [{ kind: 'incompatible', clip: 2, difference: '672×384; clip 1 is 1344×768' }, 'Not joined: the clips don’t match', /clip 2 can't be joined to clip 1 \(672×384; clip 1 is 1344×768\)/],
     [{ kind: 'no_room' }, 'Not joined: this video has too many saved items', /too many saved items/],
     [{ kind: 'unavailable' }, 'Not joined: joining is unavailable', /could not be joined right now/],

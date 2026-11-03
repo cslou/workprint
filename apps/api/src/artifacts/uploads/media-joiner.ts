@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { MediaProcessError, type MediaJoinPlan, type MediaSandbox } from '../../storage/index.js';
 import { UploadError } from './errors.js';
 import { verifyDecodedFrames } from './media-probe.js';
+import { sandboxTurn, whenFree } from './media-verifier.js';
 
 const stream = z.object({
   index: z.number().int().nonnegative(), codec_type: z.string().max(32), codec_name: z.string().max(64).optional(), profile: z.string().max(64).optional(), level: z.number().int().optional(),
@@ -96,3 +97,7 @@ export function createMediaJoiner(sandbox: MediaSandbox): MediaJoiner {
     }
   };
 }
+
+/** A joiner that waits out another sandbox job's turn, as the media check does. */
+export const joinWhenFree = (join: MediaJoiner, turn: Readonly<{ waitMs: number; retryMs: number }> = sandboxTurn): MediaJoiner =>
+  (clips, signal) => whenFree(attempt => join(clips, attempt), { ...turn, signal });

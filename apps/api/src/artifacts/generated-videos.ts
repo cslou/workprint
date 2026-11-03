@@ -3,16 +3,15 @@ import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod';
 import { clipUseSchema, idSchema, MAX_UPLOAD_VIDEO_BYTES, useSchema, type Version } from '@workprint/contracts';
 import { transaction } from '../db/index.js';
-import type { PrivateObjectStorage } from '../storage/index.js';
+import { MEDIA_JOIN_CLIPS, MEDIA_JOB_BYTES, type PrivateObjectStorage } from '../storage/index.js';
 import { bindDerivedDraft, derivedArtifactId, ensureDerivedArtifact, hasDerivedRoom, movableUse, type DerivedBinding } from './derived-artifacts.js';
-import { digest, requireOwnedConversation, requireUseRoom, withStoredObjects } from './generated-media.js';
+import { digest, readCheckedMedia, requireOwnedConversation, requireUseRoom, withStoredObjects } from './generated-media.js';
 import { hasTarget, usedPlan } from './panel-targets.js';
-import { protectedMediaObjects } from './media-objects.js';
 import { usedImageVersions, usedVideoVersions } from './workspace-images.js';
 import { lockPublicationOwner, publishVersion } from './publication.js';
 import { createArtifactStore } from './store.js';
 import { UploadError, uploadError } from './uploads/errors.js';
-import { measuredMedia, verifyWhenFree } from './uploads/media-verifier.js';
+import { measuredMedia, sandboxTurn, verifyWhenFree } from './uploads/media-verifier.js';
 import type { MediaVerifier, OwnedCheck } from './uploads/types.js';
 import { requireRoom, UseRoomError } from './use-room.js';
 
@@ -29,6 +28,8 @@ export type JoinedClips = Readonly<{ clips: readonly string[]; frameMs: number }
  * `joined`: the clips this video was joined from, which become its dependencies; it then has no frames or target.
  */
 export type GeneratedVideoInput = Readonly<{ bytes: Uint8Array; frames: readonly string[]; target?: ShotTarget | undefined; joined?: JoinedClips | undefined }>;
+/** How many clips one join takes, and the most bytes they may hold together (the media sandbox's job limit). */
+export const joinableClips = Object.freeze({ min: MEDIA_JOIN_CLIPS.min, max: MEDIA_JOIN_CLIPS.max, maxBytes: MEDIA_JOB_BYTES });
 /** The exact stored bytes of a video version and its saved length. */
 export type StoredVideo = Readonly<{ versionId: string; bytes: Buffer; durationMs: number }>;
 /** `gone`: the clip was made for a Shot that left the storyboard, so it was saved as a generated video. */
@@ -42,7 +43,7 @@ export type GeneratedVideoCollaborators = Readonly<{
 
 // A clip's input images: its frames, or up to 9 reference images (MiniMax's limit).
 const framesSchema = z.array(idSchema).max(9).refine(ids => new Set(ids).size === ids.length);
-const joinedSchema = z.strictObject({ clips: z.array(idSchema).min(2).max(20).refine(ids => new Set(ids).size === ids.length), frameMs: z.number().positive().max(1000) });
+const joinedSchema = z.strictObject({ clips: z.array(idSchema).min(joinableClips.min).max(joinableClips.max).refine(ids => new Set(ids).size === ids.length), frameMs: z.number().positive().max(1000) });
 const binding = { purpose: 'video' } as const;
 
 /** The id of a Shot's own video artifact, derived from the video and Shot. */
@@ -59,7 +60,7 @@ const shotUse = (client: Parameters<typeof movableUse>[0], account: string, conv
  * approves, and a person's chosen Shot video stays chosen.
  */
 export function createGeneratedVideos(pool: Pool, checkOwnedConversation: OwnedCheck, collaborators: GeneratedVideoCollaborators) {
-  const capacityWaitMs = collaborators.capacityWaitMs ?? 30_000, capacityRetryMs = collaborators.capacityRetryMs ?? 250;
+  const capacityWaitMs = collaborators.capacityWaitMs ?? sandboxTurn.waitMs, capacityRetryMs = collaborators.capacityRetryMs ?? sandboxTurn.retryMs;
   const reads = createArtifactStore(pool, checkOwnedConversation);
 
   return Object.freeze({
@@ -82,10 +83,11 @@ export function createGeneratedVideos(pool: Pool, checkOwnedConversation: OwnedC
         if (!storage || !verifyMedia) throw new UploadError('not_implemented', 'Private storage or media checks are not available');
         let expectedMs: number | undefined;
         if (input.joined) {
-          // Ownership is checked by the workspace read; each clip must be a video this video uses.
+          // Ownership is checked by the workspace read; each clip must be a video this video uses. Like frames, they are
+          // checked before the transaction: a version never changes owner.
           const used = usedVideoVersions(await reads.workspace(account, conversation));
           if (input.joined.clips.some(id => !used.has(id))) throw new UploadError('not_found');
-          expectedMs = input.joined.clips.reduce((sum, id) => sum + used.get(id)!, 0);
+          expectedMs = input.joined.clips.reduce((sum, id) => sum + used.get(id)!.durationMs, 0);
         } else if (input.target) {
           // A Shot's frames were its panels' images; once the Shot is gone they are no longer images the video uses,
           // so they are checked only as the account's images. They stay the clip's dependencies.
@@ -147,12 +149,7 @@ export function createGeneratedVideos(pool: Pool, checkOwnedConversation: OwnedC
         if (!storage) throw new UploadError('not_implemented', 'Private storage is not available');
         const version = await reads.version(account, versionId);
         if (version.kind !== 'video') throw new UploadError('not_found');
-        const [object] = await protectedMediaObjects(pool, [versionId], account);
-        if (!object) throw new UploadError('not_found');
-        const stored = await storage.read(object.objectKey, Math.min(version.media.byteSize, MAX_UPLOAD_VIDEO_BYTES));
-        // The bytes must be the ones that were checked and saved, not whatever the object holds now.
-        if (stored.byteSize !== version.media.byteSize || digest(stored.bytes) !== object.sha256) throw new UploadError('integration_failure');
-        return { versionId, bytes: stored.bytes, durationMs: version.media.durationMs ?? 0 };
+        return { versionId, bytes: await readCheckedMedia(pool, storage, version, account, MAX_UPLOAD_VIDEO_BYTES), durationMs: version.media.durationMs ?? 0 };
       } catch (error) { throw uploadError(error); }
     },
   });
