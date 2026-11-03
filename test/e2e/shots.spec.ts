@@ -227,12 +227,13 @@ test('the agent\'s storyboard shows each Shot\'s panel images as they are made, 
     await expect(viewer).toHaveCount(0);
   };
   // The board is the detailed view: each Shot's text and its panel images; a board panel opens the same viewer.
-  const boardHolds = async (intent: string, seconds: number) => {
+  const boardHolds = async (intent: string, seconds: number, end: string) => {
     await panel.getByRole('button', { name: 'View storyboard', exact: true }).click();
     const board = page.getByRole('dialog');
     const section = board.locator(`.wp-board-shot[data-shot-id="${shot!.shotId}"]`);
     await expect(section.locator('header b')).toHaveText(intent);
     await expect(section.locator('.wp-shot-length-text')).toHaveText(`Length · ${seconds} s`);
+    await expect(section.locator('.wp-shot-positions-text')).toHaveText(`Starts: Mara kneels at the bench, frame right, facing frame left. / Ends: ${end}`);
     await expect(section.locator('.wp-storyboard-action')).toHaveText('Mara lifts the key from the bench.');
     await expect(section.locator('.wp-storyboard-dialogue li b')).toHaveText(['Mara', 'Narration']);
     await expect(section.locator('.wp-storyboard-dialogue li q')).toHaveText(['There you are.', 'She had looked for years.']);
@@ -255,7 +256,7 @@ test('the agent\'s storyboard shows each Shot\'s panel images as they are made, 
     await expect(row.getByText('Planned panel', { exact: true })).toHaveCount(0);
     await expect(panel.locator('.wp-status')).toHaveCount(0);
     await opens(row, (await image(1).getAttribute('data-displayed-version-id'))!);
-    await boardHolds('Mara finds the key.', 6);
+    await boardHolds('Mara finds the key.', 6, 'Mara stands, holding the key up, frame right.');
 
     // The Shot row has the assistant's draft, with no status, and it plays; it isn't a Generated video.
     await page.getByRole('tab', { name: 'Videos', exact: true }).click();
@@ -347,6 +348,17 @@ test('the agent\'s storyboard shows each Shot\'s panel images as they are made, 
   await board.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(seconds).toHaveCount(0);
   await expect(board.locator('.wp-shot-length-text')).toHaveText('Length · 8 s');
+  // And its positions: an empty field saves nothing, and the edited end is what the next Shot video is told.
+  await board.getByRole('button', { name: 'Edit Shot positions', exact: true }).click();
+  const ends = board.getByRole('textbox', { name: 'Ends', exact: true });
+  await expect(ends).toHaveValue('Mara stands, holding the key up, frame right.');
+  await ends.fill(' ');
+  await board.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(board.locator('.wp-shot-positions').getByRole('status')).toHaveText('Write where the Shot starts and where it ends.');
+  await ends.fill('Mara holds the key up to the window light, frame right.');
+  await board.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(ends).toHaveCount(0);
+  await expect(board.locator('.wp-shot-positions-text')).toHaveText('Starts: Mara kneels at the bench, frame right, facing frame left. / Ends: Mara holds the key up to the window light, frame right.');
   await page.keyboard.press('Escape');
   await expect(board).toHaveCount(0);
   await expect(row.locator('summary b')).toHaveText('Mara finds the key at last.');
@@ -356,11 +368,12 @@ test('the agent\'s storyboard shows each Shot\'s panel images as they are made, 
   await expect(row.locator('summary b')).toHaveText('Mara finds the key at last.');
   await expect(row.locator('summary small')).toHaveText('medium · 8 s · 2 panels');
   await expect(image(1)).toHaveAttribute('data-displayed-version-id', v2);
-  await boardHolds('Mara finds the key at last.', 8);
+  await boardHolds('Mara finds the key at last.', 8, 'Mara holds the key up to the window light, frame right.');
   // The next Shot video runs for the length the person set.
   minimax.reset();
   await turn({ name: 'generate-shot', args: { shot: shot!.shotId, prompt: 'She lifts the key into the light.' } }, 'Make the Shot again', 'Saved Shot 1 · Video · Version 2');
   expect(sent().duration).toBe(8);
+  expect(sent().content[0]!.text).toContain('Positions: starts Mara kneels at the bench, frame right, facing frame left; ends Mara holds the key up to the window light, frame right.');
 
   // Joining is free: Shot 1's video and a generated clip join into one draft video, shown in the chat and listed in
   // Generated videos. Version 1 of the Shot's video is no longer used once Version 2 took its draft use.

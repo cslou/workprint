@@ -178,16 +178,17 @@
 - **As** a filmmaker, **I want** to see and correct where people start and end in each Shot, **so that** I can fix a mismatch before paying for panels and videos.
 - **Dependencies:** Story 3.
 - **Acceptance criteria:**
-  - [ ] "View storyboard" shows each Shot's positions as "Starts: … / Ends: …", or "Positions · not set" for an earlier Shot without them; the tab's summary row doesn't show them.
-  - [ ] A person edits them the way a Shot's length is edited: a storyboard edit of that Shot's positions alone (`storyboardEditSchema`, `editedPlan`), saved as the next storyboard version; `storyboardEditSchema` uses Story 2's 1–300 bounds, so the API refuses what the editor would. Both fields are needed, including when adding positions to an earlier Shot; an empty one is refused with "Write where the Shot starts and where it ends." An unchanged edit just closes.
-  - [ ] The next panel and Shot video use the edited positions.
+  - [x] "View storyboard" shows each Shot's positions as "Starts: … / Ends: …", or "Positions · not set" for an earlier Shot without them; the tab's summary row doesn't show them.
+  - [x] A person edits them the way a Shot's length is edited: a storyboard edit of that Shot's positions alone (`storyboardEditSchema`, `editedPlan`), saved as the next storyboard version; `storyboardEditSchema` uses Story 2's 1–300 bounds, so the API refuses what the editor would. Both fields are needed, including when adding positions to an earlier Shot; an empty one is refused with "Write where the Shot starts and where it ends." An unchanged edit just closes.
+  - [x] The next panel and Shot video use the edited positions.
 - **Functional verification:**
-  - [ ] Unit (`apps/web/test/unit/storyboard/storyboard-edit.test.ts`): the edit body carries only that Shot's positions; an empty field is refused with its text; an unchanged edit sends nothing; the display strings "Starts: … / Ends: …" and "Positions · not set". Pass: as stated.
-  - [ ] Integration (`storyboard-revisions.test.ts`): a positions edit saves the next version and changes nothing else; an empty edit is refused by the API with no new version. Pass: as stated.
-  - [ ] E2E (`shots.spec.ts` journey): edit Shot 1's end, reload and see it; the next generate-shot's MiniMax request (fake) carries it. Pass: as stated.
+  - [x] Unit (`apps/web/test/unit/storyboard/storyboard-edit.test.ts`): the edit body carries only that Shot's positions; an empty field is refused with its text; an unchanged edit sends nothing; the display strings "Starts: … / Ends: …" and "Positions · not set". Pass: as stated.
+  - [x] Integration (`storyboard-revisions.test.ts`): a positions edit saves the next version and changes nothing else; an empty edit is refused by the API with no new version. Pass: as stated.
+  - [x] E2E (`shots.spec.ts` journey): edit Shot 1's end, reload and see it; the next generate-shot's MiniMax request (fake) carries it. Pass: as stated.
 - **Regression verification:**
-  - [ ] `shots.spec.ts` whole (the length and intent edits still work). Pass: green.
+  - [x] `shots.spec.ts` whole (the length and intent edits still work). Pass: green.
 - **Editorial/design verification:** design.md's Storyboard section names the positions editor beside the length.
+- **Evidence (2026-11-04):** unit tier 223/223; `storyboard-revisions.test.ts` 14/14; `shots.spec.ts` 4/4, whose journey edits Shot 1's end, sees it in "View storyboard" after a reload, and finds it in the next fake MiniMax request's prompt; `pnpm check` green. The board's length and positions editors share one hook (`use-shot-edit.ts`), so the length edit in the same journey is the regression check for that move. The next panel reads the same saved positions through `positionLines` (Story 3), so the e2e checks the Shot video request only, as trimmed at approval. Review (4/5) P2s, fixed: saved positions with spaces at either end no longer make an unchanged Save a new version; the spec records that the next Shot isn't marked affected when an end changes, though its prompts carry the new end (decided under Lou's delegation, to keep `positionLines`' place rule out of the artifacts domain).
 - **Manual-only behavior verification:** Lou's QA item 2.
 - **Planned commits:**
   1. Feat(artifacts): Edit a Shot's positions
