@@ -14,7 +14,7 @@ const stored = { ...body(['Mara']), subjects: [{ id: 'mara', kind: 'character' a
 async function call(args: Record<string, unknown>, outcome: AssistantScriptOutcome = { kind: 'saved', versionId: 'v2', revision: 2 }) {
   const received: unknown[] = [];
   const collaborators: AgentCollaborators = { readWorkspace: async () => ({ kind: 'not_found' }), readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }), sheets: unusedSheets,
-    saveScript: async (_account, _video, input) => { received.push(input); return outcome; } };
+    saveScript: async (_account, _video, input) => { received.push(input); return outcome; }, saveStoryboard: async () => ({ kind: 'unavailable' }) };
   const parsed = tool.inputSchema.safeParse(args);
   if (!parsed.success) return { parsed: false as const, received };
   const signal = new AbortController().signal;

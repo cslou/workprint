@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { AssistantSheets, ReadImageInputs, ReadOwnedWorkspace, SaveAssistantScript, SaveGeneratedImage, VideoJobs } from '../../application/index.js';
+import type { AssistantSheets, ReadImageInputs, ReadOwnedWorkspace, SaveAssistantScript, SaveAssistantStoryboard, SaveGeneratedImage, VideoJobs } from '../../application/index.js';
 import type { MetaImageClient } from '../../generation/index.js';
 
 /** Trusted scope from the admitted native run, never from model arguments. */
@@ -10,7 +10,7 @@ export interface ToolScope {
 
 /** Application functions that tools may call, the Meta image client and the video jobs. Supplied once by composition. */
 export type AgentCollaborators = Readonly<{
-  readWorkspace: ReadOwnedWorkspace; saveScript: SaveAssistantScript;
+  readWorkspace: ReadOwnedWorkspace; saveScript: SaveAssistantScript; saveStoryboard: SaveAssistantStoryboard;
   readImageInputs: ReadImageInputs; saveGeneratedImage: SaveGeneratedImage;
   /** Saves a script subject's sheet and reads the video's use room. */
   sheets: AssistantSheets;

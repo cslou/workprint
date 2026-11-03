@@ -31,7 +31,7 @@ function harness(options: Options = {}) {
   const meta = options.meta ?? (async () => ({ images: [png], requestId: null, usage: null }));
   const collaborators: AgentCollaborators = {
     readWorkspace: async () => options.unreadable ? { kind: 'unavailable' } : { kind: 'found', workspace: workspace(images, options.sheets ?? [], options.script ?? true) },
-    saveScript: async () => ({ kind: 'unavailable' }),
+    saveScript: async () => ({ kind: 'unavailable' }), saveStoryboard: async () => ({ kind: 'unavailable' }),
     readImageInputs: async (_account, _video, ids) => { calls.edits.push(...ids); return ids.every(id => images.includes(id) || options.sheets?.some(sheet => sheet.views.includes(id))) ? { kind: 'read', images: ids.map(versionId => ({ versionId, dataUrl: 'data:image/png;base64,AA==', width: 64, height: 48 })) } : { kind: 'not_found' }; },
     saveGeneratedImage: async (_account, _video, image) => {
       const kind = failing.shift();

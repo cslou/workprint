@@ -1,4 +1,4 @@
-import { currentSheets, currentSubjects, mediaVersionName, savedScriptContentSchema, scriptSubjects, sheetViews, workspaceMediaLabels, type ScriptSubject, type Version as SavedVersion } from '@workprint/contracts';
+import { currentPanelImage, currentSheets, currentSubjects, mediaVersionName, savedScriptContentSchema, scriptSubjects, sheetViews, workspaceMediaLabels, type ScriptSubject, type Version as SavedVersion } from '@workprint/contracts';
 import type { OwnedWorkspace } from '../application/index.js';
 
 type Version = OwnedWorkspace['assets'][number]['version'];
@@ -78,6 +78,56 @@ export function workspaceSubjects(workspace: OwnedWorkspace): WorkspaceSubject[]
 /** The image versions listed as views under the subjects, which the listing then leaves out of its items. */
 export const subjectViewIds = (subjects: readonly WorkspaceSubject[]): ReadonlySet<string> => new Set(subjects.flatMap(subject => subject.sheet?.views?.map(view => view.versionId) ?? []));
 
+/**
+ * A storyboard Shot as the model sees it in a listing. It never has the Shot's action, dialogue, camera note or
+ * reference purposes, and long text is clipped: item mode on the storyboard gives those.
+ */
+export type ListedShot = {
+  shotId: string; intent?: string; framing?: string; references?: { subjectId: string; role: string }[];
+  panels?: { panelId: string; description: string; imageVersionId?: string }[];
+};
+/**
+ * The current storyboard, listed once: its version and its Shots in order. `detail` says what each Shot gives: `panels`
+ * (ids, text, references and panels), `intents` or `ids`; `truncated` says panels or Shots were left out.
+ */
+export type WorkspaceStoryboard = { name: string; versionId: string; state: State; detail: 'panels' | 'intents' | 'ids'; truncated: boolean; shots: ListedShot[] };
+
+/** What the storyboard always leaves of the listing's byte bound for the items beside it. */
+const itemReserve = listingBounds.bytes / 8;
+
+const byOrder = <T extends { order: number }>(items: readonly T[]) => [...items].sort((a, b) => a.order - b.order);
+
+/**
+ * The video's storyboard within the listing's byte bound, beside the rest of `envelope` and a reserve for items: each
+ * Shot with its id, intent, framing, subject references and panels (id, description and current image); when that
+ * doesn't fit, Shot ids and intents; then Shot ids; then the first Shot ids that fit. Undefined with no storyboard.
+ */
+export function workspaceStoryboard(workspace: OwnedWorkspace, envelope: Readonly<Record<string, unknown>> = {}): WorkspaceStoryboard | undefined {
+  // `,"storyboard":` joins it to the envelope.
+  const budget = listingBounds.bytes - itemReserve - bytesOf(envelope) - 14;
+  const work = workspace.storyboard.work;
+  if (!work) return undefined;
+  const shots = byOrder(workspace.storyboard.shots);
+  const intent = (shot: typeof shots[number]) => shot.intent ? { intent: clip(shot.intent) } : {};
+  const full: ListedShot[] = shots.map(shot => ({
+    shotId: shot.shotId, ...intent(shot), ...(shot.framing ? { framing: clip(shot.framing) } : {}),
+    ...(shot.references?.length ? { references: shot.references.map(({ subjectId, role }) => ({ subjectId, role })) } : {}),
+    panels: byOrder(shot.panels).map(panel => { const image = currentPanelImage(panel); return { panelId: panel.panelId, description: clip(panel.description), ...(image ? { imageVersionId: image.id } : {}) }; }),
+  }));
+  const head = { name: `Storyboard · Version ${work.version.revision}`, versionId: work.version.id, state: work.state };
+  const steps: [WorkspaceStoryboard['detail'], ListedShot[]][] = [['panels', full], ['intents', shots.map(shot => ({ shotId: shot.shotId, ...intent(shot) }))], ['ids', shots.map(shot => ({ shotId: shot.shotId }))]];
+  for (const [detail, listed] of steps) {
+    const candidate: WorkspaceStoryboard = { ...head, detail, truncated: detail !== 'panels', shots: listed };
+    if (bytesOf(candidate) <= budget) return candidate;
+  }
+  const fitted: WorkspaceStoryboard = { ...head, detail: 'ids', truncated: true, shots: [] };
+  for (const shot of shots) {
+    if (bytesOf({ ...fitted, shots: [...fitted.shots, { shotId: shot.shotId }] }) > budget) break;
+    fitted.shots.push({ shotId: shot.shotId });
+  }
+  return fitted;
+}
+
 /** Every exact version the video uses, in workspace order, each once, with a name a person would recognise. */
 export function workspaceEntries(workspace: OwnedWorkspace): Entry[] {
   const clips = workspace.generatedVideos ?? [];
@@ -111,9 +161,11 @@ export function workspaceEntries(workspace: OwnedWorkspace): Entry[] {
  * A compact listing within the item, byte and text bounds; `truncated` says items were left out.
  * The byte bound covers the whole tool result the model receives, including its envelope.
  */
-export function listWorkspace(workspace: OwnedWorkspace, envelope: Readonly<Record<string, unknown>> = {}, listedViews: ReadonlySet<string> = new Set()): WorkspaceListing {
-  // Images listed as views under a subject are not listed again as items; item mode still reads them.
-  const entries = workspaceEntries(workspace).filter(entry => !(entry.use === 'reference' && entry.version.kind === 'image' && listedViews.has(entry.version.id)));
+export function listWorkspace(workspace: OwnedWorkspace, envelope: Readonly<Record<string, unknown>> = {}, listedViews: ReadonlySet<string> = new Set(), listedStoryboard?: string): WorkspaceListing {
+  // Images listed as views under a subject, and a storyboard listed on its own, are not listed again as items; item
+  // mode still reads them.
+  const entries = workspaceEntries(workspace).filter(entry => !(entry.use === 'reference' && entry.version.kind === 'image' && listedViews.has(entry.version.id))
+    && !(entry.use === 'storyboard' && entry.version.id === listedStoryboard));
   const listing: WorkspaceListing = { items: [], total: entries.length, truncated: false };
   for (const entry of entries) {
     const item: WorkspaceItem = { name: clip(entry.name), kind: entry.version.kind, versionId: entry.version.id, use: entry.use, state: entry.state, text: summary(entry.version), ...(entry.subjectId ? { subjectId: entry.subjectId } : {}) };
