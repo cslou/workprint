@@ -634,7 +634,7 @@ Tools call application/domain functions in process, never application HTTP route
 | [010: Subjects and reference sheets](../sprints/sprint-010.md) | B-017 | The script lists its subjects; light sheets made and revised by generate-sheet; Assets by subject; images from chosen sheet views come with Sprint 011's panels. |
 | [011: Storyboard](../sprints/sprint-011.md) | B-018, B-019 Shot videos | save-storyboard, generate-panel and generate-shot: Shots with their text and 1–2 panels made from the sheets, each Shot's video made from its panels and text; the Storyboard and Videos tabs show them, and Assets lists each subject's Shots. |
 | [012: Reference-to-video Shots and the workflow prompt](../sprints/sprint-012.md) | B-043, B-041 | Each Shot has a length the agent sets and a person can change; Shot videos are made with MiniMax's reference-to-video mode from the named subjects' sheet views and the Shot's panels, labelled in the prompt, at 16:9; a second panel only when the picture changes a lot; a static system prompt that sets out the workflow. |
-| 013: Join clips | B-020 join clips | Joined clips play as one video. |
+| [013: Join clips](../sprints/sprint-013.md) | B-020 join clips | Joined clips play as one video. |
 | 014: Questions | B-014 AskUserQuestion, B-016 image options | Option questions as in `docs/design/demo-02.html`; the chosen option resumes the agent; image choices whose exact asset the agent then uses. |
 
 **Sprint rules**
