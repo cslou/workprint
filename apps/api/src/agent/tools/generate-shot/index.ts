@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { makeShot, type ShotRefusal } from '../../../application/index.js';
-import { maxVideoPromptCharacters, videoDurations } from '../../../generation/index.js';
+import { maxVideoPromptCharacters } from '../../../generation/index.js';
 import { defineTool } from '../define.js';
 import { savedClip, videoDoneSummary, videoRefusal, videoResult, type VideoReason, type VideoResult } from '../video-shared.js';
 
@@ -34,12 +34,12 @@ export const generateShotTool = defineTool({
     'Make one storyboard Shot\'s video with MiniMax and save it as that Shot\'s next draft video. It waits until the clip is made, usually a few minutes. Saving is never approval: the user chooses Shot videos.',
     'shot is a Shot id from read-workspace\'s storyboard. Make the Shot\'s panels first: the server sends its first panel\'s current image as the first frame and its second panel\'s as the last frame, and puts the Shot\'s action, camera note and dialogue in the video prompt itself.',
     'Write prompt about motion only: how the action moves between the two frames and how the camera moves (for example a slow push-in or a pan left). Do not repeat the action or dialogue, describe the frames, or add story facts.',
+    'The video runs for the Shot\'s length from the storyboard, which the user can change; a Shot with no length runs 6 seconds. To change it, save the storyboard with the new length first.',
     'Each call makes a new paid video. If it stops waiting, its result gives a jobId: resume it with generate-video when the user asks.',
   ].join(' '),
   inputSchema: z.strictObject({
     shot: z.string().min(1).max(200).describe('The Shot\'s id from read-workspace\'s storyboard.'),
     prompt: z.string().min(1).max(maxVideoPromptCharacters).refine(text => text.trim().length > 0, 'The prompt is empty').describe('The motion: how the action moves, and the camera.'),
-    durationS: z.number().int().min(videoDurations.min).max(videoDurations.max).default(6).describe('Whole seconds, 4 to 15.'),
   }),
   phrase: 'Making a video…',
   // A refusal still finishes the line. Mastra hands back an input validation failure as `{ error: true }`.
@@ -48,7 +48,7 @@ export const generateShotTool = defineTool({
   shownMedia: (result: GenerateShotResult | { error: true }) => 'summary' in result ? [] : savedClip(result),
   execute: async (input, context): Promise<GenerateShotResult> => {
     const { scope, collaborators, signal, abortReason } = context;
-    const outcome = await makeShot(collaborators, scope.accountId, scope.videoId, { shot: input.shot.trim(), prompt: input.prompt, durationS: input.durationS }, { signal, abortReason });
+    const outcome = await makeShot(collaborators, scope.accountId, scope.videoId, { shot: input.shot.trim(), prompt: input.prompt }, { signal, abortReason });
     if (outcome.kind === 'shot_refused') return refused(outcome.reason);
     // A shutdown ends the turn as incomplete; the job stays running for the next start to mark interrupted.
     // A call stopped before its create made nothing, and ends incomplete too.

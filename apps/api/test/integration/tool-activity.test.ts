@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { setTimeout as wait } from 'node:timers/promises';
 import { Pool } from 'pg';
-import { createArtifactStore, createArtifactWriters, createAssistantReferences, createAssistantScripts, createAssistantStoryboards, createGeneratedImages, createVersionUses, panelArtifactId, shotArtifactId } from '../../src/artifacts/index.js';
+import { createArtifactStore, createArtifactWriters, createAssistantReferences, createAssistantScripts, createAssistantStoryboards, createGeneratedImages, createStoryboardEdits, createVersionUses, panelArtifactId, shotArtifactId } from '../../src/artifacts/index.js';
 import { createAssistantScriptSaver, createAssistantSheets, createAssistantStoryboardSaver } from '../../src/application/index.js';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
 import { createGenerationJobs } from '../../src/generation/index.js';
@@ -775,7 +775,7 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
     assert.equal((await saveScript(owner.id, video, { baseVersionId: null, content, subjects: [{ id: '', kind: 'character', name: 'Mara' }] })).kind, 'saved');
     const board = await saveBoard(owner.id, video, { baseVersionId: null, shots: [
       { shotId: '', ...opening, panels: [{ panelId: '', description: 'Mara at the desk.' }, { panelId: '', description: 'Mara at the door.' }] },
-      { shotId: '', intent: 'The lights go out.', panels: [{ panelId: '', description: 'Darkness.' }] },
+      { shotId: '', intent: 'The lights go out.', durationS: 4, panels: [{ panelId: '', description: 'Darkness.' }] },
     ] });
     assert.ok(board.kind === 'saved', JSON.stringify(board));
     const [first, last] = (await store.workspace(owner.id, video)).storyboard.shots;
@@ -817,6 +817,7 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
     assert.ok(one.result.made, JSON.stringify(one.result));
     assert.equal(minimax.creates, 1);
     assert.deepEqual(createBody().content, [{ type: 'text', text: `${openingText}\n\nA slow push-in.` }, frameOf(pngs[0]!, 'first_frame'), frameOf(pngs[1]!, 'last_frame')]);
+    assert.equal((minimax.requests[0]!.body as { duration: number }).duration, 6, 'a Shot with no length runs 6 seconds');
     const v1 = await store.version(owner.id, one.result.video.versionId);
     assert.deepEqual([v1.artifactId, v1.revision, v1.createdBy, v1.dependencies], [shotArtifactId(p.video, p.opening), 1, 'assistant', p.images.slice(0, 2)]);
     assert.deepEqual((await shotUses(p.video, p.opening)).map(row => [row.version_id, row.state]), [[v1.id, 'draft']]);
@@ -834,9 +835,10 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
     assert.deepEqual([(await store.version(owner.id, two.result.video.versionId)).revision, two.summary], [2, 'Saved Shot 1 · Video · Version 2']);
     assert.deepEqual((await shotUses(p.video, p.opening)).map(row => [row.use_id, row.version_id, row.state]), [[before!.use_id, two.result.video.versionId, 'draft']]);
 
-    // A one-panel Shot sends only a first frame, and a Shot with no dialogue says no one speaks.
+    // A one-panel Shot sends only a first frame, a Shot with no dialogue says no one speaks, and the video runs
+    // for the Shot's own length.
     minimax.reset();
-    const lone = await shoot(owner, p.video, { shot: p.closing, prompt: 'The room goes dark.', durationS: 4 });
+    const lone = await shoot(owner, p.video, { shot: p.closing, prompt: 'The room goes dark.' });
     assert.ok(lone.result.made, JSON.stringify(lone.result));
     assert.deepEqual(createBody().content, [{ type: 'text', text: 'The lights go out.\n\nNo one speaks.\n\nThe room goes dark.' }, frameOf(pngs[2]!, 'first_frame')]);
     assert.equal((minimax.requests[0]!.body as { duration: number }).duration, 4);
@@ -1272,10 +1274,10 @@ test('save-storyboard saves the Shot plan from the current script, and read-work
   const scripted = await saveScript(owner.id, video, { baseVersionId: null, content: scene, subjects: [{ id: '', kind: 'character', name: 'Mara' }, { id: '', kind: 'place', name: 'The Gallery' }] });
   assert.equal(scripted.kind, 'saved');
   const shots = [
-    { shotId: '', intent: 'Mara arrives.', framing: 'wide', action: 'Mara steps in.', dialogue: [{ character: 'Mara', text: 'Anyone here?', delivery: '' }], cameraNote: 'null',
+    { shotId: '', intent: 'Mara arrives.', durationS: 6, framing: 'wide', action: 'Mara steps in.', dialogue: [{ character: 'Mara', text: 'Anyone here?', delivery: '' }], cameraNote: 'null',
       references: [{ subjectId: 'mara', role: 'identity', purpose: 'Her face.' }, { subjectId: 'the-gallery', role: 'environment', purpose: 'The room.' }],
       panels: [{ panelId: '', description: 'Mara in the doorway.' }, { panelId: '', description: 'Mara at the desk.' }] },
-    { shotId: '', intent: 'The lights go out.', panels: [{ panelId: '', description: 'Darkness.' }] },
+    { shotId: '', intent: 'The lights go out.', durationS: 5, panels: [{ panelId: '', description: 'Darkness.' }] },
   ];
 
   type Saved = { saved: true; versionId: string; version: number } | { saved: false; reason: string; message: string };
@@ -1285,17 +1287,19 @@ test('save-storyboard saves the Shot plan from the current script, and read-work
   assert.ok(!JSON.stringify(first.observed.chunks).includes('Mara in the doorway'), 'no storyboard text leaves the server');
   const board = (await store.workspace(owner.id, video)).storyboard;
   assert.deepEqual([board.work?.version.id, board.work?.version.createdBy, board.work?.use?.state], [first.result.versionId, 'assistant', 'draft']);
+  assert.deepEqual(board.shots.map(shot => shot.durationS), [6, 5], 'each Shot keeps the length the agent gave it');
 
-  type Listed = { storyboard: { versionId: string; detail: string; shots: { shotId: string; intent: string; framing?: string; references?: unknown[]; panels: { panelId: string; description: string }[] }[] } };
+  type Listed = { storyboard: { versionId: string; detail: string; shots: { shotId: string; intent: string; durationS?: number; framing?: string; references?: unknown[]; panels: { panelId: string; description: string }[] }[] } };
   const listed = (await turn<Listed>(video, 'read-workspace', {})).result.storyboard;
   assert.deepEqual([listed.versionId, listed.detail], [first.result.versionId, 'panels']);
   assert.deepEqual(listed.shots.map(shot => [shot.shotId, shot.intent, shot.framing, shot.panels.map(panel => [panel.panelId, panel.description])]), board.shots.map(shot => [shot.shotId, shot.intent, shot.framing, shot.panels.map(panel => [panel.panelId, panel.description])]));
   assert.deepEqual(listed.shots[0]!.references, [{ subjectId: 'mara', role: 'identity' }, { subjectId: 'the-gallery', role: 'environment' }]);
+  assert.deepEqual(listed.shots.map(shot => shot.durationS), [6, 5]);
 
   // The next save on the current version keeps the given ids, in the new order.
   const [opening, closing] = listed.shots;
   const second = await turn<Saved>(video, 'save-storyboard', { base: listed.versionId, shots: [
-    { shotId: closing!.shotId, intent: 'The lights go out.', panels: [{ panelId: closing!.panels[0]!.panelId, description: 'Darkness falls.' }] },
+    { shotId: closing!.shotId, intent: 'The lights go out.', durationS: 5, panels: [{ panelId: closing!.panels[0]!.panelId, description: 'Darkness falls.' }] },
     { ...shots[0], shotId: opening!.shotId, panels: [{ panelId: opening!.panels[0]!.panelId, description: 'Mara in the doorway.' }, { panelId: '', description: 'Mara turns.' }] },
   ] });
   assert.ok(second.result.saved, JSON.stringify(second.result));
@@ -1304,6 +1308,23 @@ test('save-storyboard saves the Shot plan from the current script, and read-work
   assert.deepEqual(next.map(shot => shot.shotId), [closing!.shotId, opening!.shotId]);
   assert.equal(next[1]!.panels[0]!.panelId, opening!.panels[0]!.panelId);
   assert.notEqual(next[1]!.panels[1]!.panelId, opening!.panels[1]!.panelId, 'a panel sent with no id is a new panel');
+
+  // A person's change of only the length keeps the agent's action, dialogue, camera note and references, the agent
+  // reads the new length, and its next save that sends that length back keeps it.
+  const edited = await createStoryboardEdits(pool, check).editStoryboard(owner.id, video, { operationId: randomUUID(), baseVersionId: second.result.versionId, shots: next.map(shot => ({
+    shotId: shot.shotId, order: shot.order, ...(shot.shotId === opening!.shotId ? { durationS: 8 } : {}), panels: shot.panels.map(panel => ({ panelId: panel.panelId, order: panel.order, references: [...panel.references] })) })) });
+  const kept = (await store.workspace(owner.id, video)).storyboard.shots;
+  const fieldsOf = (shot: (typeof kept)[number]) => [shot.action, shot.dialogue, shot.cameraNote, shot.references, shot.framing];
+  assert.deepEqual(kept.map(shot => shot.durationS), [5, 8]);
+  assert.deepEqual(kept.map(fieldsOf), next.map(fieldsOf), 'only the length changed');
+  const reread = (await turn<Listed>(video, 'read-workspace', {})).result.storyboard;
+  assert.deepEqual([reread.versionId, reread.shots.map(shot => shot.durationS)], [edited.version.id, [5, 8]]);
+  const third = await turn<Saved>(video, 'save-storyboard', { base: reread.versionId, shots: [
+    { shotId: closing!.shotId, intent: 'The lights go out.', durationS: 5, panels: [{ panelId: kept[0]!.panels[0]!.panelId, description: 'Darkness falls.' }] },
+    { ...shots[0], shotId: opening!.shotId, durationS: 8, intent: 'Mara arrives, wary.', panels: kept[1]!.panels.map(panel => ({ panelId: panel.panelId, description: panel.description })) },
+  ] });
+  assert.ok(third.result.saved, JSON.stringify(third.result));
+  assert.deepEqual((await store.workspace(owner.id, video)).storyboard.shots.map(shot => [shot.intent, shot.durationS]), [['The lights go out.', 5], ['Mara arrives, wary.', 8]]);
 
   // A stale base gets its line, and nothing is saved.
   const stale = await turn<Saved>(video, 'save-storyboard', { base: first.result.versionId, shots });

@@ -24,7 +24,7 @@ function makers(shots: Shot[] | 'missing') {
   };
   return { value, started };
 }
-const request = { shot: 's1', prompt: 'A slow push-in.', durationS: 6 };
+const request = { shot: 's1', prompt: 'A slow push-in.' };
 
 test('the prompt is the action and camera note, then each line as it is voiced, then the motion', () => {
   const characters = new Set(['Mara', 'Ben']);
@@ -33,6 +33,14 @@ test('the prompt is the action and camera note, then each line as it is voiced, 
   assert.equal(shotVideoPrompt({ action: 'Mara turns to the door.', cameraNote: 'Low angle.', dialogue, intent: 'Unused.' }, characters, ' A slow push-in. '),
     'Mara turns to the door.\n\nLow angle.\n\nMara says: "You came."\nBen, off screen, says: "I did."\nMara, in voice-over, says: "He always did."\nNarrated in voice-over: "Years passed."\n\nA slow push-in.');
   assert.equal(shotVideoPrompt({ intent: 'Mara arrives.' }, characters, 'Pan left.'), 'Mara arrives.\n\nNo one speaks.\n\nPan left.', 'no action: the intent, and no one speaks');
+});
+
+test('the job runs for the Shot\'s length, or 6 s for a Shot saved without one', async () => {
+  const timed = makers([shot({ durationS: 9 })]);
+  await makeShot(timed.value, 'account', 'video', request, control);
+  const untimed = makers([shot()]);
+  await makeShot(untimed.value, 'account', 'video', request, control);
+  assert.deepEqual([timed.started[0]?.durationS, untimed.started[0]?.durationS], [9, 6]);
 });
 
 test('a Shot\'s first and last panels are its frames, and the job carries the Shot', async () => {

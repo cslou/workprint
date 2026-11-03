@@ -8,8 +8,10 @@ type Line = NonNullable<Shot['dialogue']>[number];
 
 /** What making a Shot's video needs; agent composition supplies these. Without `videos` nothing is sent. */
 export type ShotMakers = Readonly<{ readWorkspace: ReadOwnedWorkspace; videos?: Pick<VideoJobs, 'start'> | undefined }>;
-/** One Shot's video to make: the Shot's id, the model's motion prompt and the clip's length. */
-export type MakeShotRequest = Readonly<{ shot: string; prompt: string; durationS: number }>;
+/** One Shot's video to make: the Shot's id and the model's motion prompt. The clip's length is the Shot's. */
+export type MakeShotRequest = Readonly<{ shot: string; prompt: string }>;
+/** The length of a Shot saved without one, such as an older or built-in storyboard's. */
+export const defaultShotDurationS = 6;
 export type ShotRefusal = 'unsaveable' | 'not_found' | 'needs_panels' | 'too_long' | 'work_unavailable';
 /** A refusal before any job is saved or sent, or the job's own outcome. */
 export type ShotOutcome = { kind: 'shot_refused'; reason: ShotRefusal } | VideoJobOutcome;
@@ -63,6 +65,6 @@ export async function makeShot(makers: ShotMakers, accountId: string, videoId: s
   const [firstFrame, last] = frames as string[];
   const lastFrame = last === firstFrame ? undefined : last;
   return videos.start(accountId, videoId, {
-    prompt, durationS: request.durationS, ratio: '16:9', firstFrame: firstFrame!, ...(lastFrame ? { lastFrame } : {}), target: { shotId: shot.shotId },
+    prompt, durationS: shot.durationS ?? defaultShotDurationS, ratio: '16:9', firstFrame: firstFrame!, ...(lastFrame ? { lastFrame } : {}), target: { shotId: shot.shotId },
   }, control);
 }
