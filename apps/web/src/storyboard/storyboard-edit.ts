@@ -50,11 +50,11 @@ export const lengthOutOfRange = `Enter a whole number of seconds from ${shotDura
 export const positionsText = (positions: Positions | undefined) => positions ? `Starts: ${positions.start} / Ends: ${positions.end}` : 'Positions · not set';
 export const positionsMissing = 'Write where the Shot starts and where it ends.';
 
-/** What a person's typed positions mean for the Shot: both are needed, and the same positions change nothing. */
+/** What a person's typed positions mean for the Shot: both are needed, and the same positions, ignoring spaces at either end, change nothing. */
 export function positionsEdit(current: Positions | undefined, start: string, end: string): { kind: 'missing' } | { kind: 'unchanged' } | { kind: 'changed'; positions: Positions } {
   const positions = { start: start.trim(), end: end.trim() };
   if (!positions.start || !positions.end || positions.start.length > shotPositionLength || positions.end.length > shotPositionLength) return { kind: 'missing' };
-  return positions.start === current?.start && positions.end === current.end ? { kind: 'unchanged' } : { kind: 'changed', positions };
+  return positions.start === current?.start.trim() && positions.end === current.end.trim() ? { kind: 'unchanged' } : { kind: 'changed', positions };
 }
 
 /** The seconds a person typed, when they are a whole number in the Shot length range; otherwise null. */

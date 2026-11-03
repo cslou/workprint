@@ -40,5 +40,6 @@ test('positions read "Starts: … / Ends: …" or "not set"; both are needed, an
   const current = { start: 'Left.', end: 'Right.' };
   for (const [start, end] of [['', 'Right.'], ['Left.', '  '], ['x'.repeat(301), 'Right.']]) assert.deepEqual(positionsEdit(current, start!, end!), { kind: 'missing' }, start);
   assert.deepEqual(positionsEdit(current, ' Left. ', 'Right.'), { kind: 'unchanged' });
+  assert.deepEqual(positionsEdit({ start: 'Left. ', end: ' Right.' }, 'Left.', 'Right.'), { kind: 'unchanged' }, 'saved spaces at either end are no change');
   assert.deepEqual(positionsEdit(undefined, 'Left.', ' Right. '), { kind: 'changed', positions: { start: 'Left.', end: 'Right.' } }, 'an earlier Shot gains both');
 });
