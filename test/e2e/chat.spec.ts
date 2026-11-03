@@ -41,6 +41,8 @@ test('a new video streams its first reply, then reload shows the saved conversat
   await expect(working(page)).toHaveCount(0);
   await expect(recents(page).getByRole('button')).toHaveCount(1);
   expect(provider.requests).toHaveLength(1);
+  // The conversation's composer has the same bare "+" as the opening one.
+  await expect(page.getByRole('button', { name: 'Attach a file' })).toHaveText('+');
 
   const video = videoId(page);
   await page.reload();
