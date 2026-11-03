@@ -42,9 +42,10 @@ export function ShotLength({ connection, scope, workspace, shotId, onEdited }: P
     busy.current = true; setPending(true); setFeedback(null);
     try {
       const outcome = await submitStoryboardEdit(connection.client, scope.conversationId, base, editedShots(shots, { shotId, durationS: value }), () => latestRevision.current);
-      if (!active.current || outcome.kind === 'superseded') return;
+      if (!active.current) return;
       if (outcome.kind === 'refused') { setFeedback(saveFeedback(outcome.code)); return; }
-      await onEdited(outcome.value);
+      // An answer older than the board already shown is dropped, but the length was saved, so the editor closes.
+      if (outcome.kind === 'edited') await onEdited(outcome.value);
       if (active.current) close();
     } catch { if (active.current) setFeedback(saveFeedback('transport_failure')); }
     finally { busy.current = false; if (active.current) setPending(false); }
