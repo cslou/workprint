@@ -54,7 +54,7 @@
 - **New flows introduced:** None. Positions are a new Shot field inside the existing storyboard flows.
 
 ### Verification Strategy
-- **Functional:** unit tests for the storyboard tool's schema and refusals and for the prompts; integration through real turns (`tool-activity.test.ts`) for a save refused without a place and a save with positions; e2e for editing positions and for Story 3's UI; one live chat check for Story 4.
+- **Functional:** unit tests for the storyboard tool's schema and refusals and for the prompts; integration through real turns (`tool-activity.test.ts`) for a save refused without a place and a save with positions; e2e for editing positions and for Story 1's UI; one live chat check for Story 5.
 - **Regression:** the storyboard, panel and Shot video suites (`tool-activity.test.ts` storyboard and generate blocks, `storyboard-revisions.test.ts`, `shot-video-choice.test.ts`), `agent-loop.test.ts`, `shots.spec.ts` and `chat.spec.ts`; the unit tier and `pnpm check` per story; the deep gate once at completion.
 - **Lou's QA** judges whether the Shots match; a test can't.
 
@@ -110,7 +110,7 @@
   - [ ] Ready for Lou
 - **Planning review:**
   - Findings: P1: the place rule's save paths weren't stated, so a person's length edit on an earlier storyboard, or a script with no place, could be refused. P2s: no length bound; keyword tests of the description prove nothing; three deliverables in one story.
-  - Resolution: the place rule applies only to the agent's save-storyboard, and only when the script lists a place; a person's edits are never refused for it (regression case added). `start` and `end` are at most 300 characters. The description's rules are editorial, judged at Lou's QA. The prompt work is now Story 3.
+  - Resolution: the place rule applies only to the agent's save-storyboard, and only when the script lists a place; a person's edits are never refused for it (regression case added). `start` and `end` are at most 300 characters. The description's rules are editorial, judged at Lou's QA. The prompt work is now Story 3. Round 2 (4/5), P2s: every suite with scripted saves is listed in regression, and reading a storyboard without positions has a case.
 - **As** a filmmaker, **I want** the storyboard to cut only where the camera changes, name every Shot's place and say where everyone starts and ends, **so that** my Shots can match across the cuts.
 - **Dependencies:** Story 1 merged.
 - **Acceptance criteria:**
@@ -123,7 +123,8 @@
   - [ ] Integration (`tool-activity.test.ts`, real turns): a save whose Shot names no place (the script lists the gallery) ends with the refusal and no new version; a save with positions lists them in the next read-workspace; a script with no place saves. Pass: as stated.
   - [ ] Integration (`storyboard-revisions.test.ts`): a person's length edit of an earlier storyboard whose Shot names no place saves. Pass: a new version.
 - **Regression verification:**
-  - [ ] `tool-activity.test.ts` storyboard block and `storyboard-revisions.test.ts` whole. Pass: green.
+  - [ ] Every suite whose scripted save-storyboard calls now need positions: `tool-activity.test.ts` (storyboard and generate blocks), `storyboard-revisions.test.ts`, `shot-video-choice.test.ts`, `agent-loop.test.ts` and `shots.spec.ts`. Pass: green after their scripted saves gain positions.
+  - [ ] Integration: read-workspace on a storyboard saved without positions lists its Shots and omits positions. Pass: as stated.
 - **Editorial/design verification:** the cutting and camera rules are prose for the model, checked by reading the description and judged at Lou's QA items 1–2, not by keyword tests. Spec §8.3 Storyboard and §10's save-storyboard guidance name positions, the place rule and the cutting rule.
 - **Manual-only behavior verification:** Lou's QA items 1–2.
 - **Planned commits:**
@@ -172,17 +173,17 @@
   - [ ] Ready for Lou
 - **Planning review:**
   - Findings: P2s: no state for a Shot without positions or text for the refusal; the unchanged edit and the next panel weren't verified; the place rule could refuse a person's edit.
-  - Resolution: "Positions · not set" and both fields required; the refusal text is given; unit and e2e cases added; Story 2 keeps person edits out of the place rule.
+  - Resolution: "Positions · not set" and both fields required; the refusal text is given; unit and e2e cases added; Story 2 keeps person edits out of the place rule. Round 2 (4/5), P2s: the display strings and the summary row have checks, and the server applies the same bounds, with a refusal case.
 - **As** a filmmaker, **I want** to see and correct where people start and end in each Shot, **so that** I can fix a mismatch before paying for panels and videos.
 - **Dependencies:** Story 3.
 - **Acceptance criteria:**
   - [ ] "View storyboard" shows each Shot's positions as "Starts: … / Ends: …", or "Positions · not set" for an earlier Shot without them; the tab's summary row doesn't show them.
-  - [ ] A person edits them the way a Shot's length is edited: a storyboard edit of that Shot's positions alone (`storyboardEditSchema`, `editedPlan`), saved as the next storyboard version. Both fields are needed, including when adding positions to an earlier Shot; an empty one is refused with "Write where the Shot starts and where it ends." An unchanged edit just closes.
+  - [ ] A person edits them the way a Shot's length is edited: a storyboard edit of that Shot's positions alone (`storyboardEditSchema`, `editedPlan`), saved as the next storyboard version; `storyboardEditSchema` uses Story 2's 1–300 bounds, so the API refuses what the editor would. Both fields are needed, including when adding positions to an earlier Shot; an empty one is refused with "Write where the Shot starts and where it ends." An unchanged edit just closes.
   - [ ] The next panel and Shot video use the edited positions.
 - **Functional verification:**
-  - [ ] Unit (`apps/web/test/unit/storyboard/storyboard-edit.test.ts`): the edit body carries only that Shot's positions; an empty field is refused with its text; an unchanged edit sends nothing. Pass: as stated.
-  - [ ] Integration (`storyboard-revisions.test.ts`): a positions edit saves the next version and changes nothing else. Pass: as stated.
-  - [ ] E2E (`shots.spec.ts` journey): edit Shot 1's end, reload and see it; the next generate-panel's Meta request and generate-shot's MiniMax request (fakes) carry it. Pass: as stated.
+  - [ ] Unit (`apps/web/test/unit/storyboard/storyboard-edit.test.ts`): the edit body carries only that Shot's positions; an empty field is refused with its text; an unchanged edit sends nothing; the display strings "Starts: … / Ends: …" and "Positions · not set". Pass: as stated.
+  - [ ] Integration (`storyboard-revisions.test.ts`): a positions edit saves the next version and changes nothing else; an empty or 301-character edit is refused by the API with no new version. Pass: as stated.
+  - [ ] E2E (`shots.spec.ts` journey): edit Shot 1's end, reload and see it; the tab's summary row shows no positions; the next generate-panel's Meta request and generate-shot's MiniMax request (fakes) carry it. Pass: as stated.
 - **Regression verification:**
   - [ ] `shots.spec.ts` whole (the length and intent edits still work). Pass: green.
 - **Editorial/design verification:** design.md's Storyboard section names the positions editor beside the length.
@@ -203,14 +204,14 @@
   - [ ] Ready for Lou
 - **Planning review:**
   - Findings: P2s: no failure path; the live check's tool wasn't named; server start, Spark staying allowed and the QA host weren't checked; the spec locations were vague.
-  - Resolution: a failure path; the live check calls save-storyboard (nested `positions`) and read-workspace; config unit cases; the QA host script and the exact spec lines are named.
+  - Resolution: a failure path; the live check calls save-storyboard (nested `positions`) and read-workspace; config unit cases; the QA host script and the exact spec lines are named. Round 2 (4/5), P2: on the failure path, one live Spark save-storyboard call confirms the nested argument before QA.
 - **As** Lou, **I want** the agent to run on Muse Wonder, **so that** the workflow gets the stronger model.
 - **Dependencies:** Story 2 (the live check uses its save-storyboard schema).
 - **Acceptance criteria:**
   - [ ] **Live check first, on Lou's go:** `scripts/live/chat.mjs` with `meta/muse-wonder-1.0` streams a reply, calls read-workspace and save-storyboard (a required nested `positions` object) and reads their results, and makes a title. The response shapes are saved as a fixture beside `muse-spark-live-shapes.json`, with any differences from Muse Spark (reasoning options, nullable or nested arguments) recorded.
   - [ ] `assistantModels` gains `meta/muse-wonder-1.0` with its own title options. There is no code default: the server still takes the model only from `DEFAULT_ASSISTANT_MODEL`. Both ids start it; an unlisted one is refused; Muse Spark's title options are unchanged.
   - [ ] `.env.example` and the Sprint 014 QA host script (`outputs/qa/sprint-014/<sha>/host.mjs`, its `DEFAULT_ASSISTANT_MODEL`) use `meta/muse-wonder-1.0`. Lou sets it in the root `.env` himself.
-  - [ ] **If the live check fails:** the differences are recorded, Muse Spark stays the default, Story 5 is closed as deferred in `## Final Review`, and Lou's QA runs on Spark.
+  - [ ] **If the live check fails:** the differences are recorded, Muse Spark stays the default, Story 5 is closed as deferred in `## Final Review`, and before Lou's QA one live `chat.mjs` save-storyboard call on `meta/muse-spark-1.3` confirms Spark sends the nested `positions` (on Lou's go); then his QA runs on Spark.
 - **Functional verification:**
   - [ ] Unit (`config.security.test.ts`, `video-title.test.ts`): both ids accepted, each with its title options; an unlisted id refused. Pass: as stated.
   - [ ] The live check above, once. Pass: reply, both tool calls and title as stated.
