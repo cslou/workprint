@@ -441,7 +441,7 @@ Sprint-specific completion items:
   - Audit is NON-PASS, as approved: the same 2 moderate advisories, `@hono/node-server` (B-004) and `minimatch` GHSA-g3hv-75wg-m249 (B-008). There are no high or critical advisories.
   - Logs: `outputs/verification/sprint-011/deep-1751b27/`.
 - **Cross-story checks:** none beyond the deep gate. Story 6's journey (`shots.spec.ts`) runs the whole chain in one browser test: script, sheet, storyboard, both panels, Shot video, the tabs and a reload. It is in that gate.
-- **Live checks:** at `1751b27`, `pnpm live:image` and `pnpm live:video` pass in dry mode. The head wasn't saved when they ran; it is the only commit between their logs' times (10:40) and the next commit, and the folder's `head.txt` says so (`"mode": "dry", "pass": true`, against the loopback fakes). Logs: `outputs/verification/sprint-011/live-dry-1751b27/`. This sprint made no paid call. Lou's QA host makes them on his requests.
+- **Live checks:** at `1751b27`, `pnpm live:image` and `pnpm live:video` pass in dry mode (`"mode": "dry", "pass": true`, against the loopback fakes). The head wasn't saved when they ran: `1751b27` was the last commit before their logs (10:40) and `ad7c790` the next, as the folder's `head.txt` records. Logs: `outputs/verification/sprint-011/live-dry-1751b27/`. This sprint made no paid call. Lou's QA host makes them on his requests.
 - **Spec:**
   - §8.3 gains a Storyboard block: save-storyboard, generate-panel, generate-shot and the tabs.
   - §8.5 gains assistant drafts beside a person's choice.
