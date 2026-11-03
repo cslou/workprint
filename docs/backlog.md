@@ -24,20 +24,6 @@ Convention: `docs/conventions/backlog-management.md` (selected harness root; AGE
 - References: PR #93 (`apps/web/src/materials/assets.tsx` wraps the image viewer in history; `apps/api/src/artifacts/generated-images.ts` makes an approved image's edit a new image); PR #91 body, Pending (the approval and refresh P2s from its re-review); `apps/web/src/versions/review.tsx` (the closed Version history disclosure); `apps/web/src/conversation/shown-images.tsx` (the chat viewer, with no history); `apps/web/src/shell/workspace-tabs.tsx` (no `onUsed` for Assets); spec §8.3 Images and SC2 (why an approval is never replaced); B-036 (edits are not journaled).
 
 ## Next
-### B-043 — Shot videos from reference images
-- Context: Lou's QA of Sprint 011 (2026-11-03). Shot videos are made from the first and last panels as MiniMax `first_frame` / `last_frame` (`apps/api/src/application/shots.ts`). Lou worried that frames are too strict, and frames force the panel's 3:2 shape. Two paid MiniMax-H3 reference-to-video (`reference_image`) runs on the QA images kept the subjects, followed the panel's framing and came out 16:9. Lou: "I would say this test passes."
-- Problem: Frame-based Shot videos copy the panel too literally, can't take the subjects' sheet views, and come out in the panel's shape rather than 16:9. The agent also has no say in a Shot's length, and a second panel is made as an edit of the first, so it keeps the first's camera.
-- Outcome: Each Shot has a length the agent sets and a person can change. Its video is made from up to 9 reference images (the named subjects' sheet views and the Shot's panels), each labelled in the prompt, at 16:9 and the Shot's length. A Shot has a second panel only when its picture changes a lot, for example when the camera moves from one part of a room to another. Pass: a Shot video plays at 16:9, keeps the subjects, and runs for the Shot's length.
-- References: MiniMax V2 `/v2/video_generation` reference-to-video (up to 9 `reference_image` items; not combinable with frames); MiniMax's H3 prompt guides (speaker ids and `<d>[English] …</d>` dialogue tags); B-018 and B-019 (the storyboard and Shot videos, Sprint 011).
-- Work: [Sprint 012](sprints/sprint-012.md) Stories 1–4.
-
-### B-041 — System prompt for the production workflow
-- Context: Lou, 2026-11-03, while planning Sprints 010 and 011. Schedule right after Sprint 011.
-- Problem: The system prompt is three static lines (`apps/api/src/agent/mastra/native-turns.ts:23`). Each tool explains itself, but nothing tells the agent the agreed workflow or how its pieces fit together.
-- Outcome: The system prompt covers the workflow (script, then reference sheets, then the storyboard, then panels, then Shot videos), how sheets feed panels and panels and Shot text feed videos, and to show the person each step before the next paid one. It stays static so provider prefix caching holds. Pass: a fresh conversation asked to make a short video follows the steps in order and asks before paid steps.
-- References: Sprints 010 and 011; `~/projects/animation-studio/.pi/skills/create-storyboard/SKILL.md`; the Muse Spark notes.
-- Work: [Sprint 012](sprints/sprint-012.md) Story 5.
-
 
 MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority order. B-021 to B-025 were added the same day from the former Sprint 006/007 plans and the gaps they exposed, placed where their dependencies need them. B-034 was added the same day from Lou's Sprint 006 decision that the agent names the video, and is ranked second because the new Sprint 006 includes it. In this file, "former Sprint 006/007" means the deleted plans at `eb98e49`; plain "Sprint 006" means the current [Sprint 006 plan](sprints/sprint-006.md). Sprint allocation is in spec §10 [Phase 3 sprint packaging](specs/implementation-spec-001.md#phase-3-sprint-packaging). Spec story IDs (P3-S*, P4-S*) and the "reduced-delivery amendment" or "Submission and recovery contract" cited below refer to text removed from the spec on 2026-11-01; read it with `git show eb98e49:docs/specs/implementation-spec-001.md`. The same applies to the former Sprint 006/007 plans, `git show eb98e49:docs/sprints/sprint-006.md` (and `sprint-007.md`). Each tool lives in its own directory under the agent module and calls application functions in process, never application HTTP routes (implementation spec §10). Assistant saves and generations never count as human approval (AGENTS.md).
 
@@ -149,18 +135,6 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
   - The saved storyboard schema requires its source script version, and panel references must be reference versions (`apps/api/src/artifacts/content.ts`), so panels can only cite saved reference sheets (B-017).
   - Panels are generated one image call at a time, each shown as it finishes (B-021).
 - References: `~/projects/animation-studio/.pi/skills/create-storyboard/SKILL.md` with `references/panel-generation-strategy.md` and `storyboard-schema.md`; B-013, B-015, B-017.
-
-### B-020 — Agent tool: join videos together
-- Problem: There is no way to combine generated clips into one video.
-- Outcome: A join-videos tool combines an ordered set of the user's stored videos into a new video. The new video is stored and shown in the Videos tab, and the originals are kept. Pass: the joined video plays in Videos in the requested order.
-- Constraint:
-  - Every id taken from model arguments or the browser (image, video, question or option) must resolve to an exact version owned by the trusted account and video, checked by an account- and video-scoped domain query that the tool reaches through an application function; a foreign or missing id returns not-found. Test it with a foreign id (spec §10 Agent tool guidance).
-  - This is the agent's assembly tool. Export and download stay in B-009.
-  - Stream-copy joining needs matching codec, resolution and frame rate, so incompatible clips fail with a clear message rather than being re-encoded in the MVP.
-  - Run ffmpeg inside the existing bounded media sandbox, and verify the output like any other video.
-- References: `~/projects/animation-studio/.pi/skills/assemble-video/SKILL.md` (stream-copy joining with compatibility checks) and `.pi/lib/ffmpeg.mjs`; `apps/api/src/storage/media/sandbox.ts` (the existing ffmpeg sandbox); B-019.
-- Constraint: Its own sprint (013), after reference sheets (010), the storyboard (011) and reference-to-video Shots (012) (Lou, 2026-11-03). It joins the generated and Shot videos.
-- Work: [Sprint 013](sprints/sprint-013.md) Stories 1–2 (#143, #144). Lou approved the plan (2026-11-03, "go ahead"): the picture is stream-copied and never re-encoded, and the sound is re-encoded once, in step with each clip's picture, because every MiniMax clip's AAC starts with a priming packet that a copied join would turn into drift. The 120 s limit is to revisit later (Lou: "we can deal with the limit later"). Lou's QA is still open.
 
 Moved after video (Lou, 2026-11-02): AskUserQuestion (B-014) and image options (B-016) wait until video generation (B-025, B-019, B-020) is done. Until then the agent asks in plain chat text.
 
