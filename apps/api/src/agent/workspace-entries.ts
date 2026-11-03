@@ -1,4 +1,4 @@
-import { currentPanelImage, currentSheets, currentSubjects, mediaVersionName, savedScriptContentSchema, scriptSubjects, sheetViews, workspaceMediaLabels, type ScriptSubject, type Version as SavedVersion } from '@workprint/contracts';
+import { currentPanelImage, currentSheets, currentSubjects, mediaVersionName, savedScriptContentSchema, scriptSubjects, sheetViews, storyboardNames, workspaceMediaLabels, type ScriptSubject, type Version as SavedVersion } from '@workprint/contracts';
 import type { OwnedWorkspace } from '../application/index.js';
 
 type Version = OwnedWorkspace['assets'][number]['version'];
@@ -147,13 +147,13 @@ export function workspaceEntries(workspace: OwnedWorkspace): Entry[] {
   }
   for (const made of clips) add({ name: mediaVersionName(labels, made.version), use: 'generated video', state: made.state, version: made.version });
   if (workspace.storyboard.work) add({ name: `Storyboard · ${revision(workspace.storyboard.work.version)}`, use: 'storyboard', state: workspace.storyboard.work.state, version: workspace.storyboard.work.version });
-  [...workspace.storyboard.shots].sort((a, b) => a.order - b.order).forEach((shot, shotIndex) => {
-    const shotNumber = shotIndex + 1;
-    [...shot.panels].sort((a, b) => a.order - b.order).forEach((panel, panelIndex) => {
-      for (const version of panel.candidateImageVersions) add({ name: `Shot ${shotNumber} · Panel ${shotNumber}.${panelIndex + 1} · ${revision(version)}`, use: 'panel image', state: panel.approvedImageVersionId === version.id ? 'Ready' : 'Draft', version });
-    });
-    for (const version of shot.candidateVideoVersions ?? []) add({ name: `Shot ${shotNumber} · Video · ${revision(version)}`, use: 'shot video', state: shot.chosenVideoVersionId === version.id ? 'Ready' : 'Draft', version });
-  });
+  const names = storyboardNames(workspace.storyboard.shots);
+  for (const shot of byOrder(workspace.storyboard.shots)) {
+    for (const panel of byOrder(shot.panels)) {
+      for (const version of panel.candidateImageVersions) add({ name: `${names.panel(shot.shotId, panel.panelId)} · ${revision(version)}`, use: 'panel image', state: panel.approvedImageVersionId === version.id ? 'Ready' : 'Draft', version });
+    }
+    for (const version of shot.candidateVideoVersions ?? []) add({ name: `${names.shot(shot.shotId)} · Video · ${revision(version)}`, use: 'shot video', state: shot.chosenVideoVersionId === version.id ? 'Ready' : 'Draft', version });
+  }
   return entries;
 }
 
