@@ -160,7 +160,7 @@ MVP items B-012 to B-020 come from Lou's 2026-11-01 grooming, in Lou's priority 
   - Run ffmpeg inside the existing bounded media sandbox, and verify the output like any other video.
 - References: `~/projects/animation-studio/.pi/skills/assemble-video/SKILL.md` (stream-copy joining with compatibility checks) and `.pi/lib/ffmpeg.mjs`; `apps/api/src/storage/media/sandbox.ts` (the existing ffmpeg sandbox); B-019.
 - Constraint: Its own sprint (013), after reference sheets (010), the storyboard (011) and reference-to-video Shots (012) (Lou, 2026-11-03). It joins the generated and Shot videos.
-- Work: [Sprint 013](sprints/sprint-013.md) Stories 1–4. Planning decision (2026-11-03, for Lou to confirm): the picture is stream-copied and never re-encoded, and the sound is re-encoded once, in step with each clip's picture, because every MiniMax clip's AAC starts with a priming packet that a copied join would turn into drift.
+- Work: [Sprint 013](sprints/sprint-013.md) Stories 1–2 (#143, #144). Lou approved the plan (2026-11-03, "go ahead"): the picture is stream-copied and never re-encoded, and the sound is re-encoded once, in step with each clip's picture, because every MiniMax clip's AAC starts with a priming packet that a copied join would turn into drift. The 120 s limit is to revisit later (Lou: "we can deal with the limit later"). Lou's QA is still open.
 
 Moved after video (Lou, 2026-11-02): AskUserQuestion (B-014) and image options (B-016) wait until video generation (B-025, B-019, B-020) is done. Until then the agent asks in plain chat text.
 
