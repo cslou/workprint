@@ -236,6 +236,15 @@ test('storyboard edits keep stable Shot and Panel identities and one forward-onl
       const before = await store.workspace(owner, video);
       for (const durationS of [16, 3, 6.5]) await assert.rejects(edits.editStoryboard(owner, video, { operationId: randomUUID(), baseVersionId: lengthened.version.id, shots: body(durationS) }), { code: 'invalid_input' }, String(durationS));
       assert.equal((await store.workspace(owner, video)).storyboard.work?.version.id, before.storyboard.work?.version.id, 'a refused length saves no version');
+
+      // Positions are edited the same way: added to Shot b1, which had none, changing nothing else; an empty one saves nothing.
+      const positions = { start: 'Ada under the clock, frame right.', end: 'Ada turns to the platform, frame left.' };
+      const moved = await edits.editStoryboard(owner, video, { operationId: randomUUID(), baseVersionId: lengthened.version.id, shots: body(8).map(shot => shot.shotId === 'b1' ? { ...shot, positions } : shot) });
+      assert.ok('content' in moved.version);
+      const [b1, b2] = shotsOf([8, 5]);
+      assert.deepEqual((moved.version.content as { shots: unknown[] }).shots, [{ ...b1, positions }, b2]);
+      await assert.rejects(edits.editStoryboard(owner, video, { operationId: randomUUID(), baseVersionId: moved.version.id, shots: body(8).map(shot => shot.shotId === 'b1' ? { ...shot, positions: { start: ' ', end: 'x' } } : shot) }), { code: 'invalid_input' });
+      assert.equal((await store.workspace(owner, video)).storyboard.work?.version.id, moved.version.id, 'a refused positions edit saves no version');
     });
   } finally { await native.close(); if (!pool.ended) await pool.end(); await setup.close(); await db.close(); }
 });
