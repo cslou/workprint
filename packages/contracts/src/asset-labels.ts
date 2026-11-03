@@ -30,6 +30,11 @@ export function workspaceMediaLabels(workspace: Readonly<{ assets: Parameters<ty
  */
 export function mediaVersionName(labels: ReadonlyMap<string, string>, version: Readonly<{ id: string; artifactId: string; kind: string; revision: number }>, views?: ReadonlyMap<string, SheetViewName>): string {
   const member = views?.get(version.id);
-  if (member) return `${member.subjectName} · ${member.view}`;
+  if (member) return sheetViewLabel(member);
   return `${labels.get(version.artifactId) ?? (version.kind === 'video' ? 'Video' : 'Image')} · Version ${version.revision}`;
+}
+
+/** A sheet image's name by its subject and view: "Mara · Face close-up". */
+export function sheetViewLabel(member: Pick<SheetViewName, 'subjectName' | 'view'>): string {
+  return `${member.subjectName} · ${member.view}`;
 }

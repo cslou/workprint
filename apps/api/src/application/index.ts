@@ -61,6 +61,7 @@ export { createAssistantStoryboardSaver, type AssistantStoryboardOutcome, type S
 export { createAssistantSheets, type AssistantSheetOutcome, type AssistantSheets, type ReadSheetView, type SaveAssistantSheet, type SheetUseRoom } from './assistant-references.js';
 export { makeSheet, sheetViewCap, sheetViewNameCap, sheetViewPrompt, type SheetMakers, type SheetOutcome, type SheetRequest, type SheetView, type SheetViewRequest } from './sheets.js';
 export { optionalId } from './optional-id.js';
+export { imageVersionNames, workspaceVersions, type WorkspaceVersion } from './workspace-versions.js';
 export { anchorJob, maxPanelInputs, otherImageJob, panelInputs, type PanelInput, type PanelInputs, type PanelRequest } from './panel-inputs.js';
 export { createGeneratedImageSaver, createImageInputReader, metaImageFailure, type GeneratedImageOutcome, type ImageFailure, type ImageInputsOutcome, type ReadImageInputs, type SaveGeneratedImage } from './generated-images.js';
 export { createGeneratedVideoSaver, type GeneratedVideoOutcome, type SaveGeneratedVideo } from './generated-videos.js';

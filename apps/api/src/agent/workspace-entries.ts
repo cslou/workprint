@@ -1,5 +1,5 @@
-import { currentPanelImage, currentSheets, currentSubjects, mediaVersionName, savedScriptContentSchema, scriptSubjects, sheetViews, storyboardNames, workspaceMediaLabels, type ScriptSubject, type Version as SavedVersion } from '@workprint/contracts';
-import type { OwnedWorkspace } from '../application/index.js';
+import { currentPanelImage, currentSheets, mediaVersionName, savedScriptContentSchema, scriptSubjects, sheetViews, workspaceMediaLabels, type ScriptSubject, type Version as SavedVersion } from '@workprint/contracts';
+import { workspaceVersions, type OwnedWorkspace } from '../application/index.js';
 
 type Version = OwnedWorkspace['assets'][number]['version'];
 type State = 'Draft' | 'Ready';
@@ -12,8 +12,6 @@ export type WorkspaceItem = { name: string; kind: Version['kind']; versionId: st
 export type WorkspaceListing = { items: WorkspaceItem[]; total: number; truncated: boolean };
 /** One item in full: the exact version's saved content, or its media facts. */
 export type WorkspaceItemDetail = { name: string; kind: Version['kind']; versionId: string; revision: number; use: string; state: State } & ({ content: unknown } | { media: unknown });
-
-type Entry = { name: string; use: string; state: State; version: Version; subjectId?: string | undefined };
 
 const clip = (text: string, limit: number = listingBounds.text) => {
   const flat = text.replace(/\s+/g, ' ').trim();
@@ -128,35 +126,6 @@ export function workspaceStoryboard(workspace: OwnedWorkspace, envelope: Readonl
   return fitted;
 }
 
-/** Every exact version the video uses, in workspace order, each once, with a name a person would recognise. */
-export function workspaceEntries(workspace: OwnedWorkspace): Entry[] {
-  const clips = workspace.generatedVideos ?? [];
-  const entries: Entry[] = [], seen = new Set<string>(), labels = workspaceMediaLabels(workspace), views = sheetViews(workspace);
-  const sheetNames = new Map(currentSheets(workspace).map(sheet => [sheet.versionId, sheet.subjectName]));
-  // An image is filed under a subject only while the script lists it, as in Assets; otherwise it is under Other.
-  const listed = new Set(currentSubjects(workspace).map(subject => subject.id));
-  const add = (entry: Entry) => { if (!seen.has(entry.version.id)) { seen.add(entry.version.id); entries.push(entry); } };
-  const revision = (version: Version) => `Version ${version.revision}`;
-  if (workspace.script) add({ name: `Script · ${revision(workspace.script.version)}`, use: 'script', state: workspace.script.state, version: workspace.script.version });
-  for (const asset of workspace.assets) {
-    const { version } = asset;
-    // Uploaded and made media keep no filename, so they are named by kind and order, or by subject and view in a sheet
-    // (the shared rule). A sheet is named by its subject's current script name.
-    const subject = 'content' in version && version.kind === 'reference' ? sheetNames.get(version.id) ?? strings(record(record(version.content).subject).name) : '';
-    add({ name: subject ? `${clip(subject, 80)} · ${revision(version)}` : mediaVersionName(labels, version, views), use: 'reference', state: asset.state, version, subjectId: asset.subjectId && listed.has(asset.subjectId) ? asset.subjectId : undefined });
-  }
-  for (const made of clips) add({ name: mediaVersionName(labels, made.version), use: 'generated video', state: made.state, version: made.version });
-  if (workspace.storyboard.work) add({ name: `Storyboard · ${revision(workspace.storyboard.work.version)}`, use: 'storyboard', state: workspace.storyboard.work.state, version: workspace.storyboard.work.version });
-  const names = storyboardNames(workspace.storyboard.shots);
-  for (const shot of byOrder(workspace.storyboard.shots)) {
-    for (const panel of byOrder(shot.panels)) {
-      for (const version of panel.candidateImageVersions) add({ name: `${names.panel(shot.shotId, panel.panelId)} · ${revision(version)}`, use: 'panel image', state: panel.approvedImageVersionId === version.id ? 'Ready' : 'Draft', version });
-    }
-    for (const version of shot.candidateVideoVersions ?? []) add({ name: `${names.shot(shot.shotId)} · Video · ${revision(version)}`, use: 'shot video', state: shot.chosenVideoVersionId === version.id ? 'Ready' : 'Draft', version });
-  }
-  return entries;
-}
-
 /**
  * A compact listing within the item, byte and text bounds; `truncated` says items were left out.
  * The byte bound covers the whole tool result the model receives, including its envelope.
@@ -164,7 +133,7 @@ export function workspaceEntries(workspace: OwnedWorkspace): Entry[] {
 export function listWorkspace(workspace: OwnedWorkspace, envelope: Readonly<Record<string, unknown>> = {}, listedViews: ReadonlySet<string> = new Set(), listedStoryboard?: string): WorkspaceListing {
   // Images listed as views under a subject, and a storyboard listed on its own, are not listed again as items; item
   // mode still reads them.
-  const entries = workspaceEntries(workspace).filter(entry => !(entry.use === 'reference' && entry.version.kind === 'image' && listedViews.has(entry.version.id))
+  const entries = workspaceVersions(workspace).filter(entry => !(entry.use === 'reference' && entry.version.kind === 'image' && listedViews.has(entry.version.id))
     && !(entry.use === 'storyboard' && entry.version.id === listedStoryboard));
   const listing: WorkspaceListing = { items: [], total: entries.length, truncated: false };
   for (const entry of entries) {
@@ -186,7 +155,7 @@ export function sheetViewItem(workspace: OwnedWorkspace, version: SavedVersion):
 
 /** One item in full, only when the video uses that exact version. */
 export function workspaceItem(workspace: OwnedWorkspace, versionId: string): WorkspaceItemDetail | null {
-  const entry = workspaceEntries(workspace).find(candidate => candidate.version.id === versionId);
+  const entry = workspaceVersions(workspace).find(candidate => candidate.version.id === versionId);
   if (!entry) return null;
   const { version } = entry;
   const base = { name: entry.name, kind: version.kind, versionId: version.id, revision: version.revision, use: entry.use, state: entry.state };

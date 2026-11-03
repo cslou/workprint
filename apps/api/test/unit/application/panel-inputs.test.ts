@@ -110,3 +110,36 @@ test('later panels of a person\'s three-panel Shot anchor on panel 1 with its si
   assert.deepEqual(third.inputs, [{ versionId: 'p1-v1', label: 'Shot 2 · Panel 2.1', job: 'keep camera, setting and staging' }]);
   assert.deepEqual(third.size, { width: 800, height: 600 });
 });
+
+test('another panel\'s image is named by its panel and version, by its first panel in story order', () => {
+  const earlier = image('q-v2', 640, 360, 'assistant', 2), shared = image('shared', 640, 360, 'assistant');
+  // Stored out of story order, and one image bound to two panels, the later one stored last: the listing names it by
+  // its first panel in story order.
+  const space = workspace({ shots: [
+    { shotId: 's1', order: 2, intent: 'Mara arrives.', references, panels: [panel('p1', 0)], chosenVideoVersionId: null },
+    { shotId: 'sa', order: 0, intent: 'First.', panels: [panel('a0', 0), panel('a1', 1, [earlier, shared])], chosenVideoVersionId: null },
+    { shotId: 'sb', order: 1, intent: 'Later.', panels: [panel('b1', 0, [shared])], chosenVideoVersionId: null },
+  ] });
+  assert.deepEqual(inputs(resolve(space, { images: ['q-v2', 'shared'] })).inputs, [
+    { versionId: 'q-v2', label: 'Shot 1 · Panel 1.2 · Version 2', job: 'as the prompt describes' },
+    { versionId: 'shared', label: 'Shot 1 · Panel 1.2 · Version 1', job: 'as the prompt describes' },
+  ]);
+});
+
+test('only a subject\'s first current sheet is passed; a view of its other sheet is another image', () => {
+  const second = sheet('sheet-mara-b', 'mara', 'character', 'Mara', [['m9', 'Back view']]);
+  const space = workspace({ assets: [...views.map(version => use(version)), use(image('m9')), use(maraSheet), use(second), use(gallerySheet), use(keySheet)] });
+  assert.deepEqual(inputs(resolve(space)).inputs.slice(0, 3).map(input => input.versionId), ['m1', 'm2', 'm3']);
+  assert.ok(!inputs(resolve(space)).inputs.some(input => input.versionId === 'm9'));
+  assert.deepEqual(inputs(resolve(space, { images: ['m9', 'm1'] })).inputs, [
+    { versionId: 'm1', label: 'Mara · Full-body front', job: 'Her face and coat.' },
+    { versionId: 'm9', label: 'Mara · Back view', job: 'as the prompt describes' },
+  ]);
+});
+
+test('a later panel\'s anchor counts toward the 10-input limit', () => {
+  const first = image('p1-v1', 640, 360, 'assistant'), many = Array.from({ length: 10 }, (_, index) => image(`x${index}`));
+  const space = workspace({ assets: many.map(version => use(version)), shots: [{ shotId: 's1', order: 0, intent: 'Mara arrives.', panels: [panel('p1', 0, [first]), panel('p2', 1)], chosenVideoVersionId: null }] });
+  assert.deepEqual(resolve(space, { panel: 'p2', images: many.map(version => version.id) }), { kind: 'too_many', count: 11 });
+  assert.equal(inputs(resolve(space, { panel: 'p2', images: many.slice(0, 9).map(version => version.id) })).inputs.length, 10);
+});

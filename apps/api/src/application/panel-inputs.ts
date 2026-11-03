@@ -1,6 +1,7 @@
-import { currentPanelImage, currentSheets, currentSubjects, mediaVersionName, sheetViews, shotRoles, storyboardNames, subjectGroups, workspaceMediaLabels } from '@workprint/contracts';
+import { currentPanelImage, currentSheets, currentSubjects, shotRoles, storyboardNames, subjectGroups } from '@workprint/contracts';
 import { usedImageVersions } from '../artifacts/index.js';
 import type { OwnedWorkspace } from './workspace-reads.js';
+import { imageVersionNames } from './workspace-versions.js';
 
 /** Meta takes at most this many input images. */
 export const maxPanelInputs = 10;
@@ -18,10 +19,6 @@ export type PanelInputs =
   | { kind: 'too_many'; count: number } | { kind: 'subject_gone'; subjectName: string };
 /** The panel to make and the images the agent picked; empty `images` means every sheet the Shot names, whole. */
 export type PanelRequest = Readonly<{ shot: string; panel: string; images: readonly string[] }>;
-
-type Storyboard = OwnedWorkspace['storyboard'];
-type Shot = Storyboard['shots'][number];
-type Version = Shot['panels'][number]['candidateImageVersions'][number];
 
 const byOrder = <T extends { order: number }>(items: readonly T[]) => [...items].sort((a, b) => a.order - b.order);
 
@@ -71,22 +68,8 @@ export function panelInputs(workspace: OwnedWorkspace, request: PanelRequest): P
 
   const unique = inputs.filter((input, position) => inputs.findIndex(other => other.versionId === input.versionId) === position);
   if (unique.length > maxPanelInputs) return { kind: 'too_many', count: unique.length };
-  const label = imageLabels(workspace, names);
-  const resolved = unique.map(input => input.label ? input : { ...input, label: label(input.versionId) });
+  // Each label is the workspace's own name for the image, the one the agent picked it by.
+  const name = imageVersionNames(workspace);
+  const resolved = unique.map(input => input.label ? input : { ...input, label: name(input.versionId) ?? input.versionId });
   return { kind: 'resolved', inputs: resolved, preface: resolved.map((input, position) => `Input ${position + 1}: ${input.label} — ${input.job}`).join('\n'), ...(size ? { size } : {}) };
-}
-
-/** The workspace's name for an image the video uses: a sheet view by subject and view, an asset by its number, a panel's image by its panel. */
-function imageLabels(workspace: OwnedWorkspace, names: ReturnType<typeof storyboardNames>): (versionId: string) => string {
-  const labels = workspaceMediaLabels(workspace), views = sheetViews(workspace), versions = new Map<string, Version>(), panelNames = new Map<string, string>();
-  for (const { version } of workspace.assets) versions.set(version.id, version);
-  for (const shot of workspace.storyboard.shots) {
-    for (const panel of shot.panels) for (const version of panel.candidateImageVersions) if (!versions.has(version.id)) panelNames.set(version.id, `${names.panel(shot.shotId, panel.panelId)} · Version ${version.revision}`);
-  }
-  return versionId => {
-    const view = views.get(versionId);
-    if (view) return `${view.subjectName} · ${view.view}`;
-    const version = versions.get(versionId);
-    return version ? mediaVersionName(labels, version) : panelNames.get(versionId) ?? versionId;
-  };
 }
