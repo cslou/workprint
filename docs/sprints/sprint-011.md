@@ -429,7 +429,7 @@ Sprint-specific completion items:
 
 ## Final Review
 
-- **Outcome:** the goal is met in the scripted build. Lou's live QA of Sprints 010 and 011 together is in progress on a QA host at `1751b27` (Lou asked for it on 2026-11-03). Every story AC and verification item is met, with the deviations recorded below. Each story merged into `sprint-011` after an independent review of its final head scored at least 4/5 with no open P0/P1. The verdicts are recorded in the PR bodies:
+- **Outcome:** the goal is met in the scripted build. Lou's live QA of Sprints 010 and 011 together, on a QA host at `1751b27`, passed on 2026-11-03 (see the QA line below). Every story AC and verification item is met, with the deviations recorded below. Each story merged into `sprint-011` after an independent review of its final head scored at least 4/5 with no open P0/P1. The verdicts are recorded in the PR bodies:
   - Story 1, #115 (assistant storyboards): 3/5, then 5/5. The P1 was a read case that didn't go through the strict workspace contract.
   - Story 2, #116 (save-storyboard and the agent's view): 4/5, then 4/5.
   - Story 3, #117 (panel inputs from sheets): 4/5, then 5/5.
@@ -447,10 +447,10 @@ Sprint-specific completion items:
   - §8.5 gains assistant drafts beside a person's choice.
   - §8.7 gains Shot jobs.
   - The §4 `contracts`, `application`, `agent`, `artifacts` and `generation` rows, and the sprint table, name this sprint's parts.
-- **QA build for Lou:** at `1751b27` (live Muse Spark, Meta and MiniMax), covering Sprint 010's QA item and this sprint's. Lou reported "it all works" (2026-11-03). In the QA database:
-  - each panel's inputs are the sheet views the agent picked;
+- **QA build for Lou:** at `1751b27` (live Muse Spark, Meta and MiniMax), covering Sprint 010's QA item and this sprint's. Lou reported "it all works" (2026-11-03), including the Shot video playing in its row. In the QA database:
+  - each panel's inputs are the images the agent picked;
   - Shot 2's panel 2 has panel 1's image first;
-  - Shot 1's video depends on its one panel, and it plays in the Shot's row.
+  - Shot 1's video depends on its one panel.
 - **B-041** (the system prompt) is first in the backlog's Next, for the next planning round.
 - **Lou's decisions during the sprint (2026-11-03):**
   - **Voice-over.** The agent decides by the speaker it names. A scene character's own voice-over reads "Mara (voice-over)" and is voiced as hers; any other voice-over is "Narration". `lineVoice` in contracts is the one rule.
