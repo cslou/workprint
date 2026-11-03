@@ -4,7 +4,7 @@
 **Goal:** In a local build, a signed-in user asks the agent to make a short video.
 - The agent follows the workflow its system prompt sets out: script, then reference sheets, then a storyboard where every Shot has a length, then panels, then Shot videos. It shows the person each step before the next paid one.
 - Each Shot's video is made with MiniMax's reference-to-video mode. The inputs are the sheet views of the subjects the Shot names, plus its panels as the framing guide, each labelled in the prompt. The clip is 16:9 and runs for the Shot's length.
-- Panels are 16:9. A Shot has a second panel only when its framing really changes.
+- A Shot has a second panel only when its picture changes a lot, for example when the camera moves from one part of the room to another.
 - A person sees and can change a Shot's length in "View storyboard".
 
 **Status:** 🟡 Planning
@@ -61,7 +61,7 @@
     - **Reference-to-video replaces first and last frames for Shot videos.** generate-video, the free-form tool, keeps its frames.
     - **Sprint 012** is reference video (B-043) plus B-041, the system prompt. Join clips moves to 013 and Questions to 014.
     - **The agent sets each Shot's length** when it saves the storyboard. A person sees it and can change it in "View storyboard". Making the video uses it.
-    - **One key panel per Shot.** A second only when the framing really changes, made from the sheet views, not as an edit of panel 1.
+    - **One key panel per Shot.** A second only when the picture changes a lot within the Shot (Lou: for example two different parts of the room, as the camera moves from one to the other), made from the sheet views, not as an edit of panel 1. Panels keep their current shape; the video's 16:9 is set by the request.
     - **Lip sync, consistent voices and narration tracks are later work** (backlog). This sprint only writes dialogue in MiniMax's documented form.
   - **How a Shot's reference images are picked** (one rule, Story 3), at most 9 images, no image twice. The panels' slots are kept first, so a Shot naming many subjects still sends its panels:
     - For each subject the Shot names, in Shot order: its sheet's first view, up to 9 minus the number of panels sent.
@@ -76,9 +76,7 @@
     - After the labels come the action, the camera note, the dialogue in MiniMax's form, and a closing line: the action completes and the Shot ends on a settled moment.
     - It must fit 7,000 characters, or the Shot is refused `too_long` as today.
   - **Images are sent as they are stored.** No downscaling: 9 sheet PNGs come to about 36 MB as Base64, under the 64 MiB cap. The client keeps its per-image checks: PNG or JPEG, 256–5,760 px, aspect 0.4–2.5, at most 30 MB.
-  - **No paid calls in tests.** The MiniMax and Meta fakes record what they receive; tests assert the exact `content` items, roles, labels and ratio. Paid calls happen only on Lou's go:
-    - the Story 4 size check;
-    - Lou's QA.
+  - **No paid calls in tests.** The MiniMax and Meta fakes record what they receive; tests assert the exact `content` items, roles, labels and ratio. Paid calls happen only at Lou's QA, on his go.
   - **Budget (Lou, MVP testing budget).** Targeted tests per story, plus the commit and push gates; new cases in existing files and harnesses; no screenshot or visual suites.
 - **Non-goals:**
   - Lip sync, `reference_audio` voices, MiniMax TTS (B-044) and separate narration tracks (B-045).
@@ -95,13 +93,12 @@
 - **Existing flows affected:**
   - §8.3 Develop script, references and storyboard:
     - save-storyboard saves each Shot's length;
-    - panels are 16:9;
-    - a second panel is made from the sheets.
+    - a second panel is made from the sheets, only when the picture changes a lot.
   - §8.5 Review, revise and choose: "View storyboard" shows and edits a Shot's length; the Storyboard tab's summary shows it.
   - §8.7 Stop, cancel and recover (Shot jobs): a job carries up to 9 reference inputs instead of 2 frames. Stop, restart and resume keep them.
   - Videos: Shot clips are 16:9, the Shot's length, and depend on their reference images.
   - The chat: the agent follows the workflow prompt.
-  - §10 Agent tool guidance: generate-shot loses its `durationS` input and generate-panel its `size` input; save-storyboard gains `durationS`.
+  - §10 Agent tool guidance: generate-shot loses its `durationS` input; save-storyboard gains `durationS`.
   - Developer live checks: `pnpm live:video` gains `--references`.
 - **New flows introduced:**
   - None. The flows above change. **Each story updates its own spec section in its PR** (Story 1 §8.3/§8.5, Story 2 §8.7, Story 3 §8.3 Videos/§8.7, Story 4 §8.3, Story 5 §10). The Phase 3 table is renumbered with this sprint's planning commit. Sprint Completion reviews the spec against the shipped code.
@@ -125,7 +122,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
 **Lou's core tests,** with the stories that prove each:
 1. **A Shot has a length** that the agent sets and a person can change, and its video runs for it: Stories 1 and 3.
 2. **A Shot's video is made from references,** meaning its subjects' sheet views and its panels, each labelled, at 16:9: Stories 2 and 3.
-3. **Panels are 16:9, and a second panel is made from the sheets** for a new framing: Story 4.
+3. **A second panel is made only when the picture changes a lot,** from the sheets: Story 4.
 4. **The agent follows the workflow** and shows each step before the next paid one: Story 5.
 
 ### Tests requiring extra consideration
@@ -133,8 +130,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
 1. **Integration cases on the shared test stack** in `apps/api/test/integration/tool-activity.test.ts` and `generation-jobs.test.ts`, with storage, the checker and both fakes (Stories 1–4). Only real turns prove that a Shot's references land in the job, survive a restart and reach MiniMax in order. One stack start per story.
 2. **A migration** (Story 2) that raises the job input cap from 2 to 9. `generation-jobs.test.ts` covers it, including a restart with a 9-input job.
 3. **The Shot browser journey** (`test/e2e/shots.spec.ts`), extended in Stories 1 and 3: the length in the board and its edit, and the Shot video made after the edit. About 1–2 minutes.
-4. **One paid Meta call** (Story 4, on Lou's go) to find the `WxH` that returns a 16:9 image.
-5. **The deep gate at Sprint Completion,** and again at the `main` pre-merge.
+4. **The deep gate at Sprint Completion,** and again at the `main` pre-merge.
 
 ### Stories
 **Constraints:** Target 5-8 stories per sprint. Each story should be small enough to review, verify, and merge independently. Split stories that combine unrelated outcomes or cannot be verified with a clear functional/regression verification plan.
@@ -298,7 +294,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
     - `place`: "Keep The Gallery's layout, architecture and light as shown."
     - `prop`: "Keep The key's design, shape and materials as shown."
 
-#### Story 4: 16:9 panels, and a second panel only for a new framing
+#### Story 4: A second panel only when the picture changes a lot
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
   - [x] Follows sprint template
   - [x] Acceptance criteria are specific and testable
@@ -309,34 +305,28 @@ At sprint completion, run the applicable regression suite on the combined sprint
   - [ ] Ready for Lou
 - **Planning review:**
   - Findings: Pass 1: the paid call as a dependency; panel 1 first vs Lou's decision; no generate-image size test. Pass 2: `live:image` has no size option; one vs two calls.
-  - Resolution: Dependency and held-PR rule added; panel 1 moves after the sheet views as a continuity input; `generate-image.test.ts` case named; `--size` added; up to two calls on one go.
-- **As a** user, **I want** panels in the video's shape, and a second panel only when the camera really changes, **so that** the storyboard matches the video and each panel adds something.
-- **Dependencies:** Story 1 (both edit save-storyboard's description); Lou's go for up to two paid Meta calls (`1536x864`, then `1920x1080` only if the first isn't 16:9). Until then, the PR ships `1536x864` and is held from merge. Story 5 doesn't depend on the size, so it can be done and merged while Story 4 is held.
+  - Resolution: Panel 1 moves after the sheet views as a continuity input. Lou rescoped the story after review (2026-11-03): panels keep their shape, so the 16:9 panel size, its paid Meta check and `live:image --size` are dropped. A re-check of the rescoped story scored 4/5; its P2s (a leftover `live:image` completion check, a QA item for the second panel's picture, the editorial list) were fixed.
+- **As a** user, **I want** a second panel only when the picture changes a lot within a Shot, **so that** each panel shows something new and the video knows where the camera ends up.
+- **Dependencies:** Story 1 (both edit save-storyboard's description); Story 3 (the last panel is labelled "End the Shot on this framing").
 - **Acceptance criteria:**
-  - [ ] **16:9.**
-    - `makePanel` asks Meta for the 16:9 shape on a Shot's first panel, ignoring the model's `size`. A second panel keeps the first's measured size.
-    - The `WxH` sent is the one a paid check, on Lou's go, shows returns 16:9. It is recorded in the story PR with the returned pixels.
-    - `pnpm live:image` gains `--size WxH` (default `1536x1024`, as today) for that check.
-    - generate-panel's `size` input is removed.
   - [ ] **The second-panel rule.**
-    - save-storyboard's description: "A Shot has one key panel. Add a second only when the framing really changes within the Shot (for example wide to close); never for a small change of pose."
-    - generate-panel's description: a second panel is made from the sheet views, with panel 1 only for continuity, and the camera changes as the panel describes.
+    - save-storyboard's description: "A Shot has one key panel. Add a second only when the picture changes a lot within the Shot, for example when the camera moves from one part of the room to another, or from wide to close. Never add one for a small change of pose or expression."
+    - generate-panel's description: a second panel is made from the sheet views, with panel 1 only for continuity, and shows the new picture its description sets out.
   - [ ] **The second panel's inputs** (Lou: made from the sheet views, not as an edit of panel 1).
     - `panelInputs` puts the chosen sheet views first, as for a first panel, and panel 1's image last, with the job "match the setting, people and light; not its camera or framing", replacing panel 1 first with "keep camera, setting and staging".
     - `needs_first_panel` stays: panel 1 is still made first.
+  - [ ] **Panels keep their shape.** generate-panel's `size` stays as today, and a second panel keeps the first's measured size. The video's 16:9 comes from its request (Story 3), not from the panel.
 - **Functional verification:**
   - [ ] Unit (`generate-panel.test.ts`, the input-order cases): a second panel's inputs are the sheet views, then panel 1 last with the new job line; the image cap still counts panel 1.
-  - [ ] Integration (`tool-activity.test.ts`, the generate-panel block): the Meta fake received the 16:9 `size` for panel 1 and panel 1's measured size for panel 2. The model's `size` argument is refused by the schema.
-  - [ ] Paid check (on Lou's go): one `pnpm live:image --live` with the chosen `WxH`. Pass: the returned image's width ÷ height is 16:9 within 1%. Log under `outputs/verification/sprint-012/story-4/`.
+  - [ ] Integration (`tool-activity.test.ts`, the generate-panel block): for a scripted second panel, the Meta fake received the sheet views, then panel 1 last, at panel 1's measured size.
 - **Regression verification:**
-  - [ ] generate-panel's existing cases still pass (`generate-panel.test.ts`, the input order and refusals): the input order, `needs_first_panel` and the image cap.
-  - [ ] `generate-image.test.ts`: `size: '1536x1024'` still reaches the Meta fake unchanged, and `auto` is still the default.
-- **Editorial/design verification:** Spec §8.3 Storyboard: panels are 16:9; one key panel, a second only for a new framing.
+  - [ ] generate-panel's existing cases still pass (`generate-panel.test.ts`, the input order and refusals): a first panel's input order, `needs_first_panel` and the image cap.
+- **Editorial/design verification:** Spec §8.3 Storyboard: one key panel; a second only when the picture changes a lot, made from the sheets. The save-storyboard and generate-panel descriptions are reviewed against it (review only, no prose tests).
 - **Manual-only behavior verification:** N/A. Lou checks real panels at QA.
 - **Planned commits:**
-  1. 16:9 for a first panel; generate-panel's `size` removed; `live:image --size`.
-  2. The second-panel rule in both descriptions and the input order; spec §8.3.
-- **Technical notes:** Meta treats `size` as a shape (Sprint 008). Try `1536x864` first in the paid check, then `1920x1080`, and keep whichever returns 16:9.
+  1. The second panel's inputs and job line, with tests.
+  2. The second-panel rule in both descriptions; spec §8.3.
+- **Technical notes:** Panels keep today's shape: QA's panels came back 3:2 (1920×1280). With reference images MiniMax follows the requested ratio: Lou's Shot 1 test sent a 3:2 panel and got 16:9.
 
 #### Story 5: The system prompt sets out the workflow (B-041)
 - **Story Checklist:** (MUST BE CHECKED OFF BEFORE STARTING THE SPRINT)
@@ -351,7 +341,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
   - Findings: Pass 1: a scripted turn can't prove the pass condition; open test locations; manual steps not discrete. Pass 2: the tester's replies and stopping point.
   - Resolution: The condition is judged at Lou's QA; one integration case in `agent-loop.test.ts`; three pass/fail steps with the tester's replies and stop.
 - **As a** user, **I want** the agent to follow one clear workflow and check with me before each paid step, **so that** a short video comes together in order without surprises or wasted calls.
-- **Dependencies:** Stories 1–3, so the prompt describes the shipped workflow. Story 4's panel size doesn't change the prompt, so a held Story 4 doesn't block it.
+- **Dependencies:** Stories 1–4, so the prompt describes the shipped workflow.
 - **Acceptance criteria:**
   - [ ] **One static system prompt** in `agent/mastra/native-turns.ts` replaces the three lines. It covers:
     - the steps in order: script, reference sheets, storyboard with each Shot's length, panels, Shot videos from references;
@@ -383,12 +373,12 @@ After all implementation stories are complete, perform this checklist before spr
 
 - [ ] Confirm all stories met their acceptance criteria using recorded implementation and verification evidence.
 - [ ] Run the applicable regression suite on the combined sprint branch: the deep gate (`WORKPRINT_PREVIEW_PORT=4185 .checks/regression.sh --tier=deep`).
-- [ ] Run any planned cross-story checks not covered by that suite: `pnpm live:image` and `pnpm live:video --references` in dry mode.
+- [ ] Run any planned cross-story checks not covered by that suite: `pnpm live:video --references` in dry mode.
 - [ ] Review spec §8.3, §8.5, §8.7 and §10 (updated by each story) against the shipped code.
 - [ ] A QA build for Lou with live Muse Spark, Meta and MiniMax, started when Lou asks. Pass:
   - the agent follows the workflow and asks before paid steps;
   - each Shot has a length, and Lou can change it;
-  - panels are 16:9;
+  - a Shot has a second panel only where its picture changes a lot, and that panel shows the picture its description sets out, not panel 1's camera or framing;
   - each Shot video is 16:9, at its Shot's length, and keeps the sheets' people, places and objects.
 - [ ] Record results and unresolved issues in a brief `## Final Review`.
 
