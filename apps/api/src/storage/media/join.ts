@@ -1,4 +1,4 @@
-import { MAX_UPLOAD_VIDEO_BYTES } from '@workprint/contracts';
+import { MAX_UPLOAD_VIDEO_BYTES, VIDEO_AUDIO_RATES } from '@workprint/contracts';
 import { MediaProcessError } from './errors.js';
 import { MEDIA_JOB_BYTES } from './sandbox-config.js';
 
@@ -6,8 +6,6 @@ import { MEDIA_JOB_BYTES } from './sandbox-config.js';
 export const MEDIA_JOIN_CLIPS = Object.freeze({ min: 2, max: 20 });
 /** The joined file is a video like any other, so it may be as large as an uploaded one. */
 export const MEDIA_JOIN_OUTPUT_BYTES = MAX_UPLOAD_VIDEO_BYTES;
-/** The AAC-LC sample rates the video check accepts; the joined audio uses one of them. */
-export const JOIN_AUDIO_RATES: readonly number[] = Object.freeze([8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000]);
 export const JOIN_LIST = '/clips.ffconcat';
 export const JOIN_OUTPUT = '/output.mp4';
 export const joinClipPath = (index: number) => `/clip-${index}.mp4`;
@@ -30,7 +28,7 @@ export function checkJoinInputs(clips: readonly Uint8Array[]): void {
 /** A plan for `count` clips: positive finite lengths, and an allowed rate with 1 or 2 channels whenever a clip has audio. */
 export function checkJoinPlan(plan: MediaJoinPlan, count: number): void {
   const lengths = plan.clips.every(clip => Number.isFinite(clip.lengthS) && clip.lengthS > 0 && clip.lengthS <= 3600 && typeof clip.audio === 'boolean');
-  const audio = plan.audio === null ? !plan.clips.some(clip => clip.audio) : JOIN_AUDIO_RATES.includes(plan.audio.rate) && (plan.audio.channels === 1 || plan.audio.channels === 2);
+  const audio = plan.audio === null ? !plan.clips.some(clip => clip.audio) : VIDEO_AUDIO_RATES.includes(plan.audio.rate) && (plan.audio.channels === 1 || plan.audio.channels === 2);
   if (plan.clips.length !== count || !lengths || !audio) throw new MediaProcessError('invalid_input');
 }
 
@@ -53,8 +51,8 @@ export function joinArgs(plan: MediaJoinPlan): string[] {
   const tail = ['-movflags', '+faststart', '-y', JOIN_OUTPUT];
   if (!plan.audio) return [...head, '-map', '0:v:0', '-an', '-c:v', 'copy', ...tail];
   const { rate } = plan.audio, layout = plan.audio.channels === 1 ? 'mono' : 'stereo';
-  // Each clip with audio is its own input, forced to the MP4 demuxer.
-  const inputs = plan.clips.flatMap((clip, index) => clip.audio ? ['-f', 'mov', '-i', joinClipPath(index)] : []);
+  // Each clip with audio is its own input, read only from its file and only as MP4.
+  const inputs = plan.clips.flatMap((clip, index) => clip.audio ? ['-protocol_whitelist', 'file', '-format_whitelist', 'mov', '-f', 'mov', '-i', joinClipPath(index)] : []);
   let input = 0;
   const parts = plan.clips.map((clip, index) => {
     const source = clip.audio ? `[${++input}:a:0]aresample=${rate},aformat=sample_fmts=fltp:channel_layouts=${layout},apad` : `anullsrc=r=${rate}:cl=${layout}`;

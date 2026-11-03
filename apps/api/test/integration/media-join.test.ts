@@ -70,11 +70,31 @@ test('the media sandbox joins clips by copying their picture and remaking their 
     assert.ok((await running).length > 0);
   });
 
-  await t.test('Stop during a join cancels it and leaves no container', async () => {
-    const stop = new AbortController();
-    const pending = join([clip, clip, clip], stop.signal);
-    setTimeout(() => stop.abort(), 300);
-    await assert.rejects(pending, error => error instanceof MediaProcessError && error.code === 'cancelled');
-    assert.equal(await docker(['ps', '-a', '--filter', 'name=^/workprint-media-', '--format', '{{.ID}}']), '');
+  const containers = () => docker(['ps', '-a', '--filter', 'name=^/workprint-media-', '--format', '{{.ID}}']);
+  const code = (expected: string) => (error: unknown) => error instanceof MediaProcessError && error.code === expected;
+
+  await t.test('too few or too many clips are refused before any container is made', async () => {
+    await assert.rejects(sandbox.join([clip], () => assert.fail('no job runs')), code('invalid_input'));
+    await assert.rejects(sandbox.join(Array.from({ length: 21 }, () => clip), () => assert.fail('no job runs')), code('invalid_input'));
+    assert.equal(await containers(), '');
+  });
+
+  await t.test('Stop while the join command runs cancels it and leaves no container', async () => {
+    const stop = new AbortController(), clips = Array.from({ length: 20 }, () => clip);
+    let started = false;
+    await assert.rejects(sandbox.join(clips, async session => {
+      for (const index of clips.keys()) await session.probe(index);
+      const joining = session.join({ clips: clips.map(() => ({ lengthS: 4.041667, audio: true })), audio: { rate: 32000, channels: 2 } });
+      started = true; setTimeout(() => stop.abort(), 200);
+      return joining;
+    }, stop.signal), code('cancelled'));
+    assert.ok(started);
+    assert.equal(await containers(), '');
+  });
+
+  await t.test('a job past its deadline ends with deadline and leaves no container', async () => {
+    const short = await createMediaSandbox({ ...media.toolchain, timeoutMs: 3000 });
+    try { await assert.rejects(short.use(clip, () => new Promise(() => {})), code('deadline')); } finally { await short.close(); }
+    assert.equal(await containers(), '');
   });
 });

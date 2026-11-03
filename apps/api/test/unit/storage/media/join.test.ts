@@ -3,17 +3,19 @@ import { test } from 'node:test';
 import { MediaProcessError } from '../../../../src/storage/index.js';
 import { checkJoinInputs, checkJoinPlan, JOIN_LIST, JOIN_OUTPUT, joinArgs, joinClipPath, joinList, MEDIA_JOIN_OUTPUT_BYTES, type MediaJoinPlan } from '../../../../src/storage/media/join.js';
 import { MEDIA_JOB_BYTES, MEDIA_POSTER_BYTES, mediaContainerArgs } from '../../../../src/storage/media/sandbox-config.js';
+import { CHILD_ARG_CHARS, CHILD_MAX_ARGS } from '../../../../src/storage/media/child.js';
 
 const invalid = (error: unknown) => error instanceof MediaProcessError && error.code === 'invalid_input';
 const plan = (clips: readonly boolean[], audio: MediaJoinPlan['audio'] = { rate: 32000, channels: 2 }): MediaJoinPlan => ({ clips: clips.map(hasAudio => ({ lengthS: 4.041667, audio: hasAudio })), audio });
 // `runMediaChild`'s argv bounds (child.ts).
-const fitsChild = (args: readonly string[]) => args.length <= 128 && args.every(arg => arg.length <= 4096);
+const fitsChild = (args: readonly string[]) => args.length <= CHILD_MAX_ARGS && args.every(arg => arg.length <= CHILD_ARG_CHARS);
 
 test('the join command holds only fixed paths, fixed options and the plan\'s numbers', () => {
   const args = joinArgs(plan([true, false, true]));
-  assert.deepEqual(args.slice(0, 22), ['-nostdin', '-v', 'error', '-xerror', '-threads', '1', '-filter_threads', '1', '-protocol_whitelist', 'file', '-format_whitelist', 'concat,mov', '-copyts', '-auto_convert', '0', '-safe', '0', '-f', 'concat', '-i', JOIN_LIST, '-f']);
-  // Only the clips with audio are read again for their sound, each as MP4.
-  assert.deepEqual(args.slice(21, 29), ['-f', 'mov', '-i', joinClipPath(0), '-f', 'mov', '-i', joinClipPath(2)]);
+  assert.deepEqual(args.slice(0, 21), ['-nostdin', '-v', 'error', '-xerror', '-threads', '1', '-filter_threads', '1', '-protocol_whitelist', 'file', '-format_whitelist', 'concat,mov', '-copyts', '-auto_convert', '0', '-safe', '0', '-f', 'concat', '-i', JOIN_LIST]);
+  // Only the clips with audio are read again for their sound, each only from its file and only as MP4.
+  const input = (index: number) => ['-protocol_whitelist', 'file', '-format_whitelist', 'mov', '-f', 'mov', '-i', joinClipPath(index)];
+  assert.deepEqual(args.slice(21, 37), [...input(0), ...input(2)]);
   const graph = args[args.indexOf('-filter_complex') + 1];
   assert.equal(graph, [
     '[1:a:0]aresample=32000,aformat=sample_fmts=fltp:channel_layouts=stereo,apad,atrim=end=4.041667[a0]',
