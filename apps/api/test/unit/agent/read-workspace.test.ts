@@ -72,8 +72,8 @@ test('the listing gives the video\'s stopped jobs with their resume ids, only wh
     const signal = new AbortController().signal;
     return tool.execute({}, { scope, collaborators, signal, abortReason: () => undefined }) as Promise<Record<string, unknown>>;
   };
-  const listed = await run({ kind: 'read', jobs: [{ jobId: 'job-2', frames: ['i1'], submittedAt: new Date('2026-11-03T16:34:37Z') }, { jobId: 'job-1', frames: [], submittedAt: new Date('2026-11-03T16:30:11Z') }] });
-  assert.deepEqual(listed.stoppedVideos, [{ jobId: 'job-2', frames: ['i1'], submittedAt: '2026-11-03T16:34:37.000Z' }, { jobId: 'job-1', frames: [], submittedAt: '2026-11-03T16:30:11.000Z' }]);
+  const listed = await run({ kind: 'read', jobs: [{ jobId: 'job-2', images: ['i1'], submittedAt: new Date('2026-11-03T16:34:37Z') }, { jobId: 'job-1', images: [], submittedAt: new Date('2026-11-03T16:30:11Z') }] });
+  assert.deepEqual(listed.stoppedVideos, [{ jobId: 'job-2', images: ['i1'], submittedAt: '2026-11-03T16:34:37.000Z' }, { jobId: 'job-1', images: [], submittedAt: '2026-11-03T16:30:11.000Z' }]);
   assert.deepEqual(asked, [['account', 'video']]);
   assert.equal(listed.total, 1);
   for (const quiet of [await run(), await run({ kind: 'read', jobs: [] }), await run({ kind: 'unavailable' })]) {
@@ -231,7 +231,7 @@ test('beside subjects with sheets and stopped videos, a 100-Shot storyboard step
   const views = sheets.flatMap((_, index) => [image(`v${index}a`), image(`v${index}b`)]);
   const space = workspace([...views, ...sheets, ...Array.from({ length: 20 }, (_, index) => image(`i${index}`))], { script: work(subjectScript(subjects), 'script'), storyboard: { work: work(boardVersion(shots), 'storyboard'), shots } } as Partial<OwnedWorkspace>);
   const collaborators: AgentCollaborators = { readWorkspace: async () => ({ kind: 'found', workspace: space }), saveScript: async () => ({ kind: 'unavailable' }), saveStoryboard: async () => ({ kind: 'unavailable' }), readImageInputs: async () => ({ kind: 'not_found' }), saveGeneratedImage: async () => ({ kind: 'unavailable' }), sheets: unusedSheets,
-    videos: { start: async () => ({ kind: 'not_found' }), resume: async () => ({ kind: 'not_found' }), stopped: async () => ({ kind: 'read', jobs: Array.from({ length: 10 }, (_, index) => ({ jobId: `job-${index}`, frames: [`i${index}`], submittedAt: new Date('2026-11-03T16:34:37Z') })) }) } };
+    videos: { start: async () => ({ kind: 'not_found' }), resume: async () => ({ kind: 'not_found' }), stopped: async () => ({ kind: 'read', jobs: Array.from({ length: 10 }, (_, index) => ({ jobId: `job-${index}`, images: [`i${index}`], submittedAt: new Date('2026-11-03T16:34:37Z') })) }) } };
   const listed = await readTool.execute({}, { scope: { accountId: 'a', videoId: 'v' }, collaborators, signal: new AbortController().signal, abortReason: () => undefined }) as { subjects: unknown[]; stoppedVideos: unknown[]; storyboard: { detail: string; truncated: boolean; shots: unknown[] }; items: unknown[] };
   assert.equal(listed.subjects.length, 30); assert.equal(listed.stoppedVideos.length, 10);
   assert.ok(Buffer.byteLength(JSON.stringify(listed)) <= listingBounds.bytes, String(Buffer.byteLength(JSON.stringify(listed))));

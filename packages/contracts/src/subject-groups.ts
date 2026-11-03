@@ -1,5 +1,5 @@
 import { currentSubjects, type ScriptSubject } from './script-subjects.js';
-import { currentSheets, sheetViews } from './sheet-views.js';
+import { currentSheets, sheetViews, type CurrentSheet } from './sheet-views.js';
 
 type VersionLike = Readonly<{ id: string; artifactId: string; kind: string; content?: unknown }>;
 type AssetLike = Readonly<{ version: VersionLike; subjectId?: string | undefined }>;
@@ -33,4 +33,18 @@ export function subjectGroups<A extends AssetLike>(workspace: Readonly<{ script:
     const { sheets, items } = groups.get(subject?.id ?? null)!;
     return { subject, sheets, items, empty: !sheets.length && !items.length };
   });
+}
+
+/**
+ * Each script subject's current sheet, by subject id: the first sheet Assets shows under it. A subject with no sheet
+ * has none. This is the one rule for which sheet the agent's panels and Shot videos use.
+ */
+export function currentSubjectSheets(workspace: Parameters<typeof subjectGroups>[0]): ReadonlyMap<string, CurrentSheet> {
+  const sheets = new Map(currentSheets(workspace).map(sheet => [sheet.versionId, sheet]));
+  const found = new Map<string, CurrentSheet>();
+  for (const group of subjectGroups(workspace)) {
+    const sheet = group.subject && group.sheets[0] ? sheets.get(group.sheets[0].version.id) : undefined;
+    if (group.subject && sheet) found.set(group.subject.id, sheet);
+  }
+  return found;
 }

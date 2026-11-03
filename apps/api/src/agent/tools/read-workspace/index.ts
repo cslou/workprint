@@ -4,7 +4,7 @@ import { defineTool } from '../define.js';
 import { listWorkspace, sheetViewItem, subjectViewIds, workspaceItem, workspaceStoryboard, workspaceSubjects, type WorkspaceItemDetail, type WorkspaceListing, type WorkspaceStoryboard, type WorkspaceSubject } from '../../workspace-entries.js';
 
 /** A video job that stopped waiting, as the model sees it: `jobId` is what generate-video's `resume` takes. */
-type StoppedVideoItem = { jobId: string; frames: string[]; submittedAt: string };
+type StoppedVideoItem = { jobId: string; images: string[]; submittedAt: string };
 type ReadWorkspaceResult =
   | ({ found: true; mode: 'listing'; subjects?: WorkspaceSubject[]; storyboard?: WorkspaceStoryboard; stoppedVideos?: StoppedVideoItem[] } & WorkspaceListing)
   | { found: true; mode: 'item'; item: WorkspaceItemDetail }
@@ -20,7 +20,7 @@ export const readWorkspaceTool = defineTool({
     'The list also gives subjects: the characters, places and props the script names, each with the id that update-script keeps, and its sheet\'s versionId and views when it has one (pass a sheet\'s versionId to read its views when they are left out). A sheet\'s images are listed under its subject, not again as items; pass a view\'s versionId to read that image. An image filed under a subject has its subjectId.',
     'The list also gives storyboard: its versionId and its Shots in order, each with its shotId, intent, framing, subject references and panels (panelId, description, and imageVersionId, the panel\'s current image). Its detail says what each Shot carries: panels gives all of that; intents gives each Shot\'s id and intent only; ids gives Shot ids only. truncated is true whenever detail isn\'t panels or later Shots were left out; then pass the storyboard\'s versionId to read it in full.',
     'The list never gives a Shot\'s action, dialogue or camera note and clips long text, so pass the storyboard\'s versionId to read it in full before save-storyboard.',
-    'The list also gives stoppedVideos: videos that stopped waiting, newest first, each with the jobId to pass as generate-video resume when the user asks to continue one and the image versionIds it started from (frames).',
+    'The list also gives stoppedVideos: videos that stopped waiting, newest first, each with the jobId to pass as generate-video resume when the user asks to continue one and the image versionIds it was made from (images: its frames, or a Shot video\'s sheet views and panels).',
   ].join(' '),
   inputSchema: z.strictObject({ versionId: z.string().min(1).max(200).optional().describe('An exact versionId from the listing, to read that item in full.') }),
   phrase: 'Getting up to date on our progress…',
@@ -33,7 +33,7 @@ export const readWorkspaceTool = defineTool({
     if (input.versionId === undefined) {
       // Stopped jobs are listed only when the server can make videos; a failed read of them leaves the list as it is.
       const stopped = await collaborators.videos?.stopped(scope.accountId, scope.videoId);
-      const stoppedVideos = stopped?.kind === 'read' ? stopped.jobs.map(job => ({ jobId: job.jobId, frames: [...job.frames], submittedAt: job.submittedAt.toISOString() })) : [];
+      const stoppedVideos = stopped?.kind === 'read' ? stopped.jobs.map(job => ({ jobId: job.jobId, images: [...job.images], submittedAt: job.submittedAt.toISOString() })) : [];
       const subjects = workspaceSubjects(read.workspace);
       const rest = { found: true, mode: 'listing', ...(subjects.length ? { subjects } : {}), ...(stoppedVideos.length ? { stoppedVideos } : {}) } as const;
       const storyboard = workspaceStoryboard(read.workspace, rest);

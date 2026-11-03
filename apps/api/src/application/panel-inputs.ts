@@ -1,4 +1,4 @@
-import { currentPanelImage, currentSheets, currentSubjects, shotRoles, storyboardNames, subjectGroups } from '@workprint/contracts';
+import { currentPanelImage, currentSheets, currentSubjects, currentSubjectSheets, shotRoles, storyboardNames } from '@workprint/contracts';
 import { usedImageVersions } from '../artifacts/index.js';
 import type { OwnedWorkspace } from './workspace-reads.js';
 import { imageVersionNames } from './workspace-versions.js';
@@ -45,7 +45,7 @@ export function panelInputs(workspace: OwnedWorkspace, request: PanelRequest): P
   }
 
   // Each reference's subject must still be in the script; its current sheet is the subject's first.
-  const listed = new Set(currentSubjects(workspace).map(subject => subject.id)), sheets = currentSheets(workspace), groups = subjectGroups(workspace);
+  const listed = new Set(currentSubjects(workspace).map(subject => subject.id)), sheets = currentSheets(workspace), subjectSheets = currentSubjectSheets(workspace);
   const references = (shot.references ?? []).map((reference, position) => ({ reference, position }))
     .sort((a, b) => shotRoles.indexOf(a.reference.role) - shotRoles.indexOf(b.reference.role) || a.position - b.position).map(item => item.reference);
   for (const { subjectId } of references) {
@@ -56,9 +56,7 @@ export function panelInputs(workspace: OwnedWorkspace, request: PanelRequest): P
   if (picked.some(id => !used.has(id))) return { kind: 'image_not_found' };
   const chosen = new Set(picked), claimed = new Set<string>();
   for (const reference of references) {
-    const first = groups.find(group => group.subject?.id === reference.subjectId)?.sheets[0];
-    const sheet = first ? sheets.find(candidate => candidate.versionId === first.version.id) : undefined;
-    for (const view of sheet?.views ?? []) {
+    for (const view of subjectSheets.get(reference.subjectId)?.views ?? []) {
       if (picked.length && !chosen.has(view.versionId)) continue;
       claimed.add(view.versionId);
       inputs.push({ versionId: view.versionId, label: '', job: reference.purpose });

@@ -1,63 +1,136 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { makeShot, shotVideoPrompt, type NewVideo, type OwnedWorkspace, type ShotMakers } from '../../../src/application/index.js';
+import { makeShot, shotReferences, shotVideoPrompt, type NewVideo, type OwnedWorkspace, type ShotMakers } from '../../../src/application/index.js';
 
 type Version = OwnedWorkspace['assets'][number]['version'];
 type Shot = OwnedWorkspace['storyboard']['shots'][number];
+type Subject = { id: string; kind: 'character' | 'place' | 'prop'; name: string };
+/** A subject's sheet: its view image ids, in view order, and its description. */
+type Sheet = { subjectId: string; views: string[]; description?: string };
 
 const image = (id: string, revision = 1): Version => ({ id, artifactId: `artifact-${id}`, revision, createdBy: 'assistant', createdAt: `2026-11-03T10:00:0${revision}.000Z`, dependencies: [], kind: 'image', media: { contentType: 'image/png', byteSize: 10, width: 640, height: 360 } });
 const panel = (panelId: string, order: number, candidates: Version[] = []) => ({ panelId, order, description: `Panel ${panelId}`, references: [], candidateImageVersions: candidates, approvedImageVersionId: null });
 const shot = (fields: Partial<Shot> = {}): Shot => ({ shotId: 's1', order: 0, intent: 'Mara arrives.', panels: [panel('p1', 0, [image('a1')]), panel('p2', 1, [image('b1')])], chosenVideoVersionId: null, ...fields });
-function workspace(shots: Shot[]): OwnedWorkspace {
+const names = (shot: Shot, ...subjectIds: string[]): Shot => ({ ...shot, references: subjectIds.map(subjectId => ({ subjectId, role: 'identity' as const, purpose: 'Them.' })) });
+const mara: Subject = { id: 'mara', kind: 'character', name: 'Mara' }, ben: Subject = { id: 'ben', kind: 'character', name: 'Ben' }, gallery: Subject = { id: 'the-gallery', kind: 'place', name: 'The Gallery' };
+
+function workspace(shots: Shot[], subjects: Subject[] = [mara, ben, gallery], sheets: Sheet[] = []): OwnedWorkspace {
+  const characters = subjects.filter(subject => subject.kind === 'character').map(subject => subject.name);
   const script = { id: 'script', artifactId: 'artifact-script', revision: 1, createdBy: 'assistant', createdAt: '2026-11-03T10:00:00.000Z', dependencies: [], kind: 'script',
-    content: { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'The Gallery', time: 'night' }, characters: ['Mara', 'Ben'], script: [{ action: 'Mara waits.' }] }] } };
-  return { script: { version: script, use: { id: 'use-script', versionId: 'script', binding: { purpose: 'script' }, state: 'draft' }, state: 'Draft' }, assets: [],
+    content: { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'The Gallery', time: 'night' }, characters, script: [{ action: 'Mara waits.' }] }], subjects } };
+  const assets = sheets.map(sheet => {
+    const subject = subjects.find(item => item.id === sheet.subjectId)!;
+    const version = { id: `sheet-${sheet.subjectId}`, artifactId: `artifact-sheet-${sheet.subjectId}`, revision: 1, createdBy: 'assistant', createdAt: '2026-11-03T10:00:00.000Z', dependencies: sheet.views, kind: 'reference',
+      content: { schemaVersion: 1, subject: { id: subject.id, kind: subject.kind === 'place' ? 'environment' : subject.kind, name: subject.name, description: sheet.description ?? `${subject.name} as drawn.`, continuityNotes: ['Keep it.'] },
+        references: sheet.views.map((versionId, index) => ({ versionId, view: `View ${index + 1}`, notes: [] })) } };
+    return { version, use: { id: `use-${version.id}`, versionId: version.id, binding: { purpose: 'reference' }, state: 'draft' }, state: 'Draft' };
+  });
+  return { script: { version: script, use: { id: 'use-script', versionId: 'script', binding: { purpose: 'script' }, state: 'draft' }, state: 'Draft' }, assets,
     storyboard: { work: null, shots }, videos: [], pendingQuestion: null, activeWork: [], selectionRevision: 1 } as unknown as OwnedWorkspace;
 }
 const control = { signal: new AbortController().signal, abortReason: () => undefined };
 /** Makers over one workspace; `started` keeps each video the job runner was asked for. */
-function makers(shots: Shot[] | 'missing') {
+function makers(shots: Shot[] | 'missing', subjects?: Subject[], sheets?: Sheet[]) {
   const started: NewVideo[] = [];
   const value: ShotMakers = {
-    readWorkspace: async () => shots === 'missing' ? { kind: 'not_found' } : { kind: 'found', workspace: workspace(shots) },
+    readWorkspace: async () => shots === 'missing' ? { kind: 'not_found' } : { kind: 'found', workspace: workspace(shots, subjects, sheets) },
     videos: { start: async (_account, _video, input) => { started.push(input); return { kind: 'no_room' }; } },
   };
   return { value, started };
 }
 const request = { shot: 's1', prompt: 'A slow push-in.' };
+/** The image ids `shotReferences` picks for `shot`. */
+const picked = (subject: Shot, subjects?: Subject[], sheets?: Sheet[]) => {
+  const result = shotReferences(workspace([subject], subjects, sheets), subject);
+  return result.kind === 'picked' ? result.references.map(reference => reference.versionId) : result.kind;
+};
+const twoViews = (subjectId: string): Sheet => ({ subjectId, views: [`${subjectId}-1`, `${subjectId}-2`] });
 
-test('the prompt is the action and camera note, then each line as it is voiced, then the motion', () => {
+test('a Shot\'s references are each named subject\'s first view, then its panels, then second views while room remains', () => {
+  const onePanel = names(shot({ panels: [panel('p1', 0, [image('a1')])] }), 'mara', 'the-gallery');
+  assert.deepEqual(picked(onePanel, undefined, [twoViews('mara'), twoViews('the-gallery')]), ['mara-1', 'the-gallery-1', 'a1', 'mara-2', 'the-gallery-2']);
+  const props = ['a', 'b', 'c', 'd', 'e'].map(id => ({ id, kind: 'prop' as const, name: id.toUpperCase() }));
+  assert.deepEqual(picked(names(shot(), ...props.map(prop => prop.id)), props, props.map(prop => twoViews(prop.id))), ['a-1', 'b-1', 'c-1', 'd-1', 'e-1', 'a1', 'b1', 'a-2', 'b-2']);
+  // Nine subjects leave room for both panels: the first seven first views, then the panels.
+  const many = Array.from({ length: 9 }, (_, index) => ({ id: `prop-${index + 1}`, kind: 'prop' as const, name: `Prop ${index + 1}` }));
+  assert.deepEqual(picked(names(shot(), ...many.map(prop => prop.id)), many, many.map(prop => twoViews(prop.id))), [...many.slice(0, 7).map(prop => `${prop.id}-1`), 'a1', 'b1']);
+});
+
+test('no image is sent twice, a subject without a sheet adds nothing, and only the first and last of more panels are sent', () => {
+  const same = names(shot({ panels: [panel('p1', 0, [image('a1')]), panel('p2', 1, [image('a1')])] }), 'mara', 'ben');
+  assert.deepEqual(picked(same, undefined, [{ subjectId: 'mara', views: ['mara-1'] }]), ['mara-1', 'a1'], 'Ben has no sheet, and both panels show a1');
+  // A person's Shot may have more panels, stored out of order: the first and last by order are sent, and a middle one needs no image.
+  const three = shot({ panels: [panel('p3', 2, [image('c1')]), panel('p1', 0, [image('a1'), image('a2', 2)]), panel('p2', 1)] });
+  assert.deepEqual(picked(three), ['a2', 'c1'], 'each panel\'s current image');
+  assert.equal(picked(shot({ panels: [panel('p1', 0, [image('a1')]), panel('p2', 1)] })), 'needs_panels');
+});
+
+test('a sheet view that is also a panel\'s image is sent as the panel, and a view MiniMax wouldn\'t take is left out', () => {
+  // Mara's first view is panel 1's image: it keeps the panel's framing label, and her next view takes its place.
+  const shared = names(shot({ panels: [panel('p1', 0, [image('mara-1')])] }), 'mara');
+  const reused = shotReferences(workspace([shared], undefined, [{ subjectId: 'mara', views: ['mara-1', 'mara-2', 'mara-3'] }]), shared);
+  assert.ok(reused.kind === 'picked');
+  assert.deepEqual(reused.references.map(reference => [reference.versionId, reference.label.split(',')[0]]), [['mara-2', 'Mara'], ['mara-1', 'the storyboard panel for this Shot. Frame the Shot like this panel.'], ['mara-3', 'Mara']]);
+  // A view too narrow (0.25) or too small (200 px) for MiniMax is skipped; one whose size isn't listed is sent.
+  const sized = (id: string, width: number, height: number) => ({ version: { ...image(id), media: { contentType: 'image/png', byteSize: 10, width, height } } });
+  const subject = names(shot({ panels: [panel('p1', 0, [image('a1')])] }), 'mara');
+  const space = workspace([subject], undefined, [{ subjectId: 'mara', views: ['tall', 'small', 'fits', 'unlisted'] }]);
+  const listed = { ...space, assets: [...space.assets, sized('tall', 300, 1200), sized('small', 200, 200), sized('fits', 1024, 1024)] } as unknown as OwnedWorkspace;
+  const result = shotReferences(listed, subject);
+  assert.deepEqual(result.kind === 'picked' && result.references.map(reference => reference.versionId), ['fits', 'a1', 'unlisted']);
+});
+
+test('the prompt labels each image, then gives the action, camera note, dialogue in MiniMax\'s form, motion and closing line', () => {
   const characters = new Set(['Mara', 'Ben']);
   const dialogue = [{ character: ' Mara ', text: 'You came.' }, { character: 'Ben', text: 'I did.', delivery: 'off_screen' as const },
     { character: 'Mara', text: 'He always did.', delivery: 'voice_over' as const }, { character: 'Narrator', text: 'Years passed.', delivery: 'voice_over' as const }];
-  assert.equal(shotVideoPrompt({ action: 'Mara turns to the door.', cameraNote: 'Low angle.', dialogue, intent: 'Unused.' }, characters, ' A slow push-in. '),
-    'Mara turns to the door.\n\nLow angle.\n\nMara says: "You came."\nBen, off screen, says: "I did."\nMara, in voice-over, says: "He always did."\nNarrated in voice-over: "Years passed."\n\nA slow push-in.');
-  assert.equal(shotVideoPrompt({ intent: 'Mara arrives.' }, characters, 'Pan left.'), 'Mara arrives.\n\nNo one speaks.\n\nPan left.', 'no action: the intent, and no one speaks');
+  const subject = names(shot({ action: 'Mara turns to the door.', cameraNote: 'Low angle.', dialogue }), 'mara', 'the-gallery');
+  const result = shotReferences(workspace([subject], undefined, [{ subjectId: 'mara', views: ['mara-1'], description: 'A courier in a long grey coat.' }, { subjectId: 'the-gallery', views: ['g-1'], description: 'A long gallery with tall windows' }]), subject);
+  assert.ok(result.kind === 'picked');
+  assert.equal(shotVideoPrompt(subject, characters, ' A slow push-in. ', result.references), [
+    'Image 1: Mara, A courier in a long grey coat. Keep Mara\'s face, hair, build and clothing as shown.',
+    'Image 2: The Gallery, A long gallery with tall windows. Keep The Gallery\'s layout, architecture and light as shown.',
+    'Image 3: the storyboard panel for this Shot. Frame the Shot like this panel.',
+    'Image 4: the Shot\'s last storyboard panel. End the Shot on this framing.',
+    '',
+    'Mara turns to the door.',
+    '',
+    'Low angle.',
+    '',
+    'Mara (S1) says: <d>[English] You came.</d>',
+    'Ben (S2), off-screen, says: <d>[English] I did.</d>',
+    'Mara (S1) says in an off-screen voiceover: <d>[English] He always did.</d> while Mara\'s lips remain completely closed.',
+    'A narrator (S3) says in an off-screen voiceover: <d>[English] Years passed.</d> while every character on screen keeps their lips closed.',
+    '',
+    'A slow push-in.',
+    '',
+    'The action completes within the Shot, and it ends on a settled moment.',
+  ].join('\n'));
+  assert.equal(shotVideoPrompt({ intent: 'Mara arrives.' }, characters, 'Pan left.', []), 'Mara arrives.\n\nNo one speaks.\n\nPan left.\n\nThe action completes within the Shot, and it ends on a settled moment.', 'no action: the intent, and no one speaks');
+  const key = { id: 'the-key', kind: 'prop' as const, name: 'The key' }, keyed = names(shot(), 'the-key');
+  const label = shotReferences(workspace([keyed], [mara, ben, key], [{ subjectId: 'the-key', views: ['k-1'], description: 'Brass.' }]), keyed);
+  assert.ok(label.kind === 'picked');
+  assert.equal(label.references[0]!.label, 'The key, Brass. Keep The key\'s design, shape and materials as shown.');
 });
 
-test('the job runs for the Shot\'s length, or 6 s for a Shot saved without one', async () => {
-  const timed = makers([shot({ durationS: 9 })]);
-  await makeShot(timed.value, 'account', 'video', request, control);
+test('a long sheet description is cut at a word within 300 characters', () => {
+  const long = `${'word '.repeat(70)}end.`, subject = names(shot(), 'mara');
+  const result = shotReferences(workspace([subject], undefined, [{ subjectId: 'mara', views: ['mara-1'], description: long }]), subject);
+  assert.ok(result.kind === 'picked');
+  // The last word that ends within 300 characters: 60 words of 4 letters and their spaces, 299 characters.
+  assert.equal(result.references[0]!.label, `Mara, ${'word '.repeat(60).trim()}. Keep Mara's face, hair, build and clothing as shown.`);
+});
+
+test('the job is made from the references at 16:9 and the Shot\'s length, or 6 s, and carries the Shot', async () => {
+  const subject = names(shot({ durationS: 9 }), 'mara');
+  const made = makers([subject], undefined, [twoViews('mara')]);
+  assert.deepEqual(await makeShot(made.value, 'account', 'video', request, control), { kind: 'no_room' }, 'the job runner\'s outcome is returned');
+  const [started] = made.started;
+  assert.deepEqual([started?.referenceImageIds, started?.ratio, started?.durationS, started?.target, 'firstFrame' in started!, 'lastFrame' in started!], [['mara-1', 'a1', 'b1', 'mara-2'], '16:9', 9, { shotId: 's1' }, false, false]);
+  assert.match(started!.prompt, /^Image 1: Mara, Mara as drawn\. Keep Mara's face/);
   const untimed = makers([shot()]);
   await makeShot(untimed.value, 'account', 'video', request, control);
-  assert.deepEqual([timed.started[0]?.durationS, untimed.started[0]?.durationS], [9, 6]);
-});
-
-test('a Shot\'s first and last panels are its frames, and the job carries the Shot', async () => {
-  const two = makers([shot()]);
-  assert.deepEqual(await makeShot(two.value, 'account', 'video', request, control), { kind: 'no_room' }, 'the job runner\'s outcome is returned');
-  assert.deepEqual(two.started, [{ prompt: 'Mara arrives.\n\nNo one speaks.\n\nA slow push-in.', durationS: 6, ratio: '16:9', firstFrame: 'a1', lastFrame: 'b1', target: { shotId: 's1' } }]);
-  // A person's Shot may have more panels, stored out of order: the first and last by order are the frames.
-  const three = makers([shot({ panels: [panel('p3', 2, [image('c1')]), panel('p1', 0, [image('a1'), image('a2', 2)]), panel('p2', 1)] })]);
-  await makeShot(three.value, 'account', 'video', request, control);
-  assert.deepEqual([three.started[0]?.firstFrame, three.started[0]?.lastFrame], ['a2', 'c1'], 'each panel\'s current image');
-  const one = makers([shot({ panels: [panel('p1', 0, [image('a1')])] })]);
-  await makeShot(one.value, 'account', 'video', request, control);
-  assert.deepEqual([one.started[0]?.firstFrame, 'lastFrame' in one.started[0]!], ['a1', false]);
-  // A person chose one image for both panels: it is the first frame only, since MiniMax takes each image once.
-  const same = makers([shot({ panels: [panel('p1', 0, [image('a1')]), panel('p2', 1, [image('a1')])] })]);
-  await makeShot(same.value, 'account', 'video', request, control);
-  assert.deepEqual([same.started[0]?.firstFrame, 'lastFrame' in same.started[0]!], ['a1', false]);
+  assert.deepEqual([untimed.started[0]?.durationS, untimed.started[0]?.referenceImageIds], [6, ['a1', 'b1']]);
 });
 
 test('every refusal comes before the job runner is asked', async () => {
@@ -65,13 +138,20 @@ test('every refusal comes before the job runner is asked', async () => {
     ['missing', {}, 'work_unavailable'],
     [[shot()], { shot: 'another' }, 'not_found'],
     [[shot({ panels: [panel('p1', 0, [image('a1')]), panel('p2', 1)] })], {}, 'needs_panels'],
-    [[shot({ action: 'x'.repeat(6990) })], {}, 'too_long'],
+    [[shot({ panels: [panel('p1', 0), panel('p2', 1, [image('b1')])] })], {}, 'needs_panels'],
+    [[shot({ action: 'x'.repeat(6800) })], {}, 'too_long'],
   ];
   for (const [shots, change, reason] of cases) {
     const made = makers(shots);
     assert.deepEqual(await makeShot(made.value, 'account', 'video', { ...request, ...change }, control), { kind: 'shot_refused', reason }, reason);
     assert.deepEqual(made.started, []);
   }
+  // Labels count toward MiniMax's limit: a Shot that fits without them is refused with them.
+  const labelled = names(shot({ action: 'x'.repeat(6500) }), 'mara', 'the-gallery');
+  const sheets = [{ subjectId: 'mara', views: ['mara-1'], description: 'd '.repeat(150) }, { subjectId: 'the-gallery', views: ['g-1'], description: 'd '.repeat(150) }];
+  const crowded = makers([labelled], undefined, sheets);
+  assert.deepEqual(await makeShot(crowded.value, 'account', 'video', request, control), { kind: 'shot_refused', reason: 'too_long' });
+  assert.deepEqual(crowded.started, []);
   const unsaveable = makers([shot()]);
   assert.deepEqual(await makeShot({ readWorkspace: unsaveable.value.readWorkspace }, 'account', 'video', request, control), { kind: 'shot_refused', reason: 'unsaveable' });
 });
