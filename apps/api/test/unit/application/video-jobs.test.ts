@@ -227,7 +227,7 @@ test('stopped asks for this video\'s interrupted jobs, at most five, and gives e
   const listed = await runner.stopped(account, video);
   assert.ok(listed.kind === 'read');
   assert.deepEqual(listed.jobs.map(job => job.jobId), ids.slice(1).reverse());
-  assert.deepEqual(listed.jobs.map(job => job.frames), [[frame], [], [], [], []]);
+  assert.deepEqual(listed.jobs.map(job => job.images), [[frame], [], [], [], []]);
   assert.deepEqual(asked, [[account, video, { limit: 5, status: 'interrupted' }]]);
   jobs.list = async () => { throw new Error('storage down'); };
   assert.deepEqual(await runner.stopped(account, video), { kind: 'unavailable' });

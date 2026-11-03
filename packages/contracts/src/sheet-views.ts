@@ -4,8 +4,11 @@ import { currentSubjects } from './script-subjects.js';
 type VersionLike = Readonly<{ id: string; artifactId: string; kind: string; content?: unknown }>;
 type WorkspaceLike = Readonly<{ script: Readonly<{ version: VersionLike }> | null; assets: readonly Readonly<{ version: VersionLike }>[] }>;
 
-/** A sheet the video currently uses, with its subject's current name: the script's name when the script lists it. */
-export type CurrentSheet = Readonly<{ versionId: string; artifactId: string; subjectId: string; subjectName: string; views: readonly Readonly<{ versionId: string; view: string; notes: readonly string[] }>[] }>;
+/**
+ * A sheet the video currently uses, with its subject's current name (the script's name when the script lists it) and
+ * the sheet's description of the subject.
+ */
+export type CurrentSheet = Readonly<{ versionId: string; artifactId: string; subjectId: string; subjectName: string; description: string; views: readonly Readonly<{ versionId: string; view: string; notes: readonly string[] }>[] }>;
 /** The sheet an image version is in, and its view there. */
 export type SheetViewName = Readonly<{ sheetArtifactId: string; sheetVersionId: string; subjectId: string; subjectName: string; view: string }>;
 
@@ -17,7 +20,7 @@ export function currentSheets(workspace: WorkspaceLike): CurrentSheet[] {
     const sheet = savedReferenceContentSchema.safeParse(version.content);
     if (!sheet.success) return [];
     const { subject, references } = sheet.data;
-    return [{ versionId: version.id, artifactId: version.artifactId, subjectId: subject.id, subjectName: names.get(subject.id) ?? subject.name, views: references }];
+    return [{ versionId: version.id, artifactId: version.artifactId, subjectId: subject.id, subjectName: names.get(subject.id) ?? subject.name, description: subject.description, views: references }];
   });
 }
 

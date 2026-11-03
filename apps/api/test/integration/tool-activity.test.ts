@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { setTimeout as wait } from 'node:timers/promises';
 import { Pool } from 'pg';
 import { createArtifactStore, createArtifactWriters, createAssistantReferences, createAssistantScripts, createAssistantStoryboards, createGeneratedImages, createStoryboardEdits, createVersionUses, panelArtifactId, shotArtifactId } from '../../src/artifacts/index.js';
-import { createAssistantScriptSaver, createAssistantSheets, createAssistantStoryboardSaver } from '../../src/application/index.js';
+import { createAssistantScriptSaver, createAssistantSheets, createAssistantStoryboardSaver, shotEnding } from '../../src/application/index.js';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
 import { createGenerationJobs } from '../../src/generation/index.js';
 import { createPrivateObjectStorage } from '../../src/storage/index.js';
@@ -551,7 +551,7 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
     provider.script({ toolCalls: [{ name: 'read-workspace', args: {} }] }, { text: ['Found it'] });
     const turn = await client(user).turn(video, 'Can you resume the video?', 60000);
     assert.ok(completed(turn), JSON.stringify(turn.terminal));
-    return toolResult() as unknown as { stoppedVideos?: { jobId: string; frames: string[] }[] };
+    return toolResult() as unknown as { stoppedVideos?: { jobId: string; images: string[] }[] };
   };
   /** Starts a turn that calls generate-video, and resolves its run id once accepted. */
   const running = (user: { id: string }, video: string, args: Record<string, unknown>, timeoutMs = 60000) => {
@@ -747,8 +747,8 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
   const saveScript = createAssistantScriptSaver(createAssistantScripts(pool, check).save);
   const saveBoard = createAssistantStoryboardSaver(createAssistantStoryboards(pool, check).save);
   const pngs = [3, 4, 5].map(seed => testPng({ width: 320, height: 256, seed }));
-  const frameOf = (png: Buffer, role: string) => ({ type: 'image_url', image_url: { url: `data:image/png;base64,${png.toString('base64')}` }, role });
-  const createBody = () => minimax.requests[0]!.body as { content: { type: string; text?: string }[] };
+  const referenceOf = (png: Buffer) => ({ type: 'image_url', image_url: { url: `data:image/png;base64,${png.toString('base64')}` }, role: 'reference_image' });
+  const createBody = () => minimax.requests[0]!.body as { content: { type: string; text?: string }[]; ratio: string; duration: number };
   /** Images made with generate-image in one turn, in order. */
   const stills = async (video: string, made: Buffer[]) => {
     meta.reset(); meta.script({ images: made });
@@ -764,7 +764,12 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
   const targetOf = async (jobId: string) => (await pool.query<{ target: unknown }>('SELECT target FROM generation.requests WHERE request_id=$1', [jobId])).rows[0]?.target;
   const opening = { intent: 'Mara arrives.', action: 'Mara turns to the door.', cameraNote: 'Low angle, locked off.',
     dialogue: [{ character: 'Mara', text: 'You came.' }, { character: 'Narrator', text: 'Years passed.', delivery: 'voice_over' as const }, { character: 'Mara', text: 'I knew you would.', delivery: 'voice_over' as const }] };
-  const openingText = 'Mara turns to the door.\n\nLow angle, locked off.\n\nMara says: "You came."\nNarrated in voice-over: "Years passed."\nMara, in voice-over, says: "I knew you would."';
+  const openingText = 'Mara turns to the door.\n\nLow angle, locked off.\n\nMara (S1) says: <d>[English] You came.</d>\n'
+    + 'A narrator (S2) says in an off-screen voiceover: <d>[English] Years passed.</d> while every character on screen keeps their lips closed.\n'
+    + 'Mara (S1) says in an off-screen voiceover: <d>[English] I knew you would.</d> while Mara\'s lips remain completely closed.';
+  const firstPanel = 'the storyboard panel for this Shot. Frame the Shot like this panel.', lastPanel = 'the Shot\'s last storyboard panel. End the Shot on this framing.';
+  /** The prompt for a Shot made from `labels`' images, then its text and the motion. */
+  const shotText = (labels: string[], text: string, motion: string) => [labels.map((label, index) => `Image ${index + 1}: ${label}`).join('\n'), text, motion, shotEnding].join('\n\n');
   /**
    * A video whose storyboard has a two-panel Shot with an action, a camera note and dialogue, then a one-panel Shot with
    * none. The first `framed` panels, in that order, have a person's image as their current image.
@@ -811,12 +816,13 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
   };
   const unfill = async () => { await setup.query('DELETE FROM artifacts.conversation_uses WHERE use_id=$1', [fillers.pop()]); };
 
-  await t.test('generate-shot sends a Shot\'s panels as its frames and its text before the motion, and saves the clip as the Shot\'s own draft video', async () => {
+  await t.test('generate-shot sends a Shot\'s panels as labelled reference images at 16:9 with its text before the motion, and saves the clip as the Shot\'s own draft video', async () => {
     const p = await shotBoard();
     const one = await shoot(owner, p.video, { shot: p.opening, prompt: 'A slow push-in.' });
     assert.ok(one.result.made, JSON.stringify(one.result));
     assert.equal(minimax.creates, 1);
-    assert.deepEqual(createBody().content, [{ type: 'text', text: `${openingText}\n\nA slow push-in.` }, frameOf(pngs[0]!, 'first_frame'), frameOf(pngs[1]!, 'last_frame')]);
+    assert.deepEqual(createBody().content, [{ type: 'text', text: shotText([firstPanel, lastPanel], openingText, 'A slow push-in.') }, referenceOf(pngs[0]!), referenceOf(pngs[1]!)]);
+    assert.equal(createBody().ratio, '16:9');
     assert.equal((minimax.requests[0]!.body as { duration: number }).duration, 6, 'a Shot with no length runs 6 seconds');
     const v1 = await store.version(owner.id, one.result.video.versionId);
     assert.deepEqual([v1.artifactId, v1.revision, v1.createdBy, v1.dependencies], [shotArtifactId(p.video, p.opening), 1, 'assistant', p.images.slice(0, 2)]);
@@ -835,12 +841,12 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
     assert.deepEqual([(await store.version(owner.id, two.result.video.versionId)).revision, two.summary], [2, 'Saved Shot 1 · Video · Version 2']);
     assert.deepEqual((await shotUses(p.video, p.opening)).map(row => [row.use_id, row.version_id, row.state]), [[before!.use_id, two.result.video.versionId, 'draft']]);
 
-    // A one-panel Shot sends only a first frame, a Shot with no dialogue says no one speaks, and the video runs
-    // for the Shot's own length.
+    // A one-panel Shot sends its one panel, a Shot with no dialogue says no one speaks, and the video runs for the
+    // Shot's own length.
     minimax.reset();
     const lone = await shoot(owner, p.video, { shot: p.closing, prompt: 'The room goes dark.' });
     assert.ok(lone.result.made, JSON.stringify(lone.result));
-    assert.deepEqual(createBody().content, [{ type: 'text', text: 'The lights go out.\n\nNo one speaks.\n\nThe room goes dark.' }, frameOf(pngs[2]!, 'first_frame')]);
+    assert.deepEqual(createBody().content, [{ type: 'text', text: shotText([firstPanel], 'The lights go out.\n\nNo one speaks.', 'The room goes dark.') }, referenceOf(pngs[2]!)]);
     assert.equal((minimax.requests[0]!.body as { duration: number }).duration, 4);
     assert.equal(lone.summary, 'Saved Shot 2 · Video · Version 1');
   });
@@ -893,7 +899,7 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
     assert.deepEqual([done.result.made, minimax.creates, done.lines.at(-1)?.[2]], [true, 0, 'Saved Shot 2 · Video · Version 1']);
   });
 
-  await t.test('a Shot dropped while its clip is made is saved as a generated video, with its frames as dependencies', async () => {
+  await t.test('a Shot dropped while its clip is made is saved as a generated video, with its images as dependencies', async () => {
     const p = await shotBoard();
     const gate = released();
     minimax.script.query({ task: 'running', after: gate.promise });
@@ -911,6 +917,27 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
     assert.deepEqual(await shotUses(p.video, p.opening), []);
   });
 
+  await t.test('a Shot naming a subject is made from its sheet\'s views, then its panel, and its clip depends on them all', async () => {
+    const video = await client(owner).newVideo();
+    const content = { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'The Gallery', time: 'night' }, characters: ['Mara'], script: [{ action: 'Mara waits.' }] }] };
+    assert.equal((await saveScript(owner.id, video, { baseVersionId: null, content, subjects: [{ id: '', kind: 'character', name: 'Mara' }] })).kind, 'saved');
+    const [front, face, still] = await stills(video, pngs);
+    const sheet = await createAssistantSheets(createAssistantReferences(pool, check)).save(owner.id, video, { subjectId: 'mara', description: 'A courier in a long grey coat.', continuityNotes: ['Keep the coat.'],
+      views: [{ view: 'Full-body front', versionId: front!, notes: [] }, { view: 'Face close-up', versionId: face!, notes: [] }], baseVersionId: null });
+    assert.equal(sheet.kind, 'saved', JSON.stringify(sheet));
+    const board = await saveBoard(owner.id, video, { baseVersionId: null, shots: [{ shotId: '', intent: 'Mara waits.', durationS: 7, references: [{ subjectId: 'mara', role: 'identity', purpose: 'Her face.' }], panels: [{ panelId: '', description: 'Mara by the window.' }] }] });
+    assert.ok(board.kind === 'saved', JSON.stringify(board));
+    const [planned] = (await store.workspace(owner.id, video)).storyboard.shots;
+    await choosePanel(video, still!, planned!.shotId, planned!.panels[0]!.panelId);
+    minimax.reset();
+    const made = await shoot(owner, video, { shot: planned!.shotId, prompt: 'She turns to the window.' });
+    assert.ok(made.result.made, JSON.stringify(made.result));
+    const mara = 'Mara, A courier in a long grey coat. Keep Mara\'s face, hair, build and clothing as shown.';
+    assert.deepEqual(createBody(), { ...createBody(), ratio: '16:9', duration: 7,
+      content: [{ type: 'text', text: shotText([mara, firstPanel, mara], 'Mara waits.\n\nNo one speaks.', 'She turns to the window.') }, referenceOf(pngs[0]!), referenceOf(pngs[2]!), referenceOf(pngs[1]!)] });
+    assert.deepEqual((await store.version(owner.id, made.result.video.versionId)).dependencies, [front, still, face]);
+  });
+
   await t.test('a person\'s Shot with three panels and no action sends its first and last panels and its intent', async () => {
     const video = await client(owner).newVideo();
     const images = await stills(video, pngs);
@@ -922,7 +949,7 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
     for (const [index, panelId] of ['p1', 'p2', 'p3'].entries()) await choosePanel(video, images[index]!, 's1', panelId);
     const made = await shoot(owner, video, { shot: 's1', prompt: 'Track with her.' });
     assert.ok(made.result.made, JSON.stringify(made.result));
-    assert.deepEqual(createBody().content, [{ type: 'text', text: 'Mara crosses the room.\n\nNo one speaks.\n\nTrack with her.' }, frameOf(pngs[0]!, 'first_frame'), frameOf(pngs[2]!, 'last_frame')]);
+    assert.deepEqual(createBody().content, [{ type: 'text', text: shotText([firstPanel, lastPanel], 'Mara crosses the room.\n\nNo one speaks.', 'Track with her.') }, referenceOf(pngs[0]!), referenceOf(pngs[2]!)]);
   });
 
   await t.test('the use cap: a Shot\'s first video is refused before any create, a draft is still moved, and a use taken while it is made leaves the job resumable', async () => {
@@ -986,7 +1013,7 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
     assert.equal(minimax.creates, 1);
     // No result in the history carries the id: the model finds it in read-workspace, as it would after a real restart.
     const listing = await readStopped(owner, video);
-    assert.deepEqual(listing.stoppedVideos?.map(stopped => [stopped.jobId, stopped.frames]), [[job!.request_id, []]]);
+    assert.deepEqual(listing.stoppedVideos?.map(stopped => [stopped.jobId, stopped.images]), [[job!.request_id, []]]);
     minimax.script.query({ task: 'succeeded' });
     const { result } = await generate(owner, video, { resume: listing.stoppedVideos![0]!.jobId });
     assert.ok(result.made, JSON.stringify(result));
