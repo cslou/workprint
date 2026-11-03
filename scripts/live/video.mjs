@@ -1,9 +1,11 @@
 // MiniMax video check through the app's own client. Dry by default: a loopback fake MiniMax, a
 // placeholder key and no network. `--live` makes ONE real, paid MiniMax-H3 768P 5 s prompt-only
 // generation (about $0.40), polls it, downloads the clip, probes and decodes it with the pinned
-// toolchain, and saves the sanitized shapes, the clip and its probe. Never run by a gate: only on
-// request. Run through `pnpm live:video [--live]`, which compiles the tests; only `--live` starts the
-// shared test stack, for the pinned toolchain.
+// toolchain, and saves the sanitized shapes, the clip and its probe. `--references <png>…` (Sprint
+// 012) sends those 1 to 9 PNGs as reference images instead, at 16:9 for 6 s; dry, it checks the fake
+// got each one as a reference_image in order. Never run by a gate: only on request. Run through
+// `pnpm live:video [--live] [--references <png>…]`, which compiles the tests; only `--live` starts
+// the shared test stack, for the pinned toolchain.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -12,8 +14,15 @@ import { pathToFileURL } from 'node:url';
 import { parseEnv } from 'node:util';
 
 const live = process.argv.includes('--live');
+/** The PNG paths after `--references`, up to the next option. */
+const referencePaths = (() => {
+  const at = process.argv.indexOf('--references');
+  if (at < 0) return undefined;
+  const after = process.argv.slice(at + 1), end = after.findIndex(arg => arg.startsWith('--'));
+  return end < 0 ? after : after.slice(0, end);
+})();
 if (live && !process.env.WORKPRINT_TEST_STACK) {
-  const run = spawnSync(process.execPath, [join(import.meta.dirname, '../test-stack.mjs'), process.execPath, import.meta.filename, '--live'], { stdio: 'inherit' });
+  const run = spawnSync(process.execPath, [join(import.meta.dirname, '../test-stack.mjs'), process.execPath, import.meta.filename, ...process.argv.slice(2)], { stdio: 'inherit' });
   process.exit(run.status ?? 1);
 }
 const build = join(import.meta.dirname, '../../apps/api/.test-build');
@@ -49,13 +58,33 @@ const recordingFetch = async (url, init) => {
   return response;
 };
 
-const request = { prompt: 'A slow push-in on a quiet gallery bench in soft daylight, a framed landscape painting on the wall behind it. Natural colour, no people, gentle camera movement.', durationS: 5, ratio: '16:9' };
+/** A PNG as a reference image: its data URL and the size from its header. */
+function pngReference(path) {
+  const bytes = readFileSync(path);
+  assert.ok(bytes.subarray(1, 4).toString('latin1') === 'PNG', `${path} is not a PNG`);
+  return { dataUrl: `data:image/png;base64,${bytes.toString('base64')}`, width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20), file: path, bytes: bytes.byteLength };
+}
+const references = referencePaths?.map(pngReference);
+assert.ok(!referencePaths || references.length, '--references needs at least one PNG');
+const request = references
+  ? { prompt: `${references.map((image, index) => `Image ${index + 1} is a reference for the subjects, setting and framing.`).join(' ')} A slow push-in as the scene settles. Natural colour, gentle camera movement.`,
+    durationS: 6, ratio: '16:9', referenceImages: references.map(({ dataUrl, width, height }) => ({ dataUrl, width, height })) }
+  : { prompt: 'A slow push-in on a quiet gallery bench in soft daylight, a framed landscape painting on the wall behind it. Natural colour, no people, gentle camera movement.', durationS: 5, ratio: '16:9' };
+/** The request as recorded: each reference image by its file and size, never its data. */
+const recorded = { ...request, ...(references ? { referenceImages: references.map(({ file, width, height, bytes }) => ({ file, width, height, bytes })) } : {}) };
+const directory = references ? 'outputs/verification/sprint-012' : 'outputs/verification/sprint-009';
 const pollMs = live ? 10_000 : 10, deadlineMs = 15 * 60_000;
 let pass = true, reason, clip, task, probe, taskId;
 try {
   const client = createMiniMaxVideoClient({ apiKey: live ? miniMaxKey() : 'placeholder-minimax-key', baseUrl: live ? miniMaxVideoBaseUrl : fake.url, fetch: recordingFetch, ...(live ? {} : { download: createSafeDownload({ allowLoopback: true }) }) });
   const started = Date.now();
   ({ taskId } = await client.submit(request));
+  if (fake && references) {
+    // The fake got the text, then each image as a reference in order, with the ratio.
+    const sent = fake.requests.find(item => item.method === 'POST').body;
+    assert.deepEqual([sent.ratio, sent.content.map(item => item.role ?? item.type)], ['16:9', ['text', ...references.map(() => 'reference_image')]]);
+    assert.deepEqual(sent.content.slice(1).map(item => item.image_url.url), references.map(image => image.dataUrl));
+  }
   for (;;) {
     // A paid task is never abandoned for a passing query error; only the deadline ends the wait.
     try { task = await client.query(taskId); } catch (error) {
@@ -70,7 +99,6 @@ try {
   const bytes = await client.download(task.result.url);
   clip = { taskId, bytes: bytes.byteLength, seconds: (Date.now() - started) / 1000, reportedDurationS: task.result.durationS, resolution: task.result.resolution };
   if (live) {
-    const directory = 'outputs/verification/sprint-009';
     mkdirSync(directory, { recursive: true });
     writeFileSync(join(directory, `minimax-video-live-${taskId}.mp4`), bytes, { mode: 0o600 });
     // The pinned toolchain's view of the clip, and how long a full check would take.
@@ -93,11 +121,10 @@ try {
   await fake?.close();
 }
 if (live && (observed.create || observed.queries.length)) {
-  const directory = 'outputs/verification/sprint-009';
   mkdirSync(directory, { recursive: true });
   const file = join(directory, `minimax-video-live-${new Date().toISOString().slice(0, 10)}.json`);
   const queries = observed.queries.length > 3 ? [observed.queries[0], `<${observed.queries.length - 2} more queries>`, observed.queries.at(-1)] : observed.queries;
-  writeFileSync(file, JSON.stringify({ request: { model: 'MiniMax-H3', resolution: '768P', ...request }, create: observed.create, queries, clip, probe }, null, 2) + '\n');
+  writeFileSync(file, JSON.stringify({ request: { model: 'MiniMax-H3', resolution: '768P', ...recorded }, create: observed.create, queries, clip, probe }, null, 2) + '\n');
 }
-console.info(JSON.stringify({ mode: live ? 'live' : 'dry', pass, ...(reason ? { reason } : {}), ...(clip ? { clip } : {}), ...(probe ? { probeMs: probe.probeMs, decodeMs: probe.decodeMs } : {}) }, null, 2));
+console.info(JSON.stringify({ mode: live ? 'live' : 'dry', pass, ...(references ? { references: recorded.referenceImages } : {}), ...(reason ? { reason } : {}), ...(clip ? { clip } : {}), ...(probe ? { probeMs: probe.probeMs, decodeMs: probe.decodeMs } : {}) }, null, 2));
 if (!pass) process.exitCode = 1;
