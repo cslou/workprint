@@ -2,7 +2,7 @@
 
 **Date:** Start after Lou approves this plan, from `main` at `4d34530` (Sprint 009 merged as PR #103) – End after completion gates and Lou's QA
 **Goal:** In a local build, a signed-in user writes a script with the agent, and the script names its subjects: the characters, places and props that need a look. Assets shows each subject at once, empty until something is made for it. The user asks for a subject's reference sheet; the agent calls one tool, generate-sheet, which makes a light set of one-view images (at most 5), each later view made from the first so they match, and saves them as that subject's sheet with a view name for each image. Other images the agent makes for a subject are filed under it. Assets shows each subject with its sheet, laid out as a sheet, and its other images, live and after a reload.
-**Status:** 🟡 Implemented; Lou's QA pending (see Final Review; the merge to main waits for QA and Lou's command)
+**Status:** 🟡 Implemented; Lou's QA passed on 2026-11-03 (see Final Review; the merge to main waits for Lou's command)
 
 ---
 
@@ -405,7 +405,7 @@ Sprint-specific completion items:
 - [x] Fold the subjects, reference sheet and filing flows into spec §8.3 (a Subjects and reference sheets block) and the §4 `contracts`, `application`, `artifacts` and `agent` rows.
 - [x] Deep gate (`.checks/regression.sh --tier=deep`) on the combined branch.
 - [x] `pnpm live:image` passes dry.
-- [ ] A QA build for Lou with live Muse Spark and Meta: write a short script, ask for a character's sheet and a place's sheet, ask to redo one view, and ask for a one-off image of the character. Pass:
+- [x] A QA build for Lou with live Muse Spark and Meta: write a short script, ask for a character's sheet and a place's sheet, ask to redo one view, and ask for a one-off image of the character. Pass:
   - after the script, Assets shows each of its characters, places and props, Empty;
   - each sheet has 1–5 one-view images with view captions, under its subject, with no separate image rows and no status pill;
   - in the QA database, each made view after the first depends on the sheet's first view (or the identity photo when one was given);
@@ -450,7 +450,7 @@ Sprint-specific completion items:
 - **Cross-story checks:** none beyond the deep gate. The planned browser journey (Story 6) and the integration blocks (Stories 1–5) are in it.
 - **Live checks:** at `da42e3d`, `pnpm live:image` passes in dry mode (`"mode": "dry", "pass": true`, the loopback Meta fake). Log: `outputs/verification/sprint-010/live-dry-da42e3d/`. No paid call was made this sprint.
 - **Spec:** §8.3 gains a "Subjects and reference sheets" block, and the §4 `contracts`, `application`, `agent` and `artifacts` rows name this sprint's parts. Joining clips is credited to Sprint 012 throughout.
-- **QA build for Lou:** not built. Lou will ask for it (2026-11-03). The QA pass conditions are in Sprint Completion above and stay unchecked.
+- **QA build for Lou:** Lou tested Sprints 010 and 011 together on one QA host at `1751b27` (2026-11-03) and reported "it all works". In the QA database, each sheet's later views depend on its first view (Mara's, Night Gallery's and Brass Key's), and Mara's sheet is at version 3. Lou's follow-ups (panel and poster display, place views drawn on a grey page) were fixed in Sprint 011's PR #130.
 - **Deviations:**
   - **Completion order:** the spec fold was committed after the deep gate, not before it. The gate ran at `da42e3d` with the fold uncommitted in the checkout; the fold is docs only, the quick and standard gates passed on its commit, and the deep gate runs again on the merge to `main`.
 - **Deviations, recorded in the story PRs:**
