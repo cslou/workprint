@@ -7,7 +7,7 @@
 - A Shot has a second panel only when its picture changes a lot, for example when the camera moves from one part of the room to another.
 - A person sees and can change a Shot's length in "View storyboard".
 
-**Status:** 🔵 In Progress; merged into `main` (#141, 2026-11-03) at Lou's request so Sprint 013 could start. Lou's QA, and B-041's pass condition, are still open.
+**Status:** 🟢 Complete. Merged into `main` (#141, 2026-11-03) at Lou's request so Sprint 013 could start; Lou's QA, including B-041's pass condition, passed on 2026-11-04 (see Final Review).
 
 ---
 
@@ -350,7 +350,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
     - show the person each step's result and ask before the next paid step (images, videos);
     - one Shot video at a time unless the person asks for more.
   - [x] **It is static.** No per-turn or per-video text, so provider prefix caching holds. Tool-specific rules stay in the tool descriptions and aren't repeated.
-  - [ ] **The B-041 pass condition** (the agent follows the steps in order and asks before paid calls) is judged at Lou's QA, below. Tests prove only that the prompt is sent unchanged.
+  - [x] **The B-041 pass condition** (the agent follows the steps in order and asks before paid calls) is judged at Lou's QA, below. Tests prove only that the prompt is sent unchanged.
 - **Functional verification:**
   - [x] Integration (`apps/api/test/integration/agent-loop.test.ts`): on two fresh conversations and on a second turn of one, the scripted provider's first message is byte-identical to the exported `systemPrompt`.
 - **Regression verification:**
@@ -375,7 +375,7 @@ After all implementation stories are complete, perform this checklist before spr
 - [x] Run the applicable regression suite on the combined sprint branch: the deep gate (`WORKPRINT_PREVIEW_PORT=4185 .checks/regression.sh --tier=deep`).
 - [x] Run any planned cross-story checks not covered by that suite: `pnpm live:video --references` in dry mode.
 - [x] Review spec §8.3, §8.5, §8.7 and §10 (updated by each story) against the shipped code.
-- [ ] A QA build for Lou with live Muse Spark, Meta and MiniMax, started when Lou asks. Pass:
+- [x] A QA build for Lou with live Muse Spark, Meta and MiniMax, started when Lou asks (passed 2026-11-04). Pass:
   - the agent follows the workflow and asks before paid steps;
   - each Shot has a length, and Lou can change it;
   - a Shot has a second panel only where its picture changes a lot, and that panel shows the picture its description sets out, not panel 1's camera or framing;
@@ -405,7 +405,7 @@ For descriptive-only work, use editorial review and applicable existing checks. 
 
 ## Final Review
 
-- **Outcome:** the goal is met in the scripted build. Every story's ACs and verification items are met, with the deviations below. Lou's live QA, and B-041's pass condition, are still open (see QA below). Each story merged into `sprint-012` after an independent review of its final head scored at least 4/5 with no open P0/P1. The verdicts are recorded in the PR bodies:
+- **Outcome:** the goal is met in the scripted build. Every story's ACs and verification items are met, with the deviations below. Lou's live QA, including B-041's pass condition, passed on 2026-11-04 (see QA below). Each story merged into `sprint-012` after an independent review of its final head scored at least 4/5 with no open P0/P1. The verdicts are recorded in the PR bodies:
   - Story 1, #135 (Shot length): 3/5, then 4/5, then 5/5. The P1 was a length editor that copied the intent editor's save without its stale-answer and response checks; both now share `storyboard/storyboard-edit.ts`.
   - Story 2, #136 (reference images in the client and job store): 4/5, then 4/5, then 5/5.
   - Story 3, #137 (Shot videos from references): 3/5, then 5/5. The P1 was that a sheet view MiniMax refuses (too small, or outside 0.4–2.5) failed every Shot naming its subject. Such views are now left out (`videoImageFits`).
@@ -427,7 +427,7 @@ For descriptive-only work, use editorial review and applicable existing checks. 
   - the §4 storyboard PATCH includes `durationS`.
 
   generate-panel's comment and its shape refusal now say a panel is a Shot video's reference image, not its frame.
-- **QA build for Lou:** not started. A QA host starts only when Lou asks, and it makes paid Muse Spark, Meta and MiniMax calls. Its pass items are in Sprint Completion above. B-041's three manual steps are in Story 5 and PR #139.
+- **QA build for Lou:** one QA host for Sprints 012 and 013, at `423b3b8` (the `sprint-013` head after #147), started at Lou's request on 2026-11-03, with live Muse Spark, Meta and MiniMax. Lou ran Sprint Completion's pass items and B-041's three steps (Story 5) and reported "ok all pass" (2026-11-04). The pass rests on Lou's report.
 - **Deviations, recorded in the story PRs:**
   - **Story 1:** commit `9c9a8b1`'s subject is 51 characters. It is accepted because history isn't rewritten after a PR opens.
   - **Story 2:**
@@ -450,7 +450,6 @@ For descriptive-only work, use editorial review and applicable existing checks. 
     generate-image's line was reworded to match.
   - **The first push gate of Story 3** failed in the tooling group on a local `setTypeOfService EINVAL` socket error. The test passed alone afterwards. The diagnosis is recorded in `.checks/.logs/run-lkhhpgd9/diagnosis.md`, and the rerun passed.
 - **Unresolved:**
-  - Lou's QA, including B-041's pass condition;
   - the 2 moderate audit advisories (B-004, B-008);
   - read-workspace's description doesn't mention each Shot's length, though it lists it. This is minor, and left for a later touch.
 - **New Dependencies:** None.
