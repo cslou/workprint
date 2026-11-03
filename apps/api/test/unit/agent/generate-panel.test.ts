@@ -71,6 +71,13 @@ test('empty and "null" images are harmless: they name no image, and the Shot\'s 
   assert.ok(!JSON.stringify(z.toJSONSchema(tool.inputSchema)).includes('"null"'));
 });
 
+test('a panel\'s shape must suit a Shot video\'s frame: width ÷ height strictly between 0.4 and 2.5, on every call', () => {
+  for (const size of ['auto', '1536x1024', '1050x2600', '2400x1000']) assert.equal(tool.inputSchema.safeParse(input({ size })).success, true, size);
+  for (const size of ['4000x1000', '1000x2600', '1024x2560', '2500x1000']) assert.equal(tool.inputSchema.safeParse(input({ size })).success, false, size);
+  // A later panel ignores its size, but an unusable one is still refused, as its description says.
+  assert.equal(tool.inputSchema.safeParse(input({ panel: 'p2', size: '4000x1000' })).success, false);
+});
+
 test('a later panel takes the first panel\'s image first and its size; the given size is ignored', async () => {
   const first = version('p1-v1', 'image', { media: media(1536, 864) });
   const { collaborators, calls } = harness({ space: workspace({ first }) });

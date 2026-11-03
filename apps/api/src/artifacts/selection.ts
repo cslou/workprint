@@ -23,13 +23,14 @@ export function shotSequence(plan: Plan): readonly string[] {
 export function shotOrderChanged(before: Plan, after: Plan): boolean {
   return canonicalJson(shotSequence(before)) !== canonicalJson(shotSequence(after));
 }
-/** Shots whose plan changed. Every Panel of a changed Shot is revalidated, including siblings. */
+/** Shots whose plan changed: any Shot field (intent, framing, action, dialogue, camera note, references) or Panel,
+ * but not its place in the order. Every Panel of a changed Shot is revalidated, including siblings. */
 export function changedShots(before: Plan, after: Plan): ReadonlySet<string> {
   const previous = new Map((before?.shots ?? []).map(shot => [shot.shotId, shot]));
   const changed = new Set<string>();
   for (const shot of after?.shots ?? []) {
     const old = previous.get(shot.shotId);
-    const plan = (value: typeof shot) => canonicalJson({ intent: value.intent, panels: [...value.panels].sort((a, b) => a.order - b.order) });
+    const plan = (value: typeof shot) => canonicalJson({ ...value, order: undefined, panels: [...value.panels].sort((a, b) => a.order - b.order) });
     if (!old || plan(old) !== plan(shot)) changed.add(shot.shotId);
   }
   for (const shotId of previous.keys()) if (!after?.shots.some(shot => shot.shotId === shotId)) changed.add(shotId);
