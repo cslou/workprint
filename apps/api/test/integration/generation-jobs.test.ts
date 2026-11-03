@@ -65,6 +65,24 @@ test('saved video jobs move only along their closed transitions', { timeout: 120
     await assert.rejects(pool.query("INSERT INTO generation.requests(owner_id,request_id,conversation_id,purpose,prompt_sha256,status,submitted_at) VALUES($1,$2,$3,'video',repeat('a',64),'submitting',now() - interval '8 days')", [owner, randomUUID(), conversation]), { code: '42501' });
   });
 
+  await t.test('a Shot\'s job keeps its Shot through every move, and nothing can change it', async () => {
+    const plain = await jobs.begin(owner, conversation, { prompt: 'No Shot', inputs: [] });
+    assert.equal('target' in plain, false, 'a job started without a Shot has none');
+    const job = await jobs.begin(owner, conversation, { prompt: 'Shot 1', inputs: ['frame-a', 'frame-b'], target: { shotId: 'shot-1' } });
+    assert.deepEqual(job.target, { shotId: 'shot-1' });
+    await jobs.started(owner, job.id, `task-${job.id}`);
+    assert.equal((await jobs.interruptWaiting()).interrupted >= 1, true);
+    const parked = await jobs.get(owner, job.id);
+    assert.deepEqual([parked.status, parked.target], ['interrupted', { shotId: 'shot-1' }], 'the restart pass keeps the Shot');
+    assert.deepEqual((await jobs.resumed(owner, job.id)).target, { shotId: 'shot-1' }, 'a resume keeps the Shot');
+    await assert.rejects(jobs.begin(owner, conversation, { prompt: 'Bad', inputs: [], target: { shotId: '' } }), refused('invalid_input'));
+    // The Shot is part of the job's identity: neither the serving role nor the owner can move it.
+    await assert.rejects(pool.query(`UPDATE generation.requests SET target='{"shotId":"shot-2"}',revision=revision+1 WHERE request_id=$1`, [job.id]), { code: '42501' });
+    await assert.rejects(store.setup.query(`UPDATE generation.requests SET target='{"shotId":"shot-2"}',status='interrupted',revision=revision+1 WHERE request_id=$1`, [job.id]), { code: '23514' });
+    const insert = (target: string) => store.setup.query("INSERT INTO generation.requests(owner_id,request_id,conversation_id,purpose,prompt_sha256,status,target) VALUES($1,$2,$3,'video',repeat('a',64),'submitting',$4::jsonb)", [owner, randomUUID(), conversation, target]);
+    for (const target of ['{"shotId":""}', '{"shotId":1}', '{"shotId":"a","panelId":"b"}', '"shot-1"', '[]']) await assert.rejects(insert(target), { code: '23514' }, target);
+  });
+
   await t.test('a certainly refused or unknown create fails the submitting job with its reason', async () => {
     for (const reason of ['invalid_input', 'provider_error', 'outcome_unknown'] as const) {
       const job = await jobs.begin(owner, conversation, { prompt: 'Refused', inputs: [] });

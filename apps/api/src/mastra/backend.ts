@@ -137,7 +137,7 @@ export async function createBackend(routes: ApiRoute[] = [], turns?: TurnComposi
       ...(objects && verifyMedia ? { panelImages: createAssistantPanelImages(createPanelImages(pool, application.checkOwnedConversation, { storage: objects, verifyMedia })) } : {}),
       ...(turns.images && objects && verifyMedia ? { images: turns.images } : {}),
       ...(turns.videos && objects && verifyMedia ? { videos: createVideoJobs({
-        jobs, client: turns.videos, readImageInputs, saveVideo: createGeneratedVideoSaver(clips.save, jobs), ...(turns.videoTiming ? { timing: turns.videoTiming } : {}),
+        jobs, client: turns.videos, readImageInputs, saveVideo: createGeneratedVideoSaver(clips.save, jobs), shotRoom: clips.hasShotRoom, ...(turns.videoTiming ? { timing: turns.videoTiming } : {}),
       }) } : {}),
     };
     bindNativeTurns(mastra, { model: turns.model, tools, limits: turns.limits ?? turnLimits, collaborators });

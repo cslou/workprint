@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { idSchema, MAX_UPLOAD_IMAGE_BYTES, useSchema, type Version } from '@workprint/contracts';
 import { transaction } from '../db/index.js';
 import type { PrivateObjectStorage } from '../storage/index.js';
-import { digest, requireUseRoom, withStoredObjects } from './generated-media.js';
+import { digest, requireOwnedConversation, requireUseRoom, withStoredObjects } from './generated-media.js';
 import { protectedMediaObjects } from './media-objects.js';
 import { lockPublicationOwner, publishVersion } from './publication.js';
 import { scriptSubjectsNow } from './script-reads.js';
@@ -72,13 +72,6 @@ export async function publishImage(client: PoolClient, account: string, conversa
   if (version.kind !== 'image') throw new UploadError('integration_failure');
   await recordImageObject(client, account, version.id, image);
   return version;
-}
-
-/** The run's own account and video, as ids, owned: a foreign or unknown video is `not_found`. */
-export async function requireOwnedConversation(checkOwnedConversation: OwnedCheck, account: string, conversation: string): Promise<void> {
-  if (!idSchema.safeParse(account).success || !idSchema.safeParse(conversation).success) throw new UploadError('invalid_input');
-  const owned = await checkOwnedConversation(account, conversation);
-  if (owned.kind !== 'owned') throw new UploadError(owned.kind === 'not_found' ? 'not_found' : 'integration_failure');
 }
 
 /** Keeps an assistant-made image: `within` runs inside its save's transaction, after the owner lock, with the checked image. */

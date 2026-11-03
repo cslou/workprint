@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { setTimeout as wait } from 'node:timers/promises';
 import { Pool } from 'pg';
-import { createArtifactStore, createArtifactWriters, createAssistantReferences, createAssistantScripts, createAssistantStoryboards, createGeneratedImages, createVersionUses, panelArtifactId } from '../../src/artifacts/index.js';
+import { createArtifactStore, createArtifactWriters, createAssistantReferences, createAssistantScripts, createAssistantStoryboards, createGeneratedImages, createVersionUses, panelArtifactId, shotArtifactId } from '../../src/artifacts/index.js';
 import { createAssistantScriptSaver, createAssistantSheets, createAssistantStoryboardSaver } from '../../src/application/index.js';
 import { createOwnedConversationCheck } from '../../src/agent/index.js';
 import { createGenerationJobs } from '../../src/generation/index.js';
@@ -497,7 +497,7 @@ test('generate-image on a server that can\'t save images refuses before any call
   assert.deepEqual(turn.chunks.filter(chunk => chunk.type === 'tool-activity').at(-1)?.payload?.summary, 'Not made: images can’t be saved on this server');
 });
 
-type VideoResult = { made: true; jobId: string; showInChat: boolean; video: { versionId: string; label: string; width: number; height: number; durationS: number } }
+type VideoResult = { made: true; jobId: string; showInChat: boolean; gone?: true; video: { versionId: string; label: string; width: number; height: number; durationS: number } }
   | { made: false; reason: string; message: string; jobId?: string };
 type Job = { request_id: string; status: string; task_id: string | null; failure_reason: string | null; result_version_id: string | null; inputs: string[] };
 
@@ -740,6 +740,234 @@ test('generate-video makes one MiniMax video, waits for it and saves it as the v
     const [job] = await settled(watched, 'succeeded');
     assert.equal((await clips(owner, watched))[0]?.version.id, job!.result_version_id);
     await until(() => historyLines(owner, watched), saved => saved.length === 1 && saved[0]![1] === 'Saved Video 1 · Version 1', 'the saved line');
+  });
+
+  // generate-shot: a storyboard Shot's video from its panels' images and its text.
+  const check = createOwnedConversationCheck(fixture.native), uses = createVersionUses(pool, check);
+  const saveScript = createAssistantScriptSaver(createAssistantScripts(pool, check).save);
+  const saveBoard = createAssistantStoryboardSaver(createAssistantStoryboards(pool, check).save);
+  const pngs = [3, 4, 5].map(seed => testPng({ width: 320, height: 256, seed }));
+  const frameOf = (png: Buffer, role: string) => ({ type: 'image_url', image_url: { url: `data:image/png;base64,${png.toString('base64')}` }, role });
+  const createBody = () => minimax.requests[0]!.body as { content: { type: string; text?: string }[] };
+  /** Images made with generate-image in one turn, in order. */
+  const stills = async (video: string, made: Buffer[]) => {
+    meta.reset(); meta.script({ images: made });
+    provider.reset();
+    provider.script({ toolCalls: [{ name: 'generate-image', args: { prompt: 'Stills', count: made.length } }] }, { text: ['Made'] });
+    assert.ok(completed(await client(owner).turn(video, 'Make the stills')));
+    return (await store.workspace(owner.id, video)).assets.slice(-made.length).map(asset => asset.version.id);
+  };
+  const choosePanel = (video: string, versionId: string, shotId: string, panelId: string) => uses.useVersion(owner.id, video, { operationId: randomUUID(), versionId, purpose: 'panel_image', shotId, panelId });
+  const shotUses = async (video: string, shotId: string) => (await pool.query<{ use_id: string; version_id: string; state: string }>(
+    'SELECT use_id,version_id,state FROM artifacts.conversation_uses WHERE conversation_id=$1 AND binding=$2::jsonb ORDER BY created_at,use_id', [video, { purpose: 'shot_video', shotId }])).rows;
+  const useCount = async (video: string) => (await pool.query<{ count: number }>('SELECT count(*)::int AS count FROM artifacts.conversation_uses WHERE conversation_id=$1', [video])).rows[0]!.count;
+  const targetOf = async (jobId: string) => (await pool.query<{ target: unknown }>('SELECT target FROM generation.requests WHERE request_id=$1', [jobId])).rows[0]?.target;
+  const opening = { intent: 'Mara arrives.', action: 'Mara turns to the door.', cameraNote: 'Low angle, locked off.',
+    dialogue: [{ character: 'Mara', text: 'You came.' }, { character: 'Narrator', text: 'Years passed.', delivery: 'voice_over' as const }, { character: 'Mara', text: 'I knew you would.', delivery: 'voice_over' as const }] };
+  const openingText = 'Mara turns to the door.\n\nLow angle, locked off.\n\nMara says: "You came."\nNarrated in voice-over: "Years passed."\nMara, in voice-over, says: "I knew you would."';
+  /**
+   * A video whose storyboard has a two-panel Shot with an action, a camera note and dialogue, then a one-panel Shot with
+   * none. The first `framed` panels, in that order, have a person's image as their current image.
+   */
+  const shotBoard = async (framed = 3) => {
+    const video = await client(owner).newVideo();
+    const content = { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'The Gallery', time: 'night' }, characters: ['Mara'], script: [{ action: 'Mara waits.' }, { dialogue: { character: 'Mara', text: 'You came.' } }] }] };
+    assert.equal((await saveScript(owner.id, video, { baseVersionId: null, content, subjects: [{ id: '', kind: 'character', name: 'Mara' }] })).kind, 'saved');
+    const board = await saveBoard(owner.id, video, { baseVersionId: null, shots: [
+      { shotId: '', ...opening, panels: [{ panelId: '', description: 'Mara at the desk.' }, { panelId: '', description: 'Mara at the door.' }] },
+      { shotId: '', intent: 'The lights go out.', panels: [{ panelId: '', description: 'Darkness.' }] },
+    ] });
+    assert.ok(board.kind === 'saved', JSON.stringify(board));
+    const [first, last] = (await store.workspace(owner.id, video)).storyboard.shots;
+    const panels = [[first!.shotId, first!.panels[0]!.panelId], [first!.shotId, first!.panels[1]!.panelId], [last!.shotId, last!.panels[0]!.panelId]] as const;
+    const images = await stills(video, pngs);
+    for (const [index, [shotId, panelId]] of panels.slice(0, framed).entries()) await choosePanel(video, images[index]!, shotId, panelId);
+    return { video, board: board.versionId, opening: first!.shotId, closing: last!.shotId, closingPanel: last!.panels[0]!.panelId, images };
+  };
+  type ShotResult = VideoResult | { made: false; reason: string; summary: string; message: string };
+  /** Starts a turn that calls generate-shot, and resolves its run id once accepted. */
+  const shooting = (user: { id: string }, video: string, args: Record<string, unknown>) => {
+    provider.reset();
+    provider.script({ toolCalls: [{ name: 'generate-shot', args }] }, { text: ['Done'] });
+    let accept!: (id: string) => void;
+    const accepted = new Promise<string>(resolve => { accept = resolve; });
+    return { accepted, turn: client(user).turn(video, 'Make the Shot\'s video', 60000, id => accept(id)) };
+  };
+  const shotLine = (turn: ObservedTurn) => turn.chunks.filter(chunk => chunk.type === 'tool-activity' && chunk.payload?.tool === 'generate-shot').at(-1)?.payload;
+  /** One completed generate-shot turn: what the tool gave the model, its done line and the media under it. */
+  const shoot = async (user: { id: string }, video: string, args: Record<string, unknown>) => {
+    const turn = await shooting(user, video, args).turn;
+    assert.ok(completed(turn), JSON.stringify(turn.terminal));
+    const line = shotLine(turn);
+    return { result: toolResult() as unknown as ShotResult, summary: line?.summary, media: line?.media };
+  };
+  // A person's use of an image on a panel no storyboard has: it counts toward the cap, and nothing shows it.
+  const fillers: string[] = [];
+  const fill = async (video: string, versionId: string, count: number) => {
+    for (let index = 0; index < count; index++) {
+      const id = randomUUID(); fillers.push(id);
+      await pool.query("INSERT INTO artifacts.conversation_uses(owner_id,conversation_id,use_id,version_id,binding,purpose,state) VALUES($1,$2,$3,$4,$5,'panel_image','approved')", [owner.id, video, id, versionId, { purpose: 'panel_image', shotId: randomUUID(), panelId: randomUUID() }]);
+    }
+  };
+  const unfill = async () => { await setup.query('DELETE FROM artifacts.conversation_uses WHERE use_id=$1', [fillers.pop()]); };
+
+  await t.test('generate-shot sends a Shot\'s panels as its frames and its text before the motion, and saves the clip as the Shot\'s own draft video', async () => {
+    const p = await shotBoard();
+    const one = await shoot(owner, p.video, { shot: p.opening, prompt: 'A slow push-in.' });
+    assert.ok(one.result.made, JSON.stringify(one.result));
+    assert.equal(minimax.creates, 1);
+    assert.deepEqual(createBody().content, [{ type: 'text', text: `${openingText}\n\nA slow push-in.` }, frameOf(pngs[0]!, 'first_frame'), frameOf(pngs[1]!, 'last_frame')]);
+    const v1 = await store.version(owner.id, one.result.video.versionId);
+    assert.deepEqual([v1.artifactId, v1.revision, v1.createdBy, v1.dependencies], [shotArtifactId(p.video, p.opening), 1, 'assistant', p.images.slice(0, 2)]);
+    assert.deepEqual((await shotUses(p.video, p.opening)).map(row => [row.version_id, row.state]), [[v1.id, 'draft']]);
+    const [job] = await jobs(p.video);
+    assert.deepEqual([job!.status, await targetOf(job!.request_id)], ['succeeded', { shotId: p.opening }]);
+    const space = await store.workspace(owner.id, p.video);
+    assert.deepEqual([space.generatedVideos, space.storyboard.shots[0]!.candidateVideoVersions?.map(version => version.id), space.storyboard.shots[0]!.chosenVideoVersionId], [[], [v1.id], null], 'it is the Shot\'s draft, not a Generated video');
+    assert.deepEqual([one.summary, one.media], ['Saved Shot 1 · Video · Version 1', [{ kind: 'video', versionId: v1.id }]]);
+
+    // The next call is version 2 of the same video, and moves the same draft use.
+    const [before] = await shotUses(p.video, p.opening);
+    minimax.reset();
+    const two = await shoot(owner, p.video, { shot: p.opening, prompt: 'A slow push-in.' });
+    assert.ok(two.result.made);
+    assert.deepEqual([(await store.version(owner.id, two.result.video.versionId)).revision, two.summary], [2, 'Saved Shot 1 · Video · Version 2']);
+    assert.deepEqual((await shotUses(p.video, p.opening)).map(row => [row.use_id, row.version_id, row.state]), [[before!.use_id, two.result.video.versionId, 'draft']]);
+
+    // A one-panel Shot sends only a first frame, and a Shot with no dialogue says no one speaks.
+    minimax.reset();
+    const lone = await shoot(owner, p.video, { shot: p.closing, prompt: 'The room goes dark.', durationS: 4 });
+    assert.ok(lone.result.made, JSON.stringify(lone.result));
+    assert.deepEqual(createBody().content, [{ type: 'text', text: 'The lights go out.\n\nNo one speaks.\n\nThe room goes dark.' }, frameOf(pngs[2]!, 'first_frame')]);
+    assert.equal((minimax.requests[0]!.body as { duration: number }).duration, 4);
+    assert.equal(lone.summary, 'Saved Shot 2 · Video · Version 1');
+  });
+
+  await t.test('a Shot without its panels\' images, too long a text, or another video\'s Shot sends nothing and saves no job', async () => {
+    const unmade = await shotBoard(1);
+    for (const shot of [unmade.opening, unmade.closing]) {
+      const refused = await shoot(owner, unmade.video, { shot, prompt: 'A slow push-in.' });
+      assert.deepEqual([refused.result.made, refused.summary], [false, 'Not made: make the Shot’s panels first']);
+    }
+    const p = await shotBoard();
+    const long = await shoot(owner, p.video, { shot: p.opening, prompt: 'x'.repeat(6900) });
+    assert.deepEqual([long.result.made, long.summary], [false, 'Not made: the Shot’s text is too long for the video prompt']);
+    // Another account's video, another of the owner's own videos, and an unknown Shot.
+    const elsewhere = await client(owner).newVideo();
+    for (const [user, video, shot] of [[other, await client(other).newVideo(), p.opening], [owner, elsewhere, p.opening], [owner, p.video, randomUUID()]] as const) {
+      const away = await shoot(user, video, { shot, prompt: 'A slow push-in.' });
+      assert.deepEqual([away.result.made, away.summary], [false, 'Not made: that Shot wasn’t found']);
+    }
+    assert.deepEqual([minimax.requests, await jobs(unmade.video), await jobs(p.video), await jobs(elsewhere)], [[], [], [], []]);
+  });
+
+  await t.test('a Shot job stopped or past its poll deadline keeps its Shot, and generate-video\'s resume saves it there with one create', async () => {
+    const p = await shotBoard();
+    const gate = released();
+    minimax.script.query({ task: 'running', after: gate.promise });
+    const { accepted, turn } = shooting(owner, p.video, { shot: p.opening, prompt: 'A slow push-in.' });
+    const runId = await accepted;
+    await until(async () => queried(), count => count === 1, 'the first poll');
+    assert.equal((await stop(owner, p.video, runId)).status, 200);
+    await turn;
+    gate.release();
+    const [job] = await settled(p.video, 'interrupted');
+    assert.deepEqual(await targetOf(job!.request_id), { shotId: p.opening });
+    const resumed = await generate(owner, p.video, { resume: job!.request_id });
+    assert.ok(resumed.result.made, JSON.stringify(resumed.result));
+    assert.deepEqual([minimax.creates, resumed.lines.at(-1)?.[2]], [1, 'Saved Shot 1 · Video · Version 1']);
+    assert.deepEqual((await shotUses(p.video, p.opening)).map(row => [row.version_id, row.state]), [[resumed.result.video.versionId, 'draft']]);
+
+    const late = await shotBoard();
+    minimax.reset();
+    minimax.script.query(...Array.from({ length: 200 }, () => ({ task: 'running' as const })));
+    const waited = await shoot(owner, late.video, { shot: late.closing, prompt: 'The room goes dark.' });
+    assert.ok(!waited.result.made && waited.result.reason === 'stopped', JSON.stringify(waited.result));
+    const [parked] = await jobs(late.video);
+    assert.deepEqual([parked!.status, await targetOf(parked!.request_id)], ['interrupted', { shotId: late.closing }]);
+    minimax.reset();
+    minimax.script.query({ task: 'succeeded' });
+    const done = await generate(owner, late.video, { resume: parked!.request_id });
+    assert.deepEqual([done.result.made, minimax.creates, done.lines.at(-1)?.[2]], [true, 0, 'Saved Shot 2 · Video · Version 1']);
+  });
+
+  await t.test('a Shot dropped while its clip is made is saved as a generated video, with its frames as dependencies', async () => {
+    const p = await shotBoard();
+    const gate = released();
+    minimax.script.query({ task: 'running', after: gate.promise });
+    const { turn } = shooting(owner, p.video, { shot: p.opening, prompt: 'A slow push-in.' });
+    await until(async () => queried(), count => count === 1, 'the first poll');
+    const dropped = await saveBoard(owner.id, p.video, { baseVersionId: p.board, shots: [{ shotId: p.closing, intent: 'The lights go out.', panels: [{ panelId: p.closingPanel, description: 'Darkness.' }] }] });
+    assert.equal(dropped.kind, 'saved', JSON.stringify(dropped));
+    gate.release();
+    const observed = await turn;
+    assert.ok(completed(observed), JSON.stringify(observed.terminal));
+    assert.equal(shotLine(observed)?.summary, 'Saved Video 1 · Version 1 (its Shot is gone)');
+    const [clip] = await clips(owner, p.video);
+    assert.deepEqual([clip?.state, clip?.version.dependencies, clip?.version.artifactId === shotArtifactId(p.video, p.opening)], ['Draft', p.images.slice(0, 2), false]);
+    assert.equal((await pool.query('SELECT 1 FROM artifacts.versions WHERE artifact_id=$1', [shotArtifactId(p.video, p.opening)])).rowCount, 0);
+    assert.deepEqual(await shotUses(p.video, p.opening), []);
+  });
+
+  await t.test('a person\'s Shot with three panels and no action sends its first and last panels and its intent', async () => {
+    const video = await client(owner).newVideo();
+    const images = await stills(video, pngs);
+    const script = { schemaVersion: 1, scenes: [{ heading: { setting: 'interior', location: 'The Gallery', time: 'night' }, characters: ['Mara'], script: [{ action: 'Mara crosses the room.' }] }] };
+    const source = await store.insert({ accountId: owner.id, conversationId: video, kind: 'script', content: script, createdBy: 'human', dependencies: [], use: { binding: { purpose: 'script' }, state: 'approved' } });
+    const panels = [['p3', 2], ['p1', 0], ['p2', 1]] as const;
+    await store.insert({ accountId: owner.id, conversationId: video, kind: 'storyboard', createdBy: 'human', dependencies: [source.id], use: { binding: { purpose: 'storyboard' }, state: 'approved' },
+      content: { schemaVersion: 1, sourceScriptVersionId: source.id, shots: [{ shotId: 's1', order: 0, intent: 'Mara crosses the room.', panels: panels.map(([panelId, order]) => ({ panelId, order, description: panelId, references: [] })) }] } });
+    for (const [index, panelId] of ['p1', 'p2', 'p3'].entries()) await choosePanel(video, images[index]!, 's1', panelId);
+    const made = await shoot(owner, video, { shot: 's1', prompt: 'Track with her.' });
+    assert.ok(made.result.made, JSON.stringify(made.result));
+    assert.deepEqual(createBody().content, [{ type: 'text', text: 'Mara crosses the room.\n\nNo one speaks.\n\nTrack with her.' }, frameOf(pngs[0]!, 'first_frame'), frameOf(pngs[2]!, 'last_frame')]);
+  });
+
+  await t.test('the use cap: a Shot\'s first video is refused before any create, a draft is still moved, and a use taken while it is made leaves the job resumable', async () => {
+    const p = await shotBoard();
+    assert.ok((await shoot(owner, p.video, { shot: p.opening, prompt: 'A slow push-in.' })).result.made);
+    await fill(p.video, p.images[0]!, 100 - await useCount(p.video));
+    minimax.reset();
+    const refused = await shoot(owner, p.video, { shot: p.closing, prompt: 'The room goes dark.' });
+    assert.deepEqual([refused.result.made, refused.summary, minimax.creates, (await jobs(p.video)).length], [false, 'Not made: this video has too many saved items', 0, 1]);
+    const moved = await shoot(owner, p.video, { shot: p.opening, prompt: 'A slow push-in.' });
+    assert.ok(moved.result.made, JSON.stringify(moved.result));
+    assert.deepEqual([moved.summary, await useCount(p.video)], ['Saved Shot 1 · Video · Version 2', 100]);
+
+    // With room for one use, the last is taken while MiniMax holds the poll: the clip waits with its job.
+    await unfill();
+    minimax.reset();
+    const gate = released();
+    minimax.script.query({ task: 'running', after: gate.promise });
+    const { turn } = shooting(owner, p.video, { shot: p.closing, prompt: 'The room goes dark.' });
+    await until(async () => queried(), count => count === 1, 'the first poll');
+    await fill(p.video, p.images[0]!, 1);
+    gate.release();
+    const observed = await turn;
+    assert.ok(completed(observed), JSON.stringify(observed.terminal));
+    assert.equal(shotLine(observed)?.summary, 'Not saved yet: this video has too many saved items');
+    const parked = (await jobs(p.video)).at(-1)!;
+    assert.deepEqual([parked.status, await targetOf(parked.request_id), await shotUses(p.video, p.closing), await useCount(p.video)], ['interrupted', { shotId: p.closing }, [], 100]);
+    await unfill();
+    const resumed = await generate(owner, p.video, { resume: parked.request_id });
+    assert.deepEqual([resumed.result.made, resumed.lines.at(-1)?.[2]], [true, 'Saved Shot 2 · Video · Version 1']);
+    while (fillers.length) await unfill();
+  });
+
+  await t.test('a Generated video a person Used on a Shot is never versioned: the next generate-shot is version 1 of the Shot\'s own video', async () => {
+    const p = await shotBoard();
+    const made = await generate(owner, p.video, { prompt: 'A quiet gallery bench' });
+    assert.ok(made.result.made, JSON.stringify(made.result));
+    const clip = made.result.video.versionId;
+    await uses.useVersion(owner.id, p.video, { operationId: randomUUID(), versionId: clip, purpose: 'shot_video', shotId: p.opening });
+    minimax.reset();
+    const shot = await shoot(owner, p.video, { shot: p.opening, prompt: 'A slow push-in.' });
+    assert.ok(shot.result.made, JSON.stringify(shot.result));
+    const version = await store.version(owner.id, shot.result.video.versionId), person = await store.version(owner.id, clip);
+    assert.deepEqual([version.artifactId, version.revision], [shotArtifactId(p.video, p.opening), 1]);
+    assert.equal((await pool.query('SELECT 1 FROM artifacts.versions WHERE artifact_id=$1', [person.artifactId])).rowCount, 1, 'the Generated video has no new version');
+    assert.deepEqual((await shotUses(p.video, p.opening)).map(row => [row.version_id, row.state]), [[clip, 'approved'], [version.id, 'draft']]);
+    assert.equal((await store.workspace(owner.id, p.video)).storyboard.shots[0]!.chosenVideoVersionId, clip, 'the person\'s choice stays chosen');
   });
 
   // Last: this restarts the server.
