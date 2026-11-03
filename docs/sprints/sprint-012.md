@@ -7,7 +7,7 @@
 - A Shot has a second panel only when its picture changes a lot, for example when the camera moves from one part of the room to another.
 - A person sees and can change a Shot's length in "View storyboard".
 
-**Status:** 🟡 Planned; Lou approved the plan on 2026-11-03. Not started.
+**Status:** 🟡 Implemented; Sprint Completion passed on the combined branch (2026-11-03). Waiting on Lou's QA and his merge command.
 
 ---
 
@@ -150,26 +150,26 @@ At sprint completion, run the applicable regression suite on the combined sprint
 - **As a** user, **I want** each Shot to carry how long it runs, set by the agent and changeable by me, **so that** its video is made at a length that fits its action and lines.
 - **Dependencies:** None
 - **Acceptance criteria:**
-  - [ ] **The field.** `shotFields` gains `durationS`, an optional whole number from 4 to 15. Saved storyboards without it stay valid. read-workspace's storyboard listing shows it per Shot when present (`agent/workspace-entries.ts`).
-  - [ ] **The agent sets it.** save-storyboard's Shot input requires `durationS` (a whole number, 4–15) and saves it on every Shot it writes. An agent save sets what it sends, as it does for every other Shot field, so a person's length is kept only when the agent sends it back. The description says so: read-workspace shows each Shot's current length, and the agent keeps a person's length unless asked to change it.
+  - [x] **The field.** `shotFields` gains `durationS`, an optional whole number from 4 to 15. Saved storyboards without it stay valid. read-workspace's storyboard listing shows it per Shot when present (`agent/workspace-entries.ts`).
+  - [x] **The agent sets it.** save-storyboard's Shot input requires `durationS` (a whole number, 4–15) and saves it on every Shot it writes. An agent save sets what it sends, as it does for every other Shot field, so a person's length is kept only when the agent sends it back. The description says so: read-workspace shows each Shot's current length, and the agent keeps a person's length unless asked to change it.
     - The description says how to choose it: about 2.5 spoken words per second of dialogue, plus the time the action needs, with a beat of silence at each end, rounded up to a whole second.
     - Like the other Shot fields, it is threaded through `AssistantShotInput` and `plannedShots` (`artifacts/assistant-storyboards.ts`).
-  - [ ] **A person changes it.**
+  - [x] **A person changes it.**
     - "View storyboard" shows "Length · 6 s" beside the Shot intent, or "Length · not set" for a Shot without one (an older or built-in storyboard). An Edit control opens a number field from 4 to 15 with Cancel and Save, using the same editor states as the intent.
     - Saving is a person's storyboard edit: `storyboardEditSchema` and `editedPlan` accept `durationS`. Every other Shot field is kept.
     - A value outside 4–15, or not a whole number, is refused in the field, with nothing saved.
-  - [ ] **The Storyboard tab's summary** reads "medium · 6 s · 2 panels" when the Shot has a length. A Shot without one shows no length.
-  - [ ] **generate-shot uses the Shot's length.** Its `durationS` input is removed, and the job's duration is the Shot's `durationS`, or 6 when the Shot has none. The tool description says the length comes from the storyboard and the person can change it.
+  - [x] **The Storyboard tab's summary** reads "medium · 6 s · 2 panels" when the Shot has a length. A Shot without one shows no length.
+  - [x] **generate-shot uses the Shot's length.** Its `durationS` input is removed, and the job's duration is the Shot's `durationS`, or 6 when the Shot has none. The tool description says the length comes from the storyboard and the person can change it.
 - **Functional verification:**
-  - [ ] Unit (`save-storyboard.test.ts`, and a contracts case for `shotFields` and `storyboardEditSchema`): `durationS` 4 and 15 pass; 3, 16, 6.5 and (in the tool schema) a missing value fail; an old saved storyboard without it parses. Pass: each case as stated.
-  - [ ] Unit (`read-workspace.test.ts`): a Shot with `durationS: 8` is listed with 8; a Shot without one lists no length.
-  - [ ] Unit (`generate-shot.test.ts`, `application/shots.test.ts`): a Shot with `durationS: 9` starts a job with `durationS: 9`; one without starts with 6; the tool's schema no longer accepts `durationS`.
-  - [ ] Integration (`tool-activity.test.ts`, the save-storyboard block): a saved Shot keeps `durationS`. A person's edit of only the length keeps the agent's action, dialogue and references. A later agent save that sends the person's 8 keeps 8.
-  - [ ] Integration (`storyboard-revisions.test.ts`): a person's length edit to 8 changes only that Shot's `durationS`; one with 16 is refused and the storyboard version is unchanged.
-  - [ ] E2E (`shots.spec.ts` journey): the board shows "Length · 6 s". Editing it to 8 and saving shows "8 s" in the tab's summary, before and after a reload. The Shot video choice test's storyboard (no length) shows "Length · not set".
+  - [x] Unit (`save-storyboard.test.ts`, and a contracts case for `shotFields` and `storyboardEditSchema`): `durationS` 4 and 15 pass; 3, 16, 6.5 and (in the tool schema) a missing value fail; an old saved storyboard without it parses. Pass: each case as stated.
+  - [x] Unit (`read-workspace.test.ts`): a Shot with `durationS: 8` is listed with 8; a Shot without one lists no length.
+  - [x] Unit (`generate-shot.test.ts`, `application/shots.test.ts`): a Shot with `durationS: 9` starts a job with `durationS: 9`; one without starts with 6; the tool's schema no longer accepts `durationS`.
+  - [x] Integration (`tool-activity.test.ts`, the save-storyboard block): a saved Shot keeps `durationS`. A person's edit of only the length keeps the agent's action, dialogue and references. A later agent save that sends the person's 8 keeps 8.
+  - [x] Integration (`storyboard-revisions.test.ts`): a person's length edit to 8 changes only that Shot's `durationS`; one with 16 is refused and the storyboard version is unchanged.
+  - [x] E2E (`shots.spec.ts` journey): the board shows "Length · 6 s". Editing it to 8 and saving shows "8 s" in the tab's summary, before and after a reload. The Shot video choice test's storyboard (no length) shows "Length · not set".
 - **Regression verification:**
-  - [ ] The existing Story 6 journey and planning-edit tests: intent and panel description edits still save. Pass: `shots.spec.ts` and `saves.spec.ts` green.
-  - [ ] read-workspace's budget cases (`read-workspace.test.ts`) still fit 16 KiB with the new field on 100 Shots.
+  - [x] The existing Story 6 journey and planning-edit tests: intent and panel description edits still save. Pass: `shots.spec.ts` and `saves.spec.ts` green.
+  - [x] read-workspace's budget cases (`read-workspace.test.ts`) still fit 16 KiB with the new field on 100 Shots.
 - **Editorial/design verification:** `docs/design/design.md` Storyboard board and Storyboard shots: the length line, its editor and the summary's length, reviewed against the existing editor rules (Cancel then Save, plain feedback). Spec §8.3 (the Shot's length, save-storyboard) and §8.5 (a person edits it).
 - **Manual-only behavior verification:** N/A
 - **Planned commits:**
@@ -195,28 +195,28 @@ At sprint completion, run the applicable regression suite on the combined sprint
 - **As a** maintainer, **I want** the video client and job store to carry up to 9 reference images, **so that** a Shot's video can be made from its subjects and panels instead of two fixed frames.
 - **Dependencies:** None
 - **Acceptance criteria:**
-  - [ ] **Client.** `VideoRequest` (`generation/minimax-video.ts`) gains `referenceImages`: 1–9 images. (Named apart from a Shot's `references`, which are subjects.)
+  - [x] **Client.** `VideoRequest` (`generation/minimax-video.ts`) gains `referenceImages`: 1–9 images. (Named apart from a Shot's `references`, which are subjects.)
     - `requestBody` sends each as `{type: 'image_url', image_url: {url}, role: 'reference_image'}`, after the text item and in the given order, with the requested `ratio`.
     - `referenceImages` together with `firstFrame` or `lastFrame` is `invalid_request` (`detail: 'referenceImages'`). So are more than 9.
     - Each reference passes `checkFrame`'s limits, and the whole body stays at or under 64 MiB.
     - `validateVideoRequest` applies the same checks.
-  - [ ] **Job store.**
+  - [x] **Job store.**
     - A new migration lets `generation.requests.inputs` hold up to 9 ids (MiniMax's reference limit), replacing the `<= 2` check. Inputs stay frozen after insert.
     - `generation/jobs.ts` accepts up to 9 inputs.
     - `artifacts/generated-videos.ts` accepts up to 9 input ids, which become the clip's dependencies.
-  - [ ] **Job runner.** `NewVideo` gains `referenceImageIds` (version ids), exclusive with `firstFrame` / `lastFrame`.
+  - [x] **Job runner.** `NewVideo` gains `referenceImageIds` (version ids), exclusive with `firstFrame` / `lastFrame`.
     - `video-jobs.ts` `start` reads them with `readImageInputs`, stores them as the job's `inputs`, builds the request with `referenceImages` and the ratio, and saves the clip with them as dependencies.
     - A duplicate id is refused before anything is read.
     - Stop, restart and resume keep the references, as they keep frames today.
-  - [ ] **Live script.** `pnpm live:video` gains `--references <png>…`. It is dry by default, against the loopback fake, and makes a paid call only with `--live`.
+  - [x] **Live script.** `pnpm live:video` gains `--references <png>…`. It is dry by default, against the loopback fake, and makes a paid call only with `--live`.
 - **Functional verification:**
-  - [ ] Unit (`minimax-video.test.ts`): the body has the text item, then 3 `reference_image` items in order, with `ratio: '16:9'`. Each of these is `invalid_request` with no request sent, through both `create` and `validateVideoRequest`: mixed frames and references, 10 references, one 200 px reference, one reference with aspect 3.0, and an oversize body.
-  - [ ] Unit (`video-jobs` cases in `apps/api/test/unit/application/`): a duplicate reference image id, and reference images with `firstFrame`, are refused before any image read or job row.
-  - [ ] Integration (`generation-jobs.test.ts`): a job with 9 inputs is stored and survives a restart with the same inputs; 10 is refused by the database check. An UPDATE of a 9-input row's `inputs` is still rejected. The finished clip's dependencies are those 9 versions.
-  - [ ] `pnpm live:video --references …` in dry mode reports `"mode": "dry", "pass": true`. Log under `outputs/verification/sprint-012/story-2/`.
+  - [x] Unit (`minimax-video.test.ts`): the body has the text item, then 3 `reference_image` items in order, with `ratio: '16:9'`. Each of these is `invalid_request` with no request sent, through both `create` and `validateVideoRequest`: mixed frames and references, 10 references, one 200 px reference, one reference with aspect 3.0, and an oversize body.
+  - [x] Unit (`video-jobs` cases in `apps/api/test/unit/application/`): a duplicate reference image id, and reference images with `firstFrame`, are refused before any image read or job row.
+  - [x] Integration (`generation-jobs.test.ts`): a job with 9 inputs is stored and survives a restart with the same inputs; 10 is refused by the database check. An UPDATE of a 9-input row's `inputs` is still rejected. The finished clip's dependencies are those 9 versions.
+  - [x] `pnpm live:video --references …` in dry mode reports `"mode": "dry", "pass": true`. Log under `outputs/verification/sprint-012/story-2/`.
 - **Regression verification:**
-  - [ ] generate-video with frames and without: same bodies as today (the existing `minimax-video.test.ts` and `generate-video` cases).
-  - [ ] Sprint 011 Shot jobs with 2 frames still restart and resume (`generation-jobs.test.ts`).
+  - [x] generate-video with frames and without: same bodies as today (the existing `minimax-video.test.ts` and `generate-video` cases).
+  - [x] Sprint 011 Shot jobs with 2 frames still restart and resume (`generation-jobs.test.ts`).
 - **Editorial/design verification:** N/A. No UI.
 - **Manual-only behavior verification:** N/A
 - **Planned commits:**
@@ -242,14 +242,14 @@ At sprint completion, run the applicable regression suite on the combined sprint
 - **As a** user, **I want** each Shot's video made from its subjects' sheets and its panels, **so that** the people, places and objects stay the same while the Shot moves freely, at 16:9.
 - **Dependencies:** Stories 1 and 2
 - **Acceptance criteria:**
-  - [ ] **`makeShot` picks the references** by the sprint's rule:
+  - [x] **`makeShot` picks the references** by the sprint's rule:
     - each named subject's first sheet view, up to 9 minus the panels sent;
     - then the first panel's current image, and the last panel's when there is more than one;
     - then second views, in subject order, while room remains;
     - at most 9 in all, no image twice; a subject without a sheet adds nothing.
     
     It starts the job with `referenceImageIds`, `ratio: '16:9'` and the Shot's length. It no longer sends frames.
-  - [ ] **`shotVideoPrompt` writes, in order:**
+  - [x] **`shotVideoPrompt` writes, in order:**
     - one "Image N: …" line per reference, as the sprint's labels say (descriptions cut to 300 characters);
     - the action (or intent);
     - the camera note;
@@ -264,10 +264,10 @@ At sprint completion, run the applicable regression suite on the combined sprint
     - then "The action completes within the Shot, and it ends on a settled moment."
     
     Over 7,000 characters is `too_long`, as today.
-  - [ ] **generate-shot.** The description says the video is made from the Shot's sheets and panels, with the Shot's text and length. Refusal and invalid messages point to panels and sheets, not frames (`agent/tools/generate-shot/index.ts`, `video-shared.ts`). generate-video's frame text is unchanged.
-  - [ ] **The clip** is saved to the Shot as today, with its references as dependencies.
+  - [x] **generate-shot.** The description says the video is made from the Shot's sheets and panels, with the Shot's text and length. Refusal and invalid messages point to panels and sheets, not frames (`agent/tools/generate-shot/index.ts`, `video-shared.ts`). generate-video's frame text is unchanged.
+  - [x] **The clip** is saved to the Shot as today, with its references as dependencies.
 - **Functional verification:**
-  - [ ] Unit (`application/shots.test.ts`):
+  - [x] Unit (`application/shots.test.ts`):
     - A Shot naming Mara and the gallery, with 1 panel, sends `references` `[mara view 1, gallery view 1, panel 1, mara view 2, gallery view 2]`.
     - A Shot naming subjects A–E (each with 2 views) and 2 panels sends exactly `[A1, B1, C1, D1, E1, panel 1, panel 2, A2, B2]`.
     - A Shot naming 9 subjects with 2 panels sends the first 7 subjects' first views, then both panels.
@@ -276,11 +276,11 @@ At sprint completion, run the applicable regression suite on the combined sprint
     - The prompt matches an exact expected string covering all four voicings, the panel labels and the closing line.
     - Long sheet descriptions are cut at 300 characters; a Shot whose prompt still passes 7,000 characters is `too_long` before any job starts.
     - A Shot whose first or last panel has no image is still `needs_panels`.
-  - [ ] Integration (`tool-activity.test.ts`, the generate-shot block): a scripted turn saves a storyboard, makes a panel and makes the Shot. The MiniMax fake received `ratio '16:9'`, the Shot's `durationS`, and `reference_image` items whose bytes are the sheet views' and panel's. The clip is saved to the Shot.
-  - [ ] E2E (`shots.spec.ts` journey): after the length edit to 8 s, the Shot video's job duration is 8. The fake's recorded request is read through the test backend.
+  - [x] Integration (`tool-activity.test.ts`, the generate-shot block): a scripted turn saves a storyboard, makes a panel and makes the Shot. The MiniMax fake received `ratio '16:9'`, the Shot's `durationS`, and `reference_image` items whose bytes are the sheet views' and panel's. The clip is saved to the Shot.
+  - [x] E2E (`shots.spec.ts` journey): after the length edit to 8 s, the Shot video's job duration is 8. The fake's recorded request is read through the test backend.
 - **Regression verification:**
-  - [ ] The Shot video choice, restart and resume e2e tests (`shots.spec.ts`) stay green.
-  - [ ] The generate-video tool's frame cases are unchanged (`generate-video.test.ts`).
+  - [x] The Shot video choice, restart and resume e2e tests (`shots.spec.ts`) stay green.
+  - [x] The generate-video tool's frame cases are unchanged (`generate-video.test.ts`).
 - **Editorial/design verification:** Spec §8.3 Videos and §8.7, and design.md Video rows: "made from the Shot's sheets and panels". Editorial review for accuracy.
 - **Manual-only behavior verification:** N/A. Lou makes real Shot videos at QA.
 - **Planned commits:**
@@ -309,18 +309,18 @@ At sprint completion, run the applicable regression suite on the combined sprint
 - **As a** user, **I want** a second panel only when the picture changes a lot within a Shot, **so that** each panel shows something new and the video knows where the camera ends up.
 - **Dependencies:** Story 1 (both edit save-storyboard's description); Story 3 (the last panel is labelled "End the Shot on this framing").
 - **Acceptance criteria:**
-  - [ ] **The second-panel rule.**
+  - [x] **The second-panel rule.**
     - save-storyboard's description: "A Shot has one key panel. Add a second only when the picture changes a lot within the Shot, for example when the camera moves from one part of the room to another, or from wide to close. Never add one for a small change of pose or expression."
     - generate-panel's description: a second panel is made from the sheet views, with panel 1 only for continuity, and shows the new picture its description sets out.
-  - [ ] **The second panel's inputs** (Lou: made from the sheet views, not as an edit of panel 1).
+  - [x] **The second panel's inputs** (Lou: made from the sheet views, not as an edit of panel 1).
     - `panelInputs` puts the chosen sheet views first, as for a first panel, and panel 1's image last, with the job "match the setting, people and light; not its camera or framing", replacing panel 1 first with "keep camera, setting and staging".
     - `needs_first_panel` stays: panel 1 is still made first.
-  - [ ] **Panels keep their shape.** generate-panel's `size` stays as today, and a second panel keeps the first's measured size. The video's 16:9 comes from its request (Story 3), not from the panel.
+  - [x] **Panels keep their shape.** generate-panel's `size` stays as today, and a second panel keeps the first's measured size. The video's 16:9 comes from its request (Story 3), not from the panel.
 - **Functional verification:**
-  - [ ] Unit (`generate-panel.test.ts`, the input-order cases): a second panel's inputs are the sheet views, then panel 1 last with the new job line; the image cap still counts panel 1.
-  - [ ] Integration (`tool-activity.test.ts`, the generate-panel block): for a scripted second panel, the Meta fake received the sheet views, then panel 1 last, at panel 1's measured size.
+  - [x] Unit (`generate-panel.test.ts`, the input-order cases): a second panel's inputs are the sheet views, then panel 1 last with the new job line; the image cap still counts panel 1.
+  - [x] Integration (`tool-activity.test.ts`, the generate-panel block): for a scripted second panel, the Meta fake received the sheet views, then panel 1 last, at panel 1's measured size.
 - **Regression verification:**
-  - [ ] generate-panel's existing cases still pass (`generate-panel.test.ts`, the input order and refusals): a first panel's input order, `needs_first_panel` and the image cap.
+  - [x] generate-panel's existing cases still pass (`generate-panel.test.ts`, the input order and refusals): a first panel's input order, `needs_first_panel` and the image cap.
 - **Editorial/design verification:** Spec §8.3 Storyboard: one key panel; a second only when the picture changes a lot, made from the sheets. The save-storyboard and generate-panel descriptions are reviewed against it (review only, no prose tests).
 - **Manual-only behavior verification:** N/A. Lou checks real panels at QA.
 - **Planned commits:**
@@ -343,18 +343,18 @@ At sprint completion, run the applicable regression suite on the combined sprint
 - **As a** user, **I want** the agent to follow one clear workflow and check with me before each paid step, **so that** a short video comes together in order without surprises or wasted calls.
 - **Dependencies:** Stories 1–4, so the prompt describes the shipped workflow.
 - **Acceptance criteria:**
-  - [ ] **One static system prompt** in `agent/mastra/native-turns.ts` replaces the three lines. It covers:
+  - [x] **One static system prompt** in `agent/mastra/native-turns.ts` replaces the three lines. It covers:
     - the steps in order: script, reference sheets, storyboard with each Shot's length, panels, Shot videos from references;
     - how sheets feed panels, and how sheets, panels and Shot text feed videos;
     - read-workspace before acting on saved work;
     - show the person each step's result and ask before the next paid step (images, videos);
     - one Shot video at a time unless the person asks for more.
-  - [ ] **It is static.** No per-turn or per-video text, so provider prefix caching holds. Tool-specific rules stay in the tool descriptions and aren't repeated.
+  - [x] **It is static.** No per-turn or per-video text, so provider prefix caching holds. Tool-specific rules stay in the tool descriptions and aren't repeated.
   - [ ] **The B-041 pass condition** (the agent follows the steps in order and asks before paid calls) is judged at Lou's QA, below. Tests prove only that the prompt is sent unchanged.
 - **Functional verification:**
-  - [ ] Integration (`apps/api/test/integration/agent-loop.test.ts`): on two fresh conversations and on a second turn of one, the scripted provider's first message is byte-identical to the exported `systemPrompt`.
+  - [x] Integration (`apps/api/test/integration/agent-loop.test.ts`): on two fresh conversations and on a second turn of one, the scripted provider's first message is byte-identical to the exported `systemPrompt`.
 - **Regression verification:**
-  - [ ] The chat and tool-activity integration tiers stay green, along with `chat.spec.ts`'s first-reply test.
+  - [x] The chat and tool-activity integration tiers stay green, along with `chat.spec.ts`'s first-reply test.
 - **Editorial/design verification:** Lou reviews the prompt text in the PR. Spec §10 Agent tool guidance points to it.
 - **Manual-only behavior verification:** at Lou's QA, a fresh conversation asked "make a 20-second video of Mara finding a key in a gallery". The tester answers "yes, go ahead" to each proposal and stops once one Shot video is made. Each is pass or fail:
   1. The first reply proposes or writes the script, with no image or video call.
@@ -371,16 +371,16 @@ At sprint completion, run the applicable regression suite on the combined sprint
 
 After all implementation stories are complete, perform this checklist before sprint integration. This is a completion step, not a separate story.
 
-- [ ] Confirm all stories met their acceptance criteria using recorded implementation and verification evidence.
-- [ ] Run the applicable regression suite on the combined sprint branch: the deep gate (`WORKPRINT_PREVIEW_PORT=4185 .checks/regression.sh --tier=deep`).
-- [ ] Run any planned cross-story checks not covered by that suite: `pnpm live:video --references` in dry mode.
-- [ ] Review spec §8.3, §8.5, §8.7 and §10 (updated by each story) against the shipped code.
+- [x] Confirm all stories met their acceptance criteria using recorded implementation and verification evidence.
+- [x] Run the applicable regression suite on the combined sprint branch: the deep gate (`WORKPRINT_PREVIEW_PORT=4185 .checks/regression.sh --tier=deep`).
+- [x] Run any planned cross-story checks not covered by that suite: `pnpm live:video --references` in dry mode.
+- [x] Review spec §8.3, §8.5, §8.7 and §10 (updated by each story) against the shipped code.
 - [ ] A QA build for Lou with live Muse Spark, Meta and MiniMax, started when Lou asks. Pass:
   - the agent follows the workflow and asks before paid steps;
   - each Shot has a length, and Lou can change it;
   - a Shot has a second panel only where its picture changes a lot, and that panel shows the picture its description sets out, not panel 1's camera or framing;
   - each Shot video is 16:9, at its Shot's length, and keeps the sheets' people, places and objects.
-- [ ] Record results and unresolved issues in a brief `## Final Review`.
+- [x] Record results and unresolved issues in a brief `## Final Review`.
 
 For descriptive-only work, use editorial review and applicable existing checks. Preserve applicable design checks and approval gates. Failed, ambiguous, or unrun required checks remain non-pass.
 
@@ -402,3 +402,55 @@ For descriptive-only work, use editorial review and applicable existing checks. 
 - Sprint doc includes a brief `## Final Review` with completion evidence, unresolved issues, and a New Dependencies field containing dependencies or `None`.
 - Sprint-integration PR is reviewed, passes the required gates, and is merged only after the explicit user merge command.
 - If the sprint introduces new flows, they are folded into the implementation spec before sprint integration.
+
+## Final Review
+
+- **Outcome:** the goal is met in the scripted build. Every story's ACs and verification items are met, with the deviations below. Lou's live QA, and B-041's pass condition, are still open (see QA below). Each story merged into `sprint-012` after an independent review of its final head scored at least 4/5 with no open P0/P1. The verdicts are recorded in the PR bodies:
+  - Story 1, #135 (Shot length): 3/5, then 4/5, then 5/5. The P1 was a length editor that copied the intent editor's save without its stale-answer and response checks; both now share `storyboard/storyboard-edit.ts`.
+  - Story 2, #136 (reference images in the client and job store): 4/5, then 4/5, then 5/5.
+  - Story 3, #137 (Shot videos from references): 3/5, then 5/5. The P1 was that a sheet view MiniMax refuses (too small, or outside 0.4–2.5) failed every Shot naming its subject. Such views are now left out (`videoImageFits`).
+  - Story 4, #138 (the second panel): 4/5, then 5/5.
+  - Story 5, #139 (the workflow prompt): 4/5, then 4/5, then 5/5.
+- **Combined-branch verification:** the deep gate (`.checks/regression.sh --tier=deep`, 464 s, run `.checks/.logs/run-xuuttqhf`) passed at `fced786`, the `sprint-012` head after Story 5.
+  - Results: unit 281/281, tooling 6/6, integration 190/190, browser 34/34.
+  - Audit is NON-PASS, as approved: the same 2 moderate advisories, `@hono/node-server` GHSA-rmxm-3fg6-px4f (B-004) and `minimatch` GHSA-g3hv-75wg-m249 (B-008). There are no high or critical advisories.
+  - Logs: `outputs/verification/sprint-012/deep-fced786/`.
+- **Cross-story checks:** `pnpm live:video --references` in dry mode at `fced786` sent the three generated sample PNGs as `reference_image` items in order, at 16:9, and reported `"mode": "dry", "pass": true` (`outputs/verification/sprint-012/completion/live-video-references-dry.log`). The Shot journey in `shots.spec.ts`, which is in the deep gate, covers the rest. It runs script, sheet, storyboard, both panels and a Shot video from references, then the length edit to 8 s and a second Shot video made at 8 s. This sprint made no paid call.
+- **Spec review:** a read-only review of §8.3, §8.5, §8.7 and §10 against the code at `fced786` found no P1s and ten stale or imprecise statements. All ten were fixed in this completion PR:
+  - the guidance now sits beside the system prompt;
+  - §8.3 lists which sheet views are left out, and that the tab and the board show a Shot's length;
+  - §8.5 says the length Edit is hidden on a built-in storyboard;
+  - §8.7 says only Shot jobs send reference images, and that a Shot job's inputs are images;
+  - §10's Production bullet gives the picking rule;
+  - the reuse map gives Join as Sprint 013;
+  - the G1/G2 sprint lists are corrected;
+  - the §4 storyboard PATCH includes `durationS`.
+
+  The stale "frame" comment in generate-panel was fixed too.
+- **QA build for Lou:** not started. A QA host starts only when Lou asks, and it makes paid Muse Spark, Meta and MiniMax calls. Its pass items are in Sprint Completion above. B-041's three manual steps are in Story 5 and PR #139.
+- **Deviations, recorded in the story PRs:**
+  - **Story 1:** commit `9c9a8b1`'s subject is 51 characters. It is accepted because history isn't rewritten after a PR opens.
+  - **Story 2:**
+    - commit `ee1bd25`'s subject is 52 characters, accepted for the same reason;
+    - with no paths, `live:video --references` uses three generated sample PNGs in dry mode, and a `--live` run with no paths stops before the stack starts.
+  - **Story 3:**
+    - the "frames" names for a job's inputs became `images` in `StoppedVideo` and read-workspace's `stoppedVideos` (Story 2's deferred P2);
+    - the Shot journey now scripts video-sized sheet views (512×288), since MiniMax refuses images under 256 px;
+    - a sheet view that is also a panel's image is sent once, as the panel;
+    - a sheet view the workspace lists at a size MiniMax refuses is left out. A view whose size isn't listed is sent, and MiniMax's checks decide.
+  - **Story 4:**
+    - generate-panel's prompt guide now separates a first panel (keep the Shot's camera, crop and staging) from a second (its new camera and framing);
+    - picking only panel 1's image means every sheet the Shot names;
+    - a sheet view that is panel 1's image is sent once, last, for continuity.
+  - **Story 5:** the reviews tightened the ask-first rule:
+    - sheets come for each subject the script lists;
+    - a user's request for that exact item is the yes, unless a choice that would change it materially is still open;
+    - a free `resume` needs no new yes.
+
+    generate-image's line was reworded to match.
+  - **The first push gate of Story 3** failed in the tooling group on a local `setTypeOfService EINVAL` socket error. The test passed alone afterwards. The diagnosis is recorded in `.checks/.logs/run-lkhhpgd9/diagnosis.md`, and the rerun passed.
+- **Unresolved:**
+  - Lou's QA, including B-041's pass condition;
+  - the 2 moderate audit advisories (B-004, B-008);
+  - read-workspace's description doesn't mention each Shot's length, though it lists it. This is minor, and left for a later touch.
+- **New Dependencies:** None.

@@ -37,7 +37,7 @@ function refused(outcome: Exclude<PanelOutcome, { kind: 'saved' }>): GeneratePan
   }
 }
 
-// A panel becomes a Shot video's frame, so its shape stays strictly inside MiniMax's frame ratio: Meta keeps the
+// A panel becomes a Shot video's reference image, so its shape stays strictly inside MiniMax's image ratio: Meta keeps the
 // shape it is asked for but picks the pixels, and rounding at an exact limit could tip it over. Checked on every
 // call, though a later panel's size is ignored. "auto" leaves the shape to Meta.
 const panelSize = imageSize.refine(value => {
