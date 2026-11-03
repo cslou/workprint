@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { makePanel, maxPanelInputs, optionalId, type PanelOutcome } from '../../../application/index.js';
+import { videoFrameRatio } from '../../../generation/index.js';
 import { defineTool } from '../define.js';
 import { imageFailure, imageSize, type ImageFailure } from '../image-shared.js';
 
@@ -36,13 +37,14 @@ function refused(outcome: Exclude<PanelOutcome, { kind: 'saved' }>): GeneratePan
   }
 }
 
-// A panel becomes a Shot video's frame, and MiniMax takes a frame's width ÷ height only from 0.4 to 2.5
-// (`checkFrame` in generation/minimax-video.ts). Meta keeps the shape it is asked for.
+// A panel becomes a Shot video's frame, so its shape stays strictly inside MiniMax's frame ratio: Meta keeps the
+// shape it is asked for but picks the pixels, and rounding at an exact limit could tip it over. Checked on every
+// call, though a later panel's size is ignored. "auto" leaves the shape to Meta.
 const panelSize = imageSize.refine(value => {
   if (value === 'auto') return true;
   const [width, height] = value.split('x').map(Number) as [number, number];
-  return width / height >= 0.4 && width / height <= 2.5;
-}, 'A panel\'s shape must be "auto" or WxH with width ÷ height from 0.4 to 2.5, so it can be a Shot video\'s frame');
+  return width / height > videoFrameRatio.min && width / height < videoFrameRatio.max;
+}, `A panel's shape must be "auto" or WxH with width ÷ height between ${videoFrameRatio.min} and ${videoFrameRatio.max}, so it can be a Shot video's frame`);
 
 /** Makes one panel's image with Meta from the Shot's sheets and saves it as the next version of that panel's image. */
 export const generatePanelTool = defineTool({
@@ -60,7 +62,7 @@ export const generatePanelTool = defineTool({
     prompt: z.string().min(1).max(32000).refine(text => text.trim().length > 0, 'The prompt is empty').describe('Preserve, Change only and Reject if, from the Shot.'),
     // More than Meta takes is accepted here, so the model is told the count rather than that its call was invalid.
     images: z.array(z.string().max(200)).max(maxPanelInputs * 2).default([]).describe('Image versionIds from read-workspace this panel is made from; empty for every sheet the Shot names.'),
-    size: panelSize.default('auto').describe('"auto" or WxH, width ÷ height from 0.4 to 2.5, for a Shot\'s first panel; a later panel takes the first panel\'s size.'),
+    size: panelSize.default('auto').describe(`"auto" or WxH, width ÷ height between ${videoFrameRatio.min} and ${videoFrameRatio.max} on every call, for a Shot's first panel; a later panel takes the first panel's size.`),
   }),
   phrase: 'Making a panel…',
   // A refusal still finishes the line. Mastra hands back an input validation failure as `{ error: true }`.
