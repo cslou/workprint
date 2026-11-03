@@ -86,14 +86,14 @@
 - **Acceptance criteria:**
   - [x] The sidebar's top left and the entry pages show the word "Workprint" in Italiana (`--font-family-brand`, regular, 28px); the "a" mark is gone. The font file (`apps/web/src/ui/fonts/italiana-latin.woff2`, Latin subset) is bundled and served with the app, not loaded from Google Fonts; its SIL OFL licence is kept beside it in the repo.
   - [x] The composer no longer shows "JPEG or PNG only · Up to 10 MiB · 4096 × 4096 pixels. Video uploads are temporarily unavailable."; a refused file still explains the limits in its upload status.
-  - [x] The composer's attach button is "+" alone, with the accessible name "Attach a file", both before and after the first message. Only the question composer, which isn't shown until Questions (Sprint 015), keeps "+ Attach".
+  - [x] The composer's attach button is "+" alone, with the accessible name "Attach a file", both before and after the first message. Only the question composer, which isn't shown until Questions (Sprint 015), keeps "+ Attach". (Changed from "the docked composer keeps + Attach" during the story, under Lou's delegation of 2026-11-04: the only docked composer is the question composer, and Lou asked for the "Attach photos" word to go.)
   - [x] The Videos tab shows no Export or Export history (B-009); the export module itself stays.
 - **Functional verification:**
   - [x] E2E `auth.spec.ts` (sign-in test): the entry link and the sidebar wordmark use Italiana and the face is loaded; the button found by the accessible name "Attach a file" reads "+"; no limits line. `shots.spec.ts` (Generated videos test): no Export button. Pass: 2/2; both fail on the code before the change (checked by stashing it).
   - [x] E2E `chat.spec.ts` (first-reply test): after the first message, the conversation's attach button reads "+". Pass: green; on the code before the change it read "+Attach photos". (Planned as a docked "+ Attach" check, but the docked composer is only the question composer, which isn't shown yet.)
 - **Regression verification:**
   - [x] `pnpm check`. Pass: green.
-  - [x] `chat.spec.ts`, `uploads.spec.ts` and `auth.spec.ts` whole (uploads still refuse and explain an unsupported file). Pass: all green (26/26 after the assertion fix).
+  - [x] `chat.spec.ts`, `uploads.spec.ts` (an image upload still verifies and stays attached) and `auth.spec.ts` whole. Pass: all green (26/26 after the assertion fix). A refused file's limits text lives in `apps/web/src/uploads/status.tsx`, which this story doesn't change; no test refuses a file, so that clause rests on the unchanged code and QA item 4.
 - **Editorial/design verification:** design.md: the brand font token, the Logo section ("Makeshift"), the composer copy under the image-only restriction, and the Export consumers marked not shown for now.
 - **Manual-only behavior verification:** Sprint Completion's QA item 4.
 - **Planned commits:**

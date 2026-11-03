@@ -18,7 +18,7 @@
 
 ## Image-only upload restriction
 
-**Composer copy (Lou, 2026-11-04):** the composer no longer shows the "JPEG or PNG only · Up to 10 MiB · 4096 × 4096 pixels. Video uploads are temporarily unavailable." line, and the opening composer's attach button is the "+" alone (its accessible name stays "Attach a file"; the docked composer keeps "+ Attach"). A refused file still explains the limits in its upload status.
+**Composer copy (Lou, 2026-11-04):** the composer no longer shows the "JPEG or PNG only · Up to 10 MiB · 4096 × 4096 pixels. Video uploads are temporarily unavailable." line, and the composer's attach button is the "+" alone, before and after the first message (its accessible name stays "Attach a file"). Only the question composer, not shown until Questions, keeps "+ Attach". A refused file still explains the limits in its upload status.
 
 **Provisionally approved by the orchestrator on 2026-10-31 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff.** Implements Lou’s temporary video-upload restriction with the existing composer, receipt, tokens and image-recovery states: uploads accept JPEG/PNG up to 10 MiB and 4096 × 4096 pixels and say that video uploads are temporarily unavailable. Video refusal offers “Choose an image” without replaying a transfer or claiming saved work was undone; saved images remain Draft, not approved references, and Send availability is unchanged. This supersedes the video-upload entry/success promises of [verified upload feedback](#verified-upload-feedback); existing owned-video presentation is not new upload authorization. [States](brand-book/screens/uploads.html).
 
@@ -68,7 +68,7 @@
 | Voice and tone | Partial | Wording rules from user-flows.md only; no voice guide |
 | Logo | Makeshift | The word "Workprint" in Italiana, Lou, 2026-11-04; a designed logo is still deferred |
 | Color | Approved | Light theme only |
-| Typography | Approved | System fonts; no files or licences |
+| Typography | Approved | System fonts, except the wordmark: Italiana, bundled under SIL OFL 1.1 (Lou, 2026-11-04) |
 | Spacing and layout | Approved | |
 | Shape and elevation | Approved | No z-index layers defined |
 | Iconography and imagery | Approved | No icon library chosen; example media not licensed |
@@ -189,7 +189,7 @@ Product code uses semantic tokens. Primitives exist only so semantic tokens can 
 
 ## Typography
 
-**Section 06** · **Status:** Approved — two system families, no font files; bold is always 600.
+**Section 06** · **Status:** Approved — two system families; the one font file is Italiana for the wordmark only (`--font-family-brand`, SIL OFL 1.1, Lou, 2026-11-04); bold is always 600.
 
 | Token | Value | Resolved | Was | Use |
 | --- | --- | --- | --- | --- |
