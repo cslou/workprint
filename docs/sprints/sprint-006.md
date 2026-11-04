@@ -99,7 +99,7 @@ At sprint completion, run the applicable regression suite on the combined sprint
 **Sprint specifics:**
 - **Per change:** run only the targeted tests for that change.
 - **Suites:** `pnpm check`, `pnpm build`, `pnpm test:unit`, `pnpm test:tooling` (Docker-free build and dev-task tests in `apps/api/test/tooling`), `pnpm test:integration` and `pnpm test:browser`, through the shared test stack (PR #67).
-- **Gates** ([regression gates](../regression-gates.md)): every commit runs quick and every push runs standard. Story merges into `sprint-006` run standard through `.checks/pre-merge.sh`; the `sprint-006` → `main` merge runs deep. Don't run `pnpm test:*` by hand while a gate runs.
+- **Gates** ([regression gates](../../README.md#verification)): every commit runs quick and every push runs standard. Story merges into `sprint-006` run standard through `.checks/pre-merge.sh`; the `sprint-006` → `main` merge runs deep. Don't run `pnpm test:*` by hand while a gate runs.
 - **Live check:** one small script, `pnpm live:chat`. By default it runs scripted (fake provider, placeholder key, network guarded). Only `pnpm live:chat --live` makes a handful of real Muse Spark calls. It is never part of the default suites. The live mode runs in Story 1 and once at Sprint Completion.
 - **Logs:** redirect full logs to ignored files under `outputs/verification/sprint-006/<sha>/`, and report only results and paths.
 - **Design:**

@@ -1,7 +1,12 @@
 # Workprint Agent Guide
 
 See [README.md](README.md) for orientation.
-Verification gates (tiers, deep merge bases, budgets): [docs/regression-gates.md](docs/regression-gates.md).
+
+## Setup and verification
+
+- [Development setup](README.md#development): `.agents/setup` prepares orb tools and caches; local clones use `pnpm install --frozen-lockfile` and `pnpm setup:hooks`. Use `pnpm exec node` for repository scripts to select the pinned Node runtime.
+- [Verification](README.md#verification): `pnpm verify:quick`, `pnpm verify:standard`, and explicit `pnpm verify:e2e`. README covers prerequisites, hook limitations and failure cleanup.
+- Follow the [issue template](.github/ISSUE_TEMPLATE/task.md) and [PR template](.github/PULL_REQUEST_TEMPLATE.md), including when supplying bodies through the CLI or API.
 
 ## Repository context
 

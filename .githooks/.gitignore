@@ -1,5 +1,0 @@
-# Clone-local forwarding wrappers preserve custom hooks without publishing them.
-*
-!.gitignore
-!pre-commit
-!pre-push

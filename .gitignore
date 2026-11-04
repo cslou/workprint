@@ -21,6 +21,8 @@ coverage/
 # Generated work, local evidence and logs.
 /outputs/
 /logs/
+# Historical local logs from the removed verification harness.
+/.checks/
 /.amp/portals/
 *.log
 

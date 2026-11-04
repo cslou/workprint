@@ -3,7 +3,7 @@ set -eu
 
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
-.checks/regression.sh --tier=standard
+pnpm verify:standard
 
 printf '%s\n' \
     'Review reminder: if this change has not completed the review workflow,' \
