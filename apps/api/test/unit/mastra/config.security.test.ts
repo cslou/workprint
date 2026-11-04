@@ -19,6 +19,7 @@ test('missing or malformed configuration fails without echoing values', () => {
     { ...valid, DEFAULT_ASSISTANT_MODEL: 'test/fake' },
     { ...valid, DEFAULT_ASSISTANT_MODEL: 'unqualified/disabled' },
     { ...valid, DEFAULT_ASSISTANT_MODEL: 'meta/muse-spark-1.2' },
+    { ...valid, DEFAULT_ASSISTANT_MODEL: 'meta/muse-wonder' },
     { ...valid, DEFAULT_ASSISTANT_MODEL: 'openai/gpt-5' },
     { ...valid, META_API_KEY: undefined },
     { ...valid, META_API_KEY: '' },
@@ -49,6 +50,8 @@ test('missing or malformed configuration fails without echoing values', () => {
   }
   assert.equal(loadServerConfig(valid).port, 4111);
   assert.deepEqual(loadServerConfig(valid).assistant, { model: 'meta/muse-spark-1.3', apiKey: valid.META_API_KEY });
+  // Muse Wonder is qualified too (Sprint 014); the server still takes the model only from the setting.
+  assert.deepEqual(loadServerConfig({ ...valid, DEFAULT_ASSISTANT_MODEL: 'meta/muse-wonder-1.0' }).assistant, { model: 'meta/muse-wonder-1.0', apiKey: valid.META_API_KEY });
   // The image client uses the same server-only key, against Meta's API.
   assert.deepEqual(loadServerConfig(valid).images, { apiKey: valid.META_API_KEY, baseUrl: 'https://api.meta.ai/v1' });
   // Video is optional: no key, no video client; a key goes only to MiniMax's API.

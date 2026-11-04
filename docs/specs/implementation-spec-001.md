@@ -403,7 +403,7 @@ These are intended functional product flows, not claims that the Phase 1 foundat
 - **Failure/recovery:** use Supabase's standard password-reset flow; incorrect credentials and invalid/expired reset links give actionable feedback without creating an account. Authentication/session-refresh/loading failures preserve saved work and settle loading. Sign-in/out uses the qualified Auth interface; refreshing credentials or reconnecting never resubmits commands or paid requests.
 
 **Chat (Sprint 006, implemented):**
-- **Send:** a message of at most 32 KiB is sent as one Muse Spark turn. A New video's native thread is created by its first accepted send, without remounting the chat. Recents lists a video only once a send is accepted.
+- **Send:** a message of at most 32 KiB is sent as one turn of the configured model (Muse Wonder by default since Sprint 014; Muse Spark before). A New video's native thread is created by its first accepted send, without remounting the chat. Recents lists a video only once a send is accepted.
 - **One turn per video:** while a turn runs, Stop replaces Send, and a second send (another tab, say) is rejected as busy with the draft kept. Nothing queues.
 - **Stream:** the reply streams as safe text and tool-activity events only. Each tool shows its phrase with elapsed time, then a done summary or "didn't finish"; a tool without a phrase shows "Working…". History keeps the same lines in order with the text and fails closed on an unknown part.
 - **Tools:** read-workspace reads only the run's own account and video, within 50 items, 16 KiB and 200 characters per text. update-script writes the video's script (Sprint 007, §8.3). After each finished tool and when the turn ends, the workspace tabs re-read and show saved changes without a reload.
@@ -598,7 +598,7 @@ Tools call application/domain functions in process, never application HTTP route
 
 **Decisions (Lou, 2026-11-01)**
 - **Models:**
-  - Chat uses Meta Muse Spark `muse-spark-1.3` through the Meta Model API (`https://api.meta.ai/v1`, server-only `META_API_KEY`), kept swappable.
+  - Chat uses Meta Muse Wonder `muse-wonder-1.0` by default since Sprint 014 (Muse Spark `muse-spark-1.3` stays qualified), through the Meta Model API (`https://api.meta.ai/v1`, server-only `META_API_KEY`), chosen by `DEFAULT_ASSISTANT_MODEL` and kept swappable. Wonder passed the live chat check on 2026-11-04: streaming, a title at minimal effort, read-workspace, and save-storyboard with its nested positions.
   - Images use Meta `muse-image-1.0`.
   - Video uses MiniMax Video Generation V2 (server-only `MINIMAX_API_KEY`); Meta's API has no video generation.
 - **Agent tools are MVP work:**

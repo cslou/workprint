@@ -53,9 +53,9 @@ export type TestEnvironment = Awaited<ReturnType<typeof environment>>;
  * Unguarded environment for `pnpm live:chat --live` only: the same allowlist as `environment()`, but the
  * real Meta key and no network guard. Never used by the default suites.
  */
-export async function liveEnvironment(metaApiKey: string): Promise<TestEnvironment> {
+export async function liveEnvironment(metaApiKey: string, model: string): Promise<TestEnvironment> {
   const guarded = await environment();
-  const env: NodeJS.ProcessEnv = { ...guarded.env, META_API_KEY: metaApiKey };
+  const env: NodeJS.ProcessEnv = { ...guarded.env, META_API_KEY: metaApiKey, DEFAULT_ASSISTANT_MODEL: model };
   delete env.NODE_OPTIONS;
   return { env, logs: guarded.logs, async noNetwork() { /* live calls are the point */ } };
 }

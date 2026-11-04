@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { MastraCompositeStore } from '@mastra/core/storage';
-import { cleanTitle, createAssistantModel, titleInstructions, titleLength, type NativeTurnModel } from '../../../src/agent/index.js';
+import { assistantModels, cleanTitle, createAssistantModel, titleInstructions, titleLength, type NativeTurnModel } from '../../../src/agent/index.js';
 import { createVideoTitler } from '../../../src/agent/mastra/video-title.js';
 
 const owner = 'owner', video = 'video';
@@ -63,7 +63,7 @@ test('a model not qualified for title options gets none, rather than Muse Spark\
   assert.deepEqual(calls[0]!.providerOptions, {});
 });
 
-test('the production Muse Spark route sends minimal reasoning effort and the 1,024-token cap', async t => {
+for (const id of assistantModels) test(`the production ${id} route sends minimal reasoning effort and the 1,024-token cap`, async t => {
   // The real model factory and router, with fetch answered locally: no network.
   const bodies: Record<string, unknown>[] = [];
   const chunk = (delta: Record<string, unknown>, finish: string | null = null) => `data: ${JSON.stringify({ id: 'x', object: 'chat.completion.chunk', created: 1, model: 'muse-spark-1.3', choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`;
@@ -72,7 +72,7 @@ test('the production Muse Spark route sends minimal reasoning effort and the 1,0
     return new Response(chunk({ role: 'assistant', content: 'Night swim' }) + chunk({}, 'stop') + 'data: [DONE]\n\n', { status: 200, headers: { 'content-type': 'text/event-stream' } });
   });
   const { storage, patches } = fakeStorage();
-  await createVideoTitler(createAssistantModel({ model: 'meta/muse-spark-1.3', apiKey: 'placeholder-key' }), storage, limits)(owner, video, 'A night swim');
+  await createVideoTitler(createAssistantModel({ model: id, apiKey: 'placeholder-key' }), storage, limits)(owner, video, 'A night swim');
   assert.equal(bodies.length, 1);
   assert.equal(bodies[0]!.reasoning_effort, 'minimal'); assert.equal(bodies[0]!.max_tokens, 1024);
   assert.deepEqual(patches, [{ id: video, title: 'Night swim' }]);

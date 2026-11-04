@@ -1,0 +1,833 @@
+{
+  "observed": "2026-11-04",
+  "model": "meta/muse-wonder-1.0",
+  "shapes": {
+    "send": [
+      {
+        "type": "start",
+        "payloadKeys": [
+          "messageId"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "finish",
+        "payloadKeys": [
+          "stepResult"
+        ],
+        "reason": "stop"
+      }
+    ],
+    "tool": [
+      {
+        "type": "start",
+        "payloadKeys": [
+          "messageId"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "phrase",
+          "state",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "test-echo",
+        "state": "running"
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "phrase",
+          "state",
+          "summary",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "test-echo",
+        "state": "done"
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "finish",
+        "payloadKeys": [
+          "stepResult"
+        ],
+        "reason": "stop"
+      }
+    ],
+    "read-workspace": [
+      {
+        "type": "start",
+        "payloadKeys": [
+          "messageId"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "phrase",
+          "state",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "read-workspace",
+        "state": "running"
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "phrase",
+          "state",
+          "summary",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "read-workspace",
+        "state": "done"
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "finish",
+        "payloadKeys": [
+          "stepResult"
+        ],
+        "reason": "stop"
+      }
+    ],
+    "update-script": [
+      {
+        "type": "start",
+        "payloadKeys": [
+          "messageId"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "phrase",
+          "state",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "read-workspace",
+        "state": "running"
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "phrase",
+          "state",
+          "summary",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "read-workspace",
+        "state": "done"
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "phrase",
+          "state",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "update-script",
+        "state": "running"
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "phrase",
+          "state",
+          "summary",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "update-script",
+        "state": "done"
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "finish",
+        "payloadKeys": [
+          "stepResult"
+        ],
+        "reason": "stop"
+      }
+    ],
+    "save-storyboard": [
+      {
+        "type": "start",
+        "payloadKeys": [
+          "messageId"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "phrase",
+          "state",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "read-workspace",
+        "state": "running"
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "phrase",
+          "state",
+          "summary",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "read-workspace",
+        "state": "done"
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "phrase",
+          "state",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "read-workspace",
+        "state": "running"
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "phrase",
+          "state",
+          "summary",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "read-workspace",
+        "state": "done"
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "phrase",
+          "state",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "save-storyboard",
+        "state": "running"
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "phrase",
+          "state",
+          "summary",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "save-storyboard",
+        "state": "done"
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "finish",
+        "payloadKeys": [
+          "stepResult"
+        ],
+        "reason": "stop"
+      }
+    ],
+    "generate-image": [
+      {
+        "type": "start",
+        "payloadKeys": [
+          "messageId"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "phrase",
+          "state",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "generate-image",
+        "state": "running"
+      },
+      {
+        "type": "tool-activity",
+        "payloadKeys": [
+          "media",
+          "phrase",
+          "state",
+          "summary",
+          "tool",
+          "toolCallId"
+        ],
+        "tool": "generate-image",
+        "state": "done"
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "text-delta",
+        "payloadKeys": [
+          "text"
+        ]
+      },
+      {
+        "type": "finish",
+        "payloadKeys": [
+          "stepResult"
+        ],
+        "reason": "stop"
+      }
+    ],
+    "stop": [
+      {
+        "type": "start",
+        "payloadKeys": [
+          "messageId"
+        ]
+      },
+      {
+        "type": "abort",
+        "payloadKeys": []
+      }
+    ]
+  }
+}
