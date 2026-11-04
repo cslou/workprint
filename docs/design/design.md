@@ -411,7 +411,7 @@ Each component has the same anchor here and on the [Components page](brand-book/
 
 - **Shape:** `--color-bg-surface`, `--color-border-input`, `--radius-2xl`, `--shadow-input`, 14px 12px 10px 16px padding, width `--size-layout-chat`, centred, 24px from the bottom.
 - **Field:** 15px text, at least 44px high. The placeholder uses `--color-text-subtle`; typed text uses `--color-text-primary`.
-- **Bottom bar:** "+" on the left (accessible name "Attach a file"; "+ Attach" only in the docked question composer; a 30px round button; it opens the [Library picker](#library-picker)) and **Send** on the right.
+- **Bottom bar:** "+" on the left (accessible name "Attach a file"; "+ Attach" only in the docked question composer; a 30px round button; it opens the device's file chooser for a JPEG or PNG upload, while the [Library picker](#library-picker) opens from Library) and **Send** on the right.
 
 | State | What shows | Rules |
 | --- | --- | --- |
