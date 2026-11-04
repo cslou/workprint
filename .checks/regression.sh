@@ -14,7 +14,7 @@ COMPILED = ['env', 'WORKPRINT_TESTS_COMPILED=1']
 COMMANDS = {
     # Compile the tests once; later groups reuse the build.
     'setup': ['sh', '-c', 'node scripts/test-stack-leftovers.mjs baseline && pnpm exec node scripts/test.mjs compile'],
-    'check': ['pnpm', 'check'],
+    'check': COMPILED + ['pnpm', 'check'],
     'unit': COMPILED + ['pnpm', 'test:unit'],
     'build': ['pnpm', 'build'],
     'tooling': COMPILED + ['pnpm', 'test:tooling'],

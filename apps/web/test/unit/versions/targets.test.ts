@@ -30,6 +30,6 @@ test('reference description and stable planning targets preserve every unrelated
   assert.deepEqual(nextContent, { ...content, shots: [{ ...content.shots[0], panels: [content.shots[0]!.panels[0], { ...content.shots[0]!.panels[1], description: 'The train reaches the platform.' }] }] });
   assert.equal(panel.compatible(planning, { ...planning, id: 'v2', revision: 2, content: nextContent! }), true);
   assert.equal(panel.compatible(planning, { ...planning, dependencies: ['script-v2', 'reference-v1'] }), false);
-  assert.equal(panel.compatible(planning, version('storyboard', { ...content, shots: [{ ...content.shots[0], panels: [...content.shots[0]!.panels].reverse() }] })), false);
+  assert.equal(panel.compatible(planning, { ...planning, content: { ...content, shots: [{ ...content.shots[0]!, panels: [...content.shots[0]!.panels].reverse() }] } }), false);
   assert.equal(savedTextTarget({ kind: 'panel', shotId: 'shot-a', panelId: 'missing' }).replace(planning, 'Never guess an index.'), null);
 });

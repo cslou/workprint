@@ -30,7 +30,8 @@ test('past two stalled image reads a third waits its turn, and leaving the queue
 });
 test('private video download requires the exact version type and byte size, holds one slot and scales its deadline',async()=>{
   for(const [headers,body] of [[{'Content-Type':'video/webm','Content-Length':3},'abc'],[{'Content-Type':'video/mp4','Content-Length':4},'abcd'],[{'Content-Type':'video/mp4','Content-Length':3},'ab']] as const){
-    const fixture=await peer((_request,response)=>{response.writeHead(200,headers);response.end(body);});
+    // A truncated response ends its connection; a stalled body is covered separately.
+    const fixture=await peer((_request,response)=>{response.writeHead(200,{...headers,Connection:'close'});response.end(body);});
     try{assert.ok(!(await readPrivateVideo(fixture.url,new AbortController().signal,{contentType:'video/mp4',byteSize:3})).ok);}finally{await fixture.close();}
   }
   let reached!:()=>void;const ready=new Promise<void>(r=>{reached=r;});

@@ -6,12 +6,16 @@ Workprint's map for the harness regression command contract. `.checks/regression
 
 | Tier | Trigger | Checks, in order | Budget | Observed |
 |---|---|---|---|---|
-| quick | commit | `pnpm check`, `pnpm test:unit` | 180 s | 51 s |
-| standard | push, merge into any other branch | quick, then `pnpm build`, `pnpm test:tooling` | 300 s | 60 s |
+| quick | commit | `pnpm check`, `pnpm test:unit` | 180 s | 82 s (x64 orb) |
+| standard | push, merge into any other branch | quick, then `pnpm build`, `pnpm test:tooling` | 300 s | 101 s (x64 orb) |
 | deep | merge into `main` or `develop` | standard, then integration and browser journeys on one shared stack, then `scripts/audit.mjs` | 1200 s | 138 s |
 | full, routine | — | not configured; exits 2 | — | — |
 
 Hooks run these through each clone's `git config --local core.hooksPath <harness root>/githooks` (per clone, not committed). Each budget includes a 90 s cleanup reserve. Don't run `pnpm test:*` by hand during a gate run; it rebuilds the shared test build. A step that ends without failing but has something to report prints a `GATE-NOTICE:` line. The gate prints that line again in its summary, and it must appear in the report.
+
+The gate compiles package declarations and API/web/client tests once during setup; `check`, unit and tooling reuse that output. Standalone `pnpm check` and test commands compile afresh, removing stale emitted tests first. Root type checking covers the web app; the compile step checks API and shared packages, and E2E has its own type check. Production builds remain separate from test output.
+
+Only the explicit unit group runs independent files concurrently, bounded by `.checks/config.json` (currently two workers). `CHECKS_JOBS=1 pnpm test:unit` selects serial execution; values above the configured limit are rejected. Integration, tooling and the default all-tests invocation remain serial. The x64 timings above are observations, not revised budgets or fresh deep qualification; the older deep timing came from a different environment.
 
 ## Merges
 

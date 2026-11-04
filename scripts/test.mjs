@@ -1,9 +1,13 @@
-import { globSync, rmSync } from 'node:fs';
+import { globSync, readFileSync, rmSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
+import { URL } from 'node:url';
 
 // Groups: `unit` (each package's test/unit) and `tooling` (apps/api/test/tooling) need no Docker; `integration` (the rest of apps/api/test) runs against one shared stack of Postgres, Auth and storage containers.
 const group = process.argv[2];
 if (group && !['unit', 'tooling', 'integration', 'compile'].includes(group)) throw new Error('Unknown test group');
+const { resources: { jobs } } = JSON.parse(readFileSync(new URL('../.checks/config.json', import.meta.url), 'utf8'));
+const concurrency = Number(process.env.CHECKS_JOBS ?? jobs);
+if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > jobs) throw new Error('CHECKS_JOBS must be within the repository job limit');
 
 // Never discover stale emitted cases from a different branch or removed source files.
 // The regression gate compiles once in its setup step and sets WORKPRINT_TESTS_COMPILED=1 for later groups.
@@ -28,7 +32,9 @@ const orphaned = compiled.filter(file => !unit.includes(file) && !tooling.includ
 if (orphaned.length) throw new Error(`Tests outside a known group: ${orphaned.join(', ')}`);
 const files = group === 'unit' ? unit : group === 'tooling' ? tooling : group === 'integration' ? integration : [...unit, ...tooling, ...integration];
 if (files.length === 0) throw new Error('No tests discovered');
-const run = [process.execPath, '--test', '--test-concurrency=1', ...files];
+// Only independent unit files run concurrently. Integration shares one database,
+// and tooling checks can inspect the same build output, including in the all-tests command.
+const run = [process.execPath, '--test', `--test-concurrency=${group === 'unit' ? concurrency : 1}`, ...files];
 // Integration files share one stack for the whole run; the launcher always removes it afterwards.
 const command = files.some(file => integration.includes(file)) ? [process.execPath, 'scripts/test-stack.mjs', ...run] : run;
 const child = spawn(command[0], command.slice(1), { stdio: 'inherit' });
