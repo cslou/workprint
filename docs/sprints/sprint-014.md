@@ -210,20 +210,21 @@
 - **As** Lou, **I want** the agent to run on Muse Wonder, **so that** the workflow gets the stronger model.
 - **Dependencies:** Story 2 (the live check uses its save-storyboard schema).
 - **Acceptance criteria:**
-  - [ ] **Live check first, on Lou's go:** `scripts/live/chat.mjs` with `meta/muse-wonder-1.0` streams a reply, calls read-workspace and save-storyboard (a required nested `positions` object) and reads their results, and makes a title. The response shapes are saved as a fixture beside `muse-spark-live-shapes.json`, with any differences from Muse Spark (reasoning options, nullable or nested arguments) recorded.
-  - [ ] `assistantModels` gains `meta/muse-wonder-1.0` with its own title options. There is no code default: the server still takes the model only from `DEFAULT_ASSISTANT_MODEL`. Both ids start it; an unlisted one is refused; Muse Spark's title options are unchanged.
-  - [ ] `.env.example` and the Sprint 014 QA host script (`outputs/qa/sprint-014/<sha>/host.mjs`, its `DEFAULT_ASSISTANT_MODEL`) use `meta/muse-wonder-1.0`. Lou sets it in the root `.env` himself.
-  - [ ] **If the live check fails:** the differences are recorded, Muse Spark stays the default, Story 5 is closed as deferred in `## Final Review`, and before Lou's QA one live `chat.mjs` save-storyboard call on `meta/muse-spark-1.3` confirms Spark sends the nested `positions` (on Lou's go); then his QA runs on Spark.
+  - [x] **Live check first, on Lou's go:** `scripts/live/chat.mjs` with `meta/muse-wonder-1.0` streams a reply, calls read-workspace and save-storyboard (a required nested `positions` object) and reads their results, and makes a title. The response shapes are saved as a fixture beside `muse-spark-live-shapes.json`, with any differences from Muse Spark (reasoning options, nullable or nested arguments) recorded.
+  - [x] `assistantModels` gains `meta/muse-wonder-1.0` with its own title options. There is no code default: the server still takes the model only from `DEFAULT_ASSISTANT_MODEL`. Both ids start it; an unlisted one is refused; Muse Spark's title options are unchanged.
+  - [ ] `.env.example` (done) and the Sprint 014 QA host script (`outputs/qa/sprint-014/<sha>/host.mjs`, its `DEFAULT_ASSISTANT_MODEL`) use `meta/muse-wonder-1.0`. Lou sets it in the root `.env` himself.
+  - [x] N/A (the live check passed) — **If the live check fails:** the differences are recorded, Muse Spark stays the default, Story 5 is closed as deferred in `## Final Review`, and before Lou's QA one live `chat.mjs` save-storyboard call on `meta/muse-spark-1.3` confirms Spark sends the nested `positions` (on Lou's go); then his QA runs on Spark.
 - **Functional verification:**
-  - [ ] Unit (`config.security.test.ts`, `video-title.test.ts`): both ids accepted, each with its title options; an unlisted id refused. Pass: as stated.
-  - [ ] The live check above, once. Pass: reply, both tool calls and title as stated.
+  - [x] Unit (`config.security.test.ts`, `video-title.test.ts`): both ids accepted, each with its title options; an unlisted id refused. Pass: as stated.
+  - [x] The live check above, once. Pass: reply, both tool calls and title as stated.
 - **Regression verification:**
-  - [ ] `agent-loop.test.ts` and the chat e2e (scripted provider). Pass: green.
+  - [x] `agent-loop.test.ts` and the chat e2e (scripted provider). Pass: green.
 - **Editorial/design verification:** spec §10 MVP plan → Decisions → Models, §8.1 Chat's "sent as one Muse Spark turn", and the README's model line name Muse Wonder as the default.
 - **Manual-only behavior verification:** the live check is a paid call and needs Lou's go.
 - **Planned commits:**
   1. Feat(agent): Qualify Muse Wonder as a chat model
   2. Chore(env): Make Muse Wonder the default
+- **Evidence (2026-11-04):** `pnpm live:chat --live --model meta/muse-wonder-1.0` passed every step on the first prompt: a streamed reply, a title at `minimal` effort (29 characters), test-echo, read-workspace, update-script, save-storyboard (two Shots, nested positions, saved first time) and a Meta image, then Stop (30 ms). `muse-wonder-live-shapes.json` saved; the steps both models ran show the same chunk types and payload keys as Muse Spark's record, so no difference to handle. The live check gained `--model` and the save-storyboard step (its scripted run passes too). Unit tier 224/224; `agent-loop.test.ts` 17/17; `chat.spec.ts` 23/23; `pnpm check` green. The QA host for Lou's QA is built with `DEFAULT_ASSISTANT_MODEL=meta/muse-wonder-1.0` at handoff (the live gallery run's host used Muse Spark, as planned).
 - **Technical notes:** the key is the same `META_API_KEY`. If Wonder rejects `reasoningEffort: 'minimal'` for titles, its title options leave it out.
 
 ### Sprint Completion
