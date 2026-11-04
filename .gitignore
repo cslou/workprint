@@ -21,6 +21,7 @@ coverage/
 # Generated work, local evidence and logs.
 /outputs/
 /logs/
+/.amp/portals/
 *.log
 
 # Personal editor and operating-system files.

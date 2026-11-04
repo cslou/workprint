@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+.checks/regression.sh --tier=standard
+
+printf '%s\n' \
+    'Review reminder: if this change has not completed the review workflow,' \
+    'follow the review skill, including its round limit and stopping rules.' \
+    'Do not repeat a completed, still-applicable review.' >&2

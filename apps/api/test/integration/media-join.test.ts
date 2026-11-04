@@ -40,10 +40,29 @@ test('the media sandbox joins clips by copying their picture and remaking their 
     assert.ok(Math.abs(Number(video.start_time)) <= frame && Math.abs(Number(audio.start_time)) <= frame, `${video.start_time}, ${audio.start_time}`);
   });
 
-  await t.test('clips without sound make a video without sound', async () => {
-    const { checked, audio } = await measure(joined(await join([silent, silent])).bytes);
+  await t.test('distinct silent clips retain their requested picture order and remain silent', async () => {
+    const [red, blue] = await sandbox.use(media.png, async session => {
+      const exec = async (args: string[]) => (await runMediaChild(media.toolchain.dockerPath, ['exec', session.resource.id, ...args], { timeoutMs: 5000 })).stdout;
+      const clips: Buffer[] = [];
+      for (const color of ['red', 'blue']) {
+        await exec(['/tools/ffmpeg', '-nostdin', '-v', 'error', '-threads', '1', '-filter_threads', '1', '-f', 'lavfi', '-i', `color=${color}:size=320x180:rate=24:duration=1`, '-c:v', 'libopenh264', '-pix_fmt', 'yuv420p', '-b:v', '100k', '-an', '-movflags', '+faststart', '-y', '/work/color.mp4']);
+        clips.push(await exec(['/bin/cat', '/work/color.mp4']));
+      }
+      return clips as [Buffer, Buffer];
+    });
+    // Reverse creation order deliberately: metadata alone cannot prove content order.
+    const result = joined(await join([blue, red]));
+    const { checked, audio } = await measure(result.bytes);
     assert.equal(checked.hasAudio, false);
     assert.equal(audio, undefined);
+    assert.equal(result.frames, 48);
+    await sandbox.use(result.bytes, async session => {
+      const pixel = async (time: string) => (await runMediaChild(media.toolchain.dockerPath, ['exec', session.resource.id, '/tools/ffmpeg', '-nostdin', '-v', 'error', '-threads', '1', '-filter_threads', '1', '-ss', time, '-i', '/input.bin', '-frames:v', '1', '-vf', 'scale=1:1', '-pix_fmt', 'rgb24', '-f', 'rawvideo', 'pipe:1'], { timeoutMs: 5000 })).stdout;
+      const first = await pixel('0.5'), second = await pixel('1.5');
+      assert.equal(first.length, 3); assert.equal(second.length, 3);
+      assert.ok(first[2]! > 200 && first[0]! < 30, `First segment must be blue: ${[...first]}`);
+      assert.ok(second[0]! > 200 && second[2]! < 30, `Second segment must be red: ${[...second]}`);
+    });
   });
 
   await t.test('a clip of another size is refused, naming it', async () => {
@@ -58,7 +77,18 @@ test('the media sandbox joins clips by copying their picture and remaking their 
 
   await t.test('each job keeps its own file size limit', async () => {
     const limit = async (id: string) => JSON.parse(await docker(['inspect', id, '--format', '{{json .HostConfig.Ulimits}}'])).find((item: { Name: string }) => item.Name === 'fsize').Hard as number;
-    assert.equal(await sandbox.use(clip, session => limit(session.resource.id)), MEDIA_POSTER_BYTES);
+    assert.equal(await sandbox.use(clip, async session => {
+      const actual = JSON.parse(await docker(['inspect', session.resource.id]))[0];
+      assert.equal(actual.HostConfig.NetworkMode, 'none');
+      assert.equal(actual.HostConfig.ReadonlyRootfs, true);
+      assert.equal(actual.Config.User, '65534:65534');
+      assert.deepEqual(actual.HostConfig.CapDrop, ['ALL']);
+      assert.ok(actual.HostConfig.SecurityOpt.includes('no-new-privileges'));
+      assert.equal(actual.HostConfig.Memory, 768 * 1024 * 1024);
+      assert.equal(actual.HostConfig.PidsLimit, 64);
+      assert.equal(actual.Mounts.find((mount: { Destination: string }) => mount.Destination === '/tools').RW, false);
+      return limit(session.resource.id);
+    }), MEDIA_POSTER_BYTES);
     assert.equal(await sandbox.join([clip, clip], session => limit(session.resource.id)), MEDIA_JOIN_OUTPUT_BYTES);
   });
 
