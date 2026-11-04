@@ -375,7 +375,8 @@ test('the assistant saves a storyboard from the current script as a draft, keepi
     dialogue: [{ character: 'Mara', text: 'Anyone here?' }, { character: 'Narrator', text: 'It was late.', delivery: 'voice_over' as const }],
     references: [{ subjectId: 'mara', role: 'identity' as const, purpose: 'Her face and coat.' }, { subjectId: 'the-gallery', role: 'environment' as const, purpose: 'The room.' }],
     panels: [{ panelId: ids.panels?.[0] ?? '', description: 'Mara in the doorway.' }, { panelId: ids.panels?.[1] ?? '', description: 'Mara at the desk.' }] });
-  const closing = (shot = '', panel = '') => ({ shotId: shot, intent: 'The key turns.', panels: [{ panelId: panel, description: 'The key in the lock.' }] });
+  // Since Sprint 014 every Shot names the script's place.
+  const closing = (shot = '', panel = '') => ({ shotId: shot, intent: 'The key turns.', references: [{ subjectId: 'the-gallery', role: 'environment' as const, purpose: 'The room.' }], panels: [{ panelId: panel, description: 'The key in the lock.' }] });
   const saved = (outcome: AssistantStoryboardOutcome) => { assert.equal(outcome.kind, 'saved', JSON.stringify(outcome)); return outcome as Extract<AssistantStoryboardOutcome, { kind: 'saved' }>; };
   const revision = async (video: string) => (await pool.query<{ revision: number }>('SELECT COALESCE(max(revision),0)::int AS revision FROM artifacts.selection_revisions WHERE conversation_id=$1', [video])).rows[0]!.revision;
   const boardUse = async (video: string) => (await pool.query<{ use_id: string; version_id: string; state: string }>("SELECT use_id,version_id,state FROM artifacts.conversation_uses WHERE conversation_id=$1 AND purpose='storyboard'", [video])).rows;
@@ -447,7 +448,7 @@ test('the assistant saves a storyboard from the current script as a draft, keepi
     assert.deepEqual(await save(account, fresh, { baseVersionId: null, shots: [{ ...closing(), panels: [closing().panels[0]!, closing().panels[0]!, closing().panels[0]!] }] }), { kind: 'invalid', field: 'shots[0].panels' });
     assert.deepEqual(await save(account, fresh, { baseVersionId: null, shots: [{ ...closing(), framing: 'x'.repeat(81) }] }), { kind: 'invalid', field: 'shots[0].framing' });
     // A composition reference fits any kind, and a subject with no sheet yet may be referenced.
-    const ok = saved(await save(account, fresh, { baseVersionId: null, shots: [{ ...closing(), references: [{ subjectId: 'the-key', role: 'composition', purpose: 'Centre frame.' }] }] }));
+    const ok = saved(await save(account, fresh, { baseVersionId: null, shots: [{ ...closing(), references: [{ subjectId: 'the-key', role: 'composition', purpose: 'Centre frame.' }, closing().references[0]!] }] }));
     assert.equal((await store.version(account, ok.versionId)).dependencies.length, 1);
     assert.equal((await pool.query('SELECT 1 FROM artifacts.versions WHERE origin_conversation_id=$1 AND kind=$2', [fresh, 'storyboard'])).rowCount, 1, 'refusals save nothing');
   });

@@ -364,7 +364,7 @@ Each component has the same anchor here and on the [Components page](brand-book/
 
 `.sidebar` on `--color-bg-sunken` with a right border.
 
-- **Contents, top to bottom:** the product name (working placeholder), **New video**, **Library**, a **Recents** label with one row per video, and the account at the bottom.
+- **Contents, top to bottom:** the "Workprint" wordmark in Italiana (a makeshift logo, Sprint 014), **New video**, **Library**, a **Recents** label with one row per video, and the account at the bottom.
 - **Nav items** (`.navitem`): 14px text with an 18px icon, `--radius-md`, 8px 10px padding. The current item gets a `--color-bg-hover` fill and `aria-current="page"`.
 - **Recents rows** use 13px text.
 
@@ -411,7 +411,7 @@ Each component has the same anchor here and on the [Components page](brand-book/
 
 - **Shape:** `--color-bg-surface`, `--color-border-input`, `--radius-2xl`, `--shadow-input`, 14px 12px 10px 16px padding, width `--size-layout-chat`, centred, 24px from the bottom.
 - **Field:** 15px text, at least 44px high. The placeholder uses `--color-text-subtle`; typed text uses `--color-text-primary`.
-- **Bottom bar:** "+ Attach" on the left (a 30px round button; it opens the [Library picker](#library-picker)) and **Send** on the right.
+- **Bottom bar:** "+" on the left (accessible name "Attach a file"; "+ Attach" only in the docked question composer; a 30px round button; it opens the device's file chooser for a JPEG or PNG upload, while the [Library picker](#library-picker) opens from Library) and **Send** on the right.
 
 | State | What shows | Rules |
 | --- | --- | --- |
@@ -466,7 +466,7 @@ The conversation follows the newest text while you are at its end, within about 
 | Stop | `.stop` | `--color-bg-inverse` fill, `--color-text-inverse` text, 9px square icon, height 32 | Only while the agent works |
 | Secondary pill | `.viewboard`, `.choice`, `.th-row .use` | `--color-border-default`, `--color-text-secondary` 13px, `--radius-pill`; hover fills `--color-bg-hover` | View storyboard, Play all, Use this version |
 | Icon | `.edit`, `.qclose`, `.lb-nav a` | 26–32px, transparent or outlined round; hover fills `--color-bg-hover` | Edit section, close, previous and next |
-| Attach | `.attach .plus` | 30px round outline with the + drawn as two 1.5px bars, centred exactly | Opens the library picker |
+| Attach | `.attach .plus` | 30px round outline with the + drawn as two 1.5px bars, centred exactly | Opens the device's file chooser for a JPEG or PNG upload |
 | Quiet | `.gen-quiet-button` | Minimum `--size-control-md` (32px), 13px/400 at 1.45 line height, 6px 10px padding, no border, transparent fill, `--radius-pill`, `--color-text-secondary` | Low-priority local action such as Collapse all; not a navigation link |
 
 Quiet-button hover/pressed uses `--color-bg-hover` and primary text. Keyboard focus underlines the label at 2px thickness (`--border-width-focus`) and 2px offset (`--border-width-focus-offset`), with no outline. Disabled is 45% opacity in this reference and skipped by keyboard focus. Collapse all closes the outer Scene groups only; it must not change the Scene filter, tab, conversation or material. It does not promise to reset every nested disclosure. Enter/Space activates the button. The reference's reset-only form is a script-free demonstration, not a required application mechanism.
@@ -593,7 +593,7 @@ The Script tab has three sections: **What happens**, **Shots** and **Look**.
 - **Camera pills live here.** A changed value marks its shot changed and shows **Regenerate** for that shot only.
 - **Edits are saved at once** and handed to the agent on its next turn (D-54).
 - **At ≤ `--breakpoint-sm`**, the grid is 2 columns.
-- **The agent's storyboard** (Sprint 011 QA follow-up): the board is the detailed view. Each Shot has its header, the Shot intent editor and its length line, then, each line only when the Shot has it, the action in 13px; the dialogue, one line each, with the speaker in 600 and the words in the display font; the camera note in 12px `--color-text-subtle`; and the subjects it names, joined by " · ", in 12px `--color-text-subtle`. Each panel tile shows its current image full width (selecting it opens the panel viewer), its number, the panel description editor and its version links.
+- **The agent's storyboard** (Sprint 011 QA follow-up): the board is the detailed view. Each Shot has its header, the Shot intent editor, its length line and its positions line (below), then, each line only when the Shot has it, the action in 13px; the dialogue, one line each, with the speaker in 600 and the words in the display font; the camera note in 12px `--color-text-subtle`; and the subjects it names, joined by " · ", in 12px `--color-text-subtle`. Each panel tile shows its current image full width (selecting it opens the panel viewer), its number, the panel description editor and its version links.
 - **A Shot's length** (Sprint 012): a 13px `--color-text-secondary` line, "Length · 6 s", or "Length · not set" for a Shot saved without one. On an editable storyboard a quiet **Edit** ("Edit Shot length") opens a number field labelled "Length in seconds" (4 to 15, whole seconds) in the planning editor's states, **Cancel, then Save**. A value outside that range, or not a whole number, shows "Enter a whole number of seconds from 4 to 15." and saves nothing; save failures reuse the planning editor's feedback lines. A built-in storyboard shows the line without Edit.
 - **A Shot's positions** (Sprint 014): under the length, a 13px `--color-text-secondary` line, "Starts: … / Ends: …", or "Positions · not set" for a Shot saved without them; the Storyboard tab's summary row doesn't show them. On an editable storyboard a quiet **Edit** ("Edit Shot positions") opens two text fields, "Starts" and "Ends" (up to 300 characters each), in the planning editor's states, **Cancel, then Save**. Both are needed: an empty one shows "Write where the Shot starts and where it ends." and saves nothing; unchanged positions just close. A built-in storyboard shows the line without Edit.
 
@@ -676,7 +676,7 @@ Keyboard/focus: labelled native checkbox toggles with Space; group summaries tog
 
 ### Library picker
 
-`.libpick`: opened from + Attach (D-83). This was a design example, used in the demo only.
+`.libpick`: opened from + Attach (D-83). This was a design example, used in the demo only; the shipped picker opens from Library.
 
 - **Panel:** `--size-layout-picker-w` × `--size-layout-picker-h`, `--radius-3xl`; full screen ≤ 820px.
 - **Head:** a title and a 260px round search field (hidden ≤ 820px).
