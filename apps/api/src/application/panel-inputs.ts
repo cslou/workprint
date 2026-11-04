@@ -1,6 +1,6 @@
 import { currentPanelImage, currentSheets, currentSubjects, currentSubjectSheets, shotRoles, storyboardNames } from '@workprint/contracts';
 import { usedImageVersions } from '../artifacts/index.js';
-import { positionLines } from './shot-positions.js';
+import { clause, positionLines } from './shot-positions.js';
 import type { OwnedWorkspace } from './workspace-reads.js';
 import { imageVersionNames } from './workspace-versions.js';
 
@@ -8,6 +8,8 @@ import { imageVersionNames } from './workspace-versions.js';
 export const maxPanelInputs = 10;
 /** The job of a later panel's last input, the Shot's first panel: continuity only, never its framing. */
 export const continuityJob = 'match the setting, people and light; not its camera or framing';
+/** Added to a place view's job: the view shows the room, and the Shot's camera line sets the angle. */
+export const placeJob = 'Match the place, not its camera angle or framing.';
 /** Which moment of a Shot with positions its panel shows: the first panel frames the start, a later one the end. */
 export const panelMoments = { start: 'This panel shows the Shot as it starts.', end: 'This panel shows the Shot as it ends.' } as const;
 /** The job of a picked image that isn't a view of one of the Shot's sheets. */
@@ -66,7 +68,7 @@ export function panelInputs(workspace: OwnedWorkspace, request: PanelRequest): P
     for (const view of subjectSheets.get(reference.subjectId)?.views ?? []) {
       if (view.versionId === continuity?.versionId || (picked.length && !chosen.has(view.versionId))) continue;
       claimed.add(view.versionId);
-      inputs.push({ versionId: view.versionId, label: '', job: reference.purpose });
+      inputs.push({ versionId: view.versionId, label: '', job: reference.role === 'environment' ? `${clause(reference.purpose)}. ${placeJob}` : reference.purpose });
     }
   }
   for (const id of picked) if (!claimed.has(id)) inputs.push({ versionId: id, label: '', job: otherImageJob });
@@ -77,8 +79,11 @@ export function panelInputs(workspace: OwnedWorkspace, request: PanelRequest): P
   // Each label is the workspace's own name for the image, the one the agent picked it by.
   const name = imageVersionNames(workspace);
   const resolved = unique.map(input => input.label ? input : { ...input, label: name(input.versionId) ?? input.versionId });
-  // The preface labels each input, then says where the Shot starts and ends (`positionLines`) and which moment this panel shows.
+  // The preface labels each input, then gives the Shot's camera (its note, else its framing) to the first panel only, which
+  // sets the Shot's framing (a later panel's own camera is in its prompt), where the Shot starts and ends (`positionLines`)
+  // and which moment this panel shows.
+  const camera = index === 0 ? shot.cameraNote?.trim() || shot.framing?.trim() : undefined;
   const moment = shot.positions ? [index === 0 ? panelMoments.start : panelMoments.end] : [];
-  const preface = [...resolved.map((input, position) => `Input ${position + 1}: ${input.label} — ${input.job}`), ...positionLines(workspace.storyboard.shots, shot), ...moment].join('\n');
+  const preface = [...resolved.map((input, position) => `Input ${position + 1}: ${input.label} — ${input.job}`), ...(camera ? [`Camera: ${clause(camera)}.`] : []), ...positionLines(workspace.storyboard.shots, shot), ...moment].join('\n');
   return { kind: 'resolved', inputs: resolved, preface, ...(size ? { size } : {}) };
 }

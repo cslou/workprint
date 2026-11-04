@@ -3,7 +3,7 @@ import type { OwnedWorkspace } from './workspace-reads.js';
 type Shot = OwnedWorkspace['storyboard']['shots'][number];
 
 /** A position as one clause: trimmed, without the closing punctuation the line adds itself (unless that is all it is). */
-const clause = (text: string) => text.trim().replace(/[.;!?\s]+$/, '') || text.trim();
+export const clause = (text: string) => text.trim().replace(/[.;!?\s]+$/, '') || text.trim();
 /** The places a Shot names, by subject id. */
 const places = (shot: Shot) => new Set((shot.references ?? []).filter(reference => reference.role === 'environment').map(reference => reference.subjectId));
 
