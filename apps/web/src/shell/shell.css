@@ -22,9 +22,6 @@ html, body, #root { min-height: 100%; }
 .wp-welcome { margin: auto; max-width: calc(var(--size-layout-chat) - 2 * var(--space-20)); width: 100%; display: grid; gap: var(--space-14); text-align: left; }
 .wp-welcome .wp-welcome-title { margin: 0; font: var(--font-weight-regular) var(--font-size-34)/var(--font-line-height-1-2) var(--font-family-display); letter-spacing: var(--font-tracking-display); }
 .wp-lead { color: var(--color-text-secondary); font-size: var(--font-size-15); }
-.wp-hints { display: flex; gap: var(--space-6); flex-wrap: wrap; }
-.wp-hints span { font-size: var(--font-size-12); color: var(--color-text-secondary); background: var(--color-bg-surface); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-pill); padding: calc(var(--space-2) + var(--border-width-default)) calc(var(--space-10) + var(--border-width-default)); }
-.wp-aside-note { font-size: var(--font-size-12); color: var(--color-text-subtle); }
 .wp-main > .wp-chat-feedback { width: min(var(--size-layout-chat), calc(100% - 2 * var(--space-16))); margin: calc(-1 * var(--space-14)) auto var(--space-24); }
 /* Opening state: welcome and composer form one group, centred in the main column. */
 .wp-main[data-layout="opening"] { overflow: auto; }
