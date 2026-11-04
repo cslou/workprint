@@ -62,8 +62,11 @@ From the repository root:
 
 ```sh
 pnpm install --frozen-lockfile
+pnpm setup:hooks
 pnpm db:local
 ```
+
+Hook activation preserves existing custom hooks or refuses conflicts; see [regression gates](docs/regression-gates.md) for suite commands, worktree limits and working-tree verification limitations.
 
 Keep that terminal open. No prior `pnpm build` is needed: `db:local` reuses the test fixture's dependency-ordered compilation of contracts, api-client and API helpers before starting storage. The development-only helper creates a uniquely labelled, ephemeral Docker Postgres on a loopback-only ephemeral port, creates separate setup/serving roles, runs the supported native initialization through `pnpm db:prepare`, and grants serving DML access. It writes only the database settings to ignored, mode-0600 `outputs/local-database.env`; it refuses to overwrite an existing file. It does not use your Supabase stacks.
 
@@ -151,7 +154,7 @@ Account browser tests use only disposable accounts on the shared test stack's Au
 
 ## Verification
 
-Run the gates through `.checks/regression.sh --tier=quick|standard|deep`: quick on commit, standard on push and on merges into any branch other than `main` or `develop`, deep on merges into `main` or `develop`. [Regression gates](docs/regression-gates.md) lists each tier's checks and budgets. The underlying commands are below; bare `pnpm audit` fails while the reported moderate advisories exist, whereas the gate blocks only on high and critical ones.
+Use [Regression gates](docs/regression-gates.md) for the quick, standard and E2E commands, hook activation and merge requirements. The underlying commands below are available for targeted checks; budgets and resource limits live in `.checks/config.json`.
 
 ```sh
 pnpm check
