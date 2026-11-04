@@ -44,12 +44,29 @@ Dependency direction: the shell composes features; features use shared `api/` an
 
 Prerequisites: a working Docker engine, Git/tar for the clean-export smoke, and pnpm **11.28.8** (Corepack can select the version in `package.json`). pnpm downloads the repository-local Node **24.22.1** runtime; no global Node upgrade is needed. Dependency versions are pinned in the [root](package.json), [API](apps/api/package.json) and [web](apps/web/package.json) manifests and [lockfile](pnpm-lock.yaml).
 
+### Amp orbs
+
+`.agents/setup` installs the manifest-pinned pnpm and repository-local Node, frozen-lockfile dependencies, Playwright Chromium and its Debian libraries, and the Docker CLI/daemon. It also caches verified native media tools and immutable fixture images. Amp snapshots these installed assets; warm setup checks reuse them. Use `pnpm exec node` for standalone repository scripts so they use the pinned runtime rather than the orb's global Node.
+
+`.agents/resume` checks Docker and starts the supervised, Unix-socket-only service declared in `.amp/services.yaml` when needed. It installs nothing. Inspect failures with `amp orb service logs docker`; `amp orb services ensure` repairs the declared service. No app, database fixtures, credentials, `.env` file or public portal are created automatically. Existing private configuration is untouched; tests retain ownership of disposable data and teardown.
+
+Quick and standard gates need no private configuration. Deep/integration/browser checks use native Linux x64 or ARM64 media, selected from `apps/api/src/storage/media/pins.ts`; the Docker daemon and cached image must match the host architecture. The sandbox retains `--pull=never`, exact archive/binary verification and its existing isolation/resource limits. No system-FFmpeg fallback or emulation is allowed. Media preflight runs before acquiring the backing stack. Setup caches images; standalone fixtures acquire missing images on demand, never during resume.
+
+Outside an orb, with local Docker ready, run `pnpm exec node scripts/setup-media.mjs` to prepare those same caches. An optional final argument supplies a retained exact archive for offline media acquisition (missing Docker images still require registry access). Media comes from [BtbN's 2026-10-31 month-end build](https://github.com/BtbN/FFmpeg-Builds/releases/tag/autobuild-2026-10-31-12-59), FFmpeg `n8.1.3-27-g8dca1586f4-20261031`, LGPLv3+, with verified SHA-256/size pins for both architectures. Native binaries require glibc ≥2.28 and libgcc; local qualification is not production-distribution clearance. Upstream retains month-end archives for two years, rather than only 14 daily builds; plan a reviewed pin refresh or retained source before that retention ends. Installed snapshots retain the verified bytes. A missing download fails setup rather than upgrading silently.
+
+To verify lifecycle changes, run `.agents/setup` twice and `.agents/resume` twice, timing each run, then run the configured gates. Setup changes become available to future project orbs after they reach the default branch; a local commit alone does not activate them.
+
+### Local development
+
 From the repository root:
 
 ```sh
 pnpm install --frozen-lockfile
+pnpm setup:hooks
 pnpm db:local
 ```
+
+Hook activation preserves existing custom hooks or refuses conflicts; see [regression gates](docs/regression-gates.md) for suite commands, worktree limits and working-tree verification limitations.
 
 Keep that terminal open. No prior `pnpm build` is needed: `db:local` reuses the test fixture's dependency-ordered compilation of contracts, api-client and API helpers before starting storage. The development-only helper creates a uniquely labelled, ephemeral Docker Postgres on a loopback-only ephemeral port, creates separate setup/serving roles, runs the supported native initialization through `pnpm db:prepare`, and grants serving DML access. It writes only the database settings to ignored, mode-0600 `outputs/local-database.env`; it refuses to overwrite an existing file. It does not use your Supabase stacks.
 
@@ -137,7 +154,7 @@ Account browser tests use only disposable accounts on the shared test stack's Au
 
 ## Verification
 
-Run the gates through `.checks/regression.sh --tier=quick|standard|deep`: quick on commit, standard on push and on merges into any branch other than `main` or `develop`, deep on merges into `main` or `develop`. [Regression gates](docs/regression-gates.md) lists each tier's checks and budgets. The underlying commands are below; bare `pnpm audit` fails while the reported moderate advisories exist, whereas the gate blocks only on high and critical ones.
+Use [Regression gates](docs/regression-gates.md) for the quick, standard and E2E commands, hook activation and merge requirements. The underlying commands below are available for targeted checks; budgets and resource limits live in `.checks/config.json`.
 
 ```sh
 pnpm check

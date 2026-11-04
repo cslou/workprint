@@ -6,6 +6,8 @@
 
 The detailed lifecycle, API inventory and module notes below retain the earlier broader architecture for rationale, not additional current requirements. References to deferred behavior, the earlier folder layout or still-pending B-020 are historical. Current modules also include `application`, `contracts`, `exports`, `usage` and configuration-only `model-catalog`; assistant bindings live under `agent/mastra`, separate from backend `mastra` composition, in one instance. Both modules and native behavior are qualified through the owning implementation stories. Read the implementation spec and assigned sprint plan before implementing; do not infer contracts from these background examples.
 
+The storage media boundary selects an exact native Linux x64 or ARM64 toolchain from `apps/api/src/storage/media/pins.ts`. Archive/binary hashes and the pinned multi-platform container image are checked before use; a mismatched Docker architecture is refused rather than emulated. Explicit development setup owns acquisition and caching; serving code never downloads tools. Network isolation, unprivileged identity, read-only mounts and job limits remain enforced by the storage sandbox. The shared test stack checks this boundary before acquiring backing services. See README for acquisition and licensing limits.
+
 ## Contents
 
 1. [Film production lifecycle](#film-production-lifecycle)

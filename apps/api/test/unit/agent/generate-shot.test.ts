@@ -97,7 +97,8 @@ test('the job runner\'s refusals and a cap race read as the video tools say them
   assert.deepEqual([checks.reason, line(checks)?.summary], ['checks', 'Not saved: the video didn’t pass checks']);
   assert.match(String(checks.message), /media checks/); assert.doesNotMatch(String(checks.message), /frame/);
   const lost = harness({ outcome: { kind: 'input_not_found' } });
-  assert.match(String((await run(lost.collaborators, tool.inputSchema.parse(args()))).message), /make the Shot's panels or the sheet again/); assert.doesNotMatch(String((await run(lost.collaborators, tool.inputSchema.parse(args()))).message), /frame/);
+  const missing = await run(lost.collaborators, tool.inputSchema.parse(args()));
+  assert.match(String(missing.message), /make the Shot's panels or the sheet again/); assert.doesNotMatch(String(missing.message), /frame/);
   const refused = harness({ outcome: { kind: 'failed', jobId, reason: 'provider_error', provider: 'invalid_request' } });
   const content = await run(refused.collaborators, tool.inputSchema.parse(args()));
   assert.deepEqual([content.reason, line(content)?.summary], ['refused', 'Not made: MiniMax refused the request']);

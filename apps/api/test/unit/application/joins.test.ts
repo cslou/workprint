@@ -19,11 +19,11 @@ const joined: JoinedMedia = { kind: 'joined', bytes: Buffer.from('joined'), fram
 
 /** Fake collaborators that record what reached them. */
 function harness(overrides: Partial<JoinCollaborators> = {}) {
-  const calls = { read: [] as string[], join: 0, save: [] as GeneratedVideoInput[] };
+  const calls = { read: [] as string[], join: 0, clips: [] as string[], save: [] as GeneratedVideoInput[] };
   const collaborators: JoinCollaborators = {
     reads: { workspace: async () => workspace as never },
     readClip: async (_account, id) => { calls.read.push(id); return { versionId: id, bytes: Buffer.from(id), durationMs: 4042 }; },
-    join: async () => { calls.join += 1; return joined; },
+    join: async clips => { calls.join += 1; calls.clips = clips.map(clip => Buffer.from(clip).toString()); return joined; },
     save: async (_account, _video, input) => {
       calls.save.push(input);
       return { version: { id: 'joined-version', kind: 'video', media: { contentType: 'video/mp4', byteSize: 6, width: 1344, height: 768, durationMs: 8083 } }, use: {}, gone: false } as never;
@@ -37,6 +37,7 @@ test('clips this video uses are read in order, joined and saved with the clips a
   const { join, calls } = harness();
   assert.deepEqual(await join(account, video, [a, shotClip]), { kind: 'joined', versionId: 'joined-version', width: 1344, height: 768, durationMs: 8083, clips: 2 });
   assert.deepEqual(calls.read, [a, shotClip]);
+  assert.deepEqual(calls.clips, [a, shotClip]);
   assert.equal(calls.save.length, 1);
   assert.deepEqual({ ...calls.save[0], bytes: calls.save[0]!.bytes.toString() }, { bytes: 'joined', frames: [], joined: { clips: [a, shotClip], frameMs: 8083.334 / 194 } });
 });

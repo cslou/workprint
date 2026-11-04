@@ -4,10 +4,10 @@ import { promisify } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { Client } from 'pg';
 import { failFixtureAcquisition } from './fixture-diagnostics.js';
+import { postgresImage } from './fixture-images.js';
 
 const exec = promisify(execFile);
 // Immutable multi-platform image; never uses or resets a developer's Supabase stack.
-export const postgresImage = 'postgres@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b';
 const docker = async (...args: string[]) => (await exec('docker', args, { timeout: 30000 })).stdout.trim();
 
 export async function query(url: string, sql: string) {
@@ -60,7 +60,7 @@ export async function isolatedPostgres(options: { network?: { name: string; owne
       return JSON.parse(await docker('inspect', '--format', '{"id":{{json .Id}},"owner":{{json (index .Config.Labels "workprint.fixture")}},"state":{{json .State.Status}}}', reference)) as { id: string; owner: string | null; state: string };
     } catch (error) {
       if (error instanceof Error && 'code' in error && error.code === 1 &&
-        'stderr' in error && typeof error.stderr === 'string' && /No such (object|container):/.test(error.stderr)) return undefined;
+        'stderr' in error && typeof error.stderr === 'string' && /No such (object|container):/i.test(error.stderr)) return undefined;
       throw error;
     }
   };

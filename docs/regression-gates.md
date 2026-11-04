@@ -1,46 +1,39 @@
 # Regression gates
 
-Workprint's map for the harness regression command contract. `.checks/regression.sh` owns the commands and `.checks/config.json` owns the deep merge bases, budgets and limits.
+Use the repository commands below. `.checks/regression.sh` owns their implementation; `.checks/config.json` owns budgets, resource limits and deep merge targets.
 
-## Tiers
+## Commands
 
-| Tier | Trigger | Checks, in order | Budget | Observed |
-|---|---|---|---|---|
-| quick | commit | `pnpm check`, `pnpm test:unit` | 180 s | 51 s |
-| standard | push, merge into any other branch | quick, then `pnpm build`, `pnpm test:tooling` | 300 s | 60 s |
-| deep | merge into `main` or `develop` | standard, then integration and browser journeys on one shared stack, then `scripts/audit.mjs` | 1200 s | 138 s |
-| full, routine | — | not configured; exits 2 | — | — |
+| Suite | Command | Coverage | When |
+|---|---|---|---|
+| Quick | `.checks/regression.sh --tier=quick` | Types, lint, boundaries and unit tests | Pre-commit |
+| Standard | `.checks/regression.sh --tier=standard` | Quick plus production build and tooling tests | Pre-push |
+| E2E / deep | `.checks/regression.sh --tier=deep` | Standard plus integration, browser journeys and dependency audit | When required by the issue, release or merge policy below |
 
-Hooks run these through each clone's `git config --local core.hooksPath <harness root>/githooks` (per clone, not committed). Each budget includes a 90 s cleanup reserve. Don't run `pnpm test:*` by hand during a gate run; it rebuilds the shared test build. A step that ends without failing but has something to report prints a `GATE-NOTICE:` line. The gate prints that line again in its summary, and it must appear in the report.
+Quick and standard need no Docker or private configuration. Deep requires local Docker and the pinned native Linux x64 or ARM64 media prerequisites described in the [README](../README.md#amp-orbs). Do not run another gate or standalone test command concurrently in the same checkout: they share generated test output and fixture state.
+
+## Hook activation
+
+Run `pnpm setup:hooks` once per standalone clone after installing dependencies. Orb `.agents/setup` runs it automatically. It sets clone-local `core.hooksPath=.githooks`; repeating it is safe and global Git settings remain unchanged.
+
+Existing custom hooks such as `prepare-commit-msg` are preserved through ignored local wrappers. Conflicting pre-commit/pre-push hooks, linked worktrees and worktree-scoped hook paths require explicit integration; activation refuses to replace them silently.
+
+The hooks block on failed checks. They do not fix, stage or stash files, and they do not launch reviewers. Successful pre-push prints the `review` skill reminder.
+
+Hooks check files on disk, not an isolated staged snapshot or arbitrary outgoing commits. Push the checked-out committed candidate with no relevant uncommitted changes.
 
 ## Merges
 
 Run `.checks/pre-merge.sh --base <base> --head <40-hex sha>` with a clean tracked tree, once GitHub shows the new head.
 
-Quick and standard apply to every branch. Only a merge into a base listed in `deep_merge_bases` (`main` and `develop`) runs deep. A merge into any other branch, such as a sprint branch, runs standard. No branch needs its own config entry.
+Merge verification selects deep for `deep_merge_bases` in `.checks/config.json` (currently `main` and `develop`), otherwise standard. This does not authorize a merge or replace required manual QA.
 
-## Incomplete runs
+## Failures and notices
 
-A failed, interrupted or over-budget run keeps `.checks/.incomplete.json` and its logs in `.checks/.logs/`, and later runs refuse to start. Clear it like this:
-1. Read the marker and logs.
-2. Fix the cause.
-3. Confirm nothing from the run is still alive. Check for leftover `outputs/fixtures/stack/*` folders, stopped `workprint-media-*` containers, a listener on the preview port, and orphaned API or Vite processes. Remove only what this run owned.
-4. Move the marker aside and record the diagnosis.
+A failed or interrupted gate leaves `.checks/.incomplete.json` and logs in `.checks/.logs/`; later gates refuse to start. Read the logs, fix the cause, and confirm owned fixture containers, processes and private stack records have been cleaned up before archiving the marker with the diagnosis. Never delete it merely to rerun.
 
-Never delete the marker just to rerun.
-
-## Existing checks inventory
-
-| Check | Tier | Change |
-|---|---|---|
-| `pnpm check`, `pnpm test:unit` | quick | Unchanged. |
-| `pnpm build` | standard | Unchanged. |
-| `pnpm test:integration` | deep | Its three Docker-free tooling files moved to `pnpm test:tooling`, which runs in standard. |
-| `pnpm test:browser` | deep | Unchanged; it now shares the integration stack. |
-| `pnpm audit` | deep | Blocks only on high or critical advisories. Lower ones are reported as a non-pass under B-002, B-004 and B-008, which is the existing policy. |
-
-There is no CI and no branch protection, and this gate replaces neither.
+Carry every `GATE-NOTICE:` into the result report. Dependency audit blocks on high or critical advisories; lower-severity advisories remain reported non-passes, not a clean audit.
 
 ## Approval
 
-Lou approved the tiers, triggers, budgets and audit threshold on 2026-11-01 (PR #70). The same day Lou replaced the per-branch merge targets: quick and standard apply to all branches, and only merges into `main` or `develop` run deep.
+The existing tiers, triggers, budgets and audit threshold were approved by Lou on 2026-11-01 ([PR #70](https://github.com/cslou/workprint/pull/70)). This setup documentation does not change that policy.

@@ -55,13 +55,22 @@ test('a response that never starts also stalls', async () => {
   assert.equal(seen.signal?.aborted, true);
 });
 
-test('once stop fires, a running call is aborted and a new one is refused unsent', async () => {
+test('once stop fires, a running call is aborted and a new one is refused unsent', { timeout: 1000 }, async () => {
   const stop = new AbortController();
-  const running = fakeModel(async () => stream([1], 5, true));
+  let started!: () => void;
+  const ready = new Promise<void>(resolve => { started = resolve; });
+  const running = fakeModel(async signal => new ReadableStream({
+    start(controller) {
+      signal?.addEventListener('abort', () => controller.error(signal.reason), { once: true });
+      started();
+    },
+  }));
   const pending = read(withStallLimit(running.model, 10_000, stop.signal));
-  await new Promise(resolve => setTimeout(resolve, 30));
-  stop.abort(new Error('Server shutting down'));
-  await assert.rejects(pending);
+  const reason = new Error('Server shutting down');
+  const rejected = assert.rejects(pending, error => error === reason);
+  await ready;
+  stop.abort(reason);
+  await rejected;
   assert.equal(running.seen.signal?.aborted, true);
   let calls = 0;
   const later = fakeModel(async () => { calls++; return stream([1], 1); });
