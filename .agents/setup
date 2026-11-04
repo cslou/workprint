@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+# Setup is snapshotted across threads: install tools, never credentials or fixtures.
+step() {
+  local label="$1" started=$SECONDS
+  shift
+  printf '\n==> %s\n' "$label"
+  "$@"
+  printf '==> %s: %ss\n' "$label" "$((SECONDS - started))"
+}
+
+system_packages() {
+  local package missing=()
+  # Chromium's Debian 12 libraries plus the repository's shell/test prerequisites.
+  for package in ca-certificates curl git tar xz-utils python3 procps \
+    libasound2 libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 libcairo2 libcups2 \
+    libdbus-1-3 libdrm2 libgbm1 libglib2.0-0 libnspr4 libnss3 libpango-1.0-0 \
+    libx11-6 libxcb1 libxcomposite1 libxdamage1 libxext6 libxfixes3 \
+    libxkbcommon0 libxrandr2 fonts-liberation; do
+    if [[ "$(dpkg-query -W -f='${Status}' "$package" 2>/dev/null || true)" != 'install ok installed' ]]; then
+      missing+=("$package")
+    fi
+  done
+  if ((${#missing[@]})); then
+    sudo -n apt-get update
+    sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${missing[@]}"
+  fi
+}
+
+docker_client() {
+  if ! command -v docker >/dev/null || ! command -v dockerd >/dev/null; then
+    sudo -n install -m 0755 -d /etc/apt/keyrings
+    sudo -n curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+    sudo -n chmod a+r /etc/apt/keyrings/docker.asc
+    # shellcheck disable=SC1091
+    source /etc/os-release
+    printf 'deb [arch=%s signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian %s stable\n' \
+      "$(dpkg --print-architecture)" "$VERSION_CODENAME" | sudo -n tee /etc/apt/sources.list.d/docker.list >/dev/null
+    sudo -n apt-get update
+    sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends docker-ce docker-ce-cli containerd.io
+  fi
+  # The existing test stack resolves this exact path. Never replace an existing CLI.
+  if [[ ! -e /usr/local/bin/docker ]]; then
+    sudo -n ln -s "$(command -v docker)" /usr/local/bin/docker
+  fi
+}
+
+dependencies() {
+  local manager
+  manager="$(node -p 'JSON.parse(require("node:fs").readFileSync("package.json", "utf8")).packageManager')"
+  if ! command -v pnpm >/dev/null || [[ "$(pnpm --version)" != "${manager#pnpm@}" ]]; then
+    sudo -n npm install --global "$manager"
+  fi
+  # pnpm also installs the exact devEngines.runtime Node version for project commands.
+  CI=true pnpm install --frozen-lockfile
+  pnpm exec node -e 'const p = require("./package.json"); if (process.versions.node !== p.engines.node) throw new Error("Repository Node version mismatch")'
+}
+
+step 'System prerequisites' system_packages
+step 'Docker CLI (daemon starts on resume)' docker_client
+step 'Pinned pnpm, Node and workspace dependencies' dependencies
+step 'Pinned Playwright Chromium' pnpm exec playwright install chromium
+printf '\nSetup ready for quick/standard checks. Deep tests additionally require the qualified ARM64 media toolchain; see README.\n'

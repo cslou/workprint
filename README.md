@@ -44,6 +44,18 @@ Dependency direction: the shell composes features; features use shared `api/` an
 
 Prerequisites: a working Docker engine, Git/tar for the clean-export smoke, and pnpm **11.28.8** (Corepack can select the version in `package.json`). pnpm downloads the repository-local Node **24.22.1** runtime; no global Node upgrade is needed. Dependency versions are pinned in the [root](package.json), [API](apps/api/package.json) and [web](apps/web/package.json) manifests and [lockfile](pnpm-lock.yaml).
 
+### Amp orbs
+
+`.agents/setup` installs the manifest-pinned pnpm and repository-local Node, frozen-lockfile dependencies, Playwright Chromium and its Debian libraries, and the Docker CLI/daemon. Amp snapshots these installed assets; warm setup checks reuse them. Use `pnpm exec node` for standalone repository scripts so they use the pinned runtime rather than the orb's global Node.
+
+`.agents/resume` checks Docker and starts the supervised, Unix-socket-only service declared in `.amp/services.yaml` when needed. It installs nothing. Inspect failures with `amp orb service logs docker`; `amp orb services ensure` repairs the declared service. No app, database fixtures, credentials, `.env` file or public portal are created automatically. Existing private configuration is untouched; tests retain ownership of disposable data and teardown.
+
+Quick and standard gates need no private configuration. **Deep/integration/browser checks still require the separately qualified ARM64 media environment:** `apps/api/src/storage/media/pins.ts` pins an exact archive and binaries, and the sandbox requires a `linux/arm64` image with `--pull=never`. Standard x64 orbs do not satisfy that contract; setup does not substitute system FFmpeg, change the pins or silently add emulation. Docker fixture images are acquired on demand by the existing test helpers, not during resume.
+
+To verify lifecycle changes, run `.agents/setup` twice and `.agents/resume` twice, timing each run, then run the configured gates. Setup changes become available to future project orbs after they reach the default branch; a local commit alone does not activate them.
+
+### Local development
+
 From the repository root:
 
 ```sh

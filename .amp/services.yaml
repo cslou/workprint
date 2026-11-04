@@ -1,0 +1,4 @@
+services:
+  docker:
+    # Local Unix socket only; no Docker TCP API, portal, app or seeded accounts.
+    command: 'sudo -n dockerd --host=unix:///var/run/docker.sock --group="$(id -gn)"'

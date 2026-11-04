@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+# No installations or fixture seeding here. The supervisor owns the daemon.
+if ! timeout 2 docker info >/dev/null 2>&1; then
+  amp orb services ensure
+  for attempt in {1..20}; do
+    if timeout 1 docker info >/dev/null 2>&1; then
+      printf 'Docker ready\n'
+      exit 0
+    fi
+    sleep 0.2
+  done
+  printf 'Docker unavailable; inspect amp orb service logs docker\n' >&2
+  exit 1
+fi
+printf 'Docker already ready\n'
