@@ -5,19 +5,14 @@ import { createServer, request as forward, type Server } from 'node:http';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createMediaSandbox } from '../../src/storage/index.js';
-import { MEDIA_ARCHIVE } from '../../src/storage/media/pins.js';
+import { nativeMediaPins } from '../../src/storage/media/pins.js';
 import { AuthFixtureResources } from './auth-fixture-resources.js';
 import { capturedRecoveryLink } from './auth-mail.js';
+import { authImages as images } from './fixture-images.js';
 import { qualifiedMediaFixtures, qualifiedPoster } from './media-fixtures.js';
 import { isolatedObjectStorage } from './object-storage.js';
 import { applicationDatabase, isolatedPostgres, query } from './postgres.js';
 
-// Installed official Supabase CLI images, pinned by observed immutable RepoDigest.
-// Mailpit provenance: github.com/axllent/mailpit, MIT, Supabase public ECR mirror v1.31.3.
-const images = {
-  auth: 'public.ecr.aws/supabase/gotrue@sha256:87db8c737af49a64236c461882ed3925f8b1e5c2c47176c64694dedc65153573',
-  mail: 'public.ecr.aws/supabase/mailpit@sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d',
-} as const;
 const stackLifetimeMs = 30 * 60_000;
 const corsHeaders = 'Authorization, Content-Type, apikey, X-Client-Info, X-Supabase-Api-Version';
 
@@ -77,6 +72,11 @@ export async function startTestStack(options: { browserOrigins: readonly string[
     try { const url = new URL(value); return url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.origin !== value; }
     catch { return true; }
   })) throw new Error('Test stack browser origins must be exact loopback HTTP origins');
+  // Fail before acquiring listeners, private records, networks or backing containers.
+  options.signal?.throwIfAborted();
+  const media = { toolchainDirectory: resolve(`outputs/toolchains/ffmpeg-${nativeMediaPins().archive.sha256}`), dockerPath: await realpath('/usr/local/bin/docker') };
+  try { await (await createMediaSandbox(media)).close(); }
+  catch (error) { throw new Error('Native media prerequisites unavailable; run pnpm exec node scripts/setup-media.mjs with local Docker ready', { cause: error }); }
   const resources = new AuthFixtureResources();
   const directory = join(process.cwd(), 'outputs', 'fixtures', 'stack', resources.owner);
   const cleanups: (() => unknown)[] = [];
@@ -143,7 +143,6 @@ export async function startTestStack(options: { browserOrigins: readonly string[
       await delay(100);
     }
     proceed();
-    const media = { toolchainDirectory: resolve(`outputs/toolchains/ffmpeg-${MEDIA_ARCHIVE.sha256}`), dockerPath: await realpath('/usr/local/bin/docker') };
     const sandbox = await createMediaSandbox(media);
     const files = { png: join(directory, 'image.png'), jpeg: join(directory, 'image.jpg'), video: join(directory, 'clip.mp4'), poster: join(directory, 'poster.png') };
     try {

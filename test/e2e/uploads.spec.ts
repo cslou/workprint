@@ -1,6 +1,10 @@
 import { test, expect, signIn } from './fixtures.js';
 
-test('an uploaded image is verified, previewed and still attached after reload, with no credentials sent to storage', async ({ page, context, backend }) => {
+// Lou deferred this unfinished feature on 2026-11-04. Restore this journey with #125;
+// keep persistence and credential-isolation assertions rather than deleting coverage.
+test.fixme('an uploaded image is verified, previewed and still attached after reload, with no credentials sent to storage', {
+  annotation: { type: 'issue', description: 'https://github.com/cslou/workprint/issues/125' },
+}, async ({ page, context, backend }) => {
   const [account] = await backend.accounts(1);
   const conversation = await backend.app.saveNative(account!.id);
   const storage = new URL(backend.media.configuration.endpoint).origin;

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import { runMediaChild } from './child.js';
 import { MediaProcessError } from './errors.js';
-import { MEDIA_IMAGE } from './pins.js';
+import { MEDIA_IMAGE, nativeMediaPins } from './pins.js';
 import { checkJoinInputs, checkJoinPlan, JOIN_LIST, JOIN_OUTPUT, JOIN_PROBE_ARGS, joinArgs, joinClipPath, joinList, MEDIA_JOIN_OUTPUT_BYTES, type MediaJoinPlan } from './join.js';
 import { DECODE_ARGS, MEDIA_JOB_BYTES, MEDIA_JOB_MS, MEDIA_LABEL, MEDIA_POSTER_BYTES, mediaContainerArgs, POSTER_ARGS, PROBE_ARGS, type SandboxResource } from './sandbox-config.js';
 import { verifyMediaToolchain } from './toolchain.js';
@@ -24,10 +24,14 @@ export async function createMediaSandbox(options: { toolchainDirectory: string; 
   const control = async (args: string[]) => (await runMediaChild(docker, args, { timeoutMs: 4000 })).stdout.toString().trim();
   const endpoint = await control(['context', 'inspect', '--format', '{{.Endpoints.docker.Host}}']);
   if (!endpoint.startsWith('unix://')) throw new MediaProcessError('unavailable');
+  const pins = nativeMediaPins();
+  const daemon = await control(['info', '--format', '{{.OSType}}|{{.Architecture}}']);
+  const native = pins.architecture === 'amd64' ? ['amd64', 'x86_64'] : ['arm64', 'aarch64'];
+  if (!native.some(arch => daemon === `linux|${arch}`)) throw new MediaProcessError('unavailable');
   const image = await control(['image', 'inspect', MEDIA_IMAGE, '--format', '{{json .RepoDigests}}|{{.Os}}|{{.Architecture}}']);
   const [digests, os, arch] = image.split('|');
   let listed: unknown; try { listed = JSON.parse(digests ?? ''); } catch { throw new MediaProcessError('unavailable'); }
-  if (os !== 'linux' || arch !== 'arm64' || !Array.isArray(listed) || !listed.includes(MEDIA_IMAGE)) throw new MediaProcessError('unavailable');
+  if (os !== 'linux' || arch !== pins.architecture || !Array.isArray(listed) || !listed.includes(MEDIA_IMAGE)) throw new MediaProcessError('unavailable');
   let current: Job | undefined, closed = false;
   const cleanup = async (job: Job) => {
     if (job.attempted) {

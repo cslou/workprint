@@ -7,9 +7,9 @@ import { promisify } from 'node:util';
 import { S3Client } from '@aws-sdk/client-s3';
 import { initializeObjectStorage } from './object-storage-startup.js';
 import type { FixtureDiagnostic } from './fixture-observation.js';
+import { SEAWEED_IMAGE } from './fixture-images.js';
 
 // Docker Hub OCI index resolved before first use; never execute the mutable tag alone.
-export const SEAWEED_IMAGE = 'chrislusf/seaweedfs:4.51@sha256:f7a49e3f3972ebed5be2ed4befa4a0c68eb7bdddba6e692d42729ceb545134b8';
 const digest = SEAWEED_IMAGE.slice(SEAWEED_IMAGE.indexOf('@') + 1);
 const exec = promisify(execFile);
 const docker = async (...args: string[]) => (await exec('docker', args, { timeout: 90000, maxBuffer: 1024 * 1024 })).stdout.trim();
@@ -34,7 +34,7 @@ export async function isolatedObjectStorage(origins: readonly string[] = ['http:
       let inspected: string;
       try { inspected = await docker('inspect', name); }
       catch (error) {
-        if (!(error instanceof Error) || !('stderr' in error) || typeof error.stderr !== 'string' || !error.stderr.includes('No such object')) throw error;
+        if (!(error instanceof Error) || !('code' in error) || error.code !== 1 || !('stderr' in error) || typeof error.stderr !== 'string' || !/No such object:/i.test(error.stderr)) throw error;
         inspected = '[]';
       }
       const records = JSON.parse(inspected) as { Id: string; Name: string; Config: { Labels: Record<string, string> } }[];
@@ -51,7 +51,11 @@ export async function isolatedObjectStorage(origins: readonly string[] = ['http:
       { name: owner, credentials: [{ accessKey: credentials.accessKeyId, secretKey: credentials.secretAccessKey }], actions: ['Admin', 'Read', 'List', 'Write', 'Tagging'].map(action => `${action}:${bucket}`) },
       { name: `${owner}-foreign`, credentials: [{ accessKey: foreignCredentials.accessKeyId, secretKey: foreignCredentials.secretAccessKey }], actions: [`Read:other-${owner}`, `Write:other-${owner}`] },
     ] }), { mode: 0o600 });
-    await docker('pull', SEAWEED_IMAGE);
+    try { await docker('image', 'inspect', SEAWEED_IMAGE); }
+    catch (error) {
+      if (!(error instanceof Error) || !('code' in error) || error.code !== 1 || !('stderr' in error) || typeof error.stderr !== 'string' || !/No such image:/i.test(error.stderr)) throw error;
+      await docker('pull', SEAWEED_IMAGE);
+    }
     const images = JSON.parse(await docker('image', 'inspect', SEAWEED_IMAGE)) as { RepoDigests: string[] }[];
     if (images.length !== 1 || !images[0]?.RepoDigests.includes(`chrislusf/seaweedfs@${digest}`)) throw new Error('Object-storage image digest was not verified');
     acquisitionStarted = true;

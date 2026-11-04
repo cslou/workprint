@@ -14,7 +14,7 @@ step() {
 system_packages() {
   local package missing=()
   # Chromium's Debian 12 libraries plus the repository's shell/test prerequisites.
-  for package in ca-certificates curl git tar xz-utils python3 procps \
+  for package in ca-certificates curl git tar xz-utils python3 procps libc6 libgcc-s1 \
     libasound2 libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 libcairo2 libcups2 \
     libdbus-1-3 libdrm2 libgbm1 libglib2.0-0 libnspr4 libnss3 libpango-1.0-0 \
     libx11-6 libxcb1 libxcomposite1 libxdamage1 libxext6 libxfixes3 \
@@ -62,4 +62,6 @@ step 'System prerequisites' system_packages
 step 'Docker CLI (daemon starts on resume)' docker_client
 step 'Pinned pnpm, Node and workspace dependencies' dependencies
 step 'Pinned Playwright Chromium' pnpm exec playwright install chromium
-printf '\nSetup ready for quick/standard checks. Deep tests additionally require the qualified ARM64 media toolchain; see README.\n'
+step 'Supervised local Docker' .agents/resume
+step 'Verified native media and fixture image caches' pnpm exec node scripts/setup-media.mjs
+printf '\nTooling and isolated-stack prerequisites ready; no application or test accounts started.\n'
