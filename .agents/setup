@@ -64,4 +64,5 @@ step 'Pinned pnpm, Node and workspace dependencies' dependencies
 step 'Pinned Playwright Chromium' pnpm exec playwright install chromium
 step 'Supervised local Docker' .agents/resume
 step 'Verified native media and fixture image caches' pnpm exec node scripts/setup-media.mjs
+step 'Clone-local verification hooks' pnpm setup:hooks
 printf '\nTooling and isolated-stack prerequisites ready; no application or test accounts started.\n'

@@ -12,6 +12,7 @@
     "db:prepare": "node scripts/tasks.mjs db:prepare",
     "db:migrate": "node supabase/migrate.mjs",
     "db:local": "node scripts/local-database.mjs",
+    "setup:hooks": "node scripts/setup-hooks.mjs",
     "check": "node scripts/test.mjs compile && tsc --noEmit && tsc -p test/e2e/tsconfig.json && eslint . && node scripts/boundaries.mjs && node scripts/boundary-controls.mjs",
     "test": "node scripts/test.mjs",
     "test:unit": "node scripts/test.mjs unit",
