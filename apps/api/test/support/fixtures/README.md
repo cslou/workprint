@@ -17,6 +17,10 @@ for (let y = 0; y < 240; y++) for (let x = 0; x < 240; x++) {
 
 `muse-spark-live-shapes.json` is written by `pnpm live:chat --live` (scripts/live/chat.mjs) from one real `meta/muse-spark-1.3` run. It keeps only chunk types, payload keys, tool names and finish reasons: no ids, text, stacks or provider metadata values. It records the stream the browser observes for each step (send, tool, read-workspace, update-script, Stop), after the server's safe projection, so it no longer shows raw provider chunks. It is a reviewed snapshot to compare by hand when the scripted provider or stream handling changes; no test reads it.
 
+# Muse Wonder live shapes
+
+`muse-wonder-live-shapes.json` is the same record from one `pnpm live:chat --live --model meta/muse-wonder-1.0` run (Sprint 014 Story 5, 2026-11-04), which added the save-storyboard step (a nested `positions` object) in the script's video. Against the Muse Spark record, the steps both have show the same chunk types and payload keys. The one difference is the order of calls: in the update-script step Wonder read the workspace before saving, where Spark saved at once. Spark's record has no save-storyboard step to compare. Wonder took the title's `minimal` reasoning effort, sent the nested positions and saved its storyboard on the first try, and needed no rephrased prompt.
+
 # MiniMax-shaped clip
 
 `minimax-clip.mp4` is the first 97 frames (4.041667 s) of the one live MiniMax-H3 768P clip from Sprint 009 Story 1 (task 459000874041694), cut by stream copy with the pinned toolchain, so the bytes keep MiniMax's traits: H.264 High, 1344×768 with no aspect-ratio tag, 24 fps with B-frames, AAC-LC 32 kHz stereo, `ftyp free mdat moov` and the `AIGC` metadata label. The pinned toolchain encodes only Constrained Baseline, so it can't make such a clip. 97 frames is the closest cut to 4 s that keeps every reference frame (in decode order, the first 96 frames end mid-group). `GENERATED_CLIP` in `minimax-video-fake.ts` holds its expected facts.

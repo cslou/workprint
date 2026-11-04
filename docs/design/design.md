@@ -18,6 +18,8 @@
 
 ## Image-only upload restriction
 
+**Composer copy (Lou, 2026-11-04):** the composer no longer shows the "JPEG or PNG only · Up to 10 MiB · 4096 × 4096 pixels. Video uploads are temporarily unavailable." line, and the composer's attach button is the "+" alone, before and after the first message (its accessible name stays "Attach a file"). Only the question composer, not shown until Questions, keeps "+ Attach". A refused file still explains the limits in its upload status.
+
 **Provisionally approved by the orchestrator on 2026-10-31 under Lou's delegation; pending Lou's ratification at the Phase 3 handoff.** Implements Lou’s temporary video-upload restriction with the existing composer, receipt, tokens and image-recovery states: uploads accept JPEG/PNG up to 10 MiB and 4096 × 4096 pixels and say that video uploads are temporarily unavailable. Video refusal offers “Choose an image” without replaying a transfer or claiming saved work was undone; saved images remain Draft, not approved references, and Send availability is unchanged. This supersedes the video-upload entry/success promises of [verified upload feedback](#verified-upload-feedback); existing owned-video presentation is not new upload authorization. [States](brand-book/screens/uploads.html).
 
 ## Verified upload feedback
@@ -64,9 +66,9 @@
 | --- | --- | --- |
 | Brand foundation | Deferred | Positioning/identity incomplete; Workprint name selected 2026-10-27, logo deferred |
 | Voice and tone | Partial | Wording rules from user-flows.md only; no voice guide |
-| Logo | Deferred | "Lets ignore the logo and name part first", 2026-10-02 |
+| Logo | Makeshift | The word "Workprint" in Italiana, Lou, 2026-11-04; a designed logo is still deferred |
 | Color | Approved | Light theme only |
-| Typography | Approved | System fonts; no files or licences |
+| Typography | Approved | System fonts, except the wordmark: Italiana, bundled under SIL OFL 1.1 (Lou, 2026-11-04) |
 | Spacing and layout | Approved | |
 | Shape and elevation | Approved | No z-index layers defined |
 | Iconography and imagery | Approved | No icon library chosen; example media not licensed |
@@ -106,7 +108,7 @@ What exists today, from the approved flows: the agent drafts and the person deci
 
 ## Logo
 
-**Section 04** · **Status:** Logo deferred. Workprint is the selected name; the existing "a" mark remains an illustrative placeholder, not an approved Workprint logo.
+**Section 04** · **Status:** Makeshift wordmark (Lou, 2026-11-04). The app's top left and the entry pages show only the word "Workprint" in Italiana (`--font-family-brand`, regular, 28px), thickened by a 0.5px outline in the text colour (`--font-brand-stroke`, Lou, 2026-11-04), since the face has one weight; the "a" mark is gone. A designed logo is still deferred.
 
 ## Color
 
@@ -187,12 +189,14 @@ Product code uses semantic tokens. Primitives exist only so semantic tokens can 
 
 ## Typography
 
-**Section 06** · **Status:** Approved — two system families, no font files; bold is always 600.
+**Section 06** · **Status:** Approved — two system families; the one font file is Italiana for the wordmark only (`--font-family-brand`, SIL OFL 1.1, Lou, 2026-11-04); bold is always 600.
 
 | Token | Value | Resolved | Was | Use |
 | --- | --- | --- | --- | --- |
 | `--font-family-sans` | `system-ui, -apple-system, "Segoe UI", Roboto, sans-serif` |  | `--font-sans` | All interface text. |
 | `--font-family-display` | `Georgia, "Times New Roman", serif` |  | `--font-display` | Display headings, dialogue, sheet titles. |
+| `--font-family-brand` | `"Italiana", Georgia, serif` |  |  | The Workprint wordmark only. Italiana (SIL OFL 1.1) is served with the app, not loaded from Google Fonts. |
+| `--font-brand-stroke` | `0.5px` |  |  | The wordmark's outline, `-webkit-text-stroke` in `currentColor`: Italiana has one weight, so the outline makes it bolder. |
 | `--font-weight-regular` | `400` |  | `--weight-regular` |  |
 | `--font-weight-medium` | `500` |  | `--weight-medium` |  |
 | `--font-weight-semibold` | `600` |  | `--weight-semibold` | All bold text. |
@@ -361,7 +365,7 @@ Each component has the same anchor here and on the [Components page](brand-book/
 
 `.sidebar` on `--color-bg-sunken` with a right border.
 
-- **Contents, top to bottom:** the product name (working placeholder), **New video**, **Library**, a **Recents** label with one row per video, and the account at the bottom.
+- **Contents, top to bottom:** the "Workprint" wordmark in Italiana with its 0.5px outline (a makeshift logo, Sprint 014), **New video**, **Library**, a **Recents** label with one row per video, and the account at the bottom.
 - **Nav items** (`.navitem`): 14px text with an 18px icon, `--radius-md`, 8px 10px padding. The current item gets a `--color-bg-hover` fill and `aria-current="page"`.
 - **Recents rows** use 13px text.
 
@@ -408,7 +412,7 @@ Each component has the same anchor here and on the [Components page](brand-book/
 
 - **Shape:** `--color-bg-surface`, `--color-border-input`, `--radius-2xl`, `--shadow-input`, 14px 12px 10px 16px padding, width `--size-layout-chat`, centred, 24px from the bottom.
 - **Field:** 15px text, at least 44px high. The placeholder uses `--color-text-subtle`; typed text uses `--color-text-primary`.
-- **Bottom bar:** "+ Attach" on the left (a 30px round button; it opens the [Library picker](#library-picker)) and **Send** on the right.
+- **Bottom bar:** "+" on the left (accessible name "Attach a file"; "+ Attach" only in the docked question composer; a 30px round button; it opens the device's file chooser for a JPEG or PNG upload, while the [Library picker](#library-picker) opens from Library) and **Send** on the right.
 
 | State | What shows | Rules |
 | --- | --- | --- |
@@ -463,7 +467,7 @@ The conversation follows the newest text while you are at its end, within about 
 | Stop | `.stop` | `--color-bg-inverse` fill, `--color-text-inverse` text, 9px square icon, height 32 | Only while the agent works |
 | Secondary pill | `.viewboard`, `.choice`, `.th-row .use` | `--color-border-default`, `--color-text-secondary` 13px, `--radius-pill`; hover fills `--color-bg-hover` | View storyboard, Play all, Use this version |
 | Icon | `.edit`, `.qclose`, `.lb-nav a` | 26–32px, transparent or outlined round; hover fills `--color-bg-hover` | Edit section, close, previous and next |
-| Attach | `.attach .plus` | 30px round outline with the + drawn as two 1.5px bars, centred exactly | Opens the library picker |
+| Attach | `.attach .plus` | 30px round outline with the + drawn as two 1.5px bars, centred exactly | Opens the device's file chooser for a JPEG or PNG upload |
 | Quiet | `.gen-quiet-button` | Minimum `--size-control-md` (32px), 13px/400 at 1.45 line height, 6px 10px padding, no border, transparent fill, `--radius-pill`, `--color-text-secondary` | Low-priority local action such as Collapse all; not a navigation link |
 
 Quiet-button hover/pressed uses `--color-bg-hover` and primary text. Keyboard focus underlines the label at 2px thickness (`--border-width-focus`) and 2px offset (`--border-width-focus-offset`), with no outline. Disabled is 45% opacity in this reference and skipped by keyboard focus. Collapse all closes the outer Scene groups only; it must not change the Scene filter, tab, conversation or material. It does not promise to reset every nested disclosure. Enter/Space activates the button. The reference's reset-only form is a script-free demonstration, not a required application mechanism.
@@ -590,8 +594,9 @@ The Script tab has three sections: **What happens**, **Shots** and **Look**.
 - **Camera pills live here.** A changed value marks its shot changed and shows **Regenerate** for that shot only.
 - **Edits are saved at once** and handed to the agent on its next turn (D-54).
 - **At ≤ `--breakpoint-sm`**, the grid is 2 columns.
-- **The agent's storyboard** (Sprint 011 QA follow-up): the board is the detailed view. Each Shot has its header, the Shot intent editor and its length line, then, each line only when the Shot has it, the action in 13px; the dialogue, one line each, with the speaker in 600 and the words in the display font; the camera note in 12px `--color-text-subtle`; and the subjects it names, joined by " · ", in 12px `--color-text-subtle`. Each panel tile shows its current image full width (selecting it opens the panel viewer), its number, the panel description editor and its version links.
+- **The agent's storyboard** (Sprint 011 QA follow-up): the board is the detailed view. Each Shot has its header, the Shot intent editor, its length line and its positions line (below), then, each line only when the Shot has it, the action in 13px; the dialogue, one line each, with the speaker in 600 and the words in the display font; the camera note in 12px `--color-text-subtle`; and the subjects it names, joined by " · ", in 12px `--color-text-subtle`. Each panel tile shows its current image full width (selecting it opens the panel viewer), its number, the panel description editor and its version links.
 - **A Shot's length** (Sprint 012): a 13px `--color-text-secondary` line, "Length · 6 s", or "Length · not set" for a Shot saved without one. On an editable storyboard a quiet **Edit** ("Edit Shot length") opens a number field labelled "Length in seconds" (4 to 15, whole seconds) in the planning editor's states, **Cancel, then Save**. A value outside that range, or not a whole number, shows "Enter a whole number of seconds from 4 to 15." and saves nothing; save failures reuse the planning editor's feedback lines. A built-in storyboard shows the line without Edit.
+- **A Shot's positions** (Sprint 014): under the length, a 13px `--color-text-secondary` line, "Starts: … / Ends: …", or "Positions · not set" for a Shot saved without them; the Storyboard tab's summary row doesn't show them. On an editable storyboard a quiet **Edit** ("Edit Shot positions") opens two text fields, "Starts" and "Ends" (up to 300 characters each), in the planning editor's states, **Cancel, then Save**. Both are needed: an empty one shows "Write where the Shot starts and where it ends." and saves nothing; unchanged positions just close. A built-in storyboard shows the line without Edit.
 
 ### Video rows
 
@@ -672,7 +677,7 @@ Keyboard/focus: labelled native checkbox toggles with Space; group summaries tog
 
 ### Library picker
 
-`.libpick`: opened from + Attach (D-83). This was a design example, used in the demo only.
+`.libpick`: opened from + Attach (D-83). This was a design example, used in the demo only; the shipped picker opens from Library.
 
 - **Panel:** `--size-layout-picker-w` × `--size-layout-picker-h`, `--radius-3xl`; full screen ≤ 820px.
 - **Head:** a title and a 260px round search field (hidden ≤ 820px).
@@ -791,6 +796,8 @@ Categories, names and images come only from labelled read-only display facts key
 | Isolated confirmation 501 | `Confirming this upload is not available yet. No version was created.` |
 
 Attach lines use the same plain line beneath the tray as the approved Use-version feedback, but attaching a reference is not selection: no line says the selection changed. A selected local file shows no chip, filename, thumbnail, progress or attachment; the input is cleared after the attempt. Attaching sends each exact version with purpose `reference`; with no current conversation the tray stays disabled and no `useVersion` or `requestUpload` is sent. Real transfer, validation, partial-success recovery and confirmation remain P3-S3/S4, not this wiring milestone. The ignored `outputs/verification/sprint-003/design-proposals/story3/` previews are historical evidence only, never runtime or comparison dependencies.
+
+**Not shown for now (Lou, 2026-11-04):** the Videos tab no longer shows the Export card or Export history, because export doesn't exist yet (B-009). The consumers below stay specified for when it does.
 
 **Direct Export, history/status and download consumers — 003/Story 4.** **Approved by Lou on 2026-10-29 at the Phase 2 review.** The orchestrator had provisionally approved it earlier the same day under Lou's delegation. Reuse `demo-18.html#p-takes`'s direct Videos Export direction, `app-r11.css`'s item-card/neutral-status treatments and the shared 560px viewer dialog (342px wide at a 390px viewport). The populated history/detail layout structure, sectioning, wrapping, scrolling and shared loading pattern are approved with the binding substitutions below. Card: `Chosen source versions`, then `Export` and `Export history`. Creators never see opaque IDs, internal selection revisions, numeric source order or test-prerequisite lines. No Editor, scene playback, settings profile, fake record/progress, deletion or retry is authorized. Download is an exact output-version media-access consumer, not a generated URL or working export claim.
 

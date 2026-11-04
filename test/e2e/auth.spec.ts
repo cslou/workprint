@@ -4,6 +4,7 @@ test('sign in keeps the email after a wrong password, and sign-out closes the wo
   const [account] = await backend.accounts(1);
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Make room for your next idea.' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Workprint', exact: true })).toHaveCSS('font-family', /^"?Italiana"?,/);
   await page.getByRole('link', { name: 'Sign in', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
 
@@ -19,6 +20,15 @@ test('sign in keeps the email after a wrong password, and sign-out closes the wo
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page).toHaveURL('/app');
   await expect(page.getByRole('button', { name: 'New video', exact: true })).toBeVisible();
+  // The wordmark is the word alone, in Italiana served with the app, thickened by a thin outline (the face has one weight).
+  const brand = page.locator('.wp-brand');
+  await expect(brand).toHaveText('Workprint');
+  await expect(brand).toHaveCSS('font-family', /^"?Italiana"?,/);
+  await expect(brand).toHaveCSS('-webkit-text-stroke-width', '0.5px');
+  await expect.poll(() => page.evaluate(() => [...document.fonts].some(face => face.family.replace(/"/g, '') === 'Italiana' && face.status === 'loaded'))).toBe(true);
+  // The opening composer: a bare "+" to attach, and no upload limits line.
+  await expect(page.getByRole('button', { name: 'Attach a file', exact: true })).toHaveText('+');
+  await expect(page.getByText(/JPEG or PNG only/)).toHaveCount(0);
 
   await page.getByRole('button', { name: account!.email, exact: true }).click();
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();

@@ -33,20 +33,40 @@ function workspace(options: { shots?: Shot[]; assets?: OwnedWorkspace['assets'];
 const resolve = (space: OwnedWorkspace, request: Partial<PanelRequest> = {}) => panelInputs(space, { shot: 's1', panel: 'p1', images: [], ...request });
 const inputs = (outcome: ReturnType<typeof panelInputs>) => { assert.equal(outcome.kind, 'resolved', JSON.stringify(outcome)); return outcome as Extract<typeof outcome, { kind: 'resolved' }>; };
 
-test('picked views take their reference\'s role and purpose, in role order, with the exact preface', () => {
+test('picked views take their reference\'s role and purpose, a place\'s view saying it is not the camera, in role order, with the exact preface', () => {
   const made = inputs(resolve(workspace(), { images: ['g2', 'm3', 'm1'] }));
   assert.deepEqual(made.inputs, [
     { versionId: 'm1', label: 'Mara · Full-body front', job: 'Her face and coat.' },
     { versionId: 'm3', label: 'Mara · Face close-up', job: 'Her face and coat.' },
-    { versionId: 'g2', label: 'The Gallery · Reverse angle', job: 'The white room.' },
+    { versionId: 'g2', label: 'The Gallery · Reverse angle', job: 'The white room. Match the place, not its camera angle or framing.' },
   ]);
-  assert.equal(made.preface, 'Input 1: Mara · Full-body front — Her face and coat.\nInput 2: Mara · Face close-up — Her face and coat.\nInput 3: The Gallery · Reverse angle — The white room.');
+  assert.equal(made.preface, 'Input 1: Mara · Full-body front — Her face and coat.\nInput 2: Mara · Face close-up — Her face and coat.\nInput 3: The Gallery · Reverse angle — The white room. Match the place, not its camera angle or framing.');
   assert.equal(made.size, undefined, 'a first panel has no size to keep');
+  // The preface then gives the Shot's camera, its positions and, for a later Shot in the same place, where the one before ended.
+  const opening = { shotId: 's0', order: 0, intent: 'Mara walks in.', references, positions: { start: 'Mara frame left.', end: 'Mara at the bench, frame right.' }, panels: [panel('p0', 0)], chosenVideoVersionId: null };
+  const kneeling = { shotId: 's1', order: 1, intent: 'Mara kneels.', framing: 'medium', cameraNote: ' Medium, from her left, slowly pushes in. ', references, positions: { start: 'Mara at the bench.', end: 'Mara holds the key up.' }, panels: [panel('p1', 0)], chosenVideoVersionId: null };
+  const placed = inputs(resolve(workspace({ shots: [opening, kneeling] }), { images: ['g2'] }));
+  assert.equal(placed.preface, 'Input 1: The Gallery · Reverse angle — The white room. Match the place, not its camera angle or framing.\nCamera: Medium, from her left, slowly pushes in.\nPositions: starts Mara at the bench; ends Mara holds the key up.\nPrevious Shot ended: Mara at the bench, frame right.\nThis panel shows the Shot as it starts.');
+});
+
+test('a first panel\'s camera line is the Shot\'s camera note, else its framing, else absent; a later panel has none', () => {
+  const camera = (fields: Partial<Shot>) => inputs(resolve(workspace({ shots: [{ shotId: 's1', order: 0, intent: 'Mara arrives.', references, panels: [panel('p1', 0)], chosenVideoVersionId: null, ...fields }] }), { images: ['m1'] })).preface.split('\n').slice(1);
+  assert.deepEqual(camera({ framing: 'wide', cameraNote: 'Wide, from the door, static' }), ['Camera: Wide, from the door, static.']);
+  assert.deepEqual(camera({ framing: ' wide ', cameraNote: '  ' }), ['Camera: wide.']);
+  assert.deepEqual(camera({}), []);
+  const later = inputs(resolve(workspace({ shots: [{ shotId: 's1', order: 0, intent: 'Mara arrives.', cameraNote: 'Wide, then pushes in close', references, panels: [panel('p1', 0, [image('p1-v1', 1536, 864, 'assistant')]), panel('p2', 1)], chosenVideoVersionId: null }] }), { panel: 'p2', images: ['m1'] }));
+  assert.ok(!later.preface.includes('Camera:'), later.preface);
+});
+
+test('a place\'s purpose without a full stop still ends before the place job', () => {
+  const bare: Reference[] = [{ subjectId: 'the-gallery', role: 'environment', purpose: 'The white room' }];
+  const made = inputs(resolve(workspace({ shots: [{ shotId: 's1', order: 0, intent: 'Mara arrives.', references: bare, panels: [panel('p1', 0)], chosenVideoVersionId: null }] }), { images: ['g1'] }));
+  assert.equal(made.inputs[0]!.job, 'The white room. Match the place, not its camera angle or framing.');
 });
 
 test('empty images pass every referenced sheet whole; other picked images come after the sheet views', () => {
   assert.deepEqual(inputs(resolve(workspace())).inputs.map(input => [input.versionId, input.job]), [
-    ['m1', 'Her face and coat.'], ['m2', 'Her face and coat.'], ['m3', 'Her face and coat.'], ['g1', 'The white room.'], ['g2', 'The white room.'], ['k1', 'The brass key.'],
+    ['m1', 'Her face and coat.'], ['m2', 'Her face and coat.'], ['m3', 'Her face and coat.'], ['g1', 'The white room. Match the place, not its camera angle or framing.'], ['g2', 'The white room. Match the place, not its camera angle or framing.'], ['k1', 'The brass key.'],
   ]);
   // An image filed under Mara that isn't in her sheet, an upload and an unreferenced subject's view are other images.
   assert.deepEqual(inputs(resolve(workspace(), { images: ['b1', 'mara-extra', 'm2', 'u1'] })).inputs, [

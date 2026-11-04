@@ -84,7 +84,7 @@ test('a later panel takes the sheet views, then the first panel\'s image last, a
   assert.equal((await run(collaborators, input({ panel: 'p2', images: ['g1'], size: '1024x1024' }))).made, true);
   assert.deepEqual(calls.reads, [['g1', 'p1-v1']]);
   assert.equal(calls.edit[0]!.size, '1536x864');
-  assert.match(String(calls.edit[0]!.prompt), /^Input 1: The Gallery · Wide master — The room\.\nInput 2: Shot 1 · Panel 1\.1 — match the setting, people and light; not its camera or framing\n\n/);
+  assert.match(String(calls.edit[0]!.prompt), /^Input 1: The Gallery · Wide master — The room\. Match the place, not its camera angle or framing\.\nInput 2: Shot 1 · Panel 1\.1 — match the setting, people and light; not its camera or framing\n\n/);
 });
 
 test('the saved line names the panel; a panel that left the storyboard says so', async () => {

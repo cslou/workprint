@@ -4,6 +4,11 @@ Convention: `docs/conventions/backlog-management.md` (selected harness root; AGE
 
 ## Inbox
 
+### B-047 — The joined video is the result, not "Video 1"
+- Context: Lou, 2026-11-04, looking at the Sprint 014 gallery run. The joined video sits under "Generated videos" as "Video 1", beside one-off clips, as Sprint 013 planned ("a joined video is a row like any other"). It is the film, and the Shot videos are its parts.
+- Idea: its own section at the top of the Videos tab, above the Shots, named after the video's title with what it is made of ("Shots 1–3 · 0:21"); a re-join after a Shot video changes is a new version of it, not "Video 2"; "Generated videos" keeps only the agent's one-off clips. Suggested for Sprint 015.
+- Open question: whether the browser can already read which clips a join used (`JoinedClips`, `apps/api/src/artifacts/generated-videos.ts`).
+
 ### B-046 — Shrink reference images if their size becomes a problem
 - Context: Sprint 012 planning (2026-11-03). Reference images are sent to MiniMax as stored, as Base64 in the request body. Nine sheet PNGs come to about 36 MB, under the 64 MiB cap; the Shot 1 test used 1,536 px JPEGs at 1.3 MB.
 - Open decision: whether to downscale or re-encode reference images before sending, if body size, upload time or MiniMax limits become a problem.
