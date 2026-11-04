@@ -78,6 +78,12 @@ test('the production Muse Spark route sends minimal reasoning effort and the 1,0
   assert.deepEqual(patches, [{ id: video, title: 'Night swim' }]);
 });
 
+test('Muse Wonder has its own title options: minimal effort too, as its live check accepted', async () => {
+  const { model, calls } = fakeModel(text('Gallery key'), { provider: 'meta', modelId: 'muse-wonder-1.0' });
+  await createVideoTitler(model, fakeStorage().storage, limits)(owner, video, 'Hello');
+  assert.deepEqual(calls[0]!.providerOptions, { openai: { reasoningEffort: 'minimal' }, meta: { reasoningEffort: 'minimal' } });
+});
+
 test('a titled, missing or foreign video makes no call', async () => {
   for (const [thread, id] of [[{ title: 'Kept' }, video], [{ title: '' }, 'missing'], [{ title: '', resourceId: 'someone' }, video]] as const) {
     const { model, calls } = fakeModel(text('Unused'));

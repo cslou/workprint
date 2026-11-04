@@ -17,6 +17,7 @@ const minimalEffort = Object.freeze({ reasoningEffort: 'minimal' });
  */
 const titleOptions: Readonly<Record<AssistantModelId, TitleProviderOptions>> = Object.freeze({
   'meta/muse-spark-1.3': Object.freeze({ openai: minimalEffort, meta: minimalEffort }),
+  'meta/muse-wonder-1.0': Object.freeze({ openai: minimalEffort, meta: minimalEffort }),
 });
 
 /** The title options for a composed model, or none for a model not qualified here. */

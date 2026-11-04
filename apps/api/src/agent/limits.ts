@@ -35,6 +35,6 @@ export const turnLimits: TurnLimits = Object.freeze({
 /** Failure notice when the final allowed step still asks for a tool. */
 export const stepLimitReason = 'Stopped after too many steps.';
 
-/** The only assistant model qualified for the MVP. */
-export const assistantModels = ['meta/muse-spark-1.3'] as const;
+/** The assistant models qualified for the MVP; the server takes one from `DEFAULT_ASSISTANT_MODEL`. Muse Wonder since Sprint 014. */
+export const assistantModels = ['meta/muse-spark-1.3', 'meta/muse-wonder-1.0'] as const;
 export type AssistantModelId = typeof assistantModels[number];

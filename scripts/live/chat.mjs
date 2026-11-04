@@ -1,7 +1,7 @@
 // Chat check against the built API. Scripted by default (fake provider, placeholder key, network
-// guarded); `--live` makes a handful of real Muse Spark calls and one Meta image call, and saves the
-// sanitized shapes.
-// Run through `pnpm live:chat [--live]`, which compiles the tests and starts the shared test stack.
+// guarded); `--live` makes a handful of real model calls and one Meta image call, and saves the
+// sanitized shapes. `--model <id>` picks the qualified model for a live run (default Muse Spark).
+// Run through `pnpm live:chat [--live] [--model <id>]`, which compiles the tests and starts the shared test stack.
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -9,6 +9,8 @@ import { pathToFileURL } from 'node:url';
 import { parseEnv } from 'node:util';
 
 const live = process.argv.includes('--live');
+const modelAt = process.argv.indexOf('--model');
+const model = modelAt === -1 ? 'meta/muse-spark-1.3' : process.argv[modelAt + 1];
 const support = join(import.meta.dirname, '../../apps/api/.test-build/test/support');
 const load = name => import(pathToFileURL(join(support, name)).href);
 const { accountBrowserFixture } = await load('account-browser-fixture.js');
@@ -18,6 +20,10 @@ const { completed, nativeTurnClient } = await load('native-turn-client.js');
 const { scriptedProvider } = await load('scripted-provider.js');
 const { metaImageFake } = await load('meta-image-fake.js');
 const { testStack } = await load('test-stack.js');
+const { assistantModels } = await import(pathToFileURL(join(import.meta.dirname, '../../apps/api/.test-build/src/agent/index.js')).href);
+if (!assistantModels.includes(model)) throw new Error(`--model must be one of: ${assistantModels.join(', ')}`);
+// The scripted provider stands in for Muse Spark only.
+if (!live && modelAt !== -1) throw new Error('--model is for live runs');
 
 /** The key comes only from the root .env, parsed here and passed to the child; never printed or put in process.env. */
 function metaKey() {
@@ -30,7 +36,7 @@ const canary = 'workprint-live-chat-canary';
 process.env.WORKPRINT_LIVE_CHAT_CANARY = canary;
 /** Allowlisted child env, with a canary check: nothing from this process leaks in by inheritance. */
 async function childEnvironment() {
-  const prepared = live ? await liveEnvironment(metaKey()) : await environment();
+  const prepared = live ? await liveEnvironment(metaKey(), model) : await environment();
   const env = prepared.env;
   assert.ok(!Object.values(env).includes(canary), 'child env must be allowlisted');
   for (const name of ['META_MODEL_API_KEY', 'MINIMAX_API_KEY']) assert.equal(env[name], undefined, `${name} must not reach the child`);
@@ -46,7 +52,7 @@ const { storage, media } = testStack();
 const fixture = await accountBrowserFixture({
   // Saved-work tables, so read-workspace reads a real (empty) workspace; storage and the decode keep made images.
   artifacts: true, storage, media: media.toolchain,
-  composition: live ? liveChatComposition(provider.gateUrl) : chatComposition(provider, {}, { url: meta.url }),
+  composition: live ? liveChatComposition(provider.gateUrl, model) : chatComposition(provider, {}, { url: meta.url }),
   environment: childEnvironment,
 });
 const results = [];
@@ -110,8 +116,9 @@ try {
   await toolStep('read-workspace', 'read-workspace', ['Check our progress on this video.', 'Call the read-workspace tool now to check our progress on this video. Do not answer before calling it.'], {}, 'Nothing is saved yet.');
 
   // The agent writes a first script; it must use the tool with content the saved-script schema accepts.
+  let scripted;
   await step('update-script', async () => {
-    const args = { baseVersionId: null, script: { schemaVersion: 1, scenes: [{ heading: { setting: 'exterior', location: 'Mountain lake', time: 'night' }, characters: ['Mara'], script: [{ action: 'Mara swims across the dark lake toward the far shore.' }, { dialogue: { character: 'Mara', text: 'Almost there.' } }] }] } };
+    const args = { baseVersionId: null, script: { schemaVersion: 1, scenes: [{ heading: { setting: 'exterior', location: 'Mountain lake', time: 'night' }, characters: ['Mara'], script: [{ action: 'Mara swims across the dark lake toward the far shore.' }, { dialogue: { character: 'Mara', text: 'Almost there.' } }] }] }, subjects: [{ id: '', kind: 'character', name: 'Mara' }, { id: '', kind: 'place', name: 'Mountain lake' }] };
     const prompts = ['This video has no script yet. Write a short one-scene script in which Mara swims across a mountain lake at night, and save it with the update-script tool.', 'Call the update-script tool now with a one-scene script about Mara swimming across a mountain lake at night. The video has no script yet, so pass baseVersionId null. Do not answer before calling it.'];
     for (const [attempt, prompt] of prompts.entries()) {
       if (!live) provider.script({ toolCalls: [{ name: 'update-script', args }] }, { text: ['I saved the script.'] });
@@ -129,7 +136,35 @@ try {
       const { script } = await response.json();
       assert.equal(script?.version.createdBy, 'assistant'); assert.equal(script?.use.state, 'draft');
       shapes['update-script'] = sanitize(turn.chunks);
+      scripted = video;
       return { rephrased: attempt > 0, firstChunkMs: turn.firstChunkMs };
+    }
+    throw new Error('unreachable');
+  });
+
+  // In the script's video, the agent saves a storyboard: every Shot has its nested positions and names the place.
+  await step('save-storyboard', async () => {
+    assert.ok(scripted, 'needs the update-script step\'s video');
+    const read = async () => { const response = await client.get(`/v1/conversations/${scripted}/workspace`); assert.equal(response.status, 200, `workspace read answered ${response.status}`); return response.json(); };
+    const subjects = (await read()).script.version.content.subjects ?? [];
+    const id = kind => subjects.find(subject => subject.kind === kind)?.id;
+    const args = { base: '', shots: [{ intent: 'Mara nears the far shore.', framing: 'wide', action: 'Mara swims toward the far shore.', cameraNote: 'Wide, from the shore, static', dialogue: [{ character: 'Mara', text: 'Almost there.' }], references: [{ subjectId: id('character'), role: 'identity', purpose: 'Mara' }, { subjectId: id('place'), role: 'environment', purpose: 'The lake' }], durationS: 6, positions: { start: 'Mara swims frame left, heading frame right.', end: 'Mara reaches the shore, frame right.' }, panels: [{ description: 'Mara swimming across the dark lake.' }] }] };
+    const prompts = ['Plan the storyboard for this script: one or two Shots. Save it with the save-storyboard tool.', 'Call the save-storyboard tool now with a one-Shot storyboard for this script, with its positions and the lake as its place. Do not answer before calling it.'];
+    const summaries = [];
+    for (const [attempt, prompt] of prompts.entries()) {
+      if (!live) provider.script({ toolCalls: [{ name: 'save-storyboard', args }] }, { text: ['I saved the storyboard.'] });
+      const turn = await client.turn(scripted, prompt, timeoutMs);
+      const lines = turn.chunks.filter(chunk => chunk.type === 'tool-activity' && chunk.payload?.tool === 'save-storyboard' && chunk.payload?.state === 'done');
+      summaries.push(...lines.map(line => line.payload?.summary));
+      if (!summaries.some(summary => /^Saved Storyboard/.test(summary)) && attempt === 0) continue;
+      assert.ok(lines.length, 'the model declined the save-storyboard tool twice');
+      assert.ok(completed(turn), `turn did not complete: ${turn.terminal?.type ?? 'no terminal chunk'}`);
+      const { storyboard } = await read();
+      assert.ok(storyboard.shots.length > 0, 'no Shots saved');
+      for (const shot of storyboard.shots) assert.ok(shot.positions?.start && shot.positions?.end, 'a saved Shot has no positions');
+      shapes['save-storyboard'] = sanitize(turn.chunks);
+      // Refusals before the save are recorded, not failed: the result message is how the agent corrects itself.
+      return { rephrased: attempt > 0, summaries, shots: storyboard.shots.length, firstChunkMs: turn.firstChunkMs };
     }
     throw new Error('unreachable');
   });
@@ -192,7 +227,7 @@ try {
   if (live) {
     const directory = 'apps/api/test/support/fixtures';
     mkdirSync(directory, { recursive: true });
-    writeFileSync(join(directory, 'muse-spark-live-shapes.json'), JSON.stringify({ observed: new Date().toISOString().slice(0, 10), model: 'meta/muse-spark-1.3', shapes }, null, 2) + '\n');
+    writeFileSync(join(directory, `${model.split('/')[1].replace(/-[\d.]+$/, '')}-live-shapes.json`), JSON.stringify({ observed: new Date().toISOString().slice(0, 10), model, shapes }, null, 2) + '\n');
   }
   if (!live) assert.equal(provider.unscripted.length, 0, 'unscripted provider request');
   await fixture.close();
