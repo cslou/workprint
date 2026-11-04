@@ -1451,7 +1451,7 @@ test('generate-panel makes a panel\'s image from the Shot\'s sheets and saves it
     assert.ok(one.result.made, JSON.stringify(one.result));
     assert.equal(meta.requests.length, 1); assert.equal(meta.requests[0]!.path, '/v1/images/edits');
     const body = meta.requests[0]!.body;
-    assert.equal(body.prompt, 'Input 1: Mara · Face close-up — Her face.\nInput 2: The Gallery · Wide master — The room.\n\nPreserve the room. Change only: Mara steps in.');
+    assert.equal(body.prompt, 'Input 1: Mara · Face close-up — Her face.\nInput 2: The Gallery · Wide master — The room. Match the place, not its camera angle or framing.\n\nPreserve the room. Change only: Mara steps in.');
     assert.deepEqual([body.n, body.size], [1, '1536x1024']);
     assert.deepEqual(body.images, [{ image_url: await dataUrl(p.m2) }, { image_url: await dataUrl(p.g1) }]);
     const v1 = await store.version(owner.id, one.result.versionId);
