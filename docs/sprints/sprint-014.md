@@ -264,7 +264,7 @@ For descriptive-only work, use editorial review and applicable existing checks. 
 
 ## Final Review
 
-- **Outcome:** the goal is met in the scripted build and, from the live gallery run, in a live one; Lou's QA is next. Every story's ACs and verification items are met, with the changes recorded in each story. Lou was away and delegated decisions for the sprint ("you have the authority to make decisions for me"); the decisions made under it are listed below. Each story merged into `sprint-014` after an independent review of at least 4/5 with no open P0 or P1, then a review-fix:
+- **Outcome:** the goal is met in the scripted build. In the one live gallery run, items 1 and 2 pass and item 3 is ambiguous at the second cut, which waits on Lou's decision before his QA. Every story's ACs and verification items are met, with the changes recorded in each story. Lou was away and delegated decisions for the sprint ("you have the authority to make decisions for me"); the decisions made under it are listed below. Each story merged into `sprint-014` after an independent review of at least 4/5 with no open P0 or P1, then a review-fix:
   - Story 1, #150 (wordmark, composer, Videos tab): 4/5, then 5/5. Accepted P2: commit `5871aa7`'s subject is 51 characters (no amend after a PR opens).
   - Story 2, #151 (positions and the place rule): 4/5, then 5/5.
   - Story 3, #152 (positions in the panel and Shot video prompts): 4/5, then 5/5.

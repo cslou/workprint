@@ -466,7 +466,7 @@ The conversation follows the newest text while you are at its end, within about 
 | Stop | `.stop` | `--color-bg-inverse` fill, `--color-text-inverse` text, 9px square icon, height 32 | Only while the agent works |
 | Secondary pill | `.viewboard`, `.choice`, `.th-row .use` | `--color-border-default`, `--color-text-secondary` 13px, `--radius-pill`; hover fills `--color-bg-hover` | View storyboard, Play all, Use this version |
 | Icon | `.edit`, `.qclose`, `.lb-nav a` | 26–32px, transparent or outlined round; hover fills `--color-bg-hover` | Edit section, close, previous and next |
-| Attach | `.attach .plus` | 30px round outline with the + drawn as two 1.5px bars, centred exactly | Opens the library picker |
+| Attach | `.attach .plus` | 30px round outline with the + drawn as two 1.5px bars, centred exactly | Opens the device's file chooser for a JPEG or PNG upload |
 | Quiet | `.gen-quiet-button` | Minimum `--size-control-md` (32px), 13px/400 at 1.45 line height, 6px 10px padding, no border, transparent fill, `--radius-pill`, `--color-text-secondary` | Low-priority local action such as Collapse all; not a navigation link |
 
 Quiet-button hover/pressed uses `--color-bg-hover` and primary text. Keyboard focus underlines the label at 2px thickness (`--border-width-focus`) and 2px offset (`--border-width-focus-offset`), with no outline. Disabled is 45% opacity in this reference and skipped by keyboard focus. Collapse all closes the outer Scene groups only; it must not change the Scene filter, tab, conversation or material. It does not promise to reset every nested disclosure. Enter/Space activates the button. The reference's reset-only form is a script-free demonstration, not a required application mechanism.
@@ -676,7 +676,7 @@ Keyboard/focus: labelled native checkbox toggles with Space; group summaries tog
 
 ### Library picker
 
-`.libpick`: opened from + Attach (D-83). This was a design example, used in the demo only.
+`.libpick`: opened from + Attach (D-83). This was a design example, used in the demo only; the shipped picker opens from Library.
 
 - **Panel:** `--size-layout-picker-w` × `--size-layout-picker-h`, `--radius-3xl`; full screen ≤ 820px.
 - **Head:** a title and a 260px round search field (hidden ≤ 820px).
