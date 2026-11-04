@@ -19,7 +19,7 @@ for (let y = 0; y < 240; y++) for (let x = 0; x < 240; x++) {
 
 # Muse Wonder live shapes
 
-`muse-wonder-live-shapes.json` is the same record from one `pnpm live:chat --live --model meta/muse-wonder-1.0` run (Sprint 014 Story 5, 2026-11-04), which added the save-storyboard step (a nested `positions` object) in the script's video. Against the Muse Spark record, the steps both have show the same chunk types and payload keys; Wonder took the title's `minimal` reasoning effort, sent the nested positions and saved its storyboard on the first try, and needed no rephrased prompt.
+`muse-wonder-live-shapes.json` is the same record from one `pnpm live:chat --live --model meta/muse-wonder-1.0` run (Sprint 014 Story 5, 2026-11-04), which added the save-storyboard step (a nested `positions` object) in the script's video. Against the Muse Spark record, the steps both have show the same chunk types and payload keys. The one difference is the order of calls: in the update-script step Wonder read the workspace before saving, where Spark saved at once. Spark's record has no save-storyboard step to compare. Wonder took the title's `minimal` reasoning effort, sent the nested positions and saved its storyboard on the first try, and needed no rephrased prompt.
 
 # MiniMax-shaped clip
 

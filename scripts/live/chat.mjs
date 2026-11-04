@@ -6,11 +6,12 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { parseEnv } from 'node:util';
+import { parseArgs, parseEnv } from 'node:util';
 
-const live = process.argv.includes('--live');
-const modelAt = process.argv.indexOf('--model');
-const model = modelAt === -1 ? 'meta/muse-spark-1.3' : process.argv[modelAt + 1];
+// Strict: an unknown or misspelt flag stops the run rather than paying for the default model.
+const { values: options } = parseArgs({ options: { live: { type: 'boolean', default: false }, model: { type: 'string' } }, strict: true });
+const live = options.live;
+const model = options.model ?? 'meta/muse-spark-1.3';
 const support = join(import.meta.dirname, '../../apps/api/.test-build/test/support');
 const load = name => import(pathToFileURL(join(support, name)).href);
 const { accountBrowserFixture } = await load('account-browser-fixture.js');
@@ -23,7 +24,7 @@ const { testStack } = await load('test-stack.js');
 const { assistantModels } = await import(pathToFileURL(join(import.meta.dirname, '../../apps/api/.test-build/src/agent/index.js')).href);
 if (!assistantModels.includes(model)) throw new Error(`--model must be one of: ${assistantModels.join(', ')}`);
 // The scripted provider stands in for Muse Spark only.
-if (!live && modelAt !== -1) throw new Error('--model is for live runs');
+if (!live && options.model !== undefined) throw new Error('--model is for live runs');
 
 /** The key comes only from the root .env, parsed here and passed to the child; never printed or put in process.env. */
 function metaKey() {

@@ -18,15 +18,17 @@ export function chatComposition(provider: { url: string; gateUrl: string }, limi
 }
 
 /** Live composition for `pnpm live:chat --live`: the real Meta endpoints and the given model, key read from the child env. */
-export function liveChatComposition(gateUrl: string, model: AssistantModelId = 'meta/muse-spark-1.3') {
-  return composition(undefined, gateUrl, {}, undefined, {}, undefined, model);
+export function liveChatComposition(gateUrl: string, model: AssistantModelId) {
+  return composition(model, gateUrl, {});
 }
 
 /**
- * Scripted runs reach Meta images and MiniMax only through loopback fakes (`images.url`, `videos.url`); live runs use
- * the real Meta API and compose no video client.
+ * `provider` is the scripted loopback provider, or the model id of a live run. Scripted runs reach Meta images and
+ * MiniMax only through loopback fakes (`images.url`, `videos.url`); live runs use the real Meta API and compose no
+ * video client.
  */
-function composition(scripted: { url: string; apiKey: string } | undefined, gateUrl: string, limits: Partial<TurnLimits>, images?: { url: string }, server: ChatServer = {}, videos?: ChatVideos, live: AssistantModelId = 'meta/muse-spark-1.3') {
+function composition(provider: { url: string; apiKey: string } | AssistantModelId, gateUrl: string, limits: Partial<TurnLimits>, images?: { url: string }, server: ChatServer = {}, videos?: ChatVideos) {
+  const scripted = typeof provider === 'string' ? undefined : provider;
   const { slowRoute, ...start } = server;
   const imageClient = scripted
     ? images ? `createMetaImageClient({ apiKey: ${JSON.stringify(scripted.apiKey)}, baseUrl: ${JSON.stringify(images.url)}, retryDelayMs: 1 })` : 'undefined'
@@ -42,7 +44,7 @@ function composition(scripted: { url: string; apiKey: string } | undefined, gate
     import { createMetaImageClient, createMiniMaxVideoClient, createSafeDownload, metaImageBaseUrl } from ${JSON.stringify(pathToFileURL(`${src}/generation/index.js`).href)};
     import { chatTestRoutes, chatTestTools } from ${JSON.stringify(tools)};
     // Live uses the production factory; scripted routes the same model id to the loopback provider.
-    const model = ${scripted ? `new ModelRouterLanguageModel({ id: 'meta/muse-spark-1.3', apiKey: ${JSON.stringify(scripted.apiKey)}, url: ${JSON.stringify(scripted.url)} })` : `createAssistantModel({ model: ${JSON.stringify(live)}, apiKey: process.env.META_API_KEY })`};
+    const model = ${scripted ? `new ModelRouterLanguageModel({ id: 'meta/muse-spark-1.3', apiKey: ${JSON.stringify(scripted.apiKey)}, url: ${JSON.stringify(scripted.url)} })` : `createAssistantModel({ model: ${JSON.stringify(provider)}, apiKey: process.env.META_API_KEY })`};
     const images = ${imageClient};
     const videos = ${videoClient};
     const serverOptions = ${JSON.stringify(start)};
