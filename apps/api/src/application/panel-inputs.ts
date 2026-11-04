@@ -68,7 +68,7 @@ export function panelInputs(workspace: OwnedWorkspace, request: PanelRequest): P
     for (const view of subjectSheets.get(reference.subjectId)?.views ?? []) {
       if (view.versionId === continuity?.versionId || (picked.length && !chosen.has(view.versionId))) continue;
       claimed.add(view.versionId);
-      inputs.push({ versionId: view.versionId, label: '', job: reference.role === 'environment' ? `${reference.purpose} ${placeJob}` : reference.purpose });
+      inputs.push({ versionId: view.versionId, label: '', job: reference.role === 'environment' ? `${clause(reference.purpose)}. ${placeJob}` : reference.purpose });
     }
   }
   for (const id of picked) if (!claimed.has(id)) inputs.push({ versionId: id, label: '', job: otherImageJob });
@@ -79,9 +79,10 @@ export function panelInputs(workspace: OwnedWorkspace, request: PanelRequest): P
   // Each label is the workspace's own name for the image, the one the agent picked it by.
   const name = imageVersionNames(workspace);
   const resolved = unique.map(input => input.label ? input : { ...input, label: name(input.versionId) ?? input.versionId });
-  // The preface labels each input, then gives the Shot's camera (its note, else its framing), where the Shot starts and
-  // ends (`positionLines`) and which moment this panel shows.
-  const camera = shot.cameraNote?.trim() || shot.framing?.trim();
+  // The preface labels each input, then gives the Shot's camera (its note, else its framing) to the first panel only, which
+  // sets the Shot's framing (a later panel's own camera is in its prompt), where the Shot starts and ends (`positionLines`)
+  // and which moment this panel shows.
+  const camera = index === 0 ? shot.cameraNote?.trim() || shot.framing?.trim() : undefined;
   const moment = shot.positions ? [index === 0 ? panelMoments.start : panelMoments.end] : [];
   const preface = [...resolved.map((input, position) => `Input ${position + 1}: ${input.label} — ${input.job}`), ...(camera ? [`Camera: ${clause(camera)}.`] : []), ...positionLines(workspace.storyboard.shots, shot), ...moment].join('\n');
   return { kind: 'resolved', inputs: resolved, preface, ...(size ? { size } : {}) };

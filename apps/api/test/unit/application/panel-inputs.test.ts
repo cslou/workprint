@@ -49,11 +49,19 @@ test('picked views take their reference\'s role and purpose, a place\'s view say
   assert.equal(placed.preface, 'Input 1: The Gallery · Reverse angle — The white room. Match the place, not its camera angle or framing.\nCamera: Medium, from her left, slowly pushes in.\nPositions: starts Mara at the bench; ends Mara holds the key up.\nPrevious Shot ended: Mara at the bench, frame right.\nThis panel shows the Shot as it starts.');
 });
 
-test('the camera line is the Shot\'s camera note, else its framing, else absent', () => {
+test('a first panel\'s camera line is the Shot\'s camera note, else its framing, else absent; a later panel has none', () => {
   const camera = (fields: Partial<Shot>) => inputs(resolve(workspace({ shots: [{ shotId: 's1', order: 0, intent: 'Mara arrives.', references, panels: [panel('p1', 0)], chosenVideoVersionId: null, ...fields }] }), { images: ['m1'] })).preface.split('\n').slice(1);
   assert.deepEqual(camera({ framing: 'wide', cameraNote: 'Wide, from the door, static' }), ['Camera: Wide, from the door, static.']);
   assert.deepEqual(camera({ framing: ' wide ', cameraNote: '  ' }), ['Camera: wide.']);
   assert.deepEqual(camera({}), []);
+  const later = inputs(resolve(workspace({ shots: [{ shotId: 's1', order: 0, intent: 'Mara arrives.', cameraNote: 'Wide, then pushes in close', references, panels: [panel('p1', 0, [image('p1-v1', 1536, 864, 'assistant')]), panel('p2', 1)], chosenVideoVersionId: null }] }), { panel: 'p2', images: ['m1'] }));
+  assert.ok(!later.preface.includes('Camera:'), later.preface);
+});
+
+test('a place\'s purpose without a full stop still ends before the place job', () => {
+  const bare: Reference[] = [{ subjectId: 'the-gallery', role: 'environment', purpose: 'The white room' }];
+  const made = inputs(resolve(workspace({ shots: [{ shotId: 's1', order: 0, intent: 'Mara arrives.', references: bare, panels: [panel('p1', 0)], chosenVideoVersionId: null }] }), { images: ['g1'] }));
+  assert.equal(made.inputs[0]!.job, 'The white room. Match the place, not its camera angle or framing.');
 });
 
 test('empty images pass every referenced sheet whole; other picked images come after the sheet views', () => {
