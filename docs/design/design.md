@@ -364,7 +364,7 @@ Each component has the same anchor here and on the [Components page](brand-book/
 
 `.sidebar` on `--color-bg-sunken` with a right border.
 
-- **Contents, top to bottom:** the product name (working placeholder), **New video**, **Library**, a **Recents** label with one row per video, and the account at the bottom.
+- **Contents, top to bottom:** the "Workprint" wordmark in Italiana (a makeshift logo, Sprint 014), **New video**, **Library**, a **Recents** label with one row per video, and the account at the bottom.
 - **Nav items** (`.navitem`): 14px text with an 18px icon, `--radius-md`, 8px 10px padding. The current item gets a `--color-bg-hover` fill and `aria-current="page"`.
 - **Recents rows** use 13px text.
 
@@ -411,7 +411,7 @@ Each component has the same anchor here and on the [Components page](brand-book/
 
 - **Shape:** `--color-bg-surface`, `--color-border-input`, `--radius-2xl`, `--shadow-input`, 14px 12px 10px 16px padding, width `--size-layout-chat`, centred, 24px from the bottom.
 - **Field:** 15px text, at least 44px high. The placeholder uses `--color-text-subtle`; typed text uses `--color-text-primary`.
-- **Bottom bar:** "+ Attach" on the left (a 30px round button; it opens the [Library picker](#library-picker)) and **Send** on the right.
+- **Bottom bar:** "+" on the left (accessible name "Attach a file"; "+ Attach" only in the docked question composer; a 30px round button; it opens the [Library picker](#library-picker)) and **Send** on the right.
 
 | State | What shows | Rules |
 | --- | --- | --- |
@@ -593,7 +593,7 @@ The Script tab has three sections: **What happens**, **Shots** and **Look**.
 - **Camera pills live here.** A changed value marks its shot changed and shows **Regenerate** for that shot only.
 - **Edits are saved at once** and handed to the agent on its next turn (D-54).
 - **At ≤ `--breakpoint-sm`**, the grid is 2 columns.
-- **The agent's storyboard** (Sprint 011 QA follow-up): the board is the detailed view. Each Shot has its header, the Shot intent editor and its length line, then, each line only when the Shot has it, the action in 13px; the dialogue, one line each, with the speaker in 600 and the words in the display font; the camera note in 12px `--color-text-subtle`; and the subjects it names, joined by " · ", in 12px `--color-text-subtle`. Each panel tile shows its current image full width (selecting it opens the panel viewer), its number, the panel description editor and its version links.
+- **The agent's storyboard** (Sprint 011 QA follow-up): the board is the detailed view. Each Shot has its header, the Shot intent editor, its length line and its positions line (below), then, each line only when the Shot has it, the action in 13px; the dialogue, one line each, with the speaker in 600 and the words in the display font; the camera note in 12px `--color-text-subtle`; and the subjects it names, joined by " · ", in 12px `--color-text-subtle`. Each panel tile shows its current image full width (selecting it opens the panel viewer), its number, the panel description editor and its version links.
 - **A Shot's length** (Sprint 012): a 13px `--color-text-secondary` line, "Length · 6 s", or "Length · not set" for a Shot saved without one. On an editable storyboard a quiet **Edit** ("Edit Shot length") opens a number field labelled "Length in seconds" (4 to 15, whole seconds) in the planning editor's states, **Cancel, then Save**. A value outside that range, or not a whole number, shows "Enter a whole number of seconds from 4 to 15." and saves nothing; save failures reuse the planning editor's feedback lines. A built-in storyboard shows the line without Edit.
 - **A Shot's positions** (Sprint 014): under the length, a 13px `--color-text-secondary` line, "Starts: … / Ends: …", or "Positions · not set" for a Shot saved without them; the Storyboard tab's summary row doesn't show them. On an editable storyboard a quiet **Edit** ("Edit Shot positions") opens two text fields, "Starts" and "Ends" (up to 300 characters each), in the planning editor's states, **Cancel, then Save**. Both are needed: an empty one shows "Write where the Shot starts and where it ends." and saves nothing; unchanged positions just close. A built-in storyboard shows the line without Edit.
 
