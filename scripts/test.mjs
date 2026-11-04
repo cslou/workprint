@@ -1,16 +1,15 @@
-import { globSync, readFileSync, rmSync } from 'node:fs';
+import { globSync, rmSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
-import { URL } from 'node:url';
 
 // Groups: `unit` (each package's test/unit) and `tooling` (apps/api/test/tooling) need no Docker; `integration` (the rest of apps/api/test) runs against one shared stack of Postgres, Auth and storage containers.
 const group = process.argv[2];
 if (group && !['unit', 'tooling', 'integration', 'compile'].includes(group)) throw new Error('Unknown test group');
-const { resources: { jobs } } = JSON.parse(readFileSync(new URL('../.checks/config.json', import.meta.url), 'utf8'));
-const concurrency = Number(process.env.CHECKS_JOBS ?? jobs);
-if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > jobs) throw new Error('CHECKS_JOBS must be within the repository job limit');
+const jobs = 2;
+const concurrency = Number(process.env.WORKPRINT_TEST_JOBS ?? jobs);
+if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > jobs) throw new Error('WORKPRINT_TEST_JOBS must be within the repository job limit');
 
 // Never discover stale emitted cases from a different branch or removed source files.
-// The regression gate compiles once in its setup step and sets WORKPRINT_TESTS_COMPILED=1 for later groups.
+// Verification compiles once through pnpm check and reuses that output for later groups.
 if (process.env.WORKPRINT_TESTS_COMPILED !== '1') {
   for (const directory of ['apps/api/.test-build', 'apps/web/.test-build', 'packages/api-client/.test-build']) rmSync(directory, { recursive: true, force: true });
   for (const project of ['packages/contracts/tsconfig.json', 'packages/api-client/tsconfig.json', 'packages/player/tsconfig.json', 'apps/api/tsconfig.json', 'packages/api-client/tsconfig.test.json', 'apps/web/tsconfig.test.json']) {

@@ -66,7 +66,7 @@ pnpm setup:hooks
 pnpm db:local
 ```
 
-Hook activation preserves existing custom hooks or refuses conflicts; see [regression gates](docs/regression-gates.md) for suite commands, worktree limits and working-tree verification limitations.
+Hook activation refuses custom-hook conflicts; see [Hook activation](#hook-activation) for worktree and working-tree verification limitations.
 
 Keep that terminal open. No prior `pnpm build` is needed: `db:local` reuses the test fixture's dependency-ordered compilation of contracts, api-client and API helpers before starting storage. The development-only helper creates a uniquely labelled, ephemeral Docker Postgres on a loopback-only ephemeral port, creates separate setup/serving roles, runs the supported native initialization through `pnpm db:prepare`, and grants serving DML access. It writes only the database settings to ignored, mode-0600 `outputs/local-database.env`; it refuses to overwrite an existing file. It does not use your Supabase stacks.
 
@@ -154,24 +154,37 @@ Account browser tests use only disposable accounts on the shared test stack's Au
 
 ## Verification
 
-Use [Regression gates](docs/regression-gates.md) for the quick, standard and E2E commands, hook activation and merge requirements. The underlying commands below are available for targeted checks; budgets and resource limits live in `.checks/config.json`.
+Run from the repository root. [Package scripts](package.json) expose the suites; [`scripts/verify.mjs`](scripts/verify.mjs) composes the existing checks without approval records or GitHub metadata requirements.
 
-```sh
-pnpm check
-pnpm build
-pnpm test:unit
-pnpm test:tooling
-pnpm test:integration
-pnpm exec playwright install chromium
-pnpm test:browser
-pnpm audit
-```
+| Suite | Command | Coverage | Trigger |
+| --- | --- | --- | --- |
+| Quick | `pnpm verify:quick` | Types, lint, dependency boundaries and unit tests | Pre-commit |
+| Standard | `pnpm verify:standard` | Quick plus production build and tooling tests | Pre-push |
+| E2E / extended | `pnpm verify:e2e` | Standard plus integration, browser journeys and dependency audit | Explicitly when required by the issue or release |
 
-The suite is deliberately small for the MVP (trimmed 2026-11-01). `check` runs strict TypeScript (including the browser journeys), ESLint and dependency-cruiser. Tests live in each package's `test/` folder, never under `src/` (the runner refuses test files there). Unit tests are in `apps/api/test/unit`, `apps/web/test/unit` and `packages/api-client/test/unit`, mirroring `src` paths; `test:unit` runs them without Docker, as does `test:tooling` for the build and dev-task tests in `apps/api/test/tooling`. `test:integration` runs the Docker-backed tests in `apps/api/test/{integration,http}`, whose fixtures live in `apps/api/test/support`; `test` runs all three groups. `test:browser` runs eight end-to-end journeys in the root `test/e2e` (they span the web app, API and stack) against one API and built app: sign-in and sign-out, password recovery, Recents, manual saves, image upload, Library attach, Shot choice and Library video playback. Both Docker-backed commands share one [test stack](#shared-test-stack-test-only) per run; no private fixture files or hosted project are needed.
+Quick and standard need no Docker or private configuration. Extended verification requires local Docker, the pinned native Linux x64 or ARM64 [media prerequisites](#amp-orbs), and Playwright Chromium (`pnpm exec playwright install chromium`); orb setup prepares these. Do not run another suite or standalone test command concurrently in the same checkout: they share generated test output and fixture state.
+
+For targeted checks, use `pnpm check`, `pnpm build`, `pnpm test:unit`, `pnpm test:tooling`, `pnpm test:integration` or `pnpm test:browser`. Tests live under package `test/` directories, never `src/`: unit tests mirror source paths in `apps/api`, `apps/web` and `packages/api-client`; tooling tests live in `apps/api/test/tooling`; integration tests live in `apps/api/test/{integration,http}`. `pnpm test` runs these three groups, not browser journeys. Playwright journeys live in `test/e2e`. Docker-backed commands use the [shared test stack](#shared-test-stack-test-only), with disposable accounts and scripted providers; no private fixture files, hosted project or live model keys are needed.
+
+Each suite compiles tests once and reuses the output; extended verification shares one stack across integration and browser checks. Only unit files run concurrently, with at most two workers (`WORKPRINT_TEST_JOBS=1` selects serial execution); integration and tooling files run serially. Standalone commands manage their own compilation and stack lifecycle.
 
 `WORKPRINT_PREVIEW_PORT` selects the end-to-end app's loopback port (default 4180); use distinct ports and `WORKPRINT_BROWSER_OUTPUT` directories for simultaneous checkouts.
 
 Pixel-comparison screenshot suites were a one-off design-approval aid and have been removed. Approved designs remain as tracked references in `docs/design/`; layout regressions are caught by behavioural browser tests and human QA.
+
+### Hook activation
+
+Run `pnpm setup:hooks` once per standalone clone after installing dependencies; `.agents/setup` runs it automatically in orbs. It sets clone-local `core.hooksPath=.githooks`. Repeating it is safe; global Git settings are unchanged.
+
+Existing custom hooks (including legacy forwarding wrappers), linked worktrees and worktree-scoped hook paths require explicit integration; activation refuses to replace them silently and generates no forwarding wrappers. The tracked verification hooks block on failed checks; they do not fix, stage or stash files, or launch reviewers. Successful pre-push prints the review reminder.
+
+Hooks check files on disk, not an isolated staged snapshot or arbitrary outgoing commits. Push the checked-out committed candidate with no relevant uncommitted changes.
+
+### Failures and notices
+
+A failed check stops the suite with a nonzero exit. Output goes to the terminal; no approval file, merge wrapper or persistent run lock is involved. Fixture owners handle cleanup on success, failure and interruption. If cleanup fails, inspect the reported owned resources and private stack records under `outputs/fixtures/stack/`; never prune unrelated resources. Fix the cause before rerunning.
+
+Dependency audit blocks on high or critical advisories. Lower-severity advisories remain visible and must be reported as a non-clean audit even when verification exits successfully.
 
 ## Documentation
 

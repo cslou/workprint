@@ -3,4 +3,4 @@ set -eu
 
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
-exec .checks/regression.sh --tier=quick
+exec pnpm verify:quick

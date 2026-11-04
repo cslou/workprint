@@ -1,8 +1,0 @@
-{
-  "approval": "docs/regression-gates.md#approval",
-  "deep_merge_bases": ["main", "develop"],
-  "budgets_seconds": {"quick": 180, "standard": 300, "deep": 1200},
-  "cleanup_seconds": 40,
-  "teardown_seconds": 10,
-  "resources": {"jobs": 2, "open_files": 4096}
-}
