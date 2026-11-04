@@ -20,10 +20,11 @@ test('sign in keeps the email after a wrong password, and sign-out closes the wo
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page).toHaveURL('/app');
   await expect(page.getByRole('button', { name: 'New video', exact: true })).toBeVisible();
-  // The wordmark is the word alone, in Italiana served with the app.
+  // The wordmark is the word alone, in Italiana served with the app, thickened by a thin outline (the face has one weight).
   const brand = page.locator('.wp-brand');
   await expect(brand).toHaveText('Workprint');
   await expect(brand).toHaveCSS('font-family', /^"?Italiana"?,/);
+  await expect(brand).toHaveCSS('-webkit-text-stroke-width', '0.5px');
   await expect.poll(() => page.evaluate(() => [...document.fonts].some(face => face.family.replace(/"/g, '') === 'Italiana' && face.status === 'loaded'))).toBe(true);
   // The opening composer: a bare "+" to attach, and no upload limits line.
   await expect(page.getByRole('button', { name: 'Attach a file', exact: true })).toHaveText('+');

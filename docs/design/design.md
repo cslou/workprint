@@ -108,7 +108,7 @@ What exists today, from the approved flows: the agent drafts and the person deci
 
 ## Logo
 
-**Section 04** · **Status:** Makeshift wordmark (Lou, 2026-11-04). The app's top left and the entry pages show only the word "Workprint" in Italiana (`--font-family-brand`, regular, 28px); the "a" mark is gone. A designed logo is still deferred.
+**Section 04** · **Status:** Makeshift wordmark (Lou, 2026-11-04). The app's top left and the entry pages show only the word "Workprint" in Italiana (`--font-family-brand`, regular, 28px), thickened by a 0.5px outline in the text colour (`--font-brand-stroke`, Lou, 2026-11-04), since the face has one weight; the "a" mark is gone. A designed logo is still deferred.
 
 ## Color
 
@@ -196,6 +196,7 @@ Product code uses semantic tokens. Primitives exist only so semantic tokens can 
 | `--font-family-sans` | `system-ui, -apple-system, "Segoe UI", Roboto, sans-serif` |  | `--font-sans` | All interface text. |
 | `--font-family-display` | `Georgia, "Times New Roman", serif` |  | `--font-display` | Display headings, dialogue, sheet titles. |
 | `--font-family-brand` | `"Italiana", Georgia, serif` |  |  | The Workprint wordmark only. Italiana (SIL OFL 1.1) is served with the app, not loaded from Google Fonts. |
+| `--font-brand-stroke` | `0.5px` |  |  | The wordmark's outline, `-webkit-text-stroke` in `currentColor`: Italiana has one weight, so the outline makes it bolder. |
 | `--font-weight-regular` | `400` |  | `--weight-regular` |  |
 | `--font-weight-medium` | `500` |  | `--weight-medium` |  |
 | `--font-weight-semibold` | `600` |  | `--weight-semibold` | All bold text. |
@@ -364,7 +365,7 @@ Each component has the same anchor here and on the [Components page](brand-book/
 
 `.sidebar` on `--color-bg-sunken` with a right border.
 
-- **Contents, top to bottom:** the "Workprint" wordmark in Italiana (a makeshift logo, Sprint 014), **New video**, **Library**, a **Recents** label with one row per video, and the account at the bottom.
+- **Contents, top to bottom:** the "Workprint" wordmark in Italiana with its 0.5px outline (a makeshift logo, Sprint 014), **New video**, **Library**, a **Recents** label with one row per video, and the account at the bottom.
 - **Nav items** (`.navitem`): 14px text with an 18px icon, `--radius-md`, 8px 10px padding. The current item gets a `--color-bg-hover` fill and `aria-current="page"`.
 - **Recents rows** use 13px text.
 

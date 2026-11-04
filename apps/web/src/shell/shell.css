@@ -2,7 +2,7 @@ html, body, #root { min-height: 100%; }
 .wp-shell h1, .wp-shell p, .wp-session-content p, .wp-session-message { margin: 0; }
 .wp-shell { display: grid; grid-template-columns: var(--size-layout-sidebar) minmax(0, 1fr) var(--size-layout-panel); height: 100vh; min-height: var(--size-layout-viewer); }
 .wp-sidebar { background: var(--color-bg-sunken); border-right: var(--border-width-default) solid var(--color-border-default); display: flex; flex-direction: column; padding: var(--space-14) var(--space-12); gap: var(--space-18); min-height: 0; }
-.wp-brand { display: flex; align-items: center; padding: var(--space-4) var(--space-6); font: var(--font-weight-regular) var(--font-size-28)/var(--font-line-height-1-2) var(--font-family-brand); }
+.wp-brand { display: flex; align-items: center; padding: var(--space-4) var(--space-6); font: var(--font-weight-regular) var(--font-size-28)/var(--font-line-height-1-2) var(--font-family-brand); -webkit-text-stroke: var(--font-brand-stroke) currentColor; }
 .wp-nav-list { display: grid; gap: var(--space-2); }
 .wp-nav-item, .wp-nav-label, .wp-account { font: inherit; text-align: left; cursor: pointer; background: transparent; border: 0; color: inherit; }
 .wp-nav-item { display: flex; align-items: center; gap: var(--space-10); padding: var(--space-8) var(--space-10); border-radius: var(--radius-md); font-size: var(--font-size-14); }
